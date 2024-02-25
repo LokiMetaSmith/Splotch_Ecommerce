@@ -1,0 +1,25 @@
+{
+  "name": "lokimetasmith.github.io",
+  "version": "1.0.0",
+  "description": "--- title: Splotch layout: page ---",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "styles": "npx tailwindcss build styles.css -o output.css",
+    "build": "vite build --base=./"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LokiMetaSmith/lokimetasmith.github.io.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/LokiMetaSmith/lokimetasmith.github.io/issues"
+  },
+  "homepage": "https://github.com/LokiMetaSmith/lokimetasmith.github.io#readme",
+  "dependencies": {
+    "tailwindcss": "^3.4.1",
+    "vite": "^5.1.4"
+  }
+}
