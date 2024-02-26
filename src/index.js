@@ -1,5 +1,5 @@
-const appId = "{APPLICATION_ID}";
-const locationId = "{LOCATION_ID}";
+const appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
+const locationId = "LAXYBVS9QJVSC";
 
 let payments, card;
 
