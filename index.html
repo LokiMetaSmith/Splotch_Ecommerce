@@ -8,114 +8,135 @@
   <link rel="stylesheet" href="./output.css" />
   <script type="module" src="./src/index.js"></script>
 </head>
-<body>
-    <main class="container">
-        <div id="payment-status-container" class="bg-blue"></div>
-        <form id="payment-form">
-            <div class="field">
-                <label class="label" for="givenName">First Name</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="firstName"
-                        name="firstName"
-                        type="text"
-                        placeholder="John"
-                    />
+<body class="bg-gray-100">
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8">
+        <h1 class="text-3xl font-bold text-center text-gray-700 mb-8">Image Editor & Secure Pay</h1>
+
+        <div class="bg-gray-50 p-4 rounded-lg shadow-inner mb-6">
+            <canvas id="imageCanvas" width="500" height="400" class="block mx-auto border-2 border-dashed border-gray-300 rounded-md bg-white"></canvas>
+            <!-- Placeholder text can be added via JS if needed when no image is loaded -->
+        </div>
+
+        <div id="editing-controls" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50">
+            <button id="rotateLeftBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-3 rounded-md shadow transition duration-150 ease-in-out transform hover:scale-105">Rotate Left</button>
+            <button id="rotateRightBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-3 rounded-md shadow transition duration-150 ease-in-out transform hover:scale-105">Rotate Right</button>
+            <input type="text" id="resizeInput" placeholder="e.g., 50%" class="col-span-2 sm:col-span-1 border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+            <button id="resizeBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-3 rounded-md shadow transition duration-150 ease-in-out transform hover:scale-105">Apply Resize</button>
+            <button id="startCropBtn" class="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-3 rounded-md shadow transition duration-150 ease-in-out transform hover:scale-105">Crop (Center 50%)</button>
+            <button id="grayscaleBtn" class="bg-slate-500 hover:bg-slate-600 text-white font-semibold py-2 px-3 rounded-md shadow transition duration-150 ease-in-out transform hover:scale-105">Grayscale</button>
+            <button id="sepiaBtn" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-3 rounded-md shadow transition duration-150 ease-in-out transform hover:scale-105">Sepia</button>
+        </div>
+        
+        <div id="payment-status-container" class="mb-4 p-3 rounded-md text-sm text-white" style="visibility: hidden;"></div>
+        
+        <form id="payment-form" class="space-y-6 bg-gray-50 p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">Payment Information</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="firstName">First Name</label>
+                    <div class="control">
+                        <input
+                            class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            id="firstName"
+                            name="firstName"
+                            type="text"
+                            placeholder="John"
+                        />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="lastName">Last Name</label>
+                    <div class="control">
+                        <input
+                            class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            id="lastName"
+                            name="lastName"
+                            type="text"
+                            placeholder="Doe"
+                        />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="email">Email</label>
+                    <div class="control">
+                        <input
+                            class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            id="email"
+                            name="email"
+                            type="email"
+                            placeholder="you@example.com"
+                        />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="phone">Phone</label>
+                    <div class="control">
+                        <input
+                            class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            id="phone"
+                            name="phone"
+                            type="tel"
+                            placeholder="(123) 456-7890"
+                        />
+                    </div>
+                </div>
+                <div class="field md:col-span-2">
+                    <label class="label text-sm font-medium text-gray-700" for="address">Address</label>
+                    <div class="control">
+                        <input
+                            class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            id="address"
+                            name="address"
+                            type="text"
+                            placeholder="123 Main Street"
+                        />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="city">City</label>
+                    <div class="control">
+                        <input
+                            class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            id="city"
+                            name="city"
+                            type="text"
+                            placeholder="Oklahoma City"
+                        />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="state">State</label>
+                    <div class="control">
+                        <input
+                            class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            id="state"
+                            name="state"
+                            type="text"
+                            placeholder="OK"
+                        />
+                    </div>
                 </div>
             </div>
             <div class="field">
-                <label class="label" for="lastName">Last Name</label>
+                <label class="label text-sm font-medium text-gray-700" for="file">Upload Original Image (Optional)</label>
                 <div class="control">
                     <input
-                        class="input"
-                        id="lastName"
-                        name="lastName"
-                        type="text"
-                        placeholder="Doe"
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="email">Email</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder=""
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="phone">Phone</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="phone"
-                        name="phone"
-                        type="tel"
-                        placeholder=""
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="addressLines">Address</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="address"
-                        name="address"
-                        type="text"
-                        placeholder="123 Main Street"
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="city">City</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="city"
-                        name="city"
-                        type="text"
-                        placeholder="Oklahoma City"
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="state">State</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="state"
-                        name="state"
-                        type="text"
-                        placeholder="Oklahoma"
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="state">File</label>
-                <div class="control">
-                    <input
-                        class="input"
+                        class="input mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                         id="file"
                         name="file"
                         type="file"
                     />
                 </div>
             </div>
-            <div id="card-container"></div>
+            <div id="card-container" class="p-3 border rounded-md bg-white shadow-sm"></div>
             <div class="field">
                 <div class="control">
-                    <button class="button is-primary" type="submit">
-                        Pay
+                    <button class="button is-primary w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50" type="submit">
+                        Pay & Process
                     </button>
                 </div>
             </div>
-
         </form>
+        <div id="ipfsLinkContainer" class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow"></div>
     </main>
 </body>
