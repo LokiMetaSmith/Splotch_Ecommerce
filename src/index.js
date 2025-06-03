@@ -105,6 +105,7 @@ form.addEventListener('submit', async function(event) { // Made async
     ipfsLinkContainer.className = baseIpfsClasses; // Reset to base
   }
   paymentStatusContainer.className = `${baseStatusClasses} bg-blue-500`;
+
   paymentStatusContainer.textContent = 'Processing payment...';
   paymentStatusContainer.style.visibility = 'visible';
 
@@ -127,6 +128,7 @@ form.addEventListener('submit', async function(event) { // Made async
     // Added postalCode to the check.
     if (!billingContact.givenName || !billingContact.familyName || !billingContact.email || !billingContact.addressLines[0] || !billingContact.city || !billingContact.state || !billingContact.postalCode) {
         throw new Error("Please fill in all required billing details: First Name, Last Name, Email, Address, City, State, and Postal Code.");
+
     }
 
     paymentStatusContainer.className = `${baseStatusClasses} bg-blue-500`;
@@ -136,6 +138,7 @@ form.addEventListener('submit', async function(event) { // Made async
     paymentStatusContainer.className = `${baseStatusClasses} bg-blue-500`;
     paymentStatusContainer.textContent = 'Card tokenized. Verifying buyer...';
     console.log("Billing Contact being sent to verifyBuyer:", JSON.stringify(billingContact, null, 2)); // Added console.log
+
     const verificationToken = await verifyBuyer(payments, token, billingContact); // Assuming 'payments' is globally available
 
     paymentStatusContainer.className = `${baseStatusClasses} bg-blue-500`;
@@ -305,7 +308,9 @@ fileInput.addEventListener('change', (event) => {
         reader.onload = () => {
             const img = new Image();
             img.onload = () => {
+
                 originalImage = img;
+
                 updateEditingButtonsState(false);
                 if (paymentStatusContainer.textContent.includes('Please select an image file') || paymentStatusContainer.textContent.includes('No file selected') || paymentStatusContainer.textContent.includes('Invalid file type')) {
                     paymentStatusContainer.textContent = 'Image loaded successfully.';
@@ -343,8 +348,10 @@ fileInput.addEventListener('change', (event) => {
         reader.readAsDataURL(file);
     } else {
         showPaymentStatus('Invalid file type. Please select an image file (e.g., PNG, JPG).', 'error');
+
         originalImage = null;
         updateEditingButtonsState(true);
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         fileInput.value = ''; // Clear the file input
     }
@@ -380,14 +387,18 @@ function rotateCanvasContent(angleDegrees) { // This function seems to be unused
     tempImage.onload = () => { // ... (rest of this function might need review if it were to be used)
         const oldCanvasWidth = canvas.width;
         const oldCanvasHeight = canvas.height;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
         ctx.save();
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.rotate(angleDegrees * Math.PI / 180);
         ctx.drawImage(tempImage, -tempImage.width / 2, -tempImage.height / 2);
         ctx.restore();
     };
+
     tempImage.src = canvas.toDataURL();
+
 }
 
 // More robust rotation that rotates the content within the *existing* canvas bounds
@@ -439,7 +450,9 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
             canvas.height = w;
             ctx.clearRect(0,0,canvas.width, canvas.height);
             ctx.drawImage(tempCanvas, 0,0);
+
         } else {
+
             tempCanvas.width = w;
             tempCanvas.height = h;
             tempCtx.translate(w / 2, h / 2);
@@ -527,7 +540,9 @@ document.getElementById('resizeBtn').addEventListener('click', () => {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
     resizeInput.value = '';
+
     showPaymentStatus(`Image resized to ${percentage}%.`, 'success');
     // setTimeout(() => { if (document.getElementById('payment-status-container').textContent.includes('resized')) showPaymentStatus('', 'info'); }, 3000);
 
