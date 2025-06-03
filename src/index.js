@@ -1,5 +1,5 @@
 const appId = "sandbox-sq0idb-nbW_Oje9Dm0L5YvQ7WP2ow"; // Updated appId
-const locationId = "LAXYBVS9QJVSC"; // Unchanged
+const locationId = "LTS82DEX24XR0"; // Unchanged
 
 let payments, card;
 
