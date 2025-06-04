@@ -6,7 +6,7 @@ const locationId = "LTS82DEX24XR0";
 // --- PeerJS Configuration ---
 // IMPORTANT: Replace 'YOUR_PRINT_SHOP_PEER_ID_PLACEHOLDER' with the actual, stable Peer ID
 // that your local print shop application will use to register with the PeerJS server.
-const PRINT_SHOP_PEER_ID = 'YOUR_PRINT_SHOP_PEER_ID_PLACEHOLDER';
+const PRINT_SHOP_PEER_ID = 'printshop_splotch_1';
 let peer; // PeerJS instance for this client
 let connToShop; // PeerJS DataConnection to the print shop
 let peerJsStatusContainer;
