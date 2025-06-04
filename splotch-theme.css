@@ -1,0 +1,301 @@
+/* splotch-theme.css */
+
+/* Splotch Creative Color and Font Variables */
+:root {
+    --splotch-red: #FF003A;
+    --splotch-yellow: #FFD151;
+    --splotch-teal: #00A99D;
+    --splotch-navy: #2A284D;
+    --splotch-white: #FFFFFF;
+    --splotch-black: #000000;
+
+    --font-modak: 'Modak', cursive;
+    --font-baumans: 'Baumans', sans-serif;
+    --font-monofett: 'Monofett', cursive;
+}
+
+/* --- General Body and Page Styling --- */
+body {
+    background-color: var(--splotch-white) !important; /* Base page background */
+    font-family: var(--font-baumans) !important;
+    color: var(--splotch-navy) !important; /* Default text color */
+}
+
+main.container {
+    background-color: var(--splotch-yellow) !important; /* Main content area yellow */
+    color: var(--splotch-navy) !important;
+    border: 4px solid var(--splotch-navy) !important;
+    box-shadow: 0 8px 16px rgba(42, 40, 77, 0.3) !important; /* Navy shadow */
+    border-radius: 25px !important; /* Playful rounded corners */
+    margin-top: 3rem !important; /* More space from top */
+    margin-bottom: 3rem !important; /* More space at bottom */
+    /* OPTIONAL: For a splatter effect, you would use an SVG background */
+    /* background-image: url('path/to/yellow-splatter-background.svg'); */
+    /* background-size: cover; */
+    /* background-repeat: no-repeat; */
+}
+
+/* Headings */
+main.container h1.text-3xl { /* Main Page Title: "Image Editor & Secure Pay" */
+    font-family: var(--font-modak) !important;
+    color: var(--splotch-navy) !important;
+    font-size: clamp(2.5rem, 7vw, 3.75rem) !important; /* Responsive size */
+    line-height: 1.15 !important;
+    margin-bottom: 2.5rem !important;
+    padding-bottom: 1rem;
+    /* Fun touch: text-shadow: 3px 3px var(--splotch-red); */
+}
+
+form h2.text-xl { /* Form Subtitle: "Payment Information" */
+    font-family: var(--font-modak) !important;
+    color: var(--splotch-navy) !important;
+    font-size: clamp(1.8rem, 5vw, 2.5rem) !important;
+    border-bottom: 3px solid var(--splotch-teal) !important;
+    padding-bottom: 0.75rem !important;
+    margin-bottom: 2rem !important;
+}
+
+/* --- Canvas Area --- */
+/* The div containing the canvas */
+main.container > div:first-of-type { /* Targets the first div child of main, usually the canvas wrapper */
+    background-color: var(--splotch-white) !important;
+    border: 3px solid var(--splotch-teal) !important;
+    border-radius: 20px !important;
+    padding: 1.5rem !important;
+    box-shadow: inset 0 0 10px rgba(0, 169, 157, 0.2) !important;
+}
+
+#imageCanvas {
+    border: 3px dashed var(--splotch-red) !important; /* Red dashed border for canvas */
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    border-radius: 15px !important;
+}
+
+/* --- Editing Controls --- */
+#editing-controls {
+    background-color: rgba(0, 169, 157, 0.1) !important; /* Very light teal bg */
+    border: 3px solid var(--splotch-teal) !important;
+    padding: 1.5rem !important;
+    border-radius: 20px !important;
+    gap: 0.85rem !important;
+}
+
+#editing-controls button,
+#editing-controls input[type="text"] {
+    font-family: var(--font-baumans) !important;
+    border-radius: 25px !important; /* Splotch button rounding */
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    font-size: 0.8rem !important; /* Slightly smaller for more controls */
+    padding: 0.7rem 0.9rem !important;
+    transition: all 0.2s ease-in-out !important;
+    border: none !important; /* Remove default borders for buttons */
+    box-shadow: 0 3px 5px rgba(0,0,0,0.15) !important;
+}
+
+#editing-controls button:hover {
+    filter: brightness(1.15);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 5px 8px rgba(0,0,0,0.2) !important;
+}
+
+/* Specific button colors (Splotch palette) */
+#rotateLeftBtn, #rotateRightBtn { /* Original: purple */
+    background-color: var(--splotch-red) !important;
+    color: var(--splotch-white) !important;
+}
+#resizeBtn { /* Original: indigo */
+    background-color: var(--splotch-navy) !important;
+    color: var(--splotch-white) !important;
+}
+#startCropBtn { /* Original: teal */
+    background-color: var(--splotch-teal) !important;
+    color: var(--splotch-yellow) !important;
+}
+#grayscaleBtn { /* Original: slate */
+    background-color: var(--splotch-black) !important;
+    color: var(--splotch-white) !important;
+}
+#sepiaBtn { /* Original: amber */
+    background: linear-gradient(145deg, var(--splotch-red), #E05A00) !important; /* Gradient to get an amber-like red */
+    color: var(--splotch-white) !important;
+}
+
+#editing-controls input#resizeInput {
+    background-color: var(--splotch-white) !important;
+    border: 2px solid var(--splotch-navy) !important;
+    color: var(--splotch-navy) !important;
+    text-transform: none !important; /* Inputs don't usually need uppercase */
+    font-weight: normal !important;
+    box-shadow: none !important;
+}
+#editing-controls input#resizeInput::placeholder {
+    color: var(--splotch-navy) !important;
+    opacity: 0.6;
+}
+#editing-controls input#resizeInput:focus {
+    border-color: var(--splotch-red) !important;
+    box-shadow: 0 0 0 3px rgba(255, 0, 58, 0.25) !important;
+}
+
+
+/* --- Payment Form --- */
+#payment-form {
+    background-color: rgba(255, 255, 255, 0.7) !important; /* Semi-transparent white on the yellow main bg */
+    border: 3px solid var(--splotch-red) !important; /* Red border for form */
+    padding: 2rem 2.5rem !important;
+    border-radius: 20px !important;
+    box-shadow: 0 5px 15px rgba(42, 40, 77, 0.15) !important;
+}
+
+#payment-form .label { /* Targets all labels within the form */
+    font-family: var(--font-baumans) !important;
+    color: var(--splotch-navy) !important;
+    font-size: 1.05rem !important;
+    font-weight: bold !important;
+    margin-bottom: 0.4rem !important;
+    display: block;
+}
+
+#payment-form .input { /* Targets all inputs with class 'input' */
+    font-family: var(--font-baumans) !important;
+    background-color: var(--splotch-white) !important;
+    border: 2px solid var(--splotch-navy) !important;
+    color: var(--splotch-navy) !important;
+    border-radius: 12px !important;
+    padding: 0.8rem !important;
+    font-size: 1rem !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+#payment-form .input::placeholder {
+    color: var(--splotch-navy) !important;
+    opacity: 0.5;
+}
+#payment-form .input:focus {
+    border-color: var(--splotch-red) !important;
+    box-shadow: 0 0 0 3.5px rgba(255, 0, 58, 0.3) !important;
+    outline: none !important;
+}
+
+/* File Input specific styling */
+#payment-form input[type="file"].input {
+    padding: 0.35rem !important;
+    border-style: dashed !important;
+    border-width: 2px !important;
+    line-height: 1.8; /* Adjust line height for better vertical alignment */
+}
+#payment-form input[type="file"].input::-webkit-file-upload-button,
+#payment-form input[type="file"].input::file-selector-button {
+    font-family: var(--font-baumans) !important;
+    background-color: var(--splotch-teal) !important;
+    color: var(--splotch-yellow) !important;
+    border: none !important;
+    padding: 0.7rem 1.2rem !important;
+    border-radius: 20px !important;
+    margin-right: 1rem !important;
+    text-transform: uppercase;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+#payment-form input[type="file"].input::-webkit-file-upload-button:hover,
+#payment-form input[type="file"].input::file-selector-button:hover {
+    background-color: var(--splotch-navy) !important;
+    color: var(--splotch-yellow) !important;
+}
+
+/* Card container from Square */
+#card-container {
+    border: 2px solid var(--splotch-teal) !important;
+    padding: 1.25rem !important;
+    border-radius: 12px !important;
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    min-height: 50px; /* Ensure it has some height */
+}
+
+/* Submit Button ("Pay & Process") */
+#payment-form button[type="submit"] {
+    font-family: var(--font-baumans) !important;
+    background: linear-gradient(145deg, var(--splotch-red), var(--splotch-black)) !important;
+    color: var(--splotch-white) !important;
+    font-size: 1.35rem !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    border-radius: 30px !important;
+    padding: 0.9rem 1rem !important;
+    border: none !important;
+    width: 100% !important;
+    transition: all 0.25s ease-in-out !important;
+    box-shadow: 0 5px 10px rgba(42, 40, 77, 0.25) !important;
+}
+#payment-form button[type="submit"]:hover {
+    background: linear-gradient(145deg, var(--splotch-black), var(--splotch-red)) !important;
+    color: var(--splotch-yellow) !important;
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 7px 15px rgba(42, 40, 77, 0.35) !important;
+}
+
+/* --- Status Messages & Other Containers --- */
+#payment-status-container {
+    font-family: var(--font-baumans) !important;
+    font-size: 1.05rem !important;
+    text-align: center;
+    border-radius: 15px !important;
+    padding: 1.2rem !important;
+    font-weight: bold;
+    /* JavaScript will likely set background-color and color for success/error. */
+    /* Example default or if JS doesn't set color: */
+    /* background-color: var(--splotch-teal); */
+    /* color: var(--splotch-yellow); */
+}
+/* You might want to define classes for success/error messages */
+.payment-success {
+    background-color: var(--splotch-teal) !important;
+    color: var(--splotch-yellow) !important;
+    border: 2px solid var(--splotch-navy);
+}
+.payment-error {
+    background-color: var(--splotch-red) !important;
+    color: var(--splotch-white) !important;
+    border: 2px solid var(--splotch-black);
+}
+
+
+#ipfsLinkContainer {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+    border: 2px dashed var(--splotch-navy) !important;
+    padding: 1.5rem !important;
+    border-radius: 15px !important;
+    margin-top: 2.5rem !important;
+    font-family: var(--font-baumans) !important;
+    color: var(--splotch-navy) !important;
+    text-align: center;
+    font-size: 1rem;
+}
+#ipfsLinkContainer a {
+    color: var(--splotch-red) !important;
+    text-decoration: none !important;
+    font-weight: bold !important;
+    border-bottom: 2px dotted var(--splotch-red);
+    padding-bottom: 2px;
+}
+#ipfsLinkContainer a:hover {
+    color: var(--splotch-black) !important;
+    border-bottom-color: var(--splotch-black);
+}
+
+/* --- Utility to help Splotch styles win over Tailwind specifics if needed --- */
+/* You can add !important to individual properties above, or use more specific selectors. */
+/* This theme attempts to provide strong overrides. Test thoroughly. */
+
+/*
+  Note on Splatter Effects:
+  To truly achieve the "splatter" look from the original Splotch Creative design,
+  you would need to use SVG images for backgrounds or complex CSS clip-paths.
+  This stylesheet focuses on applying the color scheme, fonts, and general feel.
+  For example, 'main.container' or section divs could have:
+  background-image: url('your-splatter-asset.svg');
+  background-repeat: no-repeat;
+  background-position: top left;
+  background-size: contain or cover;
+*/
