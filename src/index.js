@@ -20,10 +20,11 @@ const designMarginNote = document.getElementById('designMarginNote');
 
 
 async function BootStrap() {
-    console.log(`Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`); // Added console.log from your version
+    console.log(`Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`);
     try {
         payments = window.Square.payments(appId, locationId);
       } catch (error) {
+        // Use showPaymentStatus for user-facing error
         showPaymentStatus(`Failed to initialize Square payments SDK: ${error.message}`, 'error');
         console.error("Failed to initialize Square payments SDK:", error); // Keep console error for details
         return;
@@ -62,6 +63,7 @@ async function BootStrap() {
       if (designMarginNote) designMarginNote.style.display = 'none';
 }
 
+// Ensures BootStrap runs after the DOM is fully loaded.
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', BootStrap);
 } else {
@@ -107,7 +109,8 @@ function calculateAndUpdatePrice() {
         currentOrderAmountCents = calculateStickerPrice(quantity, selectedMaterial);
         calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
     } else {
-        currentOrderAmountCents = calculateStickerPrice(50, selectedMaterial);
+        // Fallback if elements are not found after bootstrap
+        currentOrderAmountCents = calculateStickerPrice(50, selectedMaterial); // Default if dynamic elements are missing
         if (document.getElementById('calculatedPriceDisplay')) {
              document.getElementById('calculatedPriceDisplay').textContent = formatPrice(currentOrderAmountCents);
         }
@@ -120,6 +123,10 @@ function formatPrice(amountInCents) {
 }
 
 async function initializeCard(payments) {
+  if (!payments) {
+    console.error("Square payments object not initialized before calling initializeCard.");
+    throw new Error("Payments SDK not ready for card initialization.");
+  }
   const card = await payments.card();
   await card.attach("#card-container");
   return card;
@@ -151,34 +158,54 @@ async function createPayment(token, verificationToken, amount, currency, orderDe
     }
     throw new Error(errorBodyText);
   } catch (e) {
-    if (e instanceof Error && e.message.startsWith('PAYMENT_METHOD_ERROR')) throw e;
-    throw new Error(`Server error ${paymentResponse.status}: ${errorBodyText}`);
+    if (e instanceof Error && e.message.startsWith('PAYMENT_METHOD_ERROR')) throw e; // Keep Square's specific error
+    throw new Error(`Server error ${paymentResponse.status}: ${errorBodyText}`); // General server error
   }
 }
 
 async function tokenize(paymentMethod) {
-  const tokenResult = await paymentMethod.tokenize();
-  if (tokenResult.status === "OK") { return tokenResult.token; }
-  let errorMessage = `Tokenization failed: ${tokenResult.status}`;
-  if (tokenResult.errors) {
-    errorMessage += ` ${JSON.stringify(tokenResult.errors)}`;
-    tokenResult.errors.forEach(error => {
-      if (error.field === "cardNumber" && error.code === "INVALID") {
-          errorMessage = "Invalid card number. Please check and try again.";
-      }
-    });
+  if (!paymentMethod) {
+    console.error("Card payment method not available for tokenization.");
+    throw new Error("Card payment method not initialized.");
   }
-  throw new Error(errorMessage);
+  const tokenResult = await paymentMethod.tokenize();
+  if (tokenResult.status === "OK") {
+    if (!tokenResult.token) { // Additional check for empty token
+        console.error("Tokenization OK but token is empty:", tokenResult);
+        throw new Error("Tokenization succeeded but no token was returned.");
+    }
+    return tokenResult.token;
+  } else {
+    let errorMessage = `Tokenization failed: ${tokenResult.status}`;
+    if (tokenResult.errors) {
+      errorMessage += ` ${JSON.stringify(tokenResult.errors)}`;
+      tokenResult.errors.forEach(error => {
+        if (error.field === "cardNumber" && error.code === "INVALID") {
+            errorMessage = "Invalid card number. Please check and try again.";
+        }
+        // Add more specific error messages based on Square's error codes if needed
+      });
+    }
+    throw new Error(errorMessage);
+  }
 }
 
 async function verifyBuyer(payments, token, billingContact, amountCents) {
+  if (!payments) {
+    console.error("Square payments object not initialized before calling verifyBuyer.");
+    throw new Error("Payments SDK not ready for buyer verification.");
+  }
+  if (!token) { // Check if token is null, undefined, or empty string
+    console.error("Invalid or missing token passed to verifyBuyer. Token:", token);
+    throw new Error("Card token is missing or invalid for buyer verification.");
+  }
   const verificationDetails = {
     amount: String(amountCents),
     billingContact: billingContact,
     currencyCode: "USD",
     intentType: "CHARGE",
   };
-  console.log("Sending to payments.verifyBuyer:", JSON.stringify(verificationDetails, null, 2));
+  console.log("Sending to payments.verifyBuyer with token:", token, "and details:", JSON.stringify(verificationDetails, null, 2));
   const verificationResults = await payments.verifyBuyer(token, verificationDetails);
   return verificationResults.token;
 }
@@ -189,16 +216,20 @@ function handleAddText() {
         return;
     }
     if (!textInput || !textSizeInput || !textColorInput || !textFontFamilySelect) {
-        console.error("Text input elements not found.");
+        console.error("Text input elements not found for handleAddText.");
         showPaymentStatus("Text input elements are missing. Cannot add text.", 'error');
         return;
     }
     const text = textInput.value; const size = parseInt(textSizeInput.value, 10);
     const color = textColorInput.value; const font = textFontFamilySelect.value;
+
     if (!text.trim()) { showPaymentStatus("Please enter some text to add.", 'error'); return; }
     if (isNaN(size) || size <= 0) { showPaymentStatus("Please enter a valid font size.", 'error'); return; }
-    ctx.font = `${size}px ${font}`; ctx.fillStyle = color;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    ctx.font = `${size}px ${font}`;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
     showPaymentStatus(`Text "${text}" added.`, 'success');
 }
@@ -242,6 +273,7 @@ if (form) {
 
         showPaymentStatus('Tokenizing card...', 'info');
         const token = await tokenize(card);
+        console.log("Card tokenization result (sourceId for verifyBuyer):", token); // ***** ADDED LOG FOR TOKEN *****
 
         showPaymentStatus('Card tokenized. Verifying buyer...', 'info');
         const verificationToken = await verifyBuyer(payments, token, billingContact, currentOrderAmountCents);
@@ -358,9 +390,11 @@ function updateEditingButtonsState(disabled) {
     if (textControlsContainer) {
         const textToolInputs = textControlsContainer.querySelectorAll('input, select, button');
         textToolInputs.forEach(input => {
-            input.disabled = disabled;
-             if (disabled) { input.classList.add(...disabledClasses); }
-            else { input.classList.remove(...disabledClasses); }
+            if (input) { // Added null check for each input
+                input.disabled = disabled;
+                if (disabled) { input.classList.add(...disabledClasses); }
+                else { input.classList.remove(...disabledClasses); }
+            }
         });
     }
     if (designMarginNote) {
@@ -370,13 +404,16 @@ function updateEditingButtonsState(disabled) {
 
 function showPaymentStatus(message, type = 'info') {
     const container = document.getElementById('payment-status-container');
-    if (!container) return;
+    if (!container) {
+        console.error("Payment status container not found. Message:", message);
+        return;
+    }
     container.textContent = message;
     container.style.visibility = 'visible';
-    container.classList.remove('payment-success', 'payment-error', 'payment-info');
+    container.classList.remove('payment-success', 'payment-error', 'payment-info'); // Assumes splotch-theme has these
     if (type === 'success') { container.classList.add('payment-success'); }
     else if (type === 'error') { container.classList.add('payment-error'); }
-    else { container.classList.add('payment-info'); }
+    else { container.classList.add('payment-info'); } // Default or a specific class for info
 }
 
 if (fileInput) {
