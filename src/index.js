@@ -3,12 +3,20 @@
 const appId = "sandbox-sq0idb-nbW_Oje9Dm0L5YvQ7WP2ow";
 const locationId = "LTS82DEX24XR0";
 
-// Declare globals for SDK objects and key DOM elements that might be needed across functions
-let payments, card; // Square SDK objects
-let originalImage = null;
-let canvas, ctx; // Canvas elements
+// --- PeerJS Configuration ---
+// IMPORTANT: Replace 'YOUR_PRINT_SHOP_PEER_ID_PLACEHOLDER' with the actual, stable Peer ID
+// that your local print shop application will use to register with the PeerJS server.
+const PRINT_SHOP_PEER_ID = 'YOUR_PRINT_SHOP_PEER_ID_PLACEHOLDER';
+let peer; // PeerJS instance for this client
+let connToShop; // PeerJS DataConnection to the print shop
+let peerJsStatusContainer;
 
-// Declare other DOM element variables; will be assigned in BootStrap
+
+// Declare globals for SDK objects and key DOM elements
+let payments, card;
+let originalImage = null;
+let canvas, ctx;
+
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
 let stickerMaterialSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef;
@@ -16,8 +24,178 @@ let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, startCropBtnE
 
 let currentOrderAmountCents = 0;
 
+// --- PeerJS Helper to update status display ---
+function updatePeerJsStatus(message, type = 'info') {
+    if (!peerJsStatusContainer) peerJsStatusContainer = document.getElementById('peerjs-status-container');
+    if (peerJsStatusContainer) {
+        peerJsStatusContainer.textContent = `PeerJS Status: ${message}`;
+        peerJsStatusContainer.style.visibility = 'visible';
+        peerJsStatusContainer.classList.remove('bg-green-500', 'bg-red-500', 'bg-yellow-500', 'bg-gray-400');
+        if (type === 'success') peerJsStatusContainer.classList.add('bg-green-500');
+        else if (type === 'error') peerJsStatusContainer.classList.add('bg-red-500');
+        else if (type === 'warning') peerJsStatusContainer.classList.add('bg-yellow-500');
+        else peerJsStatusContainer.classList.add('bg-gray-400'); // Default/info
+    } else {
+        console.log(`PeerJS Status (no UI element): ${message}`);
+    }
+}
+
+// --- Initialize PeerJS ---
+function initializePeer() {
+    if (typeof Peer === 'undefined') {
+        console.error("PeerJS library is not loaded!");
+        updatePeerJsStatus("PeerJS library not loaded!", "error");
+        showPaymentStatus("Error: P2P connection library missing. Cannot connect to print shop.", "error");
+        // Disable payment form if PeerJS is critical
+        if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+            paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true;
+        }
+        return;
+    }
+
+    peer = new Peer(); // Uses the default public PeerJS server
+    updatePeerJsStatus("Initializing...");
+
+    peer.on('open', function(id) {
+        console.log('My client peer ID is: ' + id);
+        updatePeerJsStatus(`My ID: ${id.substring(0,8)}... Waiting to connect.`);
+        connectToPrintShop();
+    });
+
+    peer.on('connection', function(incomingConn) {
+        console.log('Incoming connection (unexpected for client):', incomingConn);
+        incomingConn.on('data', function(data) {
+            console.log('Received unexpected data from incoming connection:', data);
+        });
+    });
+
+    peer.on('disconnected', function() {
+        updatePeerJsStatus("Disconnected from PeerJS server. Attempting to reconnect...", "warning");
+        if (peer && !peer.destroyed) {
+            try { peer.reconnect(); } catch (e) { console.error("Error reconnecting peer:", e); }
+        }
+    });
+
+    peer.on('close', function() {
+        updatePeerJsStatus("Peer instance closed.", "error");
+        connToShop = null;
+    });
+
+    peer.on('error', function(err) {
+        console.error('PeerJS general error:', err);
+        let message = `PeerJS Error: ${err.message || err.type || 'Unknown error'}`;
+        if (err.type === 'peer-unavailable') {
+            message = `Print shop (${PRINT_SHOP_PEER_ID ? PRINT_SHOP_PEER_ID.substring(0,8) : 'N/A'}...) is unavailable. Please try again later.`;
+        } else if (err.type === 'network') {
+            message = "Network error with PeerJS. Check connection.";
+        } else if (err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed') {
+            message = "PeerJS server connection error. Please try again later.";
+        }
+        updatePeerJsStatus(message, "error");
+        showPaymentStatus(message, 'error');
+        if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+             paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true;
+        }
+    });
+}
+
+function connectToPrintShop() {
+    if (!peer || peer.destroyed) {
+        console.error("PeerJS not initialized or destroyed. Cannot connect.");
+        updatePeerJsStatus("PeerJS not ready.", "error");
+        if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+            paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true;
+        }
+        return;
+    }
+    if (!PRINT_SHOP_PEER_ID || PRINT_SHOP_PEER_ID === 'YOUR_PRINT_SHOP_PEER_ID_PLACEHOLDER') {
+        console.error("Print Shop Peer ID is not configured!");
+        updatePeerJsStatus("Print shop ID missing.", "error");
+        showPaymentStatus("Configuration error: Print shop ID not set.", "error");
+        if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+            paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true;
+        }
+        return;
+    }
+
+    if (connToShop && connToShop.open) {
+        console.log("Already connected to print shop.");
+        updatePeerJsStatus(`Connected to Print Shop (${PRINT_SHOP_PEER_ID.substring(0,8)}...).`, "success");
+        if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+            paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = false;
+        }
+        return;
+    }
+
+    console.log(`Attempting to connect to print shop peer: ${PRINT_SHOP_PEER_ID}`);
+    updatePeerJsStatus(`Connecting to Print Shop (${PRINT_SHOP_PEER_ID.substring(0,8)}...)...`, "info");
+    if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+        paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true; // Disable while attempting to connect
+    }
+
+
+    connToShop = peer.connect(PRINT_SHOP_PEER_ID, {
+        reliable: true,
+        serialization: 'json'
+    });
+
+    connToShop.on('open', function() {
+        console.log(`Successfully connected to print shop peer: ${connToShop.peer}`);
+        updatePeerJsStatus(`Connected to Print Shop!`, "success");
+        showPaymentStatus('Connected to print shop. Ready to process order.', 'info');
+        if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+            paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = false;
+        }
+    });
+
+    connToShop.on('data', function(dataFromServer) {
+        console.log('Received data from print shop:', dataFromServer);
+        if (dataFromServer.type === 'paymentResponse') {
+            if (dataFromServer.success) {
+                showPaymentStatus(`Payment successful! Order ID: ${dataFromServer.orderId || 'N/A'}. Payment ID: ${dataFromServer.paymentId ? dataFromServer.paymentId.substring(0,10)+'...' : 'N/A'}`, 'success');
+                // IPFS upload is now expected to be handled by the print shop.
+                // Client could display an IPFS hash if the shop sends it back.
+                if (dataFromServer.designIpfsHash) {
+                    if(ipfsLinkContainer) {
+                        ipfsLinkContainer.innerHTML = `Print shop confirmed design upload! <br>IPFS Hash: ${dataFromServer.designIpfsHash} <br>View: <a href="https://ipfs.io/ipfs/${dataFromServer.designIpfsHash}" target="_blank" class="text-indigo-600 hover:text-indigo-800 underline">https://ipfs.io/ipfs/${dataFromServer.designIpfsHash}</a>`;
+                        ipfsLinkContainer.style.visibility = 'visible';
+                    }
+                }
+            } else {
+                showPaymentStatus(`Payment failed: ${dataFromServer.message || 'Unknown error from print shop.'}`, 'error');
+            }
+        } else if (dataFromServer.type === 'shopStatus') {
+            console.log("Shop status update:", dataFromServer.message);
+            updatePeerJsStatus(`Shop: ${dataFromServer.message}`, 'info');
+        } else {
+            console.log("Received unknown data type from shop:", dataFromServer);
+        }
+    });
+
+    connToShop.on('error', function(err) {
+        console.error('PeerJS connection to shop error:', err);
+        updatePeerJsStatus(`Connection error with shop: ${err.message || err.type}`, "error");
+        showPaymentStatus(`Connection error with print shop. Please try again. (${err.type})`, 'error');
+        if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+            paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true;
+        }
+    });
+
+    connToShop.on('close', function() {
+        console.log('Connection to print shop closed.');
+        updatePeerJsStatus("Disconnected from Print Shop. Attempting to reconnect...", "warning");
+        showPaymentStatus('Disconnected from print shop. Please wait or refresh.', 'error');
+        connToShop = null;
+        if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+            paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true;
+        }
+        // Optional: Implement a retry mechanism for connectToPrintShop
+        // setTimeout(connectToPrintShop, 5000);
+    });
+}
+
+
 async function BootStrap() {
-    // Assign canvas and context here, assuming they exist on page load
     canvas = document.getElementById('imageCanvas');
     if (!canvas) {
         console.error("FATAL: imageCanvas element not found. Aborting BootStrap.");
@@ -32,7 +210,6 @@ async function BootStrap() {
     }
     ctx = canvas.getContext('2d');
 
-    // Assign other DOM elements now that DOM is ready
     textInput = document.getElementById('textInput');
     textSizeInput = document.getElementById('textSizeInput');
     textColorInput = document.getElementById('textColorInput');
@@ -46,6 +223,8 @@ async function BootStrap() {
     ipfsLinkContainer = document.getElementById('ipfsLinkContainer');
     fileInputGlobalRef = document.getElementById('file');
     paymentFormGlobalRef = document.getElementById('payment-form');
+    peerJsStatusContainer = document.getElementById('peerjs-status-container');
+
 
     rotateLeftBtnEl = document.getElementById('rotateLeftBtn');
     rotateRightBtnEl = document.getElementById('rotateRightBtn');
@@ -55,6 +234,7 @@ async function BootStrap() {
     grayscaleBtnEl = document.getElementById('grayscaleBtn');
     sepiaBtnEl = document.getElementById('sepiaBtn');
 
+    initializePeer();
 
     console.log(`Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`);
     try {
@@ -73,7 +253,6 @@ async function BootStrap() {
       } catch (e) {
         console.error("Initializing Card failed", e);
         showPaymentStatus(`Error initializing card form: ${e.message}`, 'error');
-        // card will remain undefined, subsequent checks should handle this
       }
 
       if (stickerQuantityInput) {
@@ -82,7 +261,7 @@ async function BootStrap() {
           stickerQuantityInput.addEventListener('change', calculateAndUpdatePrice);
       } else {
           console.warn("Sticker quantity input with ID 'stickerQuantity' not found.");
-          currentOrderAmountCents = 100; // Default
+          currentOrderAmountCents = 100;
           if (calculatedPriceDisplay) calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
       }
 
@@ -98,7 +277,6 @@ async function BootStrap() {
         console.warn("Add Text button with ID 'addTextBtn' not found.");
       }
 
-      // Attach event listeners for image editing buttons
       if (rotateLeftBtnEl) rotateLeftBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(-90));
       if (rotateRightBtnEl) rotateRightBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(90));
       if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', applyGrayscaleFilter);
@@ -106,9 +284,12 @@ async function BootStrap() {
       if (resizeBtnEl) resizeBtnEl.addEventListener('click', handleResize);
       if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
 
-
       if (paymentFormGlobalRef) {
         paymentFormGlobalRef.addEventListener('submit', handlePaymentFormSubmit);
+        if(paymentFormGlobalRef.querySelector('button[type="submit"]')) {
+            paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true; // Initially disable
+        }
+        updatePeerJsStatus("Attempting to connect to print shop...", "info");
       } else {
         console.error("Payment form with ID 'payment-form' not found. Payments will not work.");
         showPaymentStatus("Payment form is missing. Cannot process payments.", "error");
@@ -120,12 +301,10 @@ async function BootStrap() {
         console.warn("File input with ID 'file' not found.");
       }
 
-
       updateEditingButtonsState(!originalImage);
       if (designMarginNote) designMarginNote.style.display = 'none';
 }
 
-// Ensures BootStrap runs after the DOM is fully loaded.
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', BootStrap);
 } else {
@@ -157,8 +336,7 @@ function calculateAndUpdatePrice() {
         currentOrderAmountCents = calculateStickerPrice(quantity, selectedMaterial);
         calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
     } else {
-        // Fallback if elements are not found after bootstrap
-        currentOrderAmountCents = calculateStickerPrice(50, selectedMaterial); // Default if dynamic elements are missing
+        currentOrderAmountCents = calculateStickerPrice(50, selectedMaterial);
         if (calculatedPriceDisplay) calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
     }
 }
@@ -168,55 +346,23 @@ function formatPrice(amountInCents) {
     return amountInDollars.toLocaleString("en-US", {style:"currency", currency:"USD"});
 }
 
-async function initializeCard(paymentsSDK) { // Renamed 'payments' to 'paymentsSDK' for clarity
+async function initializeCard(paymentsSDK) {
   if (!paymentsSDK) {
     console.error("Square payments object not initialized before calling initializeCard.");
     throw new Error("Payments SDK not ready for card initialization.");
   }
-  const cardInstance = await paymentsSDK.card(); // Renamed to avoid conflict with global 'card'
+  const cardInstance = await paymentsSDK.card();
   await cardInstance.attach("#card-container");
-  return cardInstance; // This is the 'card' object used for tokenization
+  return cardInstance;
 }
 
-// ***** MODIFIED: createPayment no longer needs verificationToken *****
-async function createPayment(token, amount, currency, orderDetails) {
-  const body = JSON.stringify({
-    locationId,
-    sourceId: token, // This is the card nonce from card.tokenize()
-    // verificationToken is NO LONGER SENT
-    idempotencyKey: window.crypto.randomUUID(),
-    amount: amount, // Amount in smallest currency unit (e.g., "100" for $1.00)
-    currency: currency,
-    orderDetails: orderDetails
-  });
-  console.log("Sending to /payment backend:", body); // Log what's sent to your backend
-
-  const paymentResponse = await fetch("/payment", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body,
-  });
-
-  if (paymentResponse.ok) return paymentResponse.json();
-  let errorBodyText = await paymentResponse.text();
-  try {
-    const errorJson = JSON.parse(errorBodyText);
-    if (errorJson.errors && errorJson.errors.length > 0) {
-      throw new Error(errorJson.errors.map(err => `${err.category} - ${err.code}: ${err.detail}`).join('; '));
-    }
-    throw new Error(errorBodyText);
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith('PAYMENT_METHOD_ERROR')) throw e; // Keep Square's specific error
-    throw new Error(`Server error ${paymentResponse.status}: ${errorBodyText}`); // General server error
-  }
-}
-
-// ***** MODIFIED: tokenize now accepts verificationDetails *****
 async function tokenize(paymentMethod, verificationDetails) {
   if (!paymentMethod) {
     console.error("Card payment method (Square SDK card object) is not available for tokenization.");
     throw new Error("Card payment method not initialized.");
   }
   console.log("Calling card.tokenize() with verificationDetails:", JSON.stringify(verificationDetails, null, 2));
-  const tokenResult = await paymentMethod.tokenize(verificationDetails); // Pass verificationDetails here
+  const tokenResult = await paymentMethod.tokenize(verificationDetails);
 
   if (tokenResult.status === "OK") {
     if (!tokenResult.token) {
@@ -226,18 +372,14 @@ async function tokenize(paymentMethod, verificationDetails) {
     console.log("Tokenization successful, token:", tokenResult.token);
     return tokenResult.token;
   }
-
-  // Handle errors
   let errorMessage = `Tokenization failed: ${tokenResult.status}`;
   if (tokenResult.errors) {
     errorMessage += ` ${JSON.stringify(tokenResult.errors)}`;
     tokenResult.errors.forEach(error => {
-      console.error("Tokenization error detail:", error); // Log each error
+      console.error("Tokenization error detail:", error);
       if (error.field) errorMessage += ` (Field: ${error.field})`;
       if (error.message) errorMessage += ` (Message: ${error.message})`;
-
-      // Example of more specific error handling
-      if (error.field === "cardNumber" && error.type === "INVALID") { // Square often uses 'type' for error codes in tokenResult.errors
+      if (error.field === "cardNumber" && error.type === "INVALID") {
           errorMessage = "Invalid card number. Please check and try again.";
       }
     });
@@ -245,11 +387,9 @@ async function tokenize(paymentMethod, verificationDetails) {
   throw new Error(errorMessage);
 }
 
-// ***** REMOVED: verifyBuyer function is no longer needed *****
-
 function handleAddText() {
     if (!canvas || !ctx) { console.error("Canvas or context not initialized for handleAddText"); return; }
-    if (!originalImage && ctx.getImageData(0,0,1,1).data[3] === 0) { // Check if canvas is effectively blank
+    if (!originalImage && ctx.getImageData(0,0,1,1).data[3] === 0) {
         showPaymentStatus("Please load an image before adding text.", 'error'); return;
     }
     if (!textInput || !textSizeInput || !textColorInput || !textFontFamilySelect) {
@@ -258,14 +398,10 @@ function handleAddText() {
     }
     const text = textInput.value; const size = parseInt(textSizeInput.value, 10);
     const color = textColorInput.value; const font = textFontFamilySelect.value;
-
     if (!text.trim()) { showPaymentStatus("Please enter some text to add.", 'error'); return; }
     if (isNaN(size) || size <= 0) { showPaymentStatus("Please enter a valid font size.", 'error'); return; }
-
-    ctx.font = `${size}px ${font}`;
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.font = `${size}px ${font}`; ctx.fillStyle = color;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
     showPaymentStatus(`Text "${text}" added.`, 'success');
 }
@@ -274,10 +410,20 @@ async function handlePaymentFormSubmit(event) {
     event.preventDefault();
     if (ipfsLinkContainer) {
       ipfsLinkContainer.innerHTML = '';
-      ipfsLinkContainer.className = 'mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow'; // baseIpfsClasses
+      ipfsLinkContainer.className = 'mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow';
       ipfsLinkContainer.style.visibility = 'hidden';
     }
-    showPaymentStatus('Processing payment...', 'info');
+    showPaymentStatus('Processing order...', 'info');
+
+    if (!connToShop || !connToShop.open) {
+        showPaymentStatus('Not connected to the print shop. Please wait or try refreshing. Ensure the print shop application is running.', 'error');
+        console.error('PeerJS connection to shop not open or not established for submitting payment.');
+        if (!connToShop && peer && !peer.destroyed && PRINT_SHOP_PEER_ID !== 'YOUR_PRINT_SHOP_PEER_ID_PLACEHOLDER') {
+            updatePeerJsStatus("Attempting to reconnect to print shop...", "warning");
+            connectToPrintShop(); // Try to reconnect
+        }
+        return;
+    }
 
     if (currentOrderAmountCents <= 0) {
       showPaymentStatus('Invalid order amount. Please check sticker quantity/material.', 'error'); return;
@@ -288,89 +434,67 @@ async function handlePaymentFormSubmit(event) {
         givenName: document.getElementById('firstName').value || undefined,
         familyName: document.getElementById('lastName').value || undefined,
         email: document.getElementById('email').value || undefined,
-        phone: document.getElementById('phone').value || undefined, // Ensure E.164 or just digits for some regions
+        phone: document.getElementById('phone').value || undefined,
         addressLines: [document.getElementById('address').value || '123 Main St'],
         city: document.getElementById('city').value || undefined,
-        state: document.getElementById('state').value || 'CA', // Use actual state if applicable
+        state: document.getElementById('state').value || 'CA',
         postalCode: document.getElementById('postalCode').value || '90210',
-        countryCode: "US", // Or determine dynamically
+        countryCode: "US",
       };
       if (!billingContact.givenName || !billingContact.familyName || !billingContact.email || !billingContact.addressLines[0] || !billingContact.city || !billingContact.state || !billingContact.postalCode) {
           throw new Error("Please fill in all required billing details.");
       }
       if (!card) { throw new Error("Card payment method not initialized. Please refresh the page."); }
-      if (!payments) { throw new Error("Square Payments SDK not initialized. Please refresh.");} // Added check for payments
 
-
-      // ***** NEW: Construct verificationDetails for card.tokenize() *****
       const verificationDetails = {
         amount: String(currentOrderAmountCents),
         billingContact: billingContact,
         currencyCode: "USD",
-        intent: "CHARGE", // As per new Square docs, 'intent' is used here, not 'intentType' for verifyBuyer
-        customerInitiated: true, // Typically true for online payments
-        sellerKeyedIn: false     // Typically false for online payments
+        intent: "CHARGE",
+        customerInitiated: true,
+        sellerKeyedIn: false
       };
-      // console.log("Constructed verificationDetails for tokenize:", JSON.stringify(verificationDetails, null, 2)); // Already logged in tokenize
 
-      showPaymentStatus('Tokenizing card and verifying buyer...', 'info'); // Combined step
-      const cardNonce = await tokenize(card, verificationDetails); // Pass verificationDetails here
+      showPaymentStatus('Tokenizing card...', 'info');
+      const cardNonce = await tokenize(card, verificationDetails);
 
-      // No separate verifyBuyer call needed. cardNonce is the result of tokenization + internal verification.
-
-      showPaymentStatus('Card tokenized. Creating payment...', 'info');
+      showPaymentStatus('Card tokenized. Sending order to print shop...', 'info');
       const orderDetails = {
           quantity: stickerQuantityInput ? parseInt(stickerQuantityInput.value, 10) : 0,
           material: stickerMaterialSelect ? stickerMaterialSelect.value : 'unknown',
           cutLineFileName: document.getElementById('cutLineFile') && document.getElementById('cutLineFile').files.length > 0 ? document.getElementById('cutLineFile').files[0].name : null,
       };
-      // ***** MODIFIED: Call createPayment without verificationToken *****
-      const paymentResult = await createPayment(cardNonce, String(currentOrderAmountCents), "USD", orderDetails);
 
-      if (paymentResult && (paymentResult.payment || (paymentResult.data && paymentResult.data.payment))) {
-        const actualPayment = paymentResult.payment || paymentResult.data.payment;
-        showPaymentStatus(`Payment successful! Status: ${actualPayment.status || 'COMPLETED'}. Payment ID: ${actualPayment.id.substring(0,15)}...`, 'success');
-        if (ipfsLinkContainer) ipfsLinkContainer.style.visibility = 'visible'; // Make visible before IPFS
-
-        let canvasHasContent = false;
-        try { canvasHasContent = ctx.getImageData(0, 0, 1, 1).data[3] > 0; }
-        catch (e) { console.warn("Could not verify canvas content via getImageData:", e.message); canvasHasContent = !!originalImage; }
-
-        if (canvasHasContent) { // Check if canvas has any content (original image or added text)
-          if(ipfsLinkContainer) ipfsLinkContainer.innerHTML = 'Processing image for IPFS upload...';
-          canvas.toBlob(async (blob) => {
-            if (blob) {
-              try {
-                if(ipfsLinkContainer) ipfsLinkContainer.innerHTML = 'Uploading to IPFS...';
-                const ipfsFormData = new FormData();
-                const fileName = `sticker_design_${Date.now()}.png`;
-                ipfsFormData.append('file', blob, fileName);
-                const response = await fetch('https://ipfs.infura.io:5001/api/v0/add', { method: 'POST', body: ipfsFormData });
-                if (!response.ok) {
-                  const errorText = await response.text();
-                  throw new Error(`IPFS upload failed: ${response.status} ${response.statusText}. Details: ${errorText}`);
-                }
-                const result = await response.json(); const hash = result.Hash; console.log('IPFS Hash:', hash);
-                if(ipfsLinkContainer) ipfsLinkContainer.innerHTML = `Successfully uploaded to IPFS! <br>Sticker Design Hash: ${hash} <br>View: <a href="https://ipfs.io/ipfs/${hash}" target="_blank" class="text-indigo-600 hover:text-indigo-800 underline">https://ipfs.io/ipfs/${hash}</a>`;
-              } catch (ipfsError) {
-                console.error('Error uploading to IPFS:', ipfsError);
-                if(ipfsLinkContainer) ipfsLinkContainer.textContent = `Error uploading to IPFS: ${ipfsError.message}`;
-              }
-            } else {
-              console.error('Failed to get blob from canvas for IPFS upload.');
-              if(ipfsLinkContainer) ipfsLinkContainer.textContent = 'Could not prepare image for upload (failed to get blob).';
-            }
-          }, 'image/png');
-        } else {
-          if(ipfsLinkContainer) ipfsLinkContainer.textContent = 'No image to upload to IPFS or canvas is blank.';
-        }
-      } else {
-        console.error("Payment creation failed or unexpected response:", paymentResult);
-        const detail = paymentResult && paymentResult.errors && paymentResult.errors[0] ? paymentResult.errors[0].detail : (paymentResult ? JSON.stringify(paymentResult) : "Unknown error from payment processing server.");
-        showPaymentStatus(`Payment failed: ${detail}`, 'error');
+      let designDataUrl = null;
+      if (canvas && (originalImage || (ctx && ctx.getImageData(0,0,1,1).data[3] > 0)) ) {
+          try {
+            designDataUrl = canvas.toDataURL('image/png');
+          } catch (e) {
+            console.error("Error getting canvas data URL for PeerJS:", e);
+            showPaymentStatus("Error preparing design image. Please try again.", "error");
+          }
       }
+
+      const payloadToShop = {
+        type: 'newOrder',
+        sourceId: cardNonce,
+        amountCents: currentOrderAmountCents,
+        currency: "USD",
+        idempotencyKey: window.crypto.randomUUID(),
+        orderDetails: orderDetails,
+        billingContact: billingContact,
+        designDataUrl: designDataUrl
+      };
+
+      console.log("Sending payload to print shop via PeerJS. Payload size (approx string length):", JSON.stringify(payloadToShop).length);
+      if (JSON.stringify(payloadToShop).length > 16000) { // Check for PeerJS default message size limit (approx 16KB for stringified JSON)
+          console.warn("Payload to shop is large. Consider sending designDataUrl separately or via file transfer if issues arise.");
+      }
+      connToShop.send(payloadToShop);
+      showPaymentStatus('Order sent. Waiting for print shop confirmation...', 'info');
+
     } catch (error) {
-      console.error("Payment processing error in submit handler:", error);
+      console.error("Error during payment form submission:", error);
       showPaymentStatus(`Error: ${error.message}`, 'error');
     }
 }
@@ -379,7 +503,7 @@ function updateEditingButtonsState(disabled) {
     const editingButtonElements = [
         rotateLeftBtnEl, rotateRightBtnEl, resizeBtnEl, startCropBtnEl, grayscaleBtnEl, sepiaBtnEl
     ];
-    const disabledClasses = ['opacity-50', 'cursor-not-allowed']; // Tailwind classes
+    const disabledClasses = ['opacity-50', 'cursor-not-allowed'];
     editingButtonElements.forEach(button => {
         if (button) {
             button.disabled = disabled;
@@ -387,7 +511,7 @@ function updateEditingButtonsState(disabled) {
             else { button.classList.remove(...disabledClasses); }
         }
     });
-    if (resizeInputEl) { // Changed from resizeInput to resizeInputEl
+    if (resizeInputEl) {
         resizeInputEl.disabled = disabled;
         if (disabled) { resizeInputEl.classList.add(...disabledClasses); }
         else { resizeInputEl.classList.remove(...disabledClasses); }
@@ -396,7 +520,7 @@ function updateEditingButtonsState(disabled) {
     if (textControlsContainer) {
         const textToolInputs = textControlsContainer.querySelectorAll('input, select, button');
         textToolInputs.forEach(input => {
-            if (input) { // Added null check for each input
+            if (input) {
                 input.disabled = disabled;
                 if (disabled) { input.classList.add(...disabledClasses); }
                 else { input.classList.remove(...disabledClasses); }
@@ -407,16 +531,15 @@ function updateEditingButtonsState(disabled) {
 }
 
 function showPaymentStatus(message, type = 'info') {
-    if (!paymentStatusContainer) { // Check if container exists
+    if (!paymentStatusContainer) {
         console.error("Payment status container not found. Message:", message); return;
     }
     paymentStatusContainer.textContent = message;
     paymentStatusContainer.style.visibility = 'visible';
-    // These classes should be defined in splotch-theme.css or your main CSS
     paymentStatusContainer.classList.remove('payment-success', 'payment-error', 'payment-info');
     if (type === 'success') { paymentStatusContainer.classList.add('payment-success'); }
     else if (type === 'error') { paymentStatusContainer.classList.add('payment-error'); }
-    else { paymentStatusContainer.classList.add('payment-info'); } // Default or a specific class for info
+    else { paymentStatusContainer.classList.add('payment-info'); }
 }
 
 function handleFileChange(event) {
@@ -424,8 +547,8 @@ function handleFileChange(event) {
     if (files.length === 0) {
         showPaymentStatus('No file selected. Please choose an image file.', 'error');
         originalImage = null; updateEditingButtonsState(true);
-        if(ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
-        if(fileInputGlobalRef) fileInputGlobalRef.value = ''; // Clear the file input
+        if(ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if(fileInputGlobalRef) fileInputGlobalRef.value = '';
         if (designMarginNote) designMarginNote.style.display = 'none';
         return;
     }
@@ -435,33 +558,20 @@ function handleFileChange(event) {
         reader.onload = () => {
             const img = new Image();
             img.onload = () => {
-                originalImage = img; updateEditingButtonsState(false); // Enable editing buttons
+                originalImage = img; updateEditingButtonsState(false);
                 if (paymentStatusContainer && (paymentStatusContainer.textContent.includes('Please select an image file') || paymentStatusContainer.textContent.includes('No file selected') || paymentStatusContainer.textContent.includes('Invalid file type'))) {
                    showPaymentStatus('Image loaded successfully.', 'success');
                 }
-                // Set canvas dimensions based on image aspect ratio, fitting within max dimensions
-                const maxWidth = 500; // Max canvas width
-                const maxHeight = 400; // Max canvas height
-                let newWidth = img.width;
-                let newHeight = img.height;
-
-                if (newWidth > maxWidth) {
-                    const ratio = maxWidth / newWidth;
-                    newWidth = maxWidth;
-                    newHeight *= ratio;
-                }
-                if (newHeight > maxHeight) {
-                    const ratio = maxHeight / newHeight;
-                    newHeight = maxHeight;
-                    newWidth *= ratio;
-                }
+                const maxWidth = 500; const maxHeight = 400;
+                let newWidth = img.width; let newHeight = img.height;
+                if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
+                if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
                 if(canvas && ctx) {
-                    canvas.width = newWidth;
-                    canvas.height = newHeight;
+                    canvas.width = newWidth; canvas.height = newHeight;
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
                 }
-                if (designMarginNote) designMarginNote.style.display = 'block'; // Show margin note
+                if (designMarginNote) designMarginNote.style.display = 'block';
             };
             img.onerror = () => {
                 showPaymentStatus('Error loading image data.', 'error');
@@ -481,7 +591,7 @@ function handleFileChange(event) {
         };
         reader.readAsDataURL(file);
     } else {
-        showPaymentStatus('Invalid file type. Please select an image file (e.g., PNG, JPG).', 'error');
+        showPaymentStatus('Invalid file type. Please select an image file.', 'error');
         originalImage = null; updateEditingButtonsState(true);
         if(ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
         if(fileInputGlobalRef) fileInputGlobalRef.value = '';
@@ -495,19 +605,18 @@ function redrawOriginalImage() {
     }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const hRatio = canvas.width / originalImage.width; const vRatio = canvas.height / originalImage.height;
-    const ratio = Math.min(hRatio, vRatio); // Ensure it fits
+    const ratio = Math.min(hRatio, vRatio);
     const centerShift_x = (canvas.width - originalImage.width * ratio) / 2;
     const centerShift_y = (canvas.height - originalImage.height * ratio) / 2;
-    ctx.drawImage(originalImage, 0, 0, originalImage.width, originalImage.height,
-                  centerShift_x, centerShift_y, originalImage.width * ratio, originalImage.height * ratio);
+    ctx.drawImage(originalImage, 0, 0, originalImage.width, originalImage.height, centerShift_x, centerShift_y, originalImage.width * ratio, originalImage.height * ratio);
     showPaymentStatus('Image reset to original.', 'info');
 }
 
 function rotateCanvasContentFixedBounds(angleDegrees) {
-    if (!canvas || !ctx || (!originalImage && ctx.getImageData(0,0,1,1).data[3] === 0)) { // Check if canvas has content
+    if (!canvas || !ctx || (!originalImage && ctx.getImageData(0,0,1,1).data[3] === 0)) {
         showPaymentStatus('Please load an image or ensure canvas has content before rotating.', 'error'); return;
     }
-    try { if (ctx.getImageData(0,0,1,1).data[3] === 0 && originalImage) { redrawOriginalImage(); } } // Attempt redraw if blank but image exists
+    try { if (ctx.getImageData(0,0,1,1).data[3] === 0 && originalImage) { redrawOriginalImage(); } }
     catch (e) { console.warn("Could not verify canvas content for rotation via getImageData:", e.message); }
 
     const tempCanvas = document.createElement('canvas'); const tempCtx = tempCanvas.getContext('2d');
@@ -517,13 +626,13 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
 
     const imgToRotate = new Image();
     imgToRotate.onload = () => {
-        const w = canvas.width; const h = canvas.height; // Use current canvas dimensions for rotation logic
+        const w = canvas.width; const h = canvas.height;
         const newCanvasWidth = (angleDegrees === 90 || angleDegrees === -90) ? h : w;
         const newCanvasHeight = (angleDegrees === 90 || angleDegrees === -90) ? w : h;
         tempCanvas.width = newCanvasWidth; tempCanvas.height = newCanvasHeight;
         tempCtx.translate(newCanvasWidth / 2, newCanvasHeight / 2);
         tempCtx.rotate(angleDegrees * Math.PI / 180);
-        tempCtx.drawImage(imgToRotate, -w / 2, -h / 2, w, h); // Draw with original canvas dimensions
+        tempCtx.drawImage(imgToRotate, -w / 2, -h / 2, w, h);
         canvas.width = newCanvasWidth; canvas.height = newCanvasHeight;
         ctx.clearRect(0,0,canvas.width, canvas.height); ctx.drawImage(tempCanvas, 0,0);
     };
