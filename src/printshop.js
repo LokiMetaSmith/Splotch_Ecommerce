@@ -32,9 +32,6 @@ function initializeShopPeer(requestedId = null) {
         }
 
         console.log(`Initializing shop peer with ID: ${peerIdToUse || '(auto-generated)'}`);
-        // For a more robust setup, especially if NAT traversal is an issue,
-        // you might need to configure STUN/TURN servers here.
-        // Example: peer = new Peer(peerIdToUse, { config: {'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }]}});
         peer = new Peer(peerIdToUse, {
             // debug: 3 // Uncomment for verbose PeerJS logging
         });
@@ -72,7 +69,7 @@ function initializeShopPeer(requestedId = null) {
             conn.on('error', (err) => {
                 console.error(`Error with connection from ${conn.peer}:`, err);
                 updateShopPeerStatus(`Error with client ${conn.peer.substring(0,8)}...`, "error", currentShopPeerId);
-                const orderCard = findOrderCardByClientPeerId(conn.peer); // May need a more robust way to find card
+                const orderCard = findOrderCardByClientPeerId(conn.peer);
                 if (orderCard) {
                     const statusEl = orderCard.querySelector('.payment-processing-status');
                     if(statusEl) statusEl.textContent = `Connection Error: ${err.message}`;
@@ -118,22 +115,17 @@ function handleClientDisconnect(clientPeerId) {
     updateShopPeerStatus(`Client ${clientPeerId.substring(0,8)}... disconnected.`, "pending", currentShopPeerId);
     delete connectedClients[clientPeerId];
 
-    // Find all order cards associated with this client and update their status
-    // This is a simple approach; a more robust system might track orders by a unique order ID
     const orderCards = document.querySelectorAll(`.order-card[data-client-peer-id="${clientPeerId}"]`);
     orderCards.forEach(card => {
         const statusEl = card.querySelector('.client-connection-status');
         if (statusEl) statusEl.textContent = "Client Disconnected";
         card.style.opacity = "0.7";
         const processBtn = card.querySelector('.process-payment-btn');
-        if(processBtn && processBtn.textContent.includes("Process")) { // Only disable if not already processed
+        if(processBtn && processBtn.textContent.includes("Process")) {
             processBtn.disabled = true;
             processBtn.title = "Client disconnected, cannot process.";
         }
     });
-     if (Object.keys(connectedClients).length === 0 && noOrdersMessage && ordersListDiv.children.length === 1) { // Check if only "no orders" message remains
-        // noOrdersMessage.style.display = 'block'; // Or keep orders displayed
-    }
 }
 
 
@@ -147,7 +139,7 @@ function updateShopPeerStatus(message, type = "info", peerIdText = "N/A") {
             connectionStatusDot.classList.add('status-connected');
         } else if (type === "error") {
             connectionStatusDot.classList.add('status-disconnected');
-        } else { // pending or initializing
+        } else {
             connectionStatusDot.classList.add('status-pending');
         }
     }
@@ -160,13 +152,12 @@ function displayNewOrder(orderData, clientPeerId) {
     }
     if(noOrdersMessage) noOrdersMessage.style.display = 'none';
 
-    // Create a unique ID for the order card itself, incorporating clientPeerId and timestamp
     const orderCardId = `order-card-${clientPeerId}-${orderData.idempotencyKey || Date.now()}`;
 
     const card = document.createElement('div');
     card.className = 'order-card';
     card.id = orderCardId;
-    card.setAttribute('data-client-peer-id', clientPeerId); // Store client peer ID for later reference
+    card.setAttribute('data-client-peer-id', clientPeerId);
 
     const timestamp = new Date().toLocaleString();
     const formattedAmount = orderData.amountCents ? `$${(orderData.amountCents / 100).toFixed(2)}` : 'N/A';
@@ -174,8 +165,7 @@ function displayNewOrder(orderData, clientPeerId) {
     card.innerHTML = `
         <h3 class="text-xl text-splotch-red">Order from Client: <span class="font-mono text-sm">${clientPeerId.substring(0,12)}...</span></h3>
         <p class="text-sm text-gray-600">Received: <span class="order-timestamp">${timestamp}</span></p>
-        <p class="text-sm text-gray-600 client-connection-status">Client Connected</p> <!-- Status for this specific client connection -->
-
+        <p class="text-sm text-gray-600 client-connection-status">Client Connected</p>
         <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
             <div>
                 <dt>Name:</dt>
@@ -201,13 +191,11 @@ function displayNewOrder(orderData, clientPeerId) {
                 <dd class="font-mono text-xs">${orderData.idempotencyKey || 'N/A'}</dd>
             </div>
         </div>
-
         ${orderData.designDataUrl ? `
         <div class="mt-2">
             <dt>Sticker Design Preview:</dt>
             <img src="${orderData.designDataUrl}" alt="Sticker Design" class="sticker-design">
         </div>` : '<p class="mt-2 text-sm text-gray-500">No design image provided by client.</p>'}
-
         <div class="mt-2">
             <dt>Payment Nonce (Source ID):</dt>
             <dd class="payment-nonce font-mono text-xs break-all">${orderData.sourceId || 'N/A'}</dd>
@@ -220,7 +208,7 @@ function displayNewOrder(orderData, clientPeerId) {
         <p class="payment-processing-status mt-2 text-sm italic"></p>
     `;
 
-    ordersListDiv.prepend(card); // Add new orders to the top
+    ordersListDiv.prepend(card);
 
     const processBtn = card.querySelector('.process-payment-btn');
     processBtn.addEventListener('click', () => handleProcessPayment(orderData, orderCardId, clientPeerId));
@@ -238,7 +226,7 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
             statusEl.classList.remove('text-green-700');
             statusEl.classList.add('text-red-700');
         }
-        alert(msg); // Also alert for immediate attention
+        alert(msg);
         return;
     }
     const squareSecretKey = squareApiKeyInputEl.value.trim();
@@ -247,63 +235,81 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
     if (processBtn) processBtn.disabled = true;
 
     console.log("Attempting to process payment for order:", orderData);
-    console.log("Using Square API Key (masked):", "********" + squareSecretKey.slice(-4));
+    console.log("Using Square API Key (masked for log):", "********" + squareSecretKey.slice(-4));
 
-    // --- !!! IMPORTANT: ACTUAL SQUARE API CALL SIMULATION !!! ---
-    // In a real application, you would NOT make the Square API call directly from browser JavaScript
-    // if this page is hosted in a way that could expose the secret key.
-    // This script assumes it's running in a trusted local environment OR it would
-    // make a fetch request to a local backend service (e.g., http://localhost:4000/charge)
-    // which then uses the Square SDK with the secret key.
+    // --- Direct Square API Call from Browser ---
+    // WARNING: This is generally not recommended for security reasons.
+    // The Square Secret API Key will be present in the browser's memory and network requests.
+    // Proceeding as per user's understanding of the risks for their specific environment.
 
-    // For this example, we continue with the simulation, but conceptually, the `squareSecretKey`
-    // would be used by that secure backend component.
+    const SQUARE_API_URL = 'https://connect.squareupsandbox.com/v2/payments'; // For Sandbox
+    // For production, use: 'https://connect.squareup.com/v2/payments';
+
+    const paymentPayload = {
+        source_id: orderData.sourceId,
+        idempotency_key: orderData.idempotencyKey || `peer-order-${Date.now()}`, // Ensure idempotency key
+        amount_money: {
+            amount: orderData.amountCents, // Square API expects amount as integer in smallest currency unit
+            currency: orderData.currency || 'USD'
+        },
+        // Optional: Add more details if needed by Square API
+        // buyer_email_address: orderData.billingContact?.email,
+        // note: `Order for ${orderData.orderDetails?.quantity} stickers (${orderData.orderDetails?.material})`,
+    };
 
     try {
-        // SIMULATION (Replace with actual call to your local secure backend endpoint)
-        console.log("Simulating call to a local backend with payment data and API key (conceptually).");
-        await new Promise(resolve => setTimeout(resolve, 2500)); // Simulate network delay to backend + Square
+        console.log("Sending CreatePayment request to Square API:", JSON.stringify(paymentPayload));
+        const response = await fetch(SQUARE_API_URL, {
+            method: 'POST',
+            headers: {
+                'Square-Version': '2023-10-18', // Use a recent API version
+                'Authorization': `Bearer ${squareSecretKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(paymentPayload)
+        });
 
-        // This object would be the response from your local backend
-        const simulatedPaymentResult = {
-            success: Math.random() > 0.1, // Simulate 90% success rate
-            paymentId: `sp_sim_${Date.now()}`,
-            orderId: `so_sim_${Date.now()}`,
-            message: "Payment processed successfully (Simulated).",
-            // designIpfsHash: "QmSimulatedHashForDesign" // If backend uploads to IPFS and returns hash
-        };
+        const responseData = await response.json();
+        console.log("Square API Response:", responseData);
 
-        if (!simulatedPaymentResult.success) { // Simulate potential failure from backend/Square
-            simulatedPaymentResult.message = "Simulated payment failure at Square.";
-        }
-        // --- END SIMULATION ---
-
-        if (simulatedPaymentResult.success) {
-            if (statusEl) {
-                statusEl.textContent = `Success! Payment ID: ${simulatedPaymentResult.paymentId}. Order confirmed.`;
-                statusEl.classList.remove('text-red-700');
-                statusEl.classList.add('text-green-700');
+        if (!response.ok || responseData.errors) {
+            let errorMessage = "Payment processing failed.";
+            if (responseData.errors && responseData.errors.length > 0) {
+                errorMessage = responseData.errors.map(err => `[${err.category}/${err.code}]: ${err.detail}`).join('; ');
+            } else if (responseData.error && responseData.error.message) { // Older error format
+                 errorMessage = responseData.error.message;
+            } else if (response.statusText) {
+                errorMessage = `Square API Error: ${response.status} ${response.statusText}`;
             }
-            if (processBtn) processBtn.textContent = "Payment Processed";
-
-            // Send confirmation back to the client
-            const clientConn = connectedClients[clientPeerId];
-            if (clientConn && clientConn.open) {
-                clientConn.send({
-                    type: 'paymentResponse',
-                    success: true,
-                    paymentId: simulatedPaymentResult.paymentId,
-                    orderId: simulatedPaymentResult.orderId,
-                    message: 'Your payment was successful and the order is confirmed!',
-                    designIpfsHash: simulatedPaymentResult.designIpfsHash
-                });
-            }
-        } else {
-            throw new Error(simulatedPaymentResult.message || "Simulated payment failure from backend.");
+            throw new Error(errorMessage);
         }
+
+        // Payment successful
+        const payment = responseData.payment;
+        if (statusEl) {
+            statusEl.textContent = `Success! Payment ID: ${payment.id}. Order confirmed.`;
+            statusEl.classList.remove('text-red-700');
+            statusEl.classList.add('text-green-700');
+        }
+        if (processBtn) processBtn.textContent = "Payment Processed";
+
+        const clientConn = connectedClients[clientPeerId];
+        if (clientConn && clientConn.open) {
+            clientConn.send({
+                type: 'paymentResponse',
+                success: true,
+                paymentId: payment.id,
+                orderId: payment.order_id, // Square uses order_id
+                message: 'Your payment was successful and the order is confirmed!',
+            });
+        }
+
+        // Here you would typically also save the order details locally at the print shop,
+        // associate it with the Square payment ID, and manage fulfillment.
+        // Also, consider IPFS upload of the design here if needed.
 
     } catch (error) {
-        console.error("Error processing payment:", error);
+        console.error("Error processing payment with Square API:", error);
         if (statusEl) {
             statusEl.textContent = `Error: ${error.message}`;
             statusEl.classList.remove('text-green-700');
@@ -314,7 +320,6 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
             processBtn.textContent = "Retry Payment";
         }
 
-        // Send error back to the client
         const clientConn = connectedClients[clientPeerId];
         if (clientConn && clientConn.open) {
             clientConn.send({
@@ -326,10 +331,9 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
     }
 }
 
+
 // --- DOMContentLoaded ---
-// Ensures the script runs after the full HTML document has been parsed.
 document.addEventListener('DOMContentLoaded', () => {
-    // Assign DOM elements
     peerIdDisplaySpan = document.getElementById('peer-id-display')?.querySelector('span');
     peerConnectionMessage = document.getElementById('peer-connection-message');
     shopPeerIdInput = document.getElementById('shopPeerIdInput');
