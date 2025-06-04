@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Shop - Order Dashboard</title>
+    <!-- PeerJS Library -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Tailwind CSS (or your preferred styling) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Baumans', sans-serif; }
+        h1, h2, h3 { font-family: 'Modak', cursive; }
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-connected { background-color: #4CAF50; /* Green */ }
+        .status-disconnected { background-color: #F44336; /* Red */ }
+        .status-pending { background-color: #FFC107; /* Amber */ }
+        .order-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .order-card img.sticker-design {
+            max-width: 200px;
+            max-height: 200px;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+        }
+        .order-details dt { font-weight: bold; }
+        .order-details dd { margin-left: 0; margin-bottom: 0.5em; }
+    </style>
+    <!-- Link to printshop.js (we'll create this next) -->
+    <script type="module" src="./printshop.js" defer></script>
+</head>
+<body class="bg-slate-200 text-slate-800 p-4 md:p-8">
+    <div class="container mx-auto max-w-4xl bg-white p-6 rounded-lg shadow-xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl text-splotch-navy">Print Shop - Order Dashboard</h1>
+        </header>
+
+        <section id="peer-status-section" class="mb-6 p-4 border border-splotch-teal rounded-md bg-slate-50">
+            <h2 class="text-2xl text-splotch-navy mb-2">Connection Status</h2>
+            <div class="flex items-center">
+                <span id="connection-status-dot" class="status-dot status-disconnected"></span>
+                <p id="peer-id-display" class="text-lg">Peer ID: <span class="font-semibold text-splotch-red">Initializing...</span></p>
+            </div>
+            <p id="peer-connection-message" class="mt-2 text-sm text-gray-600">Attempting to connect to PeerJS network...</p>
+            <div>
+                <label for="shopPeerIdInput" class="block text-sm font-medium mt-2">Set Shop Peer ID (if blank, one will be generated):</label>
+                <div class="flex items-center space-x-2 mt-1">
+                    <input type="text" id="shopPeerIdInput" placeholder="Enter desired Peer ID (e.g., printshop01)" class="input border-gray-300 rounded-md shadow-sm p-2 flex-grow">
+                    <button id="setPeerIdBtn" class="bg-splotch-teal text-white py-2 px-4 rounded-md hover:bg-splotch-navy">Set/Refresh ID</button>
+                </div>
+                 <p class="text-xs text-gray-500 mt-1">This ID must be configured in the customer-facing website's JavaScript.</p>
+            </div>
+        </section>
+
+        <section id="incoming-orders-section">
+            <h2 class="text-3xl text-splotch-navy mb-4">Incoming Orders</h2>
+            <div id="orders-list" class="space-y-4">
+                <p id="no-orders-message" class="text-gray-500 italic">No new orders yet. Waiting for connections...</p>
+                <!-- Order cards will be dynamically inserted here by printshop.js -->
+                <!-- Example Order Card Structure (for reference):
+                <div class="order-card">
+                    <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono">CLIENT_PEER_ID_OR_ORDER_UUID</span></h3>
+                    <p class="text-sm text-gray-600">Received: <span class="order-timestamp">Timestamp</span></p>
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
+                        <div>
+                            <dt>Customer:</dt>
+                            <dd class="customer-name">John Doe</dd>
+                            <dt>Email:</dt>
+                            <dd class="customer-email">john.doe@example.com</dd>
+                        </div>
+                        <div>
+                            <dt>Quantity:</dt>
+                            <dd class="order-quantity">50</dd>
+                            <dt>Material:</dt>
+                            <dd class="order-material">Standard PP</dd>
+                            <dt>Amount:</dt>
+                            <dd class="order-amount">$40.00</dd>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <dt>Design:</dt>
+                        <img src="placeholder_design_url.png" alt="Sticker Design" class="sticker-design">
+                    </div>
+                    <div class="mt-2">
+                        <dt>Payment Nonce (Source ID):</dt>
+                        <dd class="payment-nonce font-mono text-xs">cnon:xxxxxxxxxxxx</dd>
+                    </div>
+                    <div class="mt-4">
+                        <button class="process-payment-btn bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md">Process Payment & Confirm Order</button>
+                    </div>
+                    <p class="payment-processing-status mt-2 text-sm"></p>
+                </div>
+                -->
+            </div>
+        </section>
+    </div>
+</body>
+</html>
+```
+
+**Key parts of this `printshop.html`:**
+
+* **PeerJS Library:** Included at the top.
+* **Styling:** Basic Tailwind CSS is included, along with some custom styles for status dots and order cards. I've also referenced the Splotch theme fonts.
+* **`peerjs-status-container`:** A `div` to show the print shop's own Peer ID and connection status.
+    * `shopPeerIdInput`: An input field where the print shop can optionally enter a desired Peer ID. If left blank, PeerJS will generate one.
+    * `setPeerIdBtn`: A button to initialize/refresh the PeerJS connection with the specified or a new ID.
+* **`orders-list`:** A `div` where details of incoming orders (received via PeerJS) will be dynamically added by `printshop.js`. I've included a commented-out example of what an order card might look like.
+* **`printshop.js`:** This HTML links to `printshop.js` (using `type="module"` and `defer`), which will contain all the client-side logic for this print shop application (PeerJS setup, handling incoming data, making Square API calls *if this page itself were to do it*, or more likely, triggering a local backend process).
+
+**Next Steps:**
+
+1.  **Save this HTML:** Save the code above as `printshop.html`.
+2.  **Create `printshop.js`:** We'll need to create the JavaScript file that will:
+    * Initialize the PeerJS client for the print shop.
+    * Handle the "Set Peer ID" button.
+    * Listen for incoming connections from your customer-facing website.
+    * Receive the order payload (including the Square `sourceId`, amount, design data, etc.).
+    * Display the order details on this `printshop.html` page.
+    * **Crucially:** Make the secure call to the Square Payments API using the print shop's **secret API key** to process the payment. This part will likely involve a small local server component (e.g., a Node.js script) that `printshop.js` communicates with, or if this `printshop.html` is part of an Electron app or similar Node.js-based desktop app, it could make the API call directly using Node.js modules.
+
+This `printshop.html` provides the front-end interface for the print shop staff. The real "magic" of receiving orders and processing payments will happen in its associated JavaScript and potentially a small local server/backend component that `printshop.js` interacts with to securely use the Square API ke
