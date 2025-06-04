@@ -17,6 +17,7 @@ let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, startCropBtnE
 let currentOrderAmountCents = 0;
 
 async function BootStrap() {
+    // Assign canvas and context here, assuming they exist on page load
     canvas = document.getElementById('imageCanvas');
     if (!canvas) {
         console.error("FATAL: imageCanvas element not found. Aborting BootStrap.");
@@ -31,6 +32,7 @@ async function BootStrap() {
     }
     ctx = canvas.getContext('2d');
 
+    // Assign other DOM elements now that DOM is ready
     textInput = document.getElementById('textInput');
     textSizeInput = document.getElementById('textSizeInput');
     textColorInput = document.getElementById('textColorInput');
@@ -53,6 +55,7 @@ async function BootStrap() {
     grayscaleBtnEl = document.getElementById('grayscaleBtn');
     sepiaBtnEl = document.getElementById('sepiaBtn');
 
+
     console.log(`Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`);
     try {
         if (!window.Square || !window.Square.payments) {
@@ -70,6 +73,7 @@ async function BootStrap() {
       } catch (e) {
         console.error("Initializing Card failed", e);
         showPaymentStatus(`Error initializing card form: ${e.message}`, 'error');
+        // card will remain undefined, subsequent checks should handle this
       }
 
       if (stickerQuantityInput) {
@@ -78,7 +82,7 @@ async function BootStrap() {
           stickerQuantityInput.addEventListener('change', calculateAndUpdatePrice);
       } else {
           console.warn("Sticker quantity input with ID 'stickerQuantity' not found.");
-          currentOrderAmountCents = 100;
+          currentOrderAmountCents = 100; // Default
           if (calculatedPriceDisplay) calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
       }
 
@@ -94,12 +98,14 @@ async function BootStrap() {
         console.warn("Add Text button with ID 'addTextBtn' not found.");
       }
 
+      // Attach event listeners for image editing buttons
       if (rotateLeftBtnEl) rotateLeftBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(-90));
       if (rotateRightBtnEl) rotateRightBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(90));
       if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', applyGrayscaleFilter);
       if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', applySepiaFilter);
       if (resizeBtnEl) resizeBtnEl.addEventListener('click', handleResize);
       if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
+
 
       if (paymentFormGlobalRef) {
         paymentFormGlobalRef.addEventListener('submit', handlePaymentFormSubmit);
@@ -114,10 +120,12 @@ async function BootStrap() {
         console.warn("File input with ID 'file' not found.");
       }
 
+
       updateEditingButtonsState(!originalImage);
       if (designMarginNote) designMarginNote.style.display = 'none';
 }
 
+// Ensures BootStrap runs after the DOM is fully loaded.
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', BootStrap);
 } else {
@@ -149,7 +157,8 @@ function calculateAndUpdatePrice() {
         currentOrderAmountCents = calculateStickerPrice(quantity, selectedMaterial);
         calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
     } else {
-        currentOrderAmountCents = calculateStickerPrice(50, selectedMaterial);
+        // Fallback if elements are not found after bootstrap
+        currentOrderAmountCents = calculateStickerPrice(50, selectedMaterial); // Default if dynamic elements are missing
         if (calculatedPriceDisplay) calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
     }
 }
@@ -164,7 +173,7 @@ async function initializeCard(paymentsSDK) { // Renamed 'payments' to 'paymentsS
     console.error("Square payments object not initialized before calling initializeCard.");
     throw new Error("Payments SDK not ready for card initialization.");
   }
-  const cardInstance = await paymentsSDK.card();
+  const cardInstance = await paymentsSDK.card(); // Renamed to avoid conflict with global 'card'
   await cardInstance.attach("#card-container");
   return cardInstance; // This is the 'card' object used for tokenization
 }
@@ -195,8 +204,8 @@ async function createPayment(token, amount, currency, orderDetails) {
     }
     throw new Error(errorBodyText);
   } catch (e) {
-    if (e instanceof Error && e.message.startsWith('PAYMENT_METHOD_ERROR')) throw e;
-    throw new Error(`Server error ${paymentResponse.status}: ${errorBodyText}`);
+    if (e instanceof Error && e.message.startsWith('PAYMENT_METHOD_ERROR')) throw e; // Keep Square's specific error
+    throw new Error(`Server error ${paymentResponse.status}: ${errorBodyText}`); // General server error
   }
 }
 
@@ -237,11 +246,10 @@ async function tokenize(paymentMethod, verificationDetails) {
 }
 
 // ***** REMOVED: verifyBuyer function is no longer needed *****
-// async function verifyBuyer(...) { ... }
 
 function handleAddText() {
     if (!canvas || !ctx) { console.error("Canvas or context not initialized for handleAddText"); return; }
-    if (!originalImage && ctx.getImageData(0,0,1,1).data[3] === 0) {
+    if (!originalImage && ctx.getImageData(0,0,1,1).data[3] === 0) { // Check if canvas is effectively blank
         showPaymentStatus("Please load an image before adding text.", 'error'); return;
     }
     if (!textInput || !textSizeInput || !textColorInput || !textFontFamilySelect) {
@@ -250,10 +258,14 @@ function handleAddText() {
     }
     const text = textInput.value; const size = parseInt(textSizeInput.value, 10);
     const color = textColorInput.value; const font = textFontFamilySelect.value;
+
     if (!text.trim()) { showPaymentStatus("Please enter some text to add.", 'error'); return; }
     if (isNaN(size) || size <= 0) { showPaymentStatus("Please enter a valid font size.", 'error'); return; }
-    ctx.font = `${size}px ${font}`; ctx.fillStyle = color;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    ctx.font = `${size}px ${font}`;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
     showPaymentStatus(`Text "${text}" added.`, 'success');
 }
@@ -262,7 +274,7 @@ async function handlePaymentFormSubmit(event) {
     event.preventDefault();
     if (ipfsLinkContainer) {
       ipfsLinkContainer.innerHTML = '';
-      ipfsLinkContainer.className = 'mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow';
+      ipfsLinkContainer.className = 'mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow'; // baseIpfsClasses
       ipfsLinkContainer.style.visibility = 'hidden';
     }
     showPaymentStatus('Processing payment...', 'info');
@@ -287,18 +299,19 @@ async function handlePaymentFormSubmit(event) {
           throw new Error("Please fill in all required billing details.");
       }
       if (!card) { throw new Error("Card payment method not initialized. Please refresh the page."); }
-      // payments object is checked in BootStrap
+      if (!payments) { throw new Error("Square Payments SDK not initialized. Please refresh.");} // Added check for payments
+
 
       // ***** NEW: Construct verificationDetails for card.tokenize() *****
       const verificationDetails = {
         amount: String(currentOrderAmountCents),
         billingContact: billingContact,
         currencyCode: "USD",
-        intent: "CHARGE", // As per new Square docs, 'intent' is used here, not 'intentType'
+        intent: "CHARGE", // As per new Square docs, 'intent' is used here, not 'intentType' for verifyBuyer
         customerInitiated: true, // Typically true for online payments
         sellerKeyedIn: false     // Typically false for online payments
       };
-      console.log("Constructed verificationDetails for tokenize:", JSON.stringify(verificationDetails, null, 2));
+      // console.log("Constructed verificationDetails for tokenize:", JSON.stringify(verificationDetails, null, 2)); // Already logged in tokenize
 
       showPaymentStatus('Tokenizing card and verifying buyer...', 'info'); // Combined step
       const cardNonce = await tokenize(card, verificationDetails); // Pass verificationDetails here
@@ -317,13 +330,13 @@ async function handlePaymentFormSubmit(event) {
       if (paymentResult && (paymentResult.payment || (paymentResult.data && paymentResult.data.payment))) {
         const actualPayment = paymentResult.payment || paymentResult.data.payment;
         showPaymentStatus(`Payment successful! Status: ${actualPayment.status || 'COMPLETED'}. Payment ID: ${actualPayment.id.substring(0,15)}...`, 'success');
-        if (ipfsLinkContainer) ipfsLinkContainer.style.visibility = 'visible';
+        if (ipfsLinkContainer) ipfsLinkContainer.style.visibility = 'visible'; // Make visible before IPFS
 
         let canvasHasContent = false;
         try { canvasHasContent = ctx.getImageData(0, 0, 1, 1).data[3] > 0; }
         catch (e) { console.warn("Could not verify canvas content via getImageData:", e.message); canvasHasContent = !!originalImage; }
 
-        if (canvasHasContent) {
+        if (canvasHasContent) { // Check if canvas has any content (original image or added text)
           if(ipfsLinkContainer) ipfsLinkContainer.innerHTML = 'Processing image for IPFS upload...';
           canvas.toBlob(async (blob) => {
             if (blob) {
@@ -366,7 +379,7 @@ function updateEditingButtonsState(disabled) {
     const editingButtonElements = [
         rotateLeftBtnEl, rotateRightBtnEl, resizeBtnEl, startCropBtnEl, grayscaleBtnEl, sepiaBtnEl
     ];
-    const disabledClasses = ['opacity-50', 'cursor-not-allowed'];
+    const disabledClasses = ['opacity-50', 'cursor-not-allowed']; // Tailwind classes
     editingButtonElements.forEach(button => {
         if (button) {
             button.disabled = disabled;
@@ -374,7 +387,7 @@ function updateEditingButtonsState(disabled) {
             else { button.classList.remove(...disabledClasses); }
         }
     });
-    if (resizeInputEl) {
+    if (resizeInputEl) { // Changed from resizeInput to resizeInputEl
         resizeInputEl.disabled = disabled;
         if (disabled) { resizeInputEl.classList.add(...disabledClasses); }
         else { resizeInputEl.classList.remove(...disabledClasses); }
@@ -383,7 +396,7 @@ function updateEditingButtonsState(disabled) {
     if (textControlsContainer) {
         const textToolInputs = textControlsContainer.querySelectorAll('input, select, button');
         textToolInputs.forEach(input => {
-            if (input) {
+            if (input) { // Added null check for each input
                 input.disabled = disabled;
                 if (disabled) { input.classList.add(...disabledClasses); }
                 else { input.classList.remove(...disabledClasses); }
@@ -394,15 +407,16 @@ function updateEditingButtonsState(disabled) {
 }
 
 function showPaymentStatus(message, type = 'info') {
-    if (!paymentStatusContainer) {
+    if (!paymentStatusContainer) { // Check if container exists
         console.error("Payment status container not found. Message:", message); return;
     }
     paymentStatusContainer.textContent = message;
     paymentStatusContainer.style.visibility = 'visible';
+    // These classes should be defined in splotch-theme.css or your main CSS
     paymentStatusContainer.classList.remove('payment-success', 'payment-error', 'payment-info');
     if (type === 'success') { paymentStatusContainer.classList.add('payment-success'); }
     else if (type === 'error') { paymentStatusContainer.classList.add('payment-error'); }
-    else { paymentStatusContainer.classList.add('payment-info'); }
+    else { paymentStatusContainer.classList.add('payment-info'); } // Default or a specific class for info
 }
 
 function handleFileChange(event) {
@@ -410,8 +424,8 @@ function handleFileChange(event) {
     if (files.length === 0) {
         showPaymentStatus('No file selected. Please choose an image file.', 'error');
         originalImage = null; updateEditingButtonsState(true);
-        if(ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if(fileInputGlobalRef) fileInputGlobalRef.value = '';
+        if(ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+        if(fileInputGlobalRef) fileInputGlobalRef.value = ''; // Clear the file input
         if (designMarginNote) designMarginNote.style.display = 'none';
         return;
     }
@@ -421,20 +435,33 @@ function handleFileChange(event) {
         reader.onload = () => {
             const img = new Image();
             img.onload = () => {
-                originalImage = img; updateEditingButtonsState(false);
+                originalImage = img; updateEditingButtonsState(false); // Enable editing buttons
                 if (paymentStatusContainer && (paymentStatusContainer.textContent.includes('Please select an image file') || paymentStatusContainer.textContent.includes('No file selected') || paymentStatusContainer.textContent.includes('Invalid file type'))) {
                    showPaymentStatus('Image loaded successfully.', 'success');
                 }
-                const maxWidth = 500; const maxHeight = 400;
-                let newWidth = img.width; let newHeight = img.height;
-                if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
-                if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
+                // Set canvas dimensions based on image aspect ratio, fitting within max dimensions
+                const maxWidth = 500; // Max canvas width
+                const maxHeight = 400; // Max canvas height
+                let newWidth = img.width;
+                let newHeight = img.height;
+
+                if (newWidth > maxWidth) {
+                    const ratio = maxWidth / newWidth;
+                    newWidth = maxWidth;
+                    newHeight *= ratio;
+                }
+                if (newHeight > maxHeight) {
+                    const ratio = maxHeight / newHeight;
+                    newHeight = maxHeight;
+                    newWidth *= ratio;
+                }
                 if(canvas && ctx) {
-                    canvas.width = newWidth; canvas.height = newHeight;
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
                 }
-                if (designMarginNote) designMarginNote.style.display = 'block';
+                if (designMarginNote) designMarginNote.style.display = 'block'; // Show margin note
             };
             img.onerror = () => {
                 showPaymentStatus('Error loading image data.', 'error');
@@ -454,7 +481,7 @@ function handleFileChange(event) {
         };
         reader.readAsDataURL(file);
     } else {
-        showPaymentStatus('Invalid file type. Please select an image file.', 'error');
+        showPaymentStatus('Invalid file type. Please select an image file (e.g., PNG, JPG).', 'error');
         originalImage = null; updateEditingButtonsState(true);
         if(ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
         if(fileInputGlobalRef) fileInputGlobalRef.value = '';
@@ -468,18 +495,19 @@ function redrawOriginalImage() {
     }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const hRatio = canvas.width / originalImage.width; const vRatio = canvas.height / originalImage.height;
-    const ratio = Math.min(hRatio, vRatio);
+    const ratio = Math.min(hRatio, vRatio); // Ensure it fits
     const centerShift_x = (canvas.width - originalImage.width * ratio) / 2;
     const centerShift_y = (canvas.height - originalImage.height * ratio) / 2;
-    ctx.drawImage(originalImage, 0, 0, originalImage.width, originalImage.height, centerShift_x, centerShift_y, originalImage.width * ratio, originalImage.height * ratio);
+    ctx.drawImage(originalImage, 0, 0, originalImage.width, originalImage.height,
+                  centerShift_x, centerShift_y, originalImage.width * ratio, originalImage.height * ratio);
     showPaymentStatus('Image reset to original.', 'info');
 }
 
 function rotateCanvasContentFixedBounds(angleDegrees) {
-    if (!canvas || !ctx || (!originalImage && ctx.getImageData(0,0,1,1).data[3] === 0)) {
+    if (!canvas || !ctx || (!originalImage && ctx.getImageData(0,0,1,1).data[3] === 0)) { // Check if canvas has content
         showPaymentStatus('Please load an image or ensure canvas has content before rotating.', 'error'); return;
     }
-    try { if (ctx.getImageData(0,0,1,1).data[3] === 0 && originalImage) { redrawOriginalImage(); } }
+    try { if (ctx.getImageData(0,0,1,1).data[3] === 0 && originalImage) { redrawOriginalImage(); } } // Attempt redraw if blank but image exists
     catch (e) { console.warn("Could not verify canvas content for rotation via getImageData:", e.message); }
 
     const tempCanvas = document.createElement('canvas'); const tempCtx = tempCanvas.getContext('2d');
@@ -489,13 +517,13 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
 
     const imgToRotate = new Image();
     imgToRotate.onload = () => {
-        const w = canvas.width; const h = canvas.height;
+        const w = canvas.width; const h = canvas.height; // Use current canvas dimensions for rotation logic
         const newCanvasWidth = (angleDegrees === 90 || angleDegrees === -90) ? h : w;
         const newCanvasHeight = (angleDegrees === 90 || angleDegrees === -90) ? w : h;
         tempCanvas.width = newCanvasWidth; tempCanvas.height = newCanvasHeight;
         tempCtx.translate(newCanvasWidth / 2, newCanvasHeight / 2);
         tempCtx.rotate(angleDegrees * Math.PI / 180);
-        tempCtx.drawImage(imgToRotate, -w / 2, -h / 2, w, h);
+        tempCtx.drawImage(imgToRotate, -w / 2, -h / 2, w, h); // Draw with original canvas dimensions
         canvas.width = newCanvasWidth; canvas.height = newCanvasHeight;
         ctx.clearRect(0,0,canvas.width, canvas.height); ctx.drawImage(tempCanvas, 0,0);
     };
