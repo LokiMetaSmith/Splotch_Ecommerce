@@ -38,6 +38,25 @@
         }
         .order-details dt { font-weight: bold; }
         .order-details dd { margin-left: 0; margin-bottom: 0.5em; }
+        /* Style for API Key input section */
+        .api-key-section {
+            background-color: #fff3cd; /* Light yellow warning-like background */
+            border: 1px solid #ffeeba;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .api-key-section label {
+            font-weight: bold;
+            color: #856404; /* Dark yellow text */
+        }
+        .api-key-section input[type="password"] {
+            border-color: #856404;
+        }
+        .api-key-section p {
+            font-size: 0.8rem;
+            color: #856404;
+        }
     </style>
     <!-- Link to printshop.js (we'll create this next) -->
     <script type="module" src="./printshop.js" defer></script>
@@ -65,71 +84,22 @@
             </div>
         </section>
 
+        <!-- NEW: Square API Key Input Section -->
+        <section class="api-key-section mb-6">
+            <label for="squareApiKeyInput" class="block text-sm mb-1">Square Secret API Key (Enter each session):</label>
+            <input type="password" id="squareApiKeyInput" placeholder="Paste your Square Secret API Key here" class="input w-full p-2 border rounded-md shadow-sm">
+            <p class="mt-1">This key is used to process payments and is NOT stored after you close this page. Ensure this page is run in a secure environment.</p>
+        </section>
+        <!-- END NEW SECTION -->
+
+
         <section id="incoming-orders-section">
             <h2 class="text-3xl text-splotch-navy mb-4">Incoming Orders</h2>
             <div id="orders-list" class="space-y-4">
                 <p id="no-orders-message" class="text-gray-500 italic">No new orders yet. Waiting for connections...</p>
                 <!-- Order cards will be dynamically inserted here by printshop.js -->
-                <!-- Example Order Card Structure (for reference):
-                <div class="order-card">
-                    <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono">CLIENT_PEER_ID_OR_ORDER_UUID</span></h3>
-                    <p class="text-sm text-gray-600">Received: <span class="order-timestamp">Timestamp</span></p>
-                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
-                        <div>
-                            <dt>Customer:</dt>
-                            <dd class="customer-name">John Doe</dd>
-                            <dt>Email:</dt>
-                            <dd class="customer-email">john.doe@example.com</dd>
-                        </div>
-                        <div>
-                            <dt>Quantity:</dt>
-                            <dd class="order-quantity">50</dd>
-                            <dt>Material:</dt>
-                            <dd class="order-material">Standard PP</dd>
-                            <dt>Amount:</dt>
-                            <dd class="order-amount">$40.00</dd>
-                        </div>
-                    </div>
-                    <div class="mt-2">
-                        <dt>Design:</dt>
-                        <img src="placeholder_design_url.png" alt="Sticker Design" class="sticker-design">
-                    </div>
-                    <div class="mt-2">
-                        <dt>Payment Nonce (Source ID):</dt>
-                        <dd class="payment-nonce font-mono text-xs">cnon:xxxxxxxxxxxx</dd>
-                    </div>
-                    <div class="mt-4">
-                        <button class="process-payment-btn bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md">Process Payment & Confirm Order</button>
-                    </div>
-                    <p class="payment-processing-status mt-2 text-sm"></p>
-                </div>
-                -->
             </div>
         </section>
     </div>
 </body>
 </html>
-```
-
-**Key parts of this `printshop.html`:**
-
-* **PeerJS Library:** Included at the top.
-* **Styling:** Basic Tailwind CSS is included, along with some custom styles for status dots and order cards. I've also referenced the Splotch theme fonts.
-* **`peerjs-status-container`:** A `div` to show the print shop's own Peer ID and connection status.
-    * `shopPeerIdInput`: An input field where the print shop can optionally enter a desired Peer ID. If left blank, PeerJS will generate one.
-    * `setPeerIdBtn`: A button to initialize/refresh the PeerJS connection with the specified or a new ID.
-* **`orders-list`:** A `div` where details of incoming orders (received via PeerJS) will be dynamically added by `printshop.js`. I've included a commented-out example of what an order card might look like.
-* **`printshop.js`:** This HTML links to `printshop.js` (using `type="module"` and `defer`), which will contain all the client-side logic for this print shop application (PeerJS setup, handling incoming data, making Square API calls *if this page itself were to do it*, or more likely, triggering a local backend process).
-
-**Next Steps:**
-
-1.  **Save this HTML:** Save the code above as `printshop.html`.
-2.  **Create `printshop.js`:** We'll need to create the JavaScript file that will:
-    * Initialize the PeerJS client for the print shop.
-    * Handle the "Set Peer ID" button.
-    * Listen for incoming connections from your customer-facing website.
-    * Receive the order payload (including the Square `sourceId`, amount, design data, etc.).
-    * Display the order details on this `printshop.html` page.
-    * **Crucially:** Make the secure call to the Square Payments API using the print shop's **secret API key** to process the payment. This part will likely involve a small local server component (e.g., a Node.js script) that `printshop.js` communicates with, or if this `printshop.html` is part of an Electron app or similar Node.js-based desktop app, it could make the API call directly using Node.js modules.
-
-This `printshop.html` provides the front-end interface for the print shop staff. The real "magic" of receiving orders and processing payments will happen in its associated JavaScript and potentially a small local server/backend component that `printshop.js` interacts with to securely use the Square API ke
