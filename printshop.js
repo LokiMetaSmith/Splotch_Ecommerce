@@ -342,6 +342,15 @@ document.addEventListener('DOMContentLoaded', () => {
     noOrdersMessage = document.getElementById('no-orders-message');
     connectionStatusDot = document.getElementById('connection-status-dot');
     squareApiKeyInputEl = document.getElementById('squareApiKeyInput');
+    const apiKeyFormEl = document.getElementById('apiKeyForm');
+
+    if (apiKeyFormEl) {
+        apiKeyFormEl.addEventListener('submit', (event) => {
+            event.preventDefault(); // Prevent actual form submission
+            console.log("API key form 'submission' prevented (Enter key likely pressed in input).");
+            // Optionally, could trigger a specific action here, but for now, just preventing default is enough.
+        });
+    }
 
     if (setPeerIdBtn) {
         setPeerIdBtn.addEventListener('click', () => {
