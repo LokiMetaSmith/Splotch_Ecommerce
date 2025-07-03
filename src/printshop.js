@@ -58,7 +58,11 @@ function initializeShopPeer(requestedId = null) {
                 console.log(`Received data from ${conn.peer}:`, dataFromClient);
                 const dataId = dataFromClient.idempotencyKey || (dataFromClient.orderDetails ? dataFromClient.orderDetails.idempotencyKey : null) || dataFromClient.dataId;
 
-                if (dataFromClient.type === 'newOrder') {
+                const originalType = dataFromClient.type;
+                const cleanedType = originalType ? String(originalType).replace(/[^a-zA-Z0-9]/g, "") : "";
+                console.log('Detailed type check: Original type is "' + originalType + '", Cleaned type is "' + cleanedType + '", typeof is ' + typeof cleanedType + ', length is ' + cleanedType.length);
+
+                if (cleanedType === "newOrder") {
                     if (dataFromClient.designDataUrlComingInChunks) {
                         if (!dataId) {
                             console.error("Received newOrder with designDataUrlComingInChunks but no idempotencyKey!", dataFromClient);
@@ -81,16 +85,16 @@ function initializeShopPeer(requestedId = null) {
                         // Process order directly if image is included or not expected in chunks
                         displayNewOrder(dataFromClient, conn.peer);
                     }
-                } else if (dataFromClient.type === 'imageDataChunk') {
+                } else if (cleanedType === "imageDataChunk") {
                     if (!dataId) {
                         console.error("Received imageDataChunk but no dataId!", dataFromClient);
                         return;
                     }
                     handleImageDataChunk(dataFromClient, conn.peer);
-                } else if (dataFromClient.type === 'imageDataAbort') {
+                } else if (cleanedType === "imageDataAbort") {
                     handleImageDataAbort(dataFromClient, conn.peer);
                 } else {
-                    console.warn(`Received unknown data type '${dataFromClient.type}' from client ${conn.peer}:`, dataFromClient);
+                    console.warn(`Received unknown data type. Original: '${originalType}', Cleaned: '${cleanedType}' from client ${conn.peer}:`, dataFromClient);
                 }
             });
 
