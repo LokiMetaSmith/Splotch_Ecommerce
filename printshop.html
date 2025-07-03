@@ -6,9 +6,14 @@
     <title>Print Shop - Order Dashboard</title>
     <!-- PeerJS Library -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
     <!-- Tailwind CSS (CDN for development convenience) -->
-    <!-- For production, integrate Tailwind CSS into your build process: https://tailwindcss.com/docs/installation -->
+    <!-- IMPORTANT FOR PRODUCTION: The Tailwind CSS CDN is suitable for development and prototyping ONLY. -->
+    <!-- For production deployment, you MUST install Tailwind CSS as a PostCSS plugin or use the Tailwind CLI. -->
+    <!-- This ensures optimized, purged CSS and avoids potential issues with CDN availability or performance. -->
+    <!-- See official documentation: https://tailwindcss.com/docs/installation -->
     <script src="https://cdn.tailwindcss.com"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Baumans', sans-serif; }
@@ -89,7 +94,16 @@
         <form id="apiKeyForm" class="api-key-section mb-6">
             <label for="squareApiKeyInput" class="block text-sm mb-1">Square Secret API Key (Enter each session):</label>
             <input type="password" id="squareApiKeyInput" placeholder="Paste your Square Secret API Key here" class="input w-full p-2 border rounded-md shadow-sm">
-            <p class="mt-1">This key is used to process payments and is NOT stored after you close this page. Ensure this page is run in a secure environment.</p>
+            <p class="mt-1 text-xs text-red-700 font-semibold">
+                <strong>SECURITY WARNING:</strong> Entering your Square Secret API Key directly into this web page is
+                <strong>highly insecure</strong> and not suitable for production. It exposes your key to browser-side risks.
+                This method may also lead to <strong title="Cross-Origin Resource Sharing">CORS</strong> errors, preventing payments,
+                as browsers often block direct client-to-API requests for security reasons.
+            </p>
+            <p class="mt-1 text-xs">
+                For a secure, production-ready setup, a backend server should manage API key interactions.
+                This key is NOT stored after you close this page. Use ONLY in a trusted, secure development environment.
+            </p>
         </form>
         <!-- END NEW SECTION -->
 
