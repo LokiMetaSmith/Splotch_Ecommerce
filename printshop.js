@@ -4,6 +4,7 @@
 let peer; // PeerJS instance for the print shop
 let currentShopPeerId = null; // The actual Peer ID being used
 const connectedClients = {}; // Store active connections to clients: { clientPeerId: connectionObject }
+const imageDataBuffers = {}; // To store incoming image chunks: { dataId: { chunks: [], totalChunks: 0, receivedChunks: 0 } }
 
 // --- DOM Elements ---
 // These will be assigned in the DOMContentLoaded listener
@@ -57,6 +58,8 @@ function initializeShopPeer(requestedId = null) {
                 console.log(`Received data from ${conn.peer}:`, dataFromClient);
                 if (dataFromClient.type === 'newOrder') {
                     displayNewOrder(dataFromClient, conn.peer);
+                } else if (dataFromClient.type === 'imageDataChunk') {
+                    handleImageDataChunk(dataFromClient, conn.peer);
                 } else {
                     console.warn("Received unknown data type from client:", dataFromClient);
                 }
@@ -191,11 +194,13 @@ function displayNewOrder(orderData, clientPeerId) {
                 <dd class="font-mono text-xs">${orderData.idempotencyKey || 'N/A'}</dd>
             </div>
         </div>
-        ${orderData.designDataUrl ? `
-        <div class="mt-2">
+        <div class="mt-2 sticker-design-container">
             <dt>Sticker Design Preview:</dt>
-            <img src="${orderData.designDataUrl}" alt="Sticker Design" class="sticker-design">
-        </div>` : '<p class="mt-2 text-sm text-gray-500">No design image provided by client.</p>'}
+            ${orderData.designDataUrl ?
+                `<img src="${orderData.designDataUrl}" alt="Sticker Design" class="sticker-design-img">` :
+                '<p class="design-placeholder text-sm text-gray-500">Design image not yet received or provided...</p>'
+            }
+        </div>
         <div class="mt-2">
             <dt>Payment Nonce (Source ID):</dt>
             <dd class="payment-nonce font-mono text-xs break-all">${orderData.sourceId || 'N/A'}</dd>
@@ -238,9 +243,26 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
     console.log("Using Square API Key (masked for log):", "********" + squareSecretKey.slice(-4));
 
     // --- Direct Square API Call from Browser ---
-    // WARNING: This is generally not recommended for security reasons.
-    // The Square Secret API Key will be present in the browser's memory and network requests.
-    // Proceeding as per user's understanding of the risks for their specific environment.
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SECURITY WARNING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // Making calls to the Square API directly from the client-side (browser) with a SECRET API key
+    // is highly insecure and NOT RECOMMENDED for production environments.
+    // 1. Exposure of Secret Key: Your Square Secret API Key can be exposed to anyone
+    //    inspecting the browser's network traffic or JavaScript code.
+    // 2. CORS Issues: Browsers enforce Cross-Origin Resource Sharing (CORS) policies.
+    //    Direct client-side API calls to Square (or many other third-party APIs) will often
+    //    fail due to CORS restrictions, as the API server may not explicitly allow
+    //    requests from your web application's origin. The `net::ERR_FAILED` in logs
+    //    is a common symptom of this.
+    //
+    // RECOMMENDED APPROACH:
+    // Use a backend proxy server. Your client application should send payment details to YOUR
+    // backend, and YOUR backend should securely communicate with the Square API using the
+    // secret key. This keeps the secret key off the client and manages CORS appropriately.
+    //
+    // This direct client-side call is included here for simplified demonstration purposes ONLY,
+    // and assumes a development context where such risks might be temporarily accepted or
+    // where browser security is relaxed (e.g. via specific browser extensions for development).
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     const SQUARE_API_URL = 'https://connect.squareupsandbox.com/v2/payments'; // For Sandbox
     // For production, use: 'https://connect.squareup.com/v2/payments';
@@ -366,3 +388,70 @@ document.addEventListener('DOMContentLoaded', () => {
     // This sets the initial state. If it remains this state after a click, the event handler above did not run or failed to change the state.
     updateShopPeerStatus("Ready to set Peer ID or auto-generate.", "pending", "Not Set");
 });
+
+// --- Image Chunk Handling ---
+function handleImageDataChunk(data, clientPeerId) {
+    const { dataId, chunkIndex, chunkData, totalChunks } = data;
+
+    if (!imageDataBuffers[dataId]) {
+        imageDataBuffers[dataId] = {
+            chunks: new Array(totalChunks),
+            totalChunks: totalChunks,
+            receivedChunks: 0
+        };
+        console.log(`Initialized buffer for image dataId: ${dataId}, expecting ${totalChunks} chunks.`);
+    }
+
+    const buffer = imageDataBuffers[dataId];
+    if (!buffer.chunks[chunkIndex]) { // Check if chunk already received (e.g. due to retransmission)
+        buffer.chunks[chunkIndex] = chunkData;
+        buffer.receivedChunks++;
+        console.log(`Received chunk ${chunkIndex + 1}/${totalChunks} for dataId: ${dataId}`);
+    } else {
+        console.warn(`Received duplicate chunk ${chunkIndex + 1}/${totalChunks} for dataId: ${dataId}. Ignoring.`);
+        return; // Avoid processing duplicate chunk
+    }
+
+
+    if (buffer.receivedChunks === buffer.totalChunks) {
+        console.log(`All ${totalChunks} chunks received for dataId: ${dataId}. Reconstructing image...`);
+        try {
+            const fullImageData = buffer.chunks.join('');
+            // The orderCardId is constructed using clientPeerId and idempotencyKey (which is dataId here)
+            const orderCardId = `order-card-${clientPeerId}-${dataId}`;
+            const orderCard = document.getElementById(orderCardId);
+
+            if (orderCard) {
+                let imgElement = orderCard.querySelector('.sticker-design-img');
+                const imgContainer = orderCard.querySelector('.sticker-design-container');
+
+                if (!imgContainer) {
+                    console.error(`Could not find sticker-design-container in order card ${orderCardId}`);
+                    return;
+                }
+
+                // If newOrder didn't have designDataUrl, the placeholder might be there.
+                const placeholder = orderCard.querySelector('.design-placeholder');
+                if (placeholder) {
+                    placeholder.remove();
+                }
+
+                if (!imgElement) {
+                    imgElement = document.createElement('img');
+                    imgElement.className = 'sticker-design-img'; // Use a specific class for the image itself
+                    imgElement.alt = 'Sticker Design';
+                    imgContainer.appendChild(imgElement);
+                }
+                imgElement.src = fullImageData;
+                console.log(`Image updated for order card: ${orderCardId}`);
+            } else {
+                console.warn(`Order card ${orderCardId} not found to update image for dataId: ${dataId}`);
+            }
+        } catch (error) {
+            console.error(`Error reconstructing or displaying image for dataId ${dataId}:`, error);
+        } finally {
+            delete imageDataBuffers[dataId]; // Clean up buffer
+            console.log(`Buffer cleaned for dataId: ${dataId}`);
+        }
+    }
+}
