@@ -342,14 +342,27 @@ document.addEventListener('DOMContentLoaded', () => {
     noOrdersMessage = document.getElementById('no-orders-message');
     connectionStatusDot = document.getElementById('connection-status-dot');
     squareApiKeyInputEl = document.getElementById('squareApiKeyInput');
+    const apiKeyFormEl = document.getElementById('apiKeyForm');
+
+    if (apiKeyFormEl) {
+        apiKeyFormEl.addEventListener('submit', (event) => {
+            event.preventDefault(); // Prevent actual form submission
+            console.log("API key form 'submission' prevented (Enter key likely pressed in input).");
+            // Optionally, could trigger a specific action here, but for now, just preventing default is enough.
+        });
+    }
 
     if (setPeerIdBtn) {
         setPeerIdBtn.addEventListener('click', () => {
+            // Adding a log to confirm the click handler is firing and what value is being read.
+            console.log(`setPeerIdBtn clicked. Input ID: '${shopPeerIdInput ? shopPeerIdInput.value : "N/A"}'`);
             const requestedId = shopPeerIdInput ? shopPeerIdInput.value.trim() : null;
             initializeShopPeer(requestedId);
         });
     } else {
-        console.error("Set Peer ID button not found.");
+        // This error is crucial. If it appears, the HTML is missing the button or has a wrong ID.
+        console.error("CRITICAL: Set Peer ID button (setPeerIdBtn) not found in the DOM. Click events will not work.");
     }
+    // This sets the initial state. If it remains this state after a click, the event handler above did not run or failed to change the state.
     updateShopPeerStatus("Ready to set Peer ID or auto-generate.", "pending", "Not Set");
 });
