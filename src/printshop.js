@@ -4,6 +4,7 @@
 let peer; // PeerJS instance for the print shop
 let currentShopPeerId = null; // The actual Peer ID being used
 const connectedClients = {}; // Store active connections to clients: { clientPeerId: connectionObject }
+const incomingImageChunks = {}; // Store chunks for reassembly: { dataId: { chunks: [], receivedChunks: 0, totalChunks: -1, clientPeerId: '' } }
 
 // --- DOM Elements ---
 // These will be assigned in the DOMContentLoaded listener
@@ -55,10 +56,41 @@ function initializeShopPeer(requestedId = null) {
 
             conn.on('data', (dataFromClient) => {
                 console.log(`Received data from ${conn.peer}:`, dataFromClient);
+                const dataId = dataFromClient.idempotencyKey || (dataFromClient.orderDetails ? dataFromClient.orderDetails.idempotencyKey : null) || dataFromClient.dataId;
+
                 if (dataFromClient.type === 'newOrder') {
-                    displayNewOrder(dataFromClient, conn.peer);
+                    if (dataFromClient.designDataUrlComingInChunks) {
+                        if (!dataId) {
+                            console.error("Received newOrder with designDataUrlComingInChunks but no idempotencyKey!", dataFromClient);
+                            // Send error back to client?
+                            return;
+                        }
+                        incomingImageChunks[dataId] = {
+                            orderData: dataFromClient, // Store the initial order data
+                            chunks: [],
+                            receivedChunks: 0,
+                            totalChunks: -1, // Will be set by the first chunk
+                            clientPeerId: conn.peer,
+                            status: 'waiting_chunks'
+                        };
+                        console.log(`New order ${dataId} from ${conn.peer} - expecting image data in chunks.`);
+                        // Display a placeholder card
+                        displayNewOrder(dataFromClient, conn.peer);
+                        updateOrderStatusInUI(dataId, `Receiving image for order... 0%`);
+                    } else {
+                        // Process order directly if image is included or not expected in chunks
+                        displayNewOrder(dataFromClient, conn.peer);
+                    }
+                } else if (dataFromClient.type === 'imageDataChunk') {
+                    if (!dataId) {
+                        console.error("Received imageDataChunk but no dataId!", dataFromClient);
+                        return;
+                    }
+                    handleImageDataChunk(dataFromClient, conn.peer);
+                } else if (dataFromClient.type === 'imageDataAbort') {
+                    handleImageDataAbort(dataFromClient, conn.peer);
                 } else {
-                    console.warn("Received unknown data type from client:", dataFromClient);
+                    console.warn(`Received unknown data type '${dataFromClient.type}' from client ${conn.peer}:`, dataFromClient);
                 }
             });
 
@@ -152,14 +184,23 @@ function displayNewOrder(orderData, clientPeerId) {
     }
     if(noOrdersMessage) noOrdersMessage.style.display = 'none';
 
-    const orderCardId = `order-card-${clientPeerId}-${orderData.idempotencyKey || Date.now()}`;
+    // Use idempotencyKey as the primary ID for the card to allow updates
+    const orderCardId = `order-card-${orderData.idempotencyKey || clientPeerId + '-' + Date.now()}`;
+    let card = document.getElementById(orderCardId);
+    let isNewCard = !card;
 
-    const card = document.createElement('div');
-    card.className = 'order-card';
-    card.id = orderCardId;
-    card.setAttribute('data-client-peer-id', clientPeerId);
+    if (isNewCard) {
+        card = document.createElement('div');
+        card.className = 'order-card';
+        card.id = orderCardId;
+        card.setAttribute('data-client-peer-id', clientPeerId);
+    }
 
     const timestamp = new Date().toLocaleString();
+    // Determine if we are waiting for chunks (used to decide if image placeholder is shown)
+    // This function is now also called when chunks are complete, so orderData.designDataUrlComingInChunks might be initially true
+    // but by the time it's re-called, designDataUrl is populated.
+    const isWaitingForChunks = orderData.designDataUrlComingInChunks && !orderData.designDataUrl;
     const formattedAmount = orderData.amountCents ? `$${(orderData.amountCents / 100).toFixed(2)}` : 'N/A';
 
     card.innerHTML = `
@@ -191,11 +232,13 @@ function displayNewOrder(orderData, clientPeerId) {
                 <dd class="font-mono text-xs">${orderData.idempotencyKey || 'N/A'}</dd>
             </div>
         </div>
-        ${orderData.designDataUrl ? `
-        <div class="mt-2">
-            <dt>Sticker Design Preview:</dt>
-            <img src="${orderData.designDataUrl}" alt="Sticker Design" class="sticker-design">
-        </div>` : '<p class="mt-2 text-sm text-gray-500">No design image provided by client.</p>'}
+        <div class="mt-2 design-image-container">
+            ${isWaitingForChunks ? '<p class="text-sm text-blue-500"><i>Receiving design image...</i></p>' :
+              (orderData.designDataUrl ?
+              `<div><dt>Sticker Design Preview:</dt><img src="${orderData.designDataUrl}" alt="Sticker Design" class="sticker-design"></div>` :
+              '<p class="text-sm text-gray-500">No design image provided by client.</p>')
+            }
+        </div>
         <div class="mt-2">
             <dt>Payment Nonce (Source ID):</dt>
             <dd class="payment-nonce font-mono text-xs break-all">${orderData.sourceId || 'N/A'}</dd>
@@ -208,11 +251,162 @@ function displayNewOrder(orderData, clientPeerId) {
         <p class="payment-processing-status mt-2 text-sm italic"></p>
     `;
 
-    ordersListDiv.prepend(card);
+    if (isNewCard) { // Only prepend if it's a brand new card
+        ordersListDiv.prepend(card);
+    }
 
+    // Ensure button event listener is attached/reattached if card is being updated
     const processBtn = card.querySelector('.process-payment-btn');
-    processBtn.addEventListener('click', () => handleProcessPayment(orderData, orderCardId, clientPeerId));
+    // Remove existing listener to prevent duplicates if card is updated, then add
+    // A more robust way would be to ensure this function is only called once per button,
+    // or use a unique ID for the event listener if that's feasible.
+    // For simplicity, we'll rely on the fact that innerHTML wipes old listeners on direct children.
+    // However, if the button itself is not replaced, its listeners persist.
+    // A simple way: store a flag on the button.
+    if (!processBtn.hasAttribute('data-listener-attached')) {
+        processBtn.addEventListener('click', () => handleProcessPayment(orderData, orderCardId, clientPeerId));
+        processBtn.setAttribute('data-listener-attached', 'true');
+    }
+    // Disable button if waiting for chunks and it's not yet re-enabled by full image load
+    if (isWaitingForChunks) {
+        processBtn.disabled = true;
+        processBtn.title = "Waiting for complete image data...";
+    } else if (orderData.designDataUrl) { // Re-enable if image is now present
+        processBtn.disabled = false;
+        processBtn.title = "Process Payment & Confirm Order";
+    }
+
 }
+
+function updateOrderStatusInUI(dataId, message, isError = false) {
+    const orderCardId = `order-card-${dataId}`; // dataId is the idempotencyKey
+    const orderCardElement = document.getElementById(orderCardId);
+
+    if (orderCardElement) {
+        let statusEl = orderCardElement.querySelector('.payment-processing-status');
+        if (!statusEl) {
+            statusEl = document.createElement('p');
+            statusEl.className = 'payment-processing-status mt-2 text-sm italic';
+            // Find a good place to append it, e.g., before the button container or at the end
+            const buttonContainer = orderCardElement.querySelector('.mt-4'); // Assuming this is the button div
+            if (buttonContainer) {
+                buttonContainer.parentNode.insertBefore(statusEl, buttonContainer);
+            } else {
+                orderCardElement.appendChild(statusEl);
+            }
+        }
+        statusEl.textContent = message;
+        if (isError) {
+            statusEl.classList.remove('text-green-700', 'text-blue-700');
+            statusEl.classList.add('text-red-700');
+        } else {
+            statusEl.classList.remove('text-red-700', 'text-green-700');
+            statusEl.classList.add('text-blue-700'); // Default for info
+        }
+    } else {
+        console.warn(`Order card ${orderCardId} not found for status update: ${message}`);
+    }
+}
+
+
+function handleImageDataChunk(chunkData, clientPeerId) {
+    const { dataId, chunkIndex, chunkData: imagePart, totalChunks, isLastChunk } = chunkData;
+    console.log(`Received chunk ${chunkIndex + 1}/${totalChunks} for dataId: ${dataId} from ${clientPeerId}`);
+
+    if (!incomingImageChunks[dataId]) {
+        console.error(`Received chunk for unknown dataId: ${dataId}. Discarding.`);
+        // Optionally, send an error back to the client.
+        const clientConn = connectedClients[clientPeerId];
+        if (clientConn && clientConn.open) {
+            clientConn.send({ type: 'chunkError', dataId: dataId, message: 'Unknown dataId. Please resend order metadata.' });
+        }
+        return;
+    }
+
+    const assemblyInfo = incomingImageChunks[dataId];
+    if (assemblyInfo.status === 'completed' || assemblyInfo.status === 'failed') {
+        console.warn(`Received chunk for already processed dataId: ${dataId} (status: ${assemblyInfo.status}). Discarding.`);
+        return;
+    }
+
+    // Initialize totalChunks if this is the first chunk
+    if (assemblyInfo.totalChunks === -1) {
+        assemblyInfo.totalChunks = totalChunks;
+        assemblyInfo.chunks = new Array(totalChunks); // Initialize array of correct size
+    }
+
+    if (chunkIndex >= assemblyInfo.totalChunks) {
+        console.error(`Received chunkIndex ${chunkIndex} which is out of bounds for totalChunks ${assemblyInfo.totalChunks} for dataId ${dataId}.`);
+        updateOrderStatusInUI(dataId, `Error: Received invalid image chunk index.`, true);
+        assemblyInfo.status = 'failed';
+        delete incomingImageChunks[dataId]; // Clean up
+        return;
+    }
+
+    if (!assemblyInfo.chunks[chunkIndex]) { // Avoid processing duplicate chunks
+        assemblyInfo.chunks[chunkIndex] = imagePart;
+        assemblyInfo.receivedChunks++;
+    } else {
+        console.warn(`Received duplicate chunk ${chunkIndex + 1}/${totalChunks} for dataId: ${dataId}. Ignoring.`);
+    }
+
+    const percentageComplete = assemblyInfo.totalChunks > 0 ? Math.round((assemblyInfo.receivedChunks / assemblyInfo.totalChunks) * 100) : 0;
+    updateOrderStatusInUI(dataId, `Receiving image for order... ${percentageComplete}% (${assemblyInfo.receivedChunks}/${assemblyInfo.totalChunks} chunks).`);
+
+    if (assemblyInfo.receivedChunks === assemblyInfo.totalChunks && assemblyInfo.totalChunks > 0) { // Ensure totalChunks is known
+        // All chunks received, attempt to reassemble
+        console.log(`All ${totalChunks} chunks received for dataId: ${dataId}. Reassembling...`);
+        try {
+            const fullDataUrl = assemblyInfo.chunks.join('');
+            // Update the original orderData stored in assemblyInfo
+            assemblyInfo.orderData.designDataUrl = fullDataUrl;
+            // Mark that it's no longer waiting for chunks for display purposes in displayNewOrder
+            assemblyInfo.orderData.designDataUrlComingInChunks = false;
+            assemblyInfo.status = 'completed';
+
+            // Refresh the card with the complete image
+            displayNewOrder(assemblyInfo.orderData, clientPeerId);
+            updateOrderStatusInUI(dataId, `Image reassembled and displayed.`); // Final status update
+
+            delete incomingImageChunks[dataId]; // Clean up after successful assembly
+        } catch (error) {
+            console.error(`Error reassembling data for dataId ${dataId}:`, error);
+            updateOrderStatusInUI(dataId, `Error: Failed to reassemble image data. ${error.message}`, true);
+            assemblyInfo.status = 'failed';
+            // Notify client?
+            const clientConn = connectedClients[clientPeerId];
+            if (clientConn && clientConn.open) {
+                clientConn.send({ type: 'chunkError', dataId: dataId, message: 'Failed to reassemble image on shop side.' });
+            }
+            delete incomingImageChunks[dataId]; // Clean up
+        }
+    } else if (isLastChunk && assemblyInfo.receivedChunks < assemblyInfo.totalChunks) {
+        // This case should ideally not happen if totalChunks is accurate and no chunks are lost.
+        // It means the last chunk was received, but we are still missing some.
+        console.warn(`Last chunk received for ${dataId}, but not all chunks are present. Received: ${assemblyInfo.receivedChunks}, Expected: ${assemblyInfo.totalChunks}`);
+        updateOrderStatusInUI(dataId, `Warning: Last image chunk received, but some previous chunks might be missing. Waiting for more...`, true);
+    }
+}
+
+function handleImageDataAbort(abortData, clientPeerId) {
+    const { dataId, message } = abortData;
+    console.error(`Client ${clientPeerId} aborted image data transfer for dataId ${dataId}: ${message}`);
+    if (incomingImageChunks[dataId]) {
+        incomingImageChunks[dataId].status = 'failed';
+        updateOrderStatusInUI(dataId, `Image transfer aborted by client: ${message}`, true);
+        // Optionally, remove the partial order card or mark it as failed permanently
+        const orderCardElement = document.getElementById(`order-card-${dataId}`);
+        if (orderCardElement) {
+            const processBtn = orderCardElement.querySelector('.process-payment-btn');
+            if(processBtn) {
+                processBtn.disabled = true;
+                processBtn.textContent = "Image Failed";
+            }
+        }
+        delete incomingImageChunks[dataId]; // Clean up
+    }
+}
+
 
 async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
     const orderCardElement = document.getElementById(orderCardId);
