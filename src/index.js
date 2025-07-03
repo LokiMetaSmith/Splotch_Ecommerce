@@ -23,6 +23,9 @@ let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGl
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, startCropBtnEl, grayscaleBtnEl, sepiaBtnEl;
 
 let currentOrderAmountCents = 0;
+const DESIGN_DATA_URL_JSON_THRESHOLD = 10000; // Approx 10KB, well below PeerJS 16KB limit for JSON channel.
+const IMAGE_CHUNK_SIZE = 15000; // Slightly less than 16KB for binary channel message size.
+
 
 // --- PeerJS Helper to update status display ---
 function updatePeerJsStatus(message, type = 'info') {
@@ -485,14 +488,25 @@ async function handlePaymentFormSubmit(event) {
         idempotencyKey: window.crypto.randomUUID(),
         orderDetails: orderDetails,
         billingContact: billingContact,
-        designDataUrl: designDataUrl
+        // designDataUrl will be handled based on its size
       };
 
-      console.log("Sending payload to print shop via PeerJS. Payload size (approx string length):", JSON.stringify(payloadToShop).length);
-      if (JSON.stringify(payloadToShop).length > 16000) { // Check for PeerJS default message size limit (approx 16KB for stringified JSON)
-          console.warn("Payload to shop is large. Consider sending designDataUrl separately or via file transfer if issues arise.");
+      if (designDataUrl && designDataUrl.length > DESIGN_DATA_URL_JSON_THRESHOLD) {
+        payloadToShop.designDataUrlComingInChunks = true;
+        payloadToShop.designDataUrl = null; // Don't send it in the main JSON
+        console.log("Design data URL is large, will be sent in chunks. Payload size (approx string length):", JSON.stringify(payloadToShop).length);
+        connToShop.send(payloadToShop); // Send metadata first
+        showPaymentStatus('Order metadata sent. Sending image in chunks...', 'info');
+        await sendDataInChunks(connToShop, designDataUrl, orderDetails.idempotencyKey || payloadToShop.idempotencyKey );
+      } else {
+        payloadToShop.designDataUrl = designDataUrl; // Send it as part of JSON
+        console.log("Sending payload (with designDataUrl) to print shop via PeerJS. Payload size (approx string length):", JSON.stringify(payloadToShop).length);
+        if (JSON.stringify(payloadToShop).length > 16000) {
+             console.warn("Payload to shop is large even without chunking. This might still fail for very large metadata or small threshold.");
+        }
+        connToShop.send(payloadToShop);
       }
-      connToShop.send(payloadToShop);
+
       showPaymentStatus('Order sent. Waiting for print shop confirmation...', 'info');
 
     } catch (error) {
@@ -531,6 +545,49 @@ function updateEditingButtonsState(disabled) {
     }
     if (designMarginNote) designMarginNote.style.display = disabled ? 'none' : 'block';
 }
+
+async function sendDataInChunks(connection, dataString, dataId) {
+    if (!connection || !connection.open) {
+        console.error("PeerJS connection not open. Cannot send data in chunks.");
+        showPaymentStatus("Connection error: Cannot send image data.", "error");
+        return;
+    }
+    console.log(`Starting to send data in chunks for ID: ${dataId}. Total size: ${dataString.length}`);
+    const totalChunks = Math.ceil(dataString.length / IMAGE_CHUNK_SIZE);
+
+    for (let i = 0; i < totalChunks; i++) {
+        const chunk = dataString.substring(i * IMAGE_CHUNK_SIZE, (i + 1) * IMAGE_CHUNK_SIZE);
+        const chunkPayload = {
+            type: 'imageDataChunk',
+            dataId: dataId,
+            chunkIndex: i,
+            chunkData: chunk,
+            totalChunks: totalChunks,
+            isLastChunk: (i === totalChunks - 1)
+        };
+        try {
+            // Attempt to send as JSON first, as it's simpler for text-based data URLs.
+            // PeerJS's 'json' serialization might handle larger individual text messages than raw WebRTC if it does its own chunking or uses SCTP options.
+            // However, the primary error was "Message too big for JSON channel", implying the overall JSON object containing the dataURL was too big.
+            // Here, each chunk is a smaller JSON object.
+            connection.send(chunkPayload);
+            console.log(`Sent chunk ${i + 1}/${totalChunks} for ID: ${dataId}. Chunk size: ${chunk.length}`);
+            // A small delay might help prevent overwhelming the receiver or the PeerJS internal buffers,
+            // though this is speculative and depends on the PeerJS implementation and network conditions.
+            // await new Promise(resolve => setTimeout(resolve, 50)); // Optional delay
+        } catch (error) {
+            console.error(`Error sending chunk ${i + 1} for ID ${dataId}:`, error);
+            showPaymentStatus(`Error sending image chunk ${i+1}. Please try again.`, "error");
+            // If a chunk fails, we should ideally notify the print shop or implement a retry mechanism.
+            // For now, we'll stop and let the user know.
+            connection.send({ type: 'imageDataAbort', dataId: dataId, message: `Failed to send chunk ${i+1}`});
+            return; // Stop sending further chunks
+        }
+    }
+    console.log(`All ${totalChunks} chunks sent successfully for ID: ${dataId}`);
+    showPaymentStatus('Image data sent successfully.', 'success');
+}
+
 
 function showPaymentStatus(message, type = 'info') {
     if (!paymentStatusContainer) {
