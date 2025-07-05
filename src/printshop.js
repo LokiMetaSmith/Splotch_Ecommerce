@@ -411,7 +411,17 @@ function handleImageDataAbort(abortData, clientPeerId) {
     }
 }
 
+Inside handleProcessPayment function in printshop.js
 
+// ... (other parts of the function like getting orderData)
+
+    // const squareSecretKey = squareApiKeyInputEl.value.trim(); // NO LONGER USED HERE if calling your backend
+
+    // OLD WAY - Directly calling Square (THIS IS WHAT YOUR LOGS SHOW IS STILL HAPPENING)
+    // const SQUARE_API_URL = 'https://connect.squareupsandbox.com/v2/payments'; 
+
+    
+Action Items:
 async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
     const orderCardElement = document.getElementById(orderCardId);
     const statusEl = orderCardElement ? orderCardElement.querySelector('.payment-processing-status') : null;
@@ -427,7 +437,7 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
         alert(msg);
         return;
     }
-    const squareSecretKey = squareApiKeyInputEl.value.trim();
+    //const squareSecretKey = squareApiKeyInputEl.value.trim();
 
     if (statusEl) statusEl.textContent = 'Processing payment with Square...';
     if (processBtn) processBtn.disabled = true;
@@ -440,7 +450,7 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
     // The Square Secret API Key will be present in the browser's memory and network requests.
     // Proceeding as per user's understanding of the risks for their specific environment.
 
-    const SQUARE_API_URL = 'https://connect.squareupsandbox.com/v2/payments'; // For Sandbox
+    //const SQUARE_API_URL = 'https://connect.squareupsandbox.com/v2/payments'; // For Sandbox
     // For production, use: 'https://connect.squareup.com/v2/payments';
 
     const paymentPayload = {
@@ -454,80 +464,125 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
         // buyer_email_address: orderData.billingContact?.email,
         // note: `Order for ${orderData.orderDetails?.quantity} stickers (${orderData.orderDetails?.material})`,
     };
+// NEW WAY - Calling your Node.js backend
+    const YOUR_NODE_SERVER_URL = 'http://localhost:3000/api/process-payment'; // Or your actual hosted URL if deployed
+
+    const paymentPayloadForFunction = {
+        sourceId: orderData.sourceId,
+        idempotencyKey: orderData.idempotencyKey || `peer-order-${Date.now()}`,
+        amountCents: orderData.amountCents,
+        currency: orderData.currency || 'USD',
+        // You can pass other orderDetails if your server needs them
+    };
 
     try {
-        console.log("Sending CreatePayment request to Square API:", JSON.stringify(paymentPayload));
-        const response = await fetch(SQUARE_API_URL, {
+        console.log("Sending payment processing request to backend server:", YOUR_NODE_SERVER_URL, JSON.stringify(paymentPayloadForFunction));
+        
+        // THIS IS THE FETCH CALL THAT NEEDS TO BE MODIFIED
+        const response = await fetch(YOUR_NODE_SERVER_URL, { // <<< CHANGE THIS URL
             method: 'POST',
             headers: {
-                'Square-Version': '2023-10-18', // Use a recent API version
-                'Authorization': `Bearer ${squareSecretKey}`,
                 'Content-Type': 'application/json'
+                // NO 'Authorization': `Bearer ${squareSecretKey}` header here anymore!
             },
-            body: JSON.stringify(paymentPayload)
+            body: JSON.stringify(paymentPayloadForFunction)
         });
 
         const responseData = await response.json();
-        console.log("Square API Response:", responseData);
+        console.log("Response from backend server:", responseData);
 
-        if (!response.ok || responseData.errors) {
+        if (!response.ok || responseData.error) {
             let errorMessage = "Payment processing failed.";
-            if (responseData.errors && responseData.errors.length > 0) {
-                errorMessage = responseData.errors.map(err => `[${err.category}/${err.code}]: ${err.detail}`).join('; ');
-            } else if (responseData.error && responseData.error.message) { // Older error format
-                 errorMessage = responseData.error.message;
-            } else if (response.statusText) {
-                errorMessage = `Square API Error: ${response.status} ${response.statusText}`;
+            if (responseData.error && responseData.details) {
+                errorMessage = responseData.details.map(err => `[${err.category}/${err.code}]: ${err.detail}`).join('; ');
+            } else if (responseData.error) {
+                errorMessage = responseData.error;
             }
             throw new Error(errorMessage);
         }
 
         // Payment successful
         const payment = responseData.payment;
-        if (statusEl) {
-            statusEl.textContent = `Success! Payment ID: ${payment.id}. Order confirmed.`;
-            statusEl.classList.remove('text-red-700');
-            statusEl.classList.add('text-green-700');
-        }
-        if (processBtn) processBtn.textContent = "Payment Processed";
-
-        const clientConn = connectedClients[clientPeerId];
-        if (clientConn && clientConn.open) {
-            clientConn.send({
-                type: 'paymentResponse',
-                success: true,
-                paymentId: payment.id,
-                orderId: payment.order_id, // Square uses order_id
-                message: 'Your payment was successful and the order is confirmed!',
-            });
-        }
-
-        // Here you would typically also save the order details locally at the print shop,
-        // associate it with the Square payment ID, and manage fulfillment.
-        // Also, consider IPFS upload of the design here if needed.
+        // ... (rest of your success handling)
 
     } catch (error) {
-        console.error("Error processing payment with Square API:", error);
-        if (statusEl) {
-            statusEl.textContent = `Error: ${error.message}`;
-            statusEl.classList.remove('text-green-700');
-            statusEl.classList.add('text-red-700');
-        }
-        if (processBtn) {
-            processBtn.disabled = false;
-            processBtn.textContent = "Retry Payment";
-        }
-
-        const clientConn = connectedClients[clientPeerId];
-        if (clientConn && clientConn.open) {
-            clientConn.send({
-                type: 'paymentResponse',
-                success: false,
-                message: `Payment processing failed: ${error.message}`
-            });
-        }
+        console.error("Error processing payment via backend server:", error);
+        // ... (rest of your error handling)
     }
 }
+    // try {
+        // console.log("Sending CreatePayment request to Square API:", JSON.stringify(paymentPayload));
+        // const response = await fetch(SQUARE_API_URL, {
+            // method: 'POST',
+            // headers: {
+                // 'Square-Version': '2023-10-18', // Use a recent API version
+                // 'Authorization': `Bearer ${squareSecretKey}`,
+                // 'Content-Type': 'application/json'
+            // },
+            // body: JSON.stringify(paymentPayload)
+        // });
+
+        // const responseData = await response.json();
+        // console.log("Square API Response:", responseData);
+
+        // if (!response.ok || responseData.errors) {
+            // let errorMessage = "Payment processing failed.";
+            // if (responseData.errors && responseData.errors.length > 0) {
+                // errorMessage = responseData.errors.map(err => `[${err.category}/${err.code}]: ${err.detail}`).join('; ');
+            // } else if (responseData.error && responseData.error.message) { // Older error format
+                 // errorMessage = responseData.error.message;
+            // } else if (response.statusText) {
+                // errorMessage = `Square API Error: ${response.status} ${response.statusText}`;
+            // }
+            // throw new Error(errorMessage);
+        // }
+
+       // Payment successful
+        // const payment = responseData.payment;
+        // if (statusEl) {
+            // statusEl.textContent = `Success! Payment ID: ${payment.id}. Order confirmed.`;
+            // statusEl.classList.remove('text-red-700');
+            // statusEl.classList.add('text-green-700');
+        // }
+        // if (processBtn) processBtn.textContent = "Payment Processed";
+
+        // const clientConn = connectedClients[clientPeerId];
+        // if (clientConn && clientConn.open) {
+            // clientConn.send({
+                // type: 'paymentResponse',
+                // success: true,
+                // paymentId: payment.id,
+                // orderId: payment.order_id, // Square uses order_id
+                // message: 'Your payment was successful and the order is confirmed!',
+            // });
+        // }
+
+     //   Here you would typically also save the order details locally at the print shop,
+     //   associate it with the Square payment ID, and manage fulfillment.
+     //   Also, consider IPFS upload of the design here if needed.
+
+    // } catch (error) {
+        // console.error("Error processing payment with Square API:", error);
+        // if (statusEl) {
+            // statusEl.textContent = `Error: ${error.message}`;
+            // statusEl.classList.remove('text-green-700');
+            // statusEl.classList.add('text-red-700');
+        // }
+        // if (processBtn) {
+            // processBtn.disabled = false;
+            // processBtn.textContent = "Retry Payment";
+        // }
+
+        // const clientConn = connectedClients[clientPeerId];
+        // if (clientConn && clientConn.open) {
+            // clientConn.send({
+                // type: 'paymentResponse',
+                // success: false,
+                // message: `Payment processing failed: ${error.message}`
+            // });
+        // }
+    // }
+// }
 
 
 // --- DOMContentLoaded ---

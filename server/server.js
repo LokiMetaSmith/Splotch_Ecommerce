@@ -1,6 +1,19 @@
 // server.js
 const express = require('express');
-const { Client, Environment } = require('square');
+const squarePackage = require('square');
+
+console.log('--- Square Package Output ---');
+console.log(squarePackage); 
+
+// Correct way to get Client and Environment based on your log output
+const Client = squarePackage.SquareClient; 
+const Environment = squarePackage.SquareEnvironment;
+
+console.log('--- Client from squarePackage.SquareClient ---');
+console.log(Client);
+console.log('--- Environment from squarePackage.SquareEnvironment ---');
+console.log(Environment);
+
 const { randomUUID } = require('crypto');
 const cors = require('cors');
 require('dotenv').config(); // To load environment variables from a .env file
@@ -8,6 +21,18 @@ require('dotenv').config(); // To load environment variables from a .env file
 const app = express();
 const port = process.env.PORT || 3000; // Use port from .env or default to 3000
 
+if (!Environment) {
+    console.error('FATAL: Square SDK Environment object is undefined. Cannot initialize client.');
+    process.exit(1);
+}
+if (!Client) { // Add a check for Client too
+    console.error('FATAL: Square SDK Client object is undefined. Cannot initialize client.');
+    process.exit(1);
+}
+const squareClient = new Client({
+    environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
+    accessToken: process.env.SQUARE_ACCESS_TOKEN,
+});
 // --- Middleware ---
 // Enable CORS: Configure this carefully for production
 // For development, you might allow your specific client origin:
@@ -18,13 +43,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json()); // To parse JSON request bodies
 
-// --- Square Client Initialization ---
-// Ensure SQUARE_ACCESS_TOKEN and SQUARE_ENVIRONMENT (e.g., 'sandbox' or 'production')
-// are set in your .env file or your hosting environment's variables.
-const squareClient = new Client({
-    environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
-    accessToken: process.env.SQUARE_ACCESS_TOKEN,
-});
 
 // --- API Endpoint for Processing Payments ---
 app.post('/api/process-payment', async (req, res) => {
