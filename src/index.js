@@ -29,6 +29,8 @@ const IMAGE_CHUNK_SIZE = 15000; // Slightly less than 16KB for binary channel me
 
 // --- PeerJS Helper to update status display ---
 function updatePeerJsStatus(message, type = 'info') {
+    const logMessage = `[CLIENT PeerJS Status] ${type.toUpperCase()}: ${message}`;
+    console.log(logMessage);
     if (!peerJsStatusContainer) peerJsStatusContainer = document.getElementById('peerjs-status-container');
     if (peerJsStatusContainer) {
         peerJsStatusContainer.textContent = `PeerJS Status: ${message}`;
@@ -39,14 +41,15 @@ function updatePeerJsStatus(message, type = 'info') {
         else if (type === 'warning') peerJsStatusContainer.classList.add('bg-yellow-500');
         else peerJsStatusContainer.classList.add('bg-gray-400'); // Default/info
     } else {
-        console.log(`PeerJS Status (no UI element): ${message}`);
+        // Already logged with prefix
     }
 }
 
 // --- Initialize PeerJS ---
 function initializePeer() {
+    console.log('[CLIENT] Initializing PeerJS. PRINT_SHOP_PEER_ID:', PRINT_SHOP_PEER_ID);
     if (typeof Peer === 'undefined') {
-        console.error("PeerJS library is not loaded!");
+        console.error("[CLIENT] PeerJS library is not loaded!");
         updatePeerJsStatus("PeerJS library not loaded!", "error");
         showPaymentStatus("Error: P2P connection library missing. Cannot connect to print shop.", "error");
         // Disable payment form if PeerJS is critical
@@ -60,32 +63,34 @@ function initializePeer() {
     updatePeerJsStatus("Initializing...");
 
     peer.on('open', function(id) {
-        console.log('My client peer ID is: ' + id);
+        console.log('[CLIENT] My client peer ID is: ' + id);
         updatePeerJsStatus(`My ID: ${id.substring(0,8)}... Waiting to connect.`);
         connectToPrintShop();
     });
 
     peer.on('connection', function(incomingConn) {
-        console.log('Incoming connection (unexpected for client):', incomingConn);
+        console.log('[CLIENT] Incoming connection (unexpected for client):', incomingConn);
         incomingConn.on('data', function(data) {
-            console.log('Received unexpected data from incoming connection:', data);
+            console.log('[CLIENT] Received unexpected data from incoming connection:', data);
         });
     });
 
     peer.on('disconnected', function() {
+        console.warn('[CLIENT] Disconnected from PeerJS server.');
         updatePeerJsStatus("Disconnected from PeerJS server. Attempting to reconnect...", "warning");
         if (peer && !peer.destroyed) {
-            try { peer.reconnect(); } catch (e) { console.error("Error reconnecting peer:", e); }
+            try { peer.reconnect(); } catch (e) { console.error("[CLIENT] Error reconnecting peer:", e); }
         }
     });
 
     peer.on('close', function() {
+        console.warn('[CLIENT] Peer instance closed.');
         updatePeerJsStatus("Peer instance closed.", "error");
         connToShop = null;
     });
 
     peer.on('error', function(err) {
-        console.error('PeerJS general error:', err);
+        console.error('[CLIENT] PeerJS general error:', err);
         let message = `PeerJS Error: ${err.message || err.type || 'Unknown error'}`;
         if (err.type === 'peer-unavailable') {
             message = `Print shop (${PRINT_SHOP_PEER_ID ? PRINT_SHOP_PEER_ID.substring(0,8) : 'N/A'}...) is unavailable. Please try again later.`;
@@ -104,7 +109,7 @@ function initializePeer() {
 
 function connectToPrintShop() {
     if (!peer || peer.destroyed) {
-        console.error("PeerJS not initialized or destroyed. Cannot connect.");
+        console.error("[CLIENT] PeerJS not initialized or destroyed. Cannot connect.");
         updatePeerJsStatus("PeerJS not ready.", "error");
         if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
             paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true;
@@ -112,7 +117,7 @@ function connectToPrintShop() {
         return;
     }
     if (!PRINT_SHOP_PEER_ID || PRINT_SHOP_PEER_ID === 'YOUR_PRINT_SHOP_PEER_ID_PLACEHOLDER') {
-        console.error("Print Shop Peer ID is not configured!");
+        console.error("[CLIENT] Print Shop Peer ID is not configured!", PRINT_SHOP_PEER_ID);
         updatePeerJsStatus("Print shop ID missing.", "error");
         showPaymentStatus("Configuration error: Print shop ID not set.", "error");
         if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
@@ -122,7 +127,7 @@ function connectToPrintShop() {
     }
 
     if (connToShop && connToShop.open) {
-        console.log("Already connected to print shop.");
+        console.log("[CLIENT] Already connected to print shop:", connToShop.peer);
         updatePeerJsStatus(`Connected to Print Shop (${PRINT_SHOP_PEER_ID.substring(0,8)}...).`, "success");
         if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
             paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = false;
@@ -130,7 +135,7 @@ function connectToPrintShop() {
         return;
     }
 
-    console.log(`Attempting to connect to print shop peer: ${PRINT_SHOP_PEER_ID}`);
+    console.log(`[CLIENT] Attempting to connect to print shop peer: ${PRINT_SHOP_PEER_ID}`);
     updatePeerJsStatus(`Connecting to Print Shop (${PRINT_SHOP_PEER_ID.substring(0,8)}...)...`, "info");
     if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
         paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true; // Disable while attempting to connect
@@ -143,7 +148,7 @@ function connectToPrintShop() {
     });
 
     connToShop.on('open', function() {
-        console.log(`Successfully connected to print shop peer: ${connToShop.peer}`);
+        console.log(`[CLIENT] Successfully connected to print shop peer: ${connToShop.peer}`);
         updatePeerJsStatus(`Connected to Print Shop!`, "success");
         showPaymentStatus('Connected to print shop. Ready to process order.', 'info');
         if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
@@ -152,7 +157,7 @@ function connectToPrintShop() {
     });
 
     connToShop.on('data', function(dataFromServer) {
-        console.log('Received data from print shop:', dataFromServer);
+        console.log('[CLIENT] Received data from print shop:', JSON.stringify(dataFromServer));
         if (dataFromServer.type === 'paymentResponse') {
             if (dataFromServer.success) {
                 showPaymentStatus(`Payment successful! Order ID: ${dataFromServer.orderId || 'N/A'}. Payment ID: ${dataFromServer.paymentId ? dataFromServer.paymentId.substring(0,10)+'...' : 'N/A'}`, 'success');
@@ -168,15 +173,15 @@ function connectToPrintShop() {
                 showPaymentStatus(`Payment failed: ${dataFromServer.message || 'Unknown error from print shop.'}`, 'error');
             }
         } else if (dataFromServer.type === 'shopStatus') {
-            console.log("Shop status update:", dataFromServer.message);
+             console.log("[CLIENT] Shop status update:", dataFromServer.message);
             updatePeerJsStatus(`Shop: ${dataFromServer.message}`, 'info');
         } else {
-            console.log("Received unknown data type from shop:", dataFromServer);
+            console.log("[CLIENT] Received unknown data type from shop:", dataFromServer);
         }
     });
 
     connToShop.on('error', function(err) {
-        console.error('PeerJS connection to shop error:', err);
+        console.error('[CLIENT] PeerJS connection to shop error:', err);
         updatePeerJsStatus(`Connection error with shop: ${err.message || err.type}`, "error");
         showPaymentStatus(`Connection error with print shop. Please try again. (${err.type})`, 'error');
         if(paymentFormGlobalRef && paymentFormGlobalRef.querySelector('button[type="submit"]')) {
@@ -185,7 +190,7 @@ function connectToPrintShop() {
     });
 
     connToShop.on('close', function() {
-        console.log('Connection to print shop closed.');
+        console.warn('[CLIENT] Connection to print shop closed.');
         updatePeerJsStatus("Disconnected from Print Shop. Attempting to reconnect...", "warning");
         showPaymentStatus('Disconnected from print shop. Please wait or refresh.', 'error');
         connToShop = null;
@@ -490,19 +495,21 @@ async function handlePaymentFormSubmit(event) {
         billingContact: billingContact,
         // designDataUrl will be handled based on its size
       };
+      console.log('[CLIENT] Preparing to send order to print shop. Full payloadToShop (metadata):', JSON.stringify(payloadToShop));
+
 
       if (designDataUrl && designDataUrl.length > DESIGN_DATA_URL_JSON_THRESHOLD) {
         payloadToShop.designDataUrlComingInChunks = true;
         payloadToShop.designDataUrl = null; // Don't send it in the main JSON
-        console.log("Design data URL is large, will be sent in chunks. Payload size (approx string length):", JSON.stringify(payloadToShop).length);
+        console.log("[CLIENT] Design data URL is large, will be sent in chunks. designDataUrl.length:", designDataUrl.length, "Payload metadata size (approx string length):", JSON.stringify(payloadToShop).length);
         connToShop.send(payloadToShop); // Send metadata first
         showPaymentStatus('Order metadata sent. Sending image in chunks...', 'info');
         await sendDataInChunks(connToShop, designDataUrl, orderDetails.idempotencyKey || payloadToShop.idempotencyKey );
       } else {
         payloadToShop.designDataUrl = designDataUrl; // Send it as part of JSON
-        console.log("Sending payload (with designDataUrl) to print shop via PeerJS. Payload size (approx string length):", JSON.stringify(payloadToShop).length);
+        console.log("[CLIENT] Sending payload (with designDataUrl embedded) to print shop via PeerJS. designDataUrl.length:", designDataUrl ? designDataUrl.length : 'N/A', "Total payload size (approx string length):", JSON.stringify(payloadToShop).length);
         if (JSON.stringify(payloadToShop).length > 16000) {
-             console.warn("Payload to shop is large even without chunking. This might still fail for very large metadata or small threshold.");
+             console.warn("[CLIENT] Payload to shop is large even without chunking. This might still fail for very large metadata or small threshold.");
         }
         connToShop.send(payloadToShop);
       }
@@ -510,7 +517,7 @@ async function handlePaymentFormSubmit(event) {
       showPaymentStatus('Order sent. Waiting for print shop confirmation...', 'info');
 
     } catch (error) {
-      console.error("Error during payment form submission:", error);
+      console.error("[CLIENT] Error during payment form submission:", error);
       showPaymentStatus(`Error: ${error.message}`, 'error');
     }
 }
@@ -548,11 +555,11 @@ function updateEditingButtonsState(disabled) {
 
 async function sendDataInChunks(connection, dataString, dataId) {
     if (!connection || !connection.open) {
-        console.error("PeerJS connection not open. Cannot send data in chunks.");
+        console.error("[CLIENT] PeerJS connection not open. Cannot send data in chunks.");
         showPaymentStatus("Connection error: Cannot send image data.", "error");
         return;
     }
-    console.log(`Starting to send data in chunks for ID: ${dataId}. Total size: ${dataString.length}`);
+    console.log(`[CLIENT] Starting to send data in chunks for ID: ${dataId}. Total size: ${dataString.length}. Chunk size: ${IMAGE_CHUNK_SIZE}`);
     const totalChunks = Math.ceil(dataString.length / IMAGE_CHUNK_SIZE);
 
     for (let i = 0; i < totalChunks; i++) {
@@ -561,30 +568,27 @@ async function sendDataInChunks(connection, dataString, dataId) {
             type: 'imageDataChunk',
             dataId: dataId,
             chunkIndex: i,
-            chunkData: chunk,
+            chunkData: chunk, // Actual chunk data
             totalChunks: totalChunks,
             isLastChunk: (i === totalChunks - 1)
         };
+        // Log the metadata of the chunk, not the (potentially very long) chunkData itself
+        const chunkMetadataForLog = { ...chunkPayload, chunkData: `(chunk data length: ${chunk.length})` };
+        console.log(`[CLIENT] Sending chunkPayload: ${JSON.stringify(chunkMetadataForLog)}`);
+
         try {
-            // Attempt to send as JSON first, as it's simpler for text-based data URLs.
-            // PeerJS's 'json' serialization might handle larger individual text messages than raw WebRTC if it does its own chunking or uses SCTP options.
-            // However, the primary error was "Message too big for JSON channel", implying the overall JSON object containing the dataURL was too big.
-            // Here, each chunk is a smaller JSON object.
             connection.send(chunkPayload);
-            console.log(`Sent chunk ${i + 1}/${totalChunks} for ID: ${dataId}. Chunk size: ${chunk.length}`);
-            // A small delay might help prevent overwhelming the receiver or the PeerJS internal buffers,
-            // though this is speculative and depends on the PeerJS implementation and network conditions.
+            // console.log(`[CLIENT] Sent chunk ${i + 1}/${totalChunks} for ID: ${dataId}. Chunk size: ${chunk.length}`);
+            // A small delay might help prevent overwhelming the receiver or the PeerJS internal buffers.
             // await new Promise(resolve => setTimeout(resolve, 50)); // Optional delay
         } catch (error) {
-            console.error(`Error sending chunk ${i + 1} for ID ${dataId}:`, error);
+            console.error(`[CLIENT] Error sending chunk ${i + 1} for ID ${dataId}:`, error);
             showPaymentStatus(`Error sending image chunk ${i+1}. Please try again.`, "error");
-            // If a chunk fails, we should ideally notify the print shop or implement a retry mechanism.
-            // For now, we'll stop and let the user know.
             connection.send({ type: 'imageDataAbort', dataId: dataId, message: `Failed to send chunk ${i+1}`});
             return; // Stop sending further chunks
         }
     }
-    console.log(`All ${totalChunks} chunks sent successfully for ID: ${dataId}`);
+    console.log(`[CLIENT] All ${totalChunks} chunks sent successfully for ID: ${dataId}`);
     showPaymentStatus('Image data sent successfully.', 'success');
 }
 

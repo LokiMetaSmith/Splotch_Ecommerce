@@ -15,11 +15,11 @@ let squareApiKeyInputEl; // For the API Key input
 // --- PeerJS Configuration ---
 function initializeShopPeer(requestedId = null) {
     if (peer && !peer.destroyed) {
-        console.log("Destroying existing peer instance before creating a new one.");
+        console.log("[SHOP] Destroying existing peer instance before creating a new one.");
         try {
             peer.destroy();
         } catch (e) {
-            console.error("Error destroying previous peer instance:", e);
+            console.error("[SHOP] Error destroying previous peer instance:", e);
         }
     }
 
@@ -27,12 +27,12 @@ function initializeShopPeer(requestedId = null) {
 
     try {
         if (typeof Peer === 'undefined') {
-            console.error("PeerJS library is not loaded!");
+            console.error("[SHOP] PeerJS library is not loaded!");
             updateShopPeerStatus("PeerJS library not loaded!", "error", "Error");
             return;
         }
 
-        console.log(`Initializing shop peer with ID: ${peerIdToUse || '(auto-generated)'}`);
+        console.log(`[SHOP] Initializing shop peer with ID: ${peerIdToUse || '(auto-generated)'}`);
         peer = new Peer(peerIdToUse, {
             // debug: 3 // Uncomment for verbose PeerJS logging
         });
@@ -40,7 +40,7 @@ function initializeShopPeer(requestedId = null) {
 
         peer.on('open', (id) => {
             currentShopPeerId = id;
-            console.log('Print Shop PeerJS ID is:', currentShopPeerId);
+            console.log('[SHOP] Print Shop PeerJS ID is:', currentShopPeerId);
             updateShopPeerStatus(`Listening for orders. Share this ID with the client app.`, "success", currentShopPeerId);
             if (shopPeerIdInput && !shopPeerIdInput.value && peerIdToUse === null) { // Update input if ID was auto-generated
                 shopPeerIdInput.value = currentShopPeerId;
@@ -48,64 +48,74 @@ function initializeShopPeer(requestedId = null) {
         });
 
         peer.on('connection', (conn) => {
-            console.log(`Incoming connection from client: ${conn.peer}`);
+            console.log(`[SHOP] Incoming connection from client: ${conn.peer}`);
             updateShopPeerStatus(`Connected to client: ${conn.peer.substring(0,8)}...`, "success", currentShopPeerId);
             if(noOrdersMessage) noOrdersMessage.style.display = 'none';
 
             connectedClients[conn.peer] = conn;
 
             conn.on('data', (dataFromClient) => {
-                console.log(`Received data from ${conn.peer}:`, dataFromClient);
+                // For large data (like embedded image data), JSON.stringify might be too slow or crash browser.
+                // Log metadata or a summary instead if dataFromClient can be very large.
+                let loggableData = dataFromClient;
+                if (dataFromClient && dataFromClient.designDataUrl && dataFromClient.designDataUrl.length > 1000) { // Heuristic for large data
+                    loggableData = {...dataFromClient, designDataUrl: `(data URL length: ${dataFromClient.designDataUrl.length})`};
+                } else if (dataFromClient && dataFromClient.chunkData && dataFromClient.chunkData.length > 1000) {
+                    loggableData = {...dataFromClient, chunkData: `(chunk data length: ${dataFromClient.chunkData.length})`};
+                }
+                console.log(`[SHOP] Received data from ${conn.peer}:`, JSON.stringify(loggableData));
+
                 const dataId = dataFromClient.idempotencyKey || (dataFromClient.orderDetails ? dataFromClient.orderDetails.idempotencyKey : null) || dataFromClient.dataId;
 
                 const originalType = dataFromClient.type;
                 const cleanedType = originalType ? String(originalType).replace(/[^a-zA-Z0-9]/g, "") : "";
-                console.log('Detailed type check: Original type is "' + originalType + '", Cleaned type is "' + cleanedType + '", typeof is ' + typeof cleanedType + ', length is ' + cleanedType.length);
+                console.log(`[SHOP] Detailed type check: Original type is "${originalType}", Cleaned type is "${cleanedType}", dataId: ${dataId}`);
 
                 if (cleanedType === "newOrder") {
+                    console.log(`[SHOP] Processing newOrder for dataId: ${dataId}. designDataUrlComingInChunks: ${dataFromClient.designDataUrlComingInChunks}`);
                     if (dataFromClient.designDataUrlComingInChunks) {
                         if (!dataId) {
-                            console.error("Received newOrder with designDataUrlComingInChunks but no idempotencyKey!", dataFromClient);
-                            // Send error back to client?
+                            console.error("[SHOP] Received newOrder with designDataUrlComingInChunks but no valid dataId (idempotencyKey)!", dataFromClient);
                             return;
                         }
                         incomingImageChunks[dataId] = {
-                            orderData: dataFromClient, // Store the initial order data
+                            orderData: dataFromClient,
                             chunks: [],
                             receivedChunks: 0,
-                            totalChunks: -1, // Will be set by the first chunk
+                            totalChunks: -1,
                             clientPeerId: conn.peer,
                             status: 'waiting_chunks'
                         };
-                        console.log(`New order ${dataId} from ${conn.peer} - expecting image data in chunks.`);
-                        // Display a placeholder card
+                        console.log(`[SHOP] New order ${dataId} from ${conn.peer} - expecting image data in chunks. Stored in incomingImageChunks.`);
                         displayNewOrder(dataFromClient, conn.peer);
                         updateOrderStatusInUI(dataId, `Receiving image for order... 0%`);
                     } else {
-                        // Process order directly if image is included or not expected in chunks
+                        console.log(`[SHOP] New order ${dataId} from ${conn.peer} - image data expected to be embedded or not present.`);
                         displayNewOrder(dataFromClient, conn.peer);
                     }
                 } else if (cleanedType === "imageDataChunk") {
                     if (!dataId) {
-                        console.error("Received imageDataChunk but no dataId!", dataFromClient);
+                        console.error("[SHOP] Received imageDataChunk but no dataId!", dataFromClient);
                         return;
                     }
                     handleImageDataChunk(dataFromClient, conn.peer);
                 } else if (cleanedType === "imageDataAbort") {
+                    console.log(`[SHOP] Received imageDataAbort for dataId: ${dataId}`);
                     handleImageDataAbort(dataFromClient, conn.peer);
                 } else {
-                    console.warn(`Received unknown data type. Original: '${originalType}', Cleaned: '${cleanedType}' from client ${conn.peer}:`, dataFromClient);
+                    console.warn(`[SHOP] Received unknown data type. Original: '${originalType}', Cleaned: '${cleanedType}' from client ${conn.peer}:`, dataFromClient);
                 }
             });
 
             conn.on('close', () => {
+                console.log(`[SHOP] Connection from ${conn.peer} closed.`);
                 handleClientDisconnect(conn.peer);
             });
 
             conn.on('error', (err) => {
-                console.error(`Error with connection from ${conn.peer}:`, err);
+                console.error(`[SHOP] Error with connection from ${conn.peer}:`, err);
                 updateShopPeerStatus(`Error with client ${conn.peer.substring(0,8)}...`, "error", currentShopPeerId);
-                const orderCard = findOrderCardByClientPeerId(conn.peer);
+                const orderCard = findOrderCardByClientPeerId(conn.peer); // This function isn't defined, might need to implement or remove if not used
                 if (orderCard) {
                     const statusEl = orderCard.querySelector('.payment-processing-status');
                     if(statusEl) statusEl.textContent = `Connection Error: ${err.message}`;
@@ -114,21 +124,21 @@ function initializeShopPeer(requestedId = null) {
         });
 
         peer.on('disconnected', () => {
-            console.warn('Shop peer disconnected from PeerJS server. Attempting to reconnect...');
+            console.warn('[SHOP] Shop peer disconnected from PeerJS server. Attempting to reconnect...');
             updateShopPeerStatus("Disconnected from PeerJS server. Reconnecting...", "pending", "Reconnecting...");
             if (peer && !peer.destroyed) {
-                try { peer.reconnect(); } catch(e) { console.error("Error reconnecting peer:", e); }
+                try { peer.reconnect(); } catch(e) { console.error("[SHOP] Error reconnecting peer:", e); }
             }
         });
 
         peer.on('close', () => {
-            console.log('Shop peer instance closed.');
+            console.log('[SHOP] Shop peer instance closed.');
             updateShopPeerStatus("Peer connection closed. Please Set/Refresh ID.", "error", "Closed");
             currentShopPeerId = null;
         });
 
         peer.on('error', (err) => {
-            console.error('Shop PeerJS general error:', err);
+            console.error('[SHOP] Shop PeerJS general error:', err);
             let message = `Error: ${err.message || err.type || 'Unknown PeerJS error'}`;
              if (err.type === 'unavailable-id' && shopPeerIdInput) {
                 message = `Error: Requested Peer ID "${shopPeerIdInput.value}" is already taken. Try another or leave blank.`;
@@ -147,7 +157,7 @@ function initializeShopPeer(requestedId = null) {
 }
 
 function handleClientDisconnect(clientPeerId) {
-    console.log(`Connection from ${clientPeerId} closed.`);
+    console.log(`[SHOP] Client ${clientPeerId} disconnected.`);
     updateShopPeerStatus(`Client ${clientPeerId.substring(0,8)}... disconnected.`, "pending", currentShopPeerId);
     delete connectedClients[clientPeerId];
 
@@ -166,6 +176,9 @@ function handleClientDisconnect(clientPeerId) {
 
 
 function updateShopPeerStatus(message, type = "info", peerIdText = "N/A") {
+    const logMessage = `[SHOP PeerJS Status] ${type.toUpperCase()}: ${message} (Peer ID Text: ${peerIdText})`;
+    console.log(logMessage);
+
     if (peerIdDisplaySpan) peerIdDisplaySpan.textContent = peerIdText;
     if (peerConnectionMessage) peerConnectionMessage.textContent = message;
 
@@ -182,8 +195,9 @@ function updateShopPeerStatus(message, type = "info", peerIdText = "N/A") {
 }
 
 function displayNewOrder(orderData, clientPeerId) {
+    console.log(`[SHOP] displayNewOrder called for clientPeerId: ${clientPeerId}, orderData idempotencyKey: ${orderData.idempotencyKey}`);
     if (!ordersListDiv) {
-        console.error("ordersListDiv not found, cannot display order.");
+        console.error("[SHOP] ordersListDiv not found, cannot display order.");
         return;
     }
     if(noOrdersMessage) noOrdersMessage.style.display = 'none';
@@ -315,11 +329,13 @@ function updateOrderStatusInUI(dataId, message, isError = false) {
 
 function handleImageDataChunk(chunkData, clientPeerId) {
     const { dataId, chunkIndex, chunkData: imagePart, totalChunks, isLastChunk } = chunkData;
-    console.log(`Received chunk ${chunkIndex + 1}/${totalChunks} for dataId: ${dataId} from ${clientPeerId}`);
+    // Avoid logging the full imagePart if it's large
+    const loggableChunkData = {...chunkData, chunkData: `(chunk data length: ${imagePart.length})`};
+    console.log(`[SHOP] Received imageDataChunk: ${JSON.stringify(loggableChunkData)} from ${clientPeerId}`);
+
 
     if (!incomingImageChunks[dataId]) {
-        console.error(`Received chunk for unknown dataId: ${dataId}. Discarding.`);
-        // Optionally, send an error back to the client.
+        console.error(`[SHOP] Received chunk for unknown dataId: ${dataId}. Discarding.`);
         const clientConn = connectedClients[clientPeerId];
         if (clientConn && clientConn.open) {
             clientConn.send({ type: 'chunkError', dataId: dataId, message: 'Unknown dataId. Please resend order metadata.' });
@@ -329,76 +345,70 @@ function handleImageDataChunk(chunkData, clientPeerId) {
 
     const assemblyInfo = incomingImageChunks[dataId];
     if (assemblyInfo.status === 'completed' || assemblyInfo.status === 'failed') {
-        console.warn(`Received chunk for already processed dataId: ${dataId} (status: ${assemblyInfo.status}). Discarding.`);
+        console.warn(`[SHOP] Received chunk for already processed dataId: ${dataId} (status: ${assemblyInfo.status}). Discarding.`);
         return;
     }
 
-    // Initialize totalChunks if this is the first chunk
-    if (assemblyInfo.totalChunks === -1) {
+    if (assemblyInfo.totalChunks === -1) { // Initialize totalChunks if this is the first chunk
         assemblyInfo.totalChunks = totalChunks;
-        assemblyInfo.chunks = new Array(totalChunks); // Initialize array of correct size
+        assemblyInfo.chunks = new Array(totalChunks);
+        console.log(`[SHOP] Initialized chunk assembly for dataId ${dataId}. Expecting ${totalChunks} chunks.`);
     }
 
     if (chunkIndex >= assemblyInfo.totalChunks) {
-        console.error(`Received chunkIndex ${chunkIndex} which is out of bounds for totalChunks ${assemblyInfo.totalChunks} for dataId ${dataId}.`);
+        console.error(`[SHOP] Received chunkIndex ${chunkIndex} which is out of bounds for totalChunks ${assemblyInfo.totalChunks} for dataId ${dataId}.`);
         updateOrderStatusInUI(dataId, `Error: Received invalid image chunk index.`, true);
         assemblyInfo.status = 'failed';
-        delete incomingImageChunks[dataId]; // Clean up
+        delete incomingImageChunks[dataId];
         return;
     }
 
-    if (!assemblyInfo.chunks[chunkIndex]) { // Avoid processing duplicate chunks
+    if (!assemblyInfo.chunks[chunkIndex]) {
         assemblyInfo.chunks[chunkIndex] = imagePart;
         assemblyInfo.receivedChunks++;
     } else {
-        console.warn(`Received duplicate chunk ${chunkIndex + 1}/${totalChunks} for dataId: ${dataId}. Ignoring.`);
+        console.warn(`[SHOP] Received duplicate chunk ${chunkIndex + 1}/${totalChunks} for dataId: ${dataId}. Ignoring.`);
     }
 
     const percentageComplete = assemblyInfo.totalChunks > 0 ? Math.round((assemblyInfo.receivedChunks / assemblyInfo.totalChunks) * 100) : 0;
+    console.log(`[SHOP] Chunk assembly for dataId ${dataId}: ${assemblyInfo.receivedChunks}/${assemblyInfo.totalChunks} chunks received (${percentageComplete}%).`);
     updateOrderStatusInUI(dataId, `Receiving image for order... ${percentageComplete}% (${assemblyInfo.receivedChunks}/${assemblyInfo.totalChunks} chunks).`);
 
-    if (assemblyInfo.receivedChunks === assemblyInfo.totalChunks && assemblyInfo.totalChunks > 0) { // Ensure totalChunks is known
-        // All chunks received, attempt to reassemble
-        console.log(`All ${totalChunks} chunks received for dataId: ${dataId}. Reassembling...`);
+    if (assemblyInfo.receivedChunks === assemblyInfo.totalChunks && assemblyInfo.totalChunks > 0) {
+        console.log(`[SHOP] All ${totalChunks} chunks received for dataId: ${dataId}. Attempting to reassemble...`);
         try {
             const fullDataUrl = assemblyInfo.chunks.join('');
-            // Update the original orderData stored in assemblyInfo
+            console.log(`[SHOP] Reassembly successful for dataId ${dataId}. Full data URL length: ${fullDataUrl.length}`);
             assemblyInfo.orderData.designDataUrl = fullDataUrl;
-            // Mark that it's no longer waiting for chunks for display purposes in displayNewOrder
-            assemblyInfo.orderData.designDataUrlComingInChunks = false;
+            assemblyInfo.orderData.designDataUrlComingInChunks = false; // Mark as complete
             assemblyInfo.status = 'completed';
 
-            // Refresh the card with the complete image
-            displayNewOrder(assemblyInfo.orderData, clientPeerId);
-            updateOrderStatusInUI(dataId, `Image reassembled and displayed.`); // Final status update
+            displayNewOrder(assemblyInfo.orderData, clientPeerId); // Refresh card with image
+            updateOrderStatusInUI(dataId, `Image reassembled and displayed.`);
 
-            delete incomingImageChunks[dataId]; // Clean up after successful assembly
+            delete incomingImageChunks[dataId];
         } catch (error) {
-            console.error(`Error reassembling data for dataId ${dataId}:`, error);
+            console.error(`[SHOP] Error reassembling data for dataId ${dataId}:`, error);
             updateOrderStatusInUI(dataId, `Error: Failed to reassemble image data. ${error.message}`, true);
             assemblyInfo.status = 'failed';
-            // Notify client?
             const clientConn = connectedClients[clientPeerId];
             if (clientConn && clientConn.open) {
                 clientConn.send({ type: 'chunkError', dataId: dataId, message: 'Failed to reassemble image on shop side.' });
             }
-            delete incomingImageChunks[dataId]; // Clean up
+            delete incomingImageChunks[dataId];
         }
     } else if (isLastChunk && assemblyInfo.receivedChunks < assemblyInfo.totalChunks) {
-        // This case should ideally not happen if totalChunks is accurate and no chunks are lost.
-        // It means the last chunk was received, but we are still missing some.
-        console.warn(`Last chunk received for ${dataId}, but not all chunks are present. Received: ${assemblyInfo.receivedChunks}, Expected: ${assemblyInfo.totalChunks}`);
-        updateOrderStatusInUI(dataId, `Warning: Last image chunk received, but some previous chunks might be missing. Waiting for more...`, true);
+        console.warn(`[SHOP] Last chunk received for ${dataId}, but not all chunks are present. Received: ${assemblyInfo.receivedChunks}, Expected: ${assemblyInfo.totalChunks}. This might indicate lost chunks.`);
+        updateOrderStatusInUI(dataId, `Warning: Last image chunk received, but some previous chunks might be missing. Waiting...`, true);
     }
 }
 
 function handleImageDataAbort(abortData, clientPeerId) {
     const { dataId, message } = abortData;
-    console.error(`Client ${clientPeerId} aborted image data transfer for dataId ${dataId}: ${message}`);
+    console.error(`[SHOP] Client ${clientPeerId} aborted image data transfer for dataId ${dataId}: ${message}`);
     if (incomingImageChunks[dataId]) {
         incomingImageChunks[dataId].status = 'failed';
         updateOrderStatusInUI(dataId, `Image transfer aborted by client: ${message}`, true);
-        // Optionally, remove the partial order card or mark it as failed permanently
         const orderCardElement = document.getElementById(`order-card-${dataId}`);
         if (orderCardElement) {
             const processBtn = orderCardElement.querySelector('.process-payment-btn');
@@ -407,11 +417,11 @@ function handleImageDataAbort(abortData, clientPeerId) {
                 processBtn.textContent = "Image Failed";
             }
         }
-        delete incomingImageChunks[dataId]; // Clean up
+        delete incomingImageChunks[dataId];
     }
 }
 
-Inside handleProcessPayment function in printshop.js
+// Inside handleProcessPayment function in printshop.js
 
 // ... (other parts of the function like getting orderData)
 
@@ -442,29 +452,10 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
     if (statusEl) statusEl.textContent = 'Processing payment with Square...';
     if (processBtn) processBtn.disabled = true;
 
-    console.log("Attempting to process payment for order:", orderData);
-    console.log("Using Square API Key (masked for log):", "********" + squareSecretKey.slice(-4));
+    console.log("[SHOP] Attempting to process payment for orderData:", JSON.stringify(orderData));
+    // The squareSecretKey is not used when calling a backend, so no need to log it here in that context.
+    // If direct Square API call was still an option, then logging its presence (not value) would be relevant.
 
-    // --- Direct Square API Call from Browser ---
-    // WARNING: This is generally not recommended for security reasons.
-    // The Square Secret API Key will be present in the browser's memory and network requests.
-    // Proceeding as per user's understanding of the risks for their specific environment.
-
-    //const SQUARE_API_URL = 'https://connect.squareupsandbox.com/v2/payments'; // For Sandbox
-    // For production, use: 'https://connect.squareup.com/v2/payments';
-
-    const paymentPayload = {
-        source_id: orderData.sourceId,
-        idempotency_key: orderData.idempotencyKey || `peer-order-${Date.now()}`, // Ensure idempotency key
-        amount_money: {
-            amount: orderData.amountCents, // Square API expects amount as integer in smallest currency unit
-            currency: orderData.currency || 'USD'
-        },
-        // Optional: Add more details if needed by Square API
-        // buyer_email_address: orderData.billingContact?.email,
-        // note: `Order for ${orderData.orderDetails?.quantity} stickers (${orderData.orderDetails?.material})`,
-    };
-// NEW WAY - Calling your Node.js backend
     const YOUR_NODE_SERVER_URL = 'http://localhost:3000/api/process-payment'; // Or your actual hosted URL if deployed
 
     const paymentPayloadForFunction = {
@@ -472,117 +463,99 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
         idempotencyKey: orderData.idempotencyKey || `peer-order-${Date.now()}`,
         amountCents: orderData.amountCents,
         currency: orderData.currency || 'USD',
-        // You can pass other orderDetails if your server needs them
+        // billingContact: orderData.billingContact, // You might want to pass this to your backend
+        // orderDetails: orderData.orderDetails, // And this too
     };
+    console.log("[SHOP] Calling backend server for payment. URL:", YOUR_NODE_SERVER_URL);
+    console.log("[SHOP] Payload for backend server:", JSON.stringify(paymentPayloadForFunction));
 
     try {
-        console.log("Sending payment processing request to backend server:", YOUR_NODE_SERVER_URL, JSON.stringify(paymentPayloadForFunction));
-        
-        // THIS IS THE FETCH CALL THAT NEEDS TO BE MODIFIED
-        const response = await fetch(YOUR_NODE_SERVER_URL, { // <<< CHANGE THIS URL
+        const response = await fetch(YOUR_NODE_SERVER_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-                // NO 'Authorization': `Bearer ${squareSecretKey}` header here anymore!
+                // The Square Secret API Key is NOT sent from here to your backend.
+                // Your backend uses its own configured SQUARE_ACCESS_TOKEN.
             },
             body: JSON.stringify(paymentPayloadForFunction)
         });
 
-        const responseData = await response.json();
-        console.log("Response from backend server:", responseData);
+        // Try to always get text first for better error diagnosis if JSON parsing fails
+        const responseText = await response.text();
+        console.log("[SHOP] Raw response text from backend server:", responseText);
 
-        if (!response.ok || responseData.error) {
-            let errorMessage = "Payment processing failed.";
-            if (responseData.error && responseData.details) {
+        let responseData;
+        try {
+            responseData = JSON.parse(responseText);
+        } catch (e) {
+            console.error("[SHOP] Failed to parse JSON response from backend:", e);
+            throw new Error(`Non-JSON response from server: ${response.status} ${response.statusText}. Body: ${responseText}`);
+        }
+
+        console.log("[SHOP] Parsed JSON response from backend server:", responseData);
+
+        if (!response.ok || responseData.error) { // Check response.ok for HTTP status errors
+            let errorMessage = "Payment processing failed via backend.";
+            if (responseData.error && responseData.details) { // Square-like error structure
                 errorMessage = responseData.details.map(err => `[${err.category}/${err.code}]: ${err.detail}`).join('; ');
-            } else if (responseData.error) {
+            } else if (responseData.error) { // Simpler error message from backend
                 errorMessage = responseData.error;
+            } else if (!response.ok) {
+                errorMessage = `Backend server error: ${response.status} ${response.statusText}`;
             }
             throw new Error(errorMessage);
         }
 
-        // Payment successful
-        const payment = responseData.payment;
-        // ... (rest of your success handling)
+        // Payment successful path
+        const payment = responseData.payment; // Assuming backend returns the payment object from Square
+        console.log("[SHOP] Payment successful via backend. Square Payment:", payment);
+
+        if (statusEl) {
+            statusEl.textContent = `Success! Payment ID: ${payment?.id || 'N/A'}. Order confirmed.`;
+            statusEl.classList.remove('text-red-700', 'text-blue-700');
+            statusEl.classList.add('text-green-700');
+        }
+        if (processBtn) processBtn.textContent = "Payment Processed";
+
+        const clientConn = connectedClients[clientPeerId];
+        const paymentResponseToClient = {
+            type: 'paymentResponse',
+            success: true,
+            paymentId: payment?.id,
+            orderId: payment?.order_id, // Square uses order_id
+            message: 'Your payment was successful and the order is confirmed!',
+            // designIpfsHash: "placeholder_if_shop_uploads_to_ipfs" // Example if shop handles IPFS
+        };
+        console.log("[SHOP] Sending successful paymentResponse to client:", JSON.stringify(paymentResponseToClient));
+        if (clientConn && clientConn.open) {
+            clientConn.send(paymentResponseToClient);
+        }
 
     } catch (error) {
-        console.error("Error processing payment via backend server:", error);
-        // ... (rest of your error handling)
+        console.error("[SHOP] Error processing payment via backend server:", error);
+        if (statusEl) {
+            statusEl.textContent = `Error: ${error.message}`;
+            statusEl.classList.remove('text-green-700', 'text-blue-700');
+            statusEl.classList.add('text-red-700');
+        }
+        if (processBtn) {
+            processBtn.disabled = false; // Re-enable button on failure
+            processBtn.textContent = "Retry Payment";
+        }
+
+        const clientConn = connectedClients[clientPeerId];
+        const errorResponseToClient = {
+            type: 'paymentResponse',
+            success: false,
+            message: `Payment processing failed: ${error.message}`
+        };
+        console.log("[SHOP] Sending failed paymentResponse to client:", JSON.stringify(errorResponseToClient));
+        if (clientConn && clientConn.open) {
+            clientConn.send(errorResponseToClient);
+        }
     }
 }
-    // try {
-        // console.log("Sending CreatePayment request to Square API:", JSON.stringify(paymentPayload));
-        // const response = await fetch(SQUARE_API_URL, {
-            // method: 'POST',
-            // headers: {
-                // 'Square-Version': '2023-10-18', // Use a recent API version
-                // 'Authorization': `Bearer ${squareSecretKey}`,
-                // 'Content-Type': 'application/json'
-            // },
-            // body: JSON.stringify(paymentPayload)
-        // });
-
-        // const responseData = await response.json();
-        // console.log("Square API Response:", responseData);
-
-        // if (!response.ok || responseData.errors) {
-            // let errorMessage = "Payment processing failed.";
-            // if (responseData.errors && responseData.errors.length > 0) {
-                // errorMessage = responseData.errors.map(err => `[${err.category}/${err.code}]: ${err.detail}`).join('; ');
-            // } else if (responseData.error && responseData.error.message) { // Older error format
-                 // errorMessage = responseData.error.message;
-            // } else if (response.statusText) {
-                // errorMessage = `Square API Error: ${response.status} ${response.statusText}`;
-            // }
-            // throw new Error(errorMessage);
-        // }
-
-       // Payment successful
-        // const payment = responseData.payment;
-        // if (statusEl) {
-            // statusEl.textContent = `Success! Payment ID: ${payment.id}. Order confirmed.`;
-            // statusEl.classList.remove('text-red-700');
-            // statusEl.classList.add('text-green-700');
-        // }
-        // if (processBtn) processBtn.textContent = "Payment Processed";
-
-        // const clientConn = connectedClients[clientPeerId];
-        // if (clientConn && clientConn.open) {
-            // clientConn.send({
-                // type: 'paymentResponse',
-                // success: true,
-                // paymentId: payment.id,
-                // orderId: payment.order_id, // Square uses order_id
-                // message: 'Your payment was successful and the order is confirmed!',
-            // });
-        // }
-
-     //   Here you would typically also save the order details locally at the print shop,
-     //   associate it with the Square payment ID, and manage fulfillment.
-     //   Also, consider IPFS upload of the design here if needed.
-
-    // } catch (error) {
-        // console.error("Error processing payment with Square API:", error);
-        // if (statusEl) {
-            // statusEl.textContent = `Error: ${error.message}`;
-            // statusEl.classList.remove('text-green-700');
-            // statusEl.classList.add('text-red-700');
-        // }
-        // if (processBtn) {
-            // processBtn.disabled = false;
-            // processBtn.textContent = "Retry Payment";
-        // }
-
-        // const clientConn = connectedClients[clientPeerId];
-        // if (clientConn && clientConn.open) {
-            // clientConn.send({
-                // type: 'paymentResponse',
-                // success: false,
-                // message: `Payment processing failed: ${error.message}`
-            // });
-        // }
-    // }
-// }
+// } // This curly brace seems to be a leftover from commented out code, removing it.
 
 
 // --- DOMContentLoaded ---
