@@ -117,7 +117,9 @@ app.post('/api/process-payment', async (req, res) => {
 // --- Start Server ---
 app.listen(port, () => {
     console.log(`[SERVER] Server listening at http://localhost:${port}`);
-    console.log(`[SERVER] Configured Square Environment for SDK: ${squareClient.config.environment}`);
+    // The actual environment used by the SDK was determined by process.env.SQUARE_ENVIRONMENT
+    // and logged during client initialization. Accessing it via squareClient.config.environment was problematic.
+    console.log(`[SERVER] Square client was initialized using environment: ${process.env.SQUARE_ENVIRONMENT || 'sandbox (default)'}`);
     // SQUARE_ACCESS_TOKEN is sensitive, so avoid logging its direct value.
     // We already logged its presence earlier.
 });
