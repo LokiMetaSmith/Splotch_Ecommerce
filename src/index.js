@@ -417,29 +417,40 @@ function handleAddText() {
 }
 
 async function handlePaymentFormSubmit(event) {
+    console.log('[CLIENT] handlePaymentFormSubmit triggered.');
     event.preventDefault();
+    console.log('[CLIENT] handlePaymentFormSubmit: event.preventDefault() called.');
+
     if (ipfsLinkContainer) {
+      console.log('[CLIENT] handlePaymentFormSubmit: Resetting IPFS link container.');
       ipfsLinkContainer.innerHTML = '';
       ipfsLinkContainer.className = 'mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow';
       ipfsLinkContainer.style.visibility = 'hidden';
     }
     showPaymentStatus('Processing order...', 'info');
+    console.log('[CLIENT] handlePaymentFormSubmit: Initial "Processing order..." status shown.');
 
     if (!connToShop || !connToShop.open) {
+        console.warn('[CLIENT] handlePaymentFormSubmit: No connection to shop or connection not open. connToShop:', connToShop, 'connToShop.open:', connToShop ? connToShop.open : 'N/A');
         showPaymentStatus('Not connected to the print shop. Please wait or try refreshing. Ensure the print shop application is running.', 'error');
-        console.error('PeerJS connection to shop not open or not established for submitting payment.');
+        console.error('[CLIENT] PeerJS connection to shop not open or not established for submitting payment.');
         if (!connToShop && peer && !peer.destroyed && PRINT_SHOP_PEER_ID !== 'YOUR_PRINT_SHOP_PEER_ID_PLACEHOLDER') {
+            console.log('[CLIENT] handlePaymentFormSubmit: Attempting to reconnect to print shop.');
             updatePeerJsStatus("Attempting to reconnect to print shop...", "warning");
             connectToPrintShop(); // Try to reconnect
         }
         return;
     }
+    console.log('[CLIENT] handlePaymentFormSubmit: Connection to shop is open.');
 
     if (currentOrderAmountCents <= 0) {
+      console.warn('[CLIENT] handlePaymentFormSubmit: Invalid order amount. currentOrderAmountCents:', currentOrderAmountCents);
       showPaymentStatus('Invalid order amount. Please check sticker quantity/material.', 'error'); return;
     }
+    console.log('[CLIENT] handlePaymentFormSubmit: Order amount is valid. currentOrderAmountCents:', currentOrderAmountCents);
 
     try {
+      console.log('[CLIENT] handlePaymentFormSubmit: Entering try block for payment processing.');
       const billingContact = {
         givenName: document.getElementById('firstName').value || undefined,
         familyName: document.getElementById('lastName').value || undefined,
