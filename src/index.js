@@ -245,7 +245,7 @@ async function BootStrap() {
 
     initializePeer();
 
-    console.log(`Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`);
+    console.log(`[CLIENT] Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`);
     try {
         if (!window.Square || !window.Square.payments) {
             throw new Error("Square SDK (window.Square or window.Square.payments) is not loaded.");
@@ -254,14 +254,14 @@ async function BootStrap() {
       } catch (error) {
         // Use showPaymentStatus for user-facing error
         showPaymentStatus(`Failed to initialize Square payments SDK: ${error.message}`, 'error');
-        console.error("Failed to initialize Square payments SDK:", error); // Keep console error for details
+        console.error("[CLIENT] Failed to initialize Square payments SDK:", error); // Keep console error for details
         return;
       }
 
       try {
         card = await initializeCard(payments);
       } catch (e) {
-        console.error("Initializing Card failed", e);
+        console.error("[CLIENT] Initializing Card failed", e);
         showPaymentStatus(`Error initializing card form: ${e.message}`, 'error');
       }
 
@@ -270,7 +270,7 @@ async function BootStrap() {
           stickerQuantityInput.addEventListener('input', calculateAndUpdatePrice);
           stickerQuantityInput.addEventListener('change', calculateAndUpdatePrice);
       } else {
-          console.warn("Sticker quantity input with ID 'stickerQuantity' not found.");
+          console.warn("[CLIENT] Sticker quantity input with ID 'stickerQuantity' not found.");
           currentOrderAmountCents = 100;
           if (calculatedPriceDisplay) calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
       }
@@ -278,13 +278,13 @@ async function BootStrap() {
       if (stickerMaterialSelect) {
           stickerMaterialSelect.addEventListener('change', calculateAndUpdatePrice);
       } else {
-          console.warn("Sticker material select with ID 'stickerMaterial' not found.");
+          console.warn("[CLIENT] Sticker material select with ID 'stickerMaterial' not found.");
       }
 
       if (addTextBtn) {
         addTextBtn.addEventListener('click', handleAddText);
       } else {
-        console.warn("Add Text button with ID 'addTextBtn' not found.");
+        console.warn("[CLIENT] Add Text button with ID 'addTextBtn' not found.");
       }
 
       if (rotateLeftBtnEl) rotateLeftBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(-90));
@@ -294,14 +294,18 @@ async function BootStrap() {
       if (resizeBtnEl) resizeBtnEl.addEventListener('click', handleResize);
       if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
 
+      console.log('[CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef:', paymentFormGlobalRef);
       if (paymentFormGlobalRef) {
+        console.log('[CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.');
         paymentFormGlobalRef.addEventListener('submit', handlePaymentFormSubmit);
         if(paymentFormGlobalRef.querySelector('button[type="submit"]')) {
             paymentFormGlobalRef.querySelector('button[type="submit"]').disabled = true; // Initially disable
         }
+        // This status update is potentially redundant if initializePeer() already connected.
+        // We can address this later if needed. For now, let's keep it to see the full log sequence.
         updatePeerJsStatus("Attempting to connect to print shop...", "info");
       } else {
-        console.error("Payment form with ID 'payment-form' not found. Payments will not work.");
+        console.error("[CLIENT] BootStrap: Payment form with ID 'payment-form' not found. Payments will not work.");
         showPaymentStatus("Payment form is missing. Cannot process payments.", "error");
       }
 
