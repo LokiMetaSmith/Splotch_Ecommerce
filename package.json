@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/LokiMetaSmith/lokimetasmith.github.io#readme",
   "dependencies": {
+    "multer": "^2.0.1",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.4"
   }
