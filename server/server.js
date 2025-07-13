@@ -1,125 +1,173 @@
 // server.js
 const express = require('express');
-const squarePackage = require('square');
-
-console.log('--- Square Package Output ---');
-console.log(squarePackage); 
-
-// Correct way to get Client and Environment based on your log output
-const Client = squarePackage.SquareClient; 
-const Environment = squarePackage.SquareEnvironment;
-
-console.log('--- Client from squarePackage.SquareClient ---');
-console.log(Client);
-console.log('--- Environment from squarePackage.SquareEnvironment ---');
-console.log(Environment);
-
+const { SquareClient, Environment } = require('square');
 const { randomUUID } = require('crypto');
 const cors = require('cors');
-require('dotenv').config(); // To load environment variables from a .env file
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 3000; // Use port from .env or default to 3000
+const port = process.env.PORT || 3000;
 
+// --- Ensure upload directory exists ---
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// --- In-Memory "Database" ---
+// WARNING: This is for demonstration purposes. Data will be lost on server restart.
+// For production, replace this with a real database (e.g., SQLite, PostgreSQL, MongoDB).
+const ordersDB = [];
+console.log('[SERVER] In-memory database initialized.');
+
+// --- Multer Configuration for File Uploads ---
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage });
+console.log('[SERVER] Multer configured for file uploads.');
+
+// --- Square Client Initialization ---
 console.log('[SERVER] Initializing Square client...');
 if (!process.env.SQUARE_ACCESS_TOKEN) {
     console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
-    // process.exit(1); // Potentially exit if critical
-} else {
-    console.log('[SERVER] SQUARE_ACCESS_TOKEN is present (value not logged for security).');
-}
-console.log(`[SERVER] Target Square Environment: ${process.env.SQUARE_ENVIRONMENT || 'sandbox (default)'}`);
-
-
-if (!Environment) {
-    console.error('[SERVER] FATAL: Square SDK Environment object is undefined. Cannot initialize client.');
     process.exit(1);
 }
-if (!Client) { // Add a check for Client too
-    console.error('[SERVER] FATAL: Square SDK Client object is undefined. Cannot initialize client.');
-    process.exit(1);
-}
-const squareClient = new Client({
+const squareClient = new SquareClient({
     environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
 });
 console.log('[SERVER] Square client initialized.');
 
 // --- Middleware ---
-// Enable CORS: Configure this carefully for production
-// For development, you might allow your specific client origin:
-const corsOptions = {
-    origin: 'https://lokimetasmith.github.io', // Or where your printshop.html is served
-    optionsSuccessStatus: 200 // For legacy browser support
-};
-app.use(cors(corsOptions));
-console.log('[SERVER] CORS middleware enabled with origin:', corsOptions.origin);
-app.use(express.json()); // To parse JSON request bodies
-console.log('[SERVER] Express JSON middleware enabled.');
+app.use(cors({ origin: 'https://lokimetasmith.github.io', optionsSuccessStatus: 200 }));
+app.use(express.json()); // To parse JSON request bodies (for APIs without file uploads)
+app.use('/uploads', express.static(uploadDir)); // Serve uploaded files statically
+console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
 
-// --- API Endpoint for Processing Payments ---
-app.post('/api/process-payment', async (req, res) => {
-    console.log('[SERVER] Received POST request on /api/process-payment');
-    console.log('[SERVER] Request body from print shop:', JSON.stringify(req.body));
+// --- API Endpoints ---
+
+/**
+ * Endpoint to create a new order.
+ * Expects a `multipart/form-data` request with:
+ * - 'designImage': The image file for the sticker.
+ * - All other order details as form fields (e.g., sourceId, amountCents, quantity, material, etc.).
+ */
+app.post('/api/create-order', upload.single('designImage'), async (req, res) => {
+    console.log('[SERVER] Received POST request on /api/create-order');
+    console.log('[SERVER] Request body:', req.body);
+    console.log('[SERVER] Request file:', req.file);
 
     try {
-        const { sourceId, idempotencyKey, amountCents, currency /*, other details */ } = req.body;
+        const { sourceId, amountCents, currency, ...orderDetails } = req.body;
 
-        if (!sourceId || !amountCents) {
-            console.warn('[SERVER] Missing required payment parameters in request body. sourceId:', sourceId, 'amountCents:', amountCents);
-            return res.status(400).json({ error: 'Missing required payment parameters.' });
+        if (!sourceId || !amountCents || !req.file) {
+            console.warn('[SERVER] Missing required parameters: sourceId, amountCents, or designImage.');
+            return res.status(400).json({ error: 'Missing required parameters (sourceId, amountCents, designImage).' });
         }
 
+        // 1. Process Payment
         const paymentPayload = {
             sourceId: sourceId,
-            idempotencyKey: idempotencyKey || randomUUID(),
+            idempotencyKey: randomUUID(),
             amountMoney: {
-                amount: amountCents, // Square API expects amount as integer in smallest currency unit
+                amount: BigInt(amountCents), // Use BigInt for currency
                 currency: currency || 'USD',
             },
-            // locationId: process.env.SQUARE_LOCATION_ID, // Optional: If you need to specify location ID
+        };
+        console.log('[SERVER] Calling Square CreatePayment API with payload:', JSON.stringify(paymentPayload));
+        const { result: paymentResult, statusCode } = await squareClient.paymentsApi.createPayment(paymentPayload);
+
+        if (statusCode >= 300 || (paymentResult.errors && paymentResult.errors.length > 0)) {
+            console.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
+            return res.status(statusCode || 400).json({ error: 'Square API Error', details: paymentResult.errors });
+        }
+        console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
+
+        // 2. If payment is successful, create and store the order
+        const newOrder = {
+            orderId: randomUUID(),
+            paymentId: paymentResult.payment.id,
+            squareOrderId: paymentResult.payment.orderId,
+            amount: Number(amountCents), // Store as number
+            currency: currency || 'USD',
+            status: 'NEW', // Initial status
+            orderDetails: JSON.parse(orderDetails.orderDetails), // Assuming orderDetails is a JSON string
+            billingContact: JSON.parse(orderDetails.billingContact), // Assuming billingContact is a JSON string
+            designImagePath: `/uploads/${req.file.filename}`, // Path to access the file
+            receivedAt: new Date().toISOString(),
         };
 
-        console.log('[SERVER] Prepared paymentPayload for Square API:', JSON.stringify(paymentPayload));
-        console.log('[SERVER] Calling squareClient.paymentsApi.createPayment...');
-        const { result, statusCode } = await squareClient.paymentsApi.createPayment(paymentPayload);
+        ordersDB.push(newOrder);
+        console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}. Total orders in DB: ${ordersDB.length}`);
 
-        console.log('[SERVER] Response from Square API. Status Code:', statusCode);
-        console.log('[SERVER] Response body from Square API (result):', JSON.stringify(result));
+        // TODO: In a real app, you would push a notification to connected print shops via WebSockets here.
 
-        if (result.errors && result.errors.length > 0) {
-            console.warn('[SERVER] Square API returned errors:', JSON.stringify(result.errors));
-            return res.status(statusCode || 400).json({ error: 'Square API Error', details: result.errors });
-        }
-
-        const responseToPrintShop = { success: true, payment: result.payment };
-        console.log('[SERVER] Sending successful response to print shop:', JSON.stringify(responseToPrintShop));
-        return res.status(200).json(responseToPrintShop);
+        return res.status(201).json({ success: true, order: newOrder });
 
     } catch (error) {
-        console.error('[SERVER] Error processing payment in /api/process-payment:', error);
-        // Check if it's a Square API error with a response body (from Square SDK structure)
-        if (error.response && error.response.data && error.response.data.errors) { // Error from Square SDK
-            console.error('[SERVER] Square API error details:', JSON.stringify(error.response.data.errors));
+        console.error('[SERVER] Critical error in /api/create-order:', error);
+        if (error.response && error.response.data) { // Square SDK specific error wrapping
             return res.status(error.statusCode || 500).json({ error: 'Square API Error', details: error.response.data.errors });
-        } else if (error.errors && error.statusCode) { // Another common structure for Square SDK errors
-             console.error('[SERVER] Square API error (alternative structure):', JSON.stringify(error.errors));
-            return res.status(error.statusCode).json({ error: 'Square API Error', details: error.errors });
         }
-        // Generic server error
-        const errorResponseToPrintShop = { error: 'Internal Server Error', message: error.message };
-        console.log('[SERVER] Sending internal server error response to print shop:', JSON.stringify(errorResponseToPrintShop));
-        return res.status(500).json(errorResponseToPrintShop);
+        return res.status(500).json({ error: 'Internal Server Error', message: error.message });
     }
 });
+
+
+/**
+ * Endpoint for the print shop to fetch all orders.
+ * In a real application, you'd add filtering (e.g., by status) and pagination.
+ */
+app.get('/api/orders', (req, res) => {
+    console.log(`[SERVER] Received GET request on /api/orders. Returning ${ordersDB.length} orders.`);
+    // Return orders in reverse chronological order (newest first)
+    res.status(200).json(ordersDB.slice().reverse());
+});
+
+/**
+ * Endpoint for the print shop to update an order's status.
+ */
+app.post('/api/orders/:orderId/status', (req, res) => {
+    const { orderId } = req.params;
+    const { status } = req.body;
+    console.log(`[SERVER] Received status update request for Order ID: ${orderId}. New status: ${status}`);
+
+    if (!status) {
+        return res.status(400).json({ error: 'Status is required.' });
+    }
+
+    const order = ordersDB.find(o => o.orderId === orderId);
+
+    if (!order) {
+        console.warn(`[SERVER] Status update failed: Order ID ${orderId} not found.`);
+        return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    order.status = status;
+    order.lastUpdatedAt = new Date().toISOString();
+    console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
+
+    // TODO: In a real app, you might push a notification to the client here via WebSockets.
+
+    res.status(200).json({ success: true, order: order });
+});
+
 
 // --- Start Server ---
 app.listen(port, () => {
     console.log(`[SERVER] Server listening at http://localhost:${port}`);
-    // The actual environment used by the SDK was determined by process.env.SQUARE_ENVIRONMENT
-    // and logged during client initialization. Accessing it via squareClient.config.environment was problematic.
+    console.log(`[SERVER] Uploads will be saved to: ${uploadDir}`);
+    console.log(`[SERVER] Static files served from /uploads`);
     console.log(`[SERVER] Square client was initialized using environment: ${process.env.SQUARE_ENVIRONMENT || 'sandbox (default)'}`);
-    // SQUARE_ACCESS_TOKEN is sensitive, so avoid logging its direct value.
-    // We already logged its presence earlier.
 });
