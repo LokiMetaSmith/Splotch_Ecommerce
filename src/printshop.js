@@ -1,18 +1,26 @@
 // printshop.js
+import SVGNest from './lib/svgnest.js';
+import SVGParser from './lib/svgparser.js';
 
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // --- DOM Elements ---
-let ordersListDiv, noOrdersMessage, refreshOrdersBtn;
+let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer;
 
 // --- Main Setup ---
 document.addEventListener('DOMContentLoaded', () => {
     ordersListDiv = document.getElementById('orders-list');
     noOrdersMessage = document.getElementById('no-orders-message');
     refreshOrdersBtn = document.getElementById('refreshOrdersBtn');
+    nestStickersBtn = document.getElementById('nestStickersBtn');
+    nestedSvgContainer = document.getElementById('nested-svg-container');
 
     if (refreshOrdersBtn) {
         refreshOrdersBtn.addEventListener('click', fetchAndDisplayOrders);
+    }
+
+    if (nestStickersBtn) {
+        nestStickersBtn.addEventListener('click', handleNesting);
     }
 
     // Fetch orders when the page loads
@@ -167,5 +175,56 @@ async function updateOrderStatus(orderId, newStatus) {
     } catch (error) {
         console.error(`[SHOP] Error updating status for order ${orderId}:`, error);
         if (statusMsgEl) statusMsgEl.textContent = `Error: ${error.message}`;
+    }
+}
+
+/**
+ * Handles the sticker nesting process.
+ */
+async function handleNesting() {
+    console.log('[SHOP] Starting nesting process...');
+    nestedSvgContainer.innerHTML = '<p>Nesting in progress...</p>';
+
+    // 1. Gather all SVG URLs from the displayed orders
+    const svgUrls = Array.from(ordersListDiv.querySelectorAll('.sticker-design'))
+        .map(img => img.src);
+
+    if (svgUrls.length === 0) {
+        nestedSvgContainer.innerHTML = '<p>No designs to nest.</p>';
+        return;
+    }
+
+    try {
+        // 2. Fetch all SVG content
+        const svgStrings = await Promise.all(
+            svgUrls.map(url => fetch(url).then(res => res.text()))
+        );
+
+        // 3. Define a bin (the material to cut from)
+        // For this example, let's use a standard 12x12 inch sheet (assuming 96 dpi)
+        const binWidth = 12 * 96;
+        const binHeight = 12 * 96;
+        const binSvg = `<svg width="${binWidth}" height="${binHeight}"><rect x="0" y="0" width="${binWidth}" height="${binHeight}" fill="none" stroke="blue" stroke-width="2"/></svg>`;
+
+        // 4. Parse SVGs and prepare for nesting
+        const parser = new SVGParser();
+        const svgs = svgStrings.map(s => parser.load(s));
+        const bin = parser.load(binSvg);
+
+        // 5. Configure and run SVGNest
+        const options = {
+            spacing: 10, // spacing between parts
+            rotations: 4, // 0, 90, 180, 270 degrees
+        };
+        const nest = new SVGNest(bin, svgs, options);
+        const resultSvg = nest.start(); // This can be sync or async depending on web workers
+
+        // 6. Display the nested SVG
+        nestedSvgContainer.innerHTML = resultSvg;
+        console.log('[SHOP] Nesting complete.');
+
+    } catch (error) {
+        console.error('[SHOP] Error during nesting:', error);
+        nestedSvgContainer.innerHTML = `<p class="text-red-500">Nesting failed: ${error.message}</p>`;
     }
 }
