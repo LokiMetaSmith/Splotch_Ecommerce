@@ -11,6 +11,8 @@ import csrf from 'csurf';
 import { JSONFilePreset } from 'lowdb/node';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
+import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -56,6 +58,12 @@ const squareClient = new SquareClient({
 console.log('[SERVER] Square client initialized.');
 
 // --- Middleware ---
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+});
+
+app.use(limiter);
 app.use(cors({ origin: 'https://lokimetasmith.github.io', optionsSuccessStatus: 200 }));
 app.use(express.json()); // To parse JSON request bodies (for APIs without file uploads)
 app.use(cookieParser());
@@ -203,10 +211,12 @@ app.post('/api/auth/register-user', [
         return res.status(400).json({ error: 'User already exists' });
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = {
         id: randomUUID(),
         username,
-        password, // In a real application, you should hash the password
+        password: hashedPassword,
         credentials: [],
     };
 
@@ -214,6 +224,33 @@ app.post('/api/auth/register-user', [
     await db.write();
 
     res.json({ success: true });
+});
+
+app.post('/api/auth/login', [
+    body('username').notEmpty().withMessage('username is required'),
+    body('password').notEmpty().withMessage('password is required'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { username, password } = req.body;
+
+    const user = db.data.users[username];
+
+    if (!user) {
+        return res.status(400).json({ error: 'Invalid username or password' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+        return res.status(400).json({ error: 'Invalid username or password' });
+    }
+
+    const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token });
 });
 
 app.get('/api/auth/register-options', (req, res) => {
@@ -224,7 +261,7 @@ app.get('/api/auth/register-options', (req, res) => {
     }
 
     const options = generateRegistrationOptions({
-        rpID: 'localhost',
+        rpID: process.env.RP_ID,
         rpName: 'Print Shop',
         userName: username,
         // Don't prompt users for additional information about the authenticator
@@ -248,8 +285,8 @@ app.post('/api/auth/register-verify', async (req, res) => {
         const verification = await verifyRegistrationResponse({
             response: body,
             expectedChallenge: user.challenge,
-            expectedOrigin: 'http://localhost:8080',
-            expectedRPID: 'localhost',
+            expectedOrigin: process.env.EXPECTED_ORIGIN,
+            expectedRPID: process.env.RP_ID,
         });
 
         const { verified, registrationInfo } = verification;
@@ -297,8 +334,8 @@ app.post('/api/auth/login-verify', async (req, res) => {
         const verification = await verifyAuthenticationResponse({
             response: body,
             expectedChallenge: user.challenge,
-            expectedOrigin: 'http://localhost:8080',
-            expectedRPID: 'localhost',
+            expectedOrigin: process.env.EXPECTED_ORIGIN,
+            expectedRPID: process.env.RP_ID,
             authenticator: credential,
         });
 
