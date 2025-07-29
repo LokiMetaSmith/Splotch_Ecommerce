@@ -1,12 +1,13 @@
 // printshop.js
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import DOMPurify from 'dompurify';
 import SVGNest from './lib/svgnest.js';
 import SVGParser from './lib/svgparser.js';
 
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // --- DOM Elements ---
-let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput, registerBtn, loginBtn, authStatus;
+let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput, registerBtn, loginBtn, authStatus, loadingIndicator, errorToast, errorMessage, closeErrorToast, successToast, successMessage, closeSuccessToast;
 
 // --- Main Setup ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -19,6 +20,13 @@ document.addEventListener('DOMContentLoaded', () => {
     registerBtn = document.getElementById('registerBtn');
     loginBtn = document.getElementById('loginBtn');
     authStatus = document.getElementById('auth-status');
+    loadingIndicator = document.getElementById('loading-indicator');
+    errorToast = document.getElementById('error-toast');
+    errorMessage = document.getElementById('error-message');
+    closeErrorToast = document.getElementById('close-error-toast');
+    successToast = document.getElementById('success-toast');
+    successMessage = document.getElementById('success-message');
+    closeSuccessToast = document.getElementById('close-success-toast');
 
     if (refreshOrdersBtn) {
         refreshOrdersBtn.addEventListener('click', fetchAndDisplayOrders);
@@ -38,12 +46,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fetch orders when the page loads
     fetchAndDisplayOrders();
+    getCsrfToken();
 });
+
+let csrfToken;
+let authToken;
+
+async function getCsrfToken() {
+    try {
+        const response = await fetch(`${serverUrl}/api/csrf-token`);
+        const data = await response.json();
+        csrfToken = data.csrfToken;
+    } catch (error) {
+        console.error('Error fetching CSRF token:', error);
+    }
+}
+
+function showLoadingIndicator() {
+    loadingIndicator.classList.remove('hidden');
+}
+
+function hideLoadingIndicator() {
+    loadingIndicator.classList.add('hidden');
+}
+
+function showErrorToast(message) {
+    errorMessage.textContent = message;
+    errorToast.classList.remove('hidden');
+}
+
+function hideErrorToast() {
+    errorToast.classList.add('hidden');
+}
+
+closeErrorToast.addEventListener('click', hideErrorToast);
+
+function showSuccessToast(message) {
+    successMessage.textContent = message;
+    successToast.classList.remove('hidden');
+}
+
+function hideSuccessToast() {
+    successToast.classList.add('hidden');
+}
+
+closeSuccessToast.addEventListener('click', hideSuccessToast);
 
 /**
  * Fetches orders from the server and updates the UI.
  */
 async function fetchAndDisplayOrders() {
+    showLoadingIndicator();
     console.log('[SHOP] Fetching orders from server...');
     if (noOrdersMessage) {
         noOrdersMessage.textContent = 'Loading orders...';
@@ -53,7 +106,11 @@ async function fetchAndDisplayOrders() {
     ordersListDiv.innerHTML = '';
 
     try {
-        const response = await fetch(`${serverUrl}/api/orders`);
+        const response = await fetch(`${serverUrl}/api/orders`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
         if (!response.ok) {
             throw new Error(`Server responded with status: ${response.status}`);
         }
@@ -69,9 +126,9 @@ async function fetchAndDisplayOrders() {
 
     } catch (error) {
         console.error('[SHOP] Error fetching orders:', error);
-        if (noOrdersMessage) {
-            noOrdersMessage.textContent = `Error fetching orders: ${error.message}. Is the server running?`;
-        }
+        showErrorToast(`Error fetching orders: ${error.message}. Is the server running?`);
+    } finally {
+        hideLoadingIndicator();
     }
 }
 
@@ -89,7 +146,7 @@ function displayOrder(order) {
     const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
     const receivedDate = new Date(order.receivedAt).toLocaleString();
 
-    card.innerHTML = `
+    card.innerHTML = DOMPurify.sanitize(`
         <div class="flex justify-between items-start">
             <div>
                 <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
@@ -124,6 +181,7 @@ function displayOrder(order) {
                 <img src="${serverUrl}${order.designImagePath}" alt="Sticker Design" class="sticker-design">
             </a>
         </div>
+    `);
         <div class="mt-4 flex flex-wrap gap-2">
             <button class="action-btn bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded-md" data-order-id="${order.orderId}" data-status="ACCEPTED">Accept</button>
             <button class="action-btn bg-purple-500 hover:bg-purple-600 text-white py-1 px-3 rounded-md" data-order-id="${order.orderId}" data-status="PRINTING">Mark as Printing</button>
@@ -151,6 +209,7 @@ function displayOrder(order) {
  * @param {string} newStatus - The new status for the order.
  */
 async function updateOrderStatus(orderId, newStatus) {
+    showLoadingIndicator();
     console.log(`[SHOP] Updating order ${orderId} to status ${newStatus}`);
     const statusMsgEl = document.getElementById(`status-update-msg-${orderId}`);
     if (statusMsgEl) statusMsgEl.textContent = `Updating status to ${newStatus}...`;
@@ -160,6 +219,8 @@ async function updateOrderStatus(orderId, newStatus) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+                'Authorization': `Bearer ${authToken}`,
             },
             body: JSON.stringify({ status: newStatus }),
         });
@@ -171,7 +232,7 @@ async function updateOrderStatus(orderId, newStatus) {
         }
 
         console.log(`[SHOP] Successfully updated status for order ${orderId}.`, responseData);
-        if (statusMsgEl) statusMsgEl.textContent = `Status updated to ${newStatus} successfully!`;
+        showSuccessToast(`Status updated to ${newStatus} successfully!`);
 
         // Update the status badge in the UI
         const statusBadgeEl = document.getElementById(`status-badge-${orderId}`);
@@ -187,7 +248,9 @@ async function updateOrderStatus(orderId, newStatus) {
 
     } catch (error) {
         console.error(`[SHOP] Error updating status for order ${orderId}:`, error);
-        if (statusMsgEl) statusMsgEl.textContent = `Error: ${error.message}`;
+        showErrorToast(`Error updating status for order ${orderId}: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
     }
 }
 
@@ -195,6 +258,7 @@ async function updateOrderStatus(orderId, newStatus) {
  * Handles the sticker nesting process.
  */
 async function handleNesting() {
+    showLoadingIndicator();
     console.log('[SHOP] Starting nesting process...');
     nestedSvgContainer.innerHTML = '<p>Nesting in progress...</p>';
 
@@ -236,10 +300,13 @@ async function handleNesting() {
         // 6. Display the nested SVG
         nestedSvgContainer.innerHTML = resultSvg;
         console.log('[SHOP] Nesting complete.');
+        showSuccessToast('Nesting complete.');
 
     } catch (error) {
         console.error('[SHOP] Error during nesting:', error);
-        nestedSvgContainer.innerHTML = `<p class="text-red-500">Nesting failed: ${error.message}</p>`;
+        showErrorToast(`Nesting failed: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
     }
 }
 
@@ -247,6 +314,7 @@ async function handleNesting() {
  * Handles the registration process.
  */
 async function handleRegistration() {
+    showLoadingIndicator();
     authStatus.innerHTML = '';
 
     try {
@@ -262,6 +330,7 @@ async function handleRegistration() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
             },
             body: JSON.stringify(regResp),
         });
@@ -269,13 +338,15 @@ async function handleRegistration() {
         const verificationJSON = await verificationResp.json();
 
         if (verificationJSON && verificationJSON.verified) {
-            authStatus.innerHTML = '<p class="text-green-500">YubiKey registered successfully!</p>';
+            showSuccessToast('YubiKey registered successfully!');
         } else {
-            authStatus.innerHTML = `<p class="text-red-500">Error registering YubiKey: ${verificationJSON.error}</p>`;
+            showErrorToast(`Error registering YubiKey: ${verificationJSON.error}`);
         }
     } catch (error) {
         console.error('[SHOP] Error during registration:', error);
-        authStatus.innerHTML = `<p class="text-red-500">Error registering YubiKey: ${error.message}</p>`;
+        showErrorToast(`Error registering YubiKey: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
     }
 }
 
@@ -283,6 +354,7 @@ async function handleRegistration() {
  * Handles the authentication process.
  */
 async function handleAuthentication() {
+    showLoadingIndicator();
     authStatus.innerHTML = '';
 
     try {
@@ -298,6 +370,7 @@ async function handleAuthentication() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
             },
             body: JSON.stringify(authResp),
         });
@@ -305,12 +378,15 @@ async function handleAuthentication() {
         const verificationJSON = await verificationResp.json();
 
         if (verificationJSON && verificationJSON.verified) {
-            authStatus.innerHTML = '<p class="text-green-500">Login successful!</p>';
+            authToken = verificationJSON.token;
+            showSuccessToast('Login successful!');
         } else {
-            authStatus.innerHTML = `<p class="text-red-500">Error logging in: ${verificationJSON.error}</p>`;
+            showErrorToast(`Error logging in: ${verificationJSON.error}`);
         }
     } catch (error) {
         console.error('[SHOP] Error during authentication:', error);
-        authStatus.innerHTML = `<p class="text-red-500">Error logging in: ${error.message}</p>`;
+        showErrorToast(`Error logging in: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
     }
 }
