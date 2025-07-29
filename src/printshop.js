@@ -5,7 +5,7 @@ import SVGParser from './lib/svgparser.js';
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // --- DOM Elements ---
-let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer;
+let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput;
 
 // --- Main Setup ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshOrdersBtn = document.getElementById('refreshOrdersBtn');
     nestStickersBtn = document.getElementById('nestStickersBtn');
     nestedSvgContainer = document.getElementById('nested-svg-container');
+    spacingInput = document.getElementById('spacingInput');
 
     if (refreshOrdersBtn) {
         refreshOrdersBtn.addEventListener('click', fetchAndDisplayOrders);
@@ -212,8 +213,9 @@ async function handleNesting() {
         const bin = parser.load(binSvg);
 
         // 5. Configure and run SVGNest
+        const spacing = parseInt(spacingInput.value, 10) || 0;
         const options = {
-            spacing: 10, // spacing between parts
+            spacing: spacing, // spacing between parts
             rotations: 4, // 0, 90, 180, 270 degrees
         };
         const nest = new SVGNest(bin, svgs, options);
