@@ -1,11 +1,12 @@
 // printshop.js
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import SVGNest from './lib/svgnest.js';
 import SVGParser from './lib/svgparser.js';
 
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // --- DOM Elements ---
-let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput;
+let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput, registerBtn, loginBtn, authStatus;
 
 // --- Main Setup ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     nestStickersBtn = document.getElementById('nestStickersBtn');
     nestedSvgContainer = document.getElementById('nested-svg-container');
     spacingInput = document.getElementById('spacingInput');
+    registerBtn = document.getElementById('registerBtn');
+    loginBtn = document.getElementById('loginBtn');
+    authStatus = document.getElementById('auth-status');
 
     if (refreshOrdersBtn) {
         refreshOrdersBtn.addEventListener('click', fetchAndDisplayOrders);
@@ -22,6 +26,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (nestStickersBtn) {
         nestStickersBtn.addEventListener('click', handleNesting);
+    }
+
+    if (registerBtn) {
+        registerBtn.addEventListener('click', handleRegistration);
+    }
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleAuthentication);
     }
 
     // Fetch orders when the page loads
@@ -228,5 +240,77 @@ async function handleNesting() {
     } catch (error) {
         console.error('[SHOP] Error during nesting:', error);
         nestedSvgContainer.innerHTML = `<p class="text-red-500">Nesting failed: ${error.message}</p>`;
+    }
+}
+
+/**
+ * Handles the registration process.
+ */
+async function handleRegistration() {
+    authStatus.innerHTML = '';
+
+    try {
+        // Get registration options from the server
+        const resp = await fetch(`${serverUrl}/api/auth/register-options`);
+        const opts = await resp.json();
+
+        // Start the registration process
+        const regResp = await startRegistration(opts);
+
+        // Send the registration response to the server
+        const verificationResp = await fetch(`${serverUrl}/api/auth/register-verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(regResp),
+        });
+
+        const verificationJSON = await verificationResp.json();
+
+        if (verificationJSON && verificationJSON.verified) {
+            authStatus.innerHTML = '<p class="text-green-500">YubiKey registered successfully!</p>';
+        } else {
+            authStatus.innerHTML = `<p class="text-red-500">Error registering YubiKey: ${verificationJSON.error}</p>`;
+        }
+    } catch (error) {
+        console.error('[SHOP] Error during registration:', error);
+        authStatus.innerHTML = `<p class="text-red-500">Error registering YubiKey: ${error.message}</p>`;
+    }
+}
+
+/**
+ * Handles the authentication process.
+ */
+async function handleAuthentication() {
+    authStatus.innerHTML = '';
+
+    try {
+        // Get authentication options from the server
+        const resp = await fetch(`${serverUrl}/api/auth/login-options`);
+        const opts = await resp.json();
+
+        // Start the authentication process
+        const authResp = await startAuthentication(opts);
+
+        // Send the authentication response to the server
+        const verificationResp = await fetch(`${serverUrl}/api/auth/login-verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(authResp),
+        });
+
+        const verificationJSON = await verificationResp.json();
+
+        if (verificationJSON && verificationJSON.verified) {
+            authStatus.innerHTML = '<p class="text-green-500">Login successful!</p>';
+        } else {
+            authStatus.innerHTML = `<p class="text-red-500">Error logging in: ${verificationJSON.error}</p>`;
+        }
+    } catch (error) {
+        console.error('[SHOP] Error during authentication:', error);
+        authStatus.innerHTML = `<p class="text-red-500">Error logging in: ${error.message}</p>`;
     }
 }

@@ -6,6 +6,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } = require('@simplewebauthn/server');
 require('dotenv').config();
 
 const app = express();
@@ -21,6 +22,8 @@ if (!fs.existsSync(uploadDir)) {
 // WARNING: This is for demonstration purposes. Data will be lost on server restart.
 // For production, replace this with a real database (e.g., SQLite, PostgreSQL, MongoDB).
 const ordersDB = [];
+const users = {}; // In-memory user store
+const credentials = {}; // In-memory credential store
 console.log('[SERVER] In-memory database initialized.');
 
 // --- Multer Configuration for File Uploads ---
@@ -161,6 +164,102 @@ app.post('/api/orders/:orderId/status', (req, res) => {
     // TODO: In a real app, you might push a notification to the client here via WebSockets.
 
     res.status(200).json({ success: true, order: order });
+});
+
+
+// --- Auth Endpoints ---
+
+// A dummy user for demonstration purposes
+users['printshop-user'] = {
+    id: 'printshop-user',
+    username: 'printshop-user',
+    credentials: [],
+};
+
+app.get('/api/auth/register-options', (req, res) => {
+    const options = generateRegistrationOptions({
+        rpID: 'localhost',
+        rpName: 'Print Shop',
+        userName: 'printshop-user',
+        // Don't prompt users for additional information about the authenticator
+        authenticatorSelection: {
+            userVerification: 'preferred',
+        },
+    });
+
+    // Store the challenge
+    users['printshop-user'].challenge = options.challenge;
+
+    res.json(options);
+});
+
+app.post('/api/auth/register-verify', async (req, res) => {
+    const { body } = req;
+    const user = users['printshop-user'];
+
+    try {
+        const verification = await verifyRegistrationResponse({
+            response: body,
+            expectedChallenge: user.challenge,
+            expectedOrigin: 'http://localhost:8080',
+            expectedRPID: 'localhost',
+        });
+
+        const { verified, registrationInfo } = verification;
+
+        if (verified) {
+            // Add the credential to the user's list of credentials
+            user.credentials.push(registrationInfo);
+            credentials[registrationInfo.credentialID] = registrationInfo;
+        }
+
+        res.json({ verified });
+    } catch (error) {
+        console.error(error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.get('/api/auth/login-options', (req, res) => {
+    const options = generateAuthenticationOptions({
+        allowCredentials: users['printshop-user'].credentials.map(cred => ({
+            id: cred.credentialID,
+            type: 'public-key',
+        })),
+        userVerification: 'preferred',
+    });
+
+    // Store the challenge
+    users['printshop-user'].challenge = options.challenge;
+
+    res.json(options);
+});
+
+app.post('/api/auth/login-verify', async (req, res) => {
+    const { body } = req;
+    const user = users['printshop-user'];
+    const credential = credentials[body.id];
+
+    if (!credential) {
+        return res.status(400).json({ error: 'Credential not found.' });
+    }
+
+    try {
+        const verification = await verifyAuthenticationResponse({
+            response: body,
+            expectedChallenge: user.challenge,
+            expectedOrigin: 'http://localhost:8080',
+            expectedRPID: 'localhost',
+            authenticator: credential,
+        });
+
+        const { verified } = verification;
+
+        res.json({ verified });
+    } catch (error) {
+        console.error(error);
+        res.status(400).json({ error: error.message });
+    }
 });
 
 
