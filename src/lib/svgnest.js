@@ -823,6 +823,23 @@ nfp.push(cnfp[j]);
                                 clearInterval(workerTimer);
                         }
                 };
+
+		this.getCutLines = function(){
+			if(!best){
+				return '';
+			}
+			var svglist = this.applyPlacement(best.placements);
+			var cutlines = svglist[0].cloneNode(true);
+
+			var paths = cutlines.querySelectorAll('path');
+			for(var i=0; i<paths.length; i++){
+				paths[i].setAttribute('stroke', 'red');
+				paths[i].setAttribute('fill', 'none');
+			}
+
+			var serializer = new XMLSerializer();
+			return serializer.serializeToString(cutlines);
+		}
         }
 
         function GeneticAlgorithm(adam, bin, config){
