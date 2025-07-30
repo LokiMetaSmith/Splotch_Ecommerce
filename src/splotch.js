@@ -5,6 +5,8 @@ const marginSlider = document.getElementById('marginSlider');
 const quantityInput = document.getElementById('quantityInput');
 const addToOrderBtn = document.getElementById('addToOrderBtn');
 const cartDiv = document.getElementById('cart');
+const emailInput = document.getElementById('emailInput');
+const loginBtn = document.getElementById('loginBtn');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
@@ -61,6 +63,34 @@ addToOrderBtn.addEventListener('click', () => {
 
     cart.push(sticker);
     displayCart();
+});
+
+loginBtn.addEventListener('click', async () => {
+    const email = emailInput.value;
+
+    if (!email) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${serverUrl}/api/auth/magic-login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert(data.message);
+        } else {
+            console.error('Error sending magic link:', data.error);
+        }
+    } catch (error) {
+        console.error('Error sending magic link:', error);
+    }
 });
 
 function displayCart() {

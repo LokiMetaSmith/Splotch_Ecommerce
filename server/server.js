@@ -1,27 +1,36 @@
-// server.js
-const express = require('express');
-const { SquareClient, Environment } = require('square');
-const { randomUUID } = require('crypto');
-const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-require('dotenv').config();
+import express from 'express';
+import { SquareClient, Environment } from 'square';
+import { randomUUID } from 'crypto';
+import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
+import cookieParser from 'cookie-parser';
+import csrf from 'csurf';
+import { JSONFilePreset } from 'lowdb/node';
+import jwt from 'jsonwebtoken';
+import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
+import bcrypt from 'bcrypt';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // --- Ensure upload directory exists ---
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// --- In-Memory "Database" ---
-// WARNING: This is for demonstration purposes. Data will be lost on server restart.
-// For production, replace this with a real database (e.g., SQLite, PostgreSQL, MongoDB).
-const ordersDB = [];
-console.log('[SERVER] In-memory database initialized.');
+// --- Database Setup ---
+const defaultData = { orders: [], users: {}, credentials: {} };
+const db = await JSONFilePreset('db.json', defaultData);
+console.log('[SERVER] LowDB database initialized.');
 
 // --- Multer Configuration for File Uploads ---
 const storage = multer.diskStorage({
@@ -49,13 +58,24 @@ const squareClient = new SquareClient({
 console.log('[SERVER] Square client initialized.');
 
 // --- Middleware ---
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+});
+
+app.use(limiter);
 app.use(cors({ origin: 'https://lokimetasmith.github.io', optionsSuccessStatus: 200 }));
 app.use(express.json()); // To parse JSON request bodies (for APIs without file uploads)
+app.use(cookieParser());
+app.use(csrf({ cookie: true }));
 app.use('/uploads', express.static(uploadDir)); // Serve uploaded files statically
 console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
-
 // --- API Endpoints ---
+
+app.get('/api/csrf-token', (req, res) => {
+    res.json({ csrfToken: req.csrfToken() });
+});
 
 app.post('/api/upload-image', upload.single('image'), (req, res) => {
     if (!req.file) {
@@ -65,24 +85,22 @@ app.post('/api/upload-image', upload.single('image'), (req, res) => {
     res.json({ success: true, filePath: `/uploads/${req.file.filename}` });
 });
 
-/**
- * Endpoint to create a new order.
- * Expects a `multipart/form-data` request with:
- * - 'designImage': The image file for the sticker.
- * - All other order details as form fields (e.g., sourceId, amountCents, quantity, material, etc.).
- */
-app.post('/api/create-order', upload.single('designImage'), async (req, res) => {
+app.post('/api/create-order', authenticateToken, upload.single('designImage'), [
+    body('sourceId').notEmpty().withMessage('sourceId is required'),
+    body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
+    body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     console.log('[SERVER] Received POST request on /api/create-order');
     console.log('[SERVER] Request body:', req.body);
     console.log('[SERVER] Request file:', req.file);
 
     try {
         const { sourceId, amountCents, currency, ...orderDetails } = req.body;
-
-        if (!sourceId || !amountCents || !req.file) {
-            console.warn('[SERVER] Missing required parameters: sourceId, amountCents, or designImage.');
-            return res.status(400).json({ error: 'Missing required parameters (sourceId, amountCents, designImage).' });
-        }
 
         // 1. Process Payment
         const paymentPayload = {
@@ -116,8 +134,9 @@ app.post('/api/create-order', upload.single('designImage'), async (req, res) => 
             receivedAt: new Date().toISOString(),
         };
 
-        ordersDB.push(newOrder);
-        console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}. Total orders in DB: ${ordersDB.length}`);
+        db.data.orders.push(newOrder);
+        await db.write();
+        console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}. Total orders in DB: ${db.data.orders.length}`);
 
         // TODO: In a real app, you would push a notification to connected print shops via WebSockets here.
 
@@ -137,25 +156,46 @@ app.post('/api/create-order', upload.single('designImage'), async (req, res) => 
  * Endpoint for the print shop to fetch all orders.
  * In a real application, you'd add filtering (e.g., by status) and pagination.
  */
-app.get('/api/orders', (req, res) => {
-    console.log(`[SERVER] Received GET request on /api/orders. Returning ${ordersDB.length} orders.`);
+app.get('/api/orders', authenticateToken, (req, res) => {
+    const user = Object.values(db.data.users).find(u => u.email === req.user.email);
+
+    if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+    }
+
+    const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
+    console.log(`[SERVER] Received GET request on /api/orders. Returning ${userOrders.length} orders.`);
     // Return orders in reverse chronological order (newest first)
-    res.status(200).json(ordersDB.slice().reverse());
+    res.status(200).json(userOrders.slice().reverse());
+});
+
+app.get('/api/orders/:orderId', authenticateToken, (req, res) => {
+    const { orderId } = req.params;
+    const order = db.data.orders.find(o => o.orderId === orderId);
+
+    if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json(order);
 });
 
 /**
  * Endpoint for the print shop to update an order's status.
  */
-app.post('/api/orders/:orderId/status', (req, res) => {
+app.post('/api/orders/:orderId/status', authenticateToken, [
+    body('status').notEmpty().withMessage('status is required'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     const { orderId } = req.params;
     const { status } = req.body;
     console.log(`[SERVER] Received status update request for Order ID: ${orderId}. New status: ${status}`);
 
-    if (!status) {
-        return res.status(400).json({ error: 'Status is required.' });
-    }
-
-    const order = ordersDB.find(o => o.orderId === orderId);
+    const order = db.data.orders.find(o => o.orderId === orderId);
 
     if (!order) {
         console.warn(`[SERVER] Status update failed: Order ID ${orderId} not found.`);
@@ -164,12 +204,249 @@ app.post('/api/orders/:orderId/status', (req, res) => {
 
     order.status = status;
     order.lastUpdatedAt = new Date().toISOString();
+    await db.write();
     console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
     // TODO: In a real app, you might push a notification to the client here via WebSockets.
 
     res.status(200).json({ success: true, order: order });
 });
+
+
+// --- Auth Endpoints ---
+
+app.post('/api/auth/register-user', [
+    body('username').notEmpty().withMessage('username is required'),
+    body('password').notEmpty().withMessage('password is required'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { username, password } = req.body;
+
+    if (db.data.users[username]) {
+        return res.status(400).json({ error: 'User already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = {
+        id: randomUUID(),
+        username,
+        password: hashedPassword,
+        credentials: [],
+    };
+
+    db.data.users[username] = user;
+    await db.write();
+
+    res.json({ success: true });
+});
+
+app.post('/api/auth/login', [
+    body('username').notEmpty().withMessage('username is required'),
+    body('password').notEmpty().withMessage('password is required'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { username, password } = req.body;
+
+    const user = db.data.users[username];
+
+    if (!user) {
+        return res.status(400).json({ error: 'Invalid username or password' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+        return res.status(400).json({ error: 'Invalid username or password' });
+    }
+
+    const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token });
+});
+
+app.post('/api/auth/verify-magic-link', (req, res) => {
+    const { token } = req.body;
+
+    if (!token) {
+        return res.status(400).json({ error: 'No token provided' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+
+        const user = Object.values(db.data.users).find(u => u.email === decoded.email);
+
+        if (!user) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+
+        const authToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.json({ success: true, token: authToken });
+    });
+});
+
+app.post('/api/auth/magic-login', [
+    body('email').isEmail().withMessage('email is not valid'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email } = req.body;
+
+    let user = Object.values(db.data.users).find(u => u.email === email);
+
+    if (!user) {
+        // For passwordless login, we can create a new user if one doesn't exist
+        user = {
+            id: randomUUID(),
+            email,
+            credentials: [],
+        };
+        db.data.users[user.id] = user;
+        await db.write();
+    }
+
+    const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const magicLink = `${process.env.BASE_URL}/magic-login?token=${token}`;
+
+    console.log('Magic Link:', magicLink);
+
+    res.json({ success: true, message: 'Check your email for a magic link to log in.' });
+});
+
+app.get('/api/auth/register-options', (req, res) => {
+    const { username } = req.query;
+
+    if (!username || !db.data.users[username]) {
+        return res.status(400).json({ error: 'User not found' });
+    }
+
+    const options = generateRegistrationOptions({
+        rpID: process.env.RP_ID,
+        rpName: 'Print Shop',
+        userName: username,
+        // Don't prompt users for additional information about the authenticator
+        authenticatorSelection: {
+            userVerification: 'preferred',
+        },
+    });
+
+    // Store the challenge
+    db.data.users[username].challenge = options.challenge;
+    db.write();
+
+    res.json(options);
+});
+
+app.post('/api/auth/register-verify', async (req, res) => {
+    const { body } = req;
+    const { username } = req.query;
+    const user = db.data.users[username];
+
+    try {
+        const verification = await verifyRegistrationResponse({
+            response: body,
+            expectedChallenge: user.challenge,
+            expectedOrigin: process.env.EXPECTED_ORIGIN,
+            expectedRPID: process.env.RP_ID,
+        });
+
+        const { verified, registrationInfo } = verification;
+
+        if (verified) {
+            // Add the credential to the user's list of credentials
+            user.credentials.push(registrationInfo);
+            db.data.credentials[registrationInfo.credentialID] = registrationInfo;
+            await db.write();
+        }
+
+        res.json({ verified });
+    } catch (error) {
+        console.error(error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.get('/api/auth/login-options', (req, res) => {
+    const { username } = req.query;
+    const user = db.data.users[username];
+
+    if (!user) {
+        return res.status(400).json({ error: 'User not found' });
+    }
+
+    const options = generateAuthenticationOptions({
+        allowCredentials: user.credentials.map(cred => ({
+            id: cred.credentialID,
+            type: 'public-key',
+        })),
+        userVerification: 'preferred',
+    });
+
+    // Store the challenge
+    user.challenge = options.challenge;
+    db.write();
+
+    res.json(options);
+});
+
+app.post('/api/auth/login-verify', async (req, res) => {
+    const { body } = req;
+    const { username } = req.query;
+    const user = db.data.users[username];
+    const credential = db.data.credentials[body.id];
+
+    if (!credential) {
+        return res.status(400).json({ error: 'Credential not found.' });
+    }
+
+    try {
+        const verification = await verifyAuthenticationResponse({
+            response: body,
+            expectedChallenge: user.challenge,
+            expectedOrigin: process.env.EXPECTED_ORIGIN,
+            expectedRPID: process.env.RP_ID,
+            authenticator: credential,
+        });
+
+        const { verified } = verification;
+
+        if (verified) {
+            const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+            res.json({ verified, token });
+        } else {
+            res.json({ verified });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) return res.sendStatus(401);
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+}
 
 
 // --- Start Server ---
