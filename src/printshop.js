@@ -1,4 +1,3 @@
-// printshop.js
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import DOMPurify from 'dompurify';
 import SVGNest from './lib/svgnest.js';
@@ -7,7 +6,7 @@ import SVGParser from './lib/svgparser.js';
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // --- DOM Elements ---
-let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput, registerBtn, loginBtn, authStatus, loadingIndicator, errorToast, errorMessage, closeErrorToast, successToast, successMessage, closeSuccessToast, searchInput, searchBtn;
+let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput, registerBtn, loginBtn, authStatus, loadingIndicator, errorToast, errorMessage, closeErrorToast, successToast, successMessage, closeSuccessToast, searchInput, searchBtn, downloadCutFileBtn;
 
 // --- Main Setup ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,9 +28,14 @@ document.addEventListener('DOMContentLoaded', () => {
     closeSuccessToast = document.getElementById('close-success-toast');
     searchInput = document.getElementById('searchInput');
     searchBtn = document.getElementById('searchBtn');
+    downloadCutFileBtn = document.getElementById('downloadCutFileBtn');
 
     if (refreshOrdersBtn) {
         refreshOrdersBtn.addEventListener('click', fetchAndDisplayOrders);
+    }
+
+    if (downloadCutFileBtn) {
+        downloadCutFileBtn.addEventListener('click', handleDownloadCutFile);
     }
 
     if (searchBtn) {
@@ -136,6 +140,43 @@ async function fetchAndDisplayOrders() {
     } finally {
         hideLoadingIndicator();
     }
+}
+
+function handleDownloadCutFile() {
+    if (!window.nestedSvg) {
+        showErrorToast('No nested SVG to generate a cut file from.');
+        return;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(window.nestedSvg, 'image/svg+xml');
+    const nestedSvgElement = doc.documentElement;
+
+    const cutFileSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    cutFileSvg.setAttribute('width', nestedSvgElement.getAttribute('width'));
+    cutFileSvg.setAttribute('height', nestedSvgElement.getAttribute('height'));
+    cutFileSvg.setAttribute('viewBox', nestedSvgElement.getAttribute('viewBox'));
+
+    const paths = nestedSvgElement.querySelectorAll('path');
+    paths.forEach(path => {
+        const newPath = path.cloneNode();
+        newPath.setAttribute('stroke', 'red');
+        newPath.setAttribute('fill', 'none');
+        cutFileSvg.appendChild(newPath);
+    });
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(cutFileSvg);
+
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cut-file.svg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 async function handleSearch() {
@@ -338,6 +379,9 @@ async function handleNesting() {
         nestedSvgContainer.innerHTML = resultSvg;
         console.log('[SHOP] Nesting complete.');
         showSuccessToast('Nesting complete.');
+
+        // 7. Generate and store the cut file
+        window.nestedSvg = resultSvg;
 
     } catch (error) {
         console.error('[SHOP] Error during nesting:', error);
