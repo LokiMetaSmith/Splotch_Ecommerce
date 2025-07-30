@@ -14,12 +14,14 @@ let image = null;
 let margin = 10;
 let cart = [];
 
-imageUpload.addEventListener('change', async (e) => {
+imageUpload.addEventListener('change', (e) => {
     const file = e.target.files[0];
-    if (!file) {
-        return;
+    if (file) {
+        handleFile(file);
     }
+});
 
+async function handleFile(file) {
     const formData = new FormData();
     formData.append('image', file);
 
@@ -43,11 +45,41 @@ imageUpload.addEventListener('change', async (e) => {
     } catch (error) {
         console.error('Error uploading image:', error);
     }
+}
+
+window.addEventListener('paste', (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (const item of items) {
+        if (item.kind === 'file') {
+            const file = item.getAsFile();
+            handleFile(file);
+        }
+    }
 });
 
 marginSlider.addEventListener('input', (e) => {
     margin = parseInt(e.target.value, 10);
     drawImage();
+});
+
+canvas.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    canvas.classList.add('border-dashed', 'border-2', 'border-blue-500');
+});
+
+canvas.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    canvas.classList.remove('border-dashed', 'border-2', 'border-blue-500');
+});
+
+canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    canvas.classList.remove('border-dashed', 'border-2', 'border-blue-500');
+
+    const file = e.dataTransfer.files[0];
+    if (file) {
+        handleFile(file);
+    }
 });
 
 addToOrderBtn.addEventListener('click', () => {

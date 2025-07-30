@@ -28,10 +28,6 @@
                 <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Create Your Sticker</h2>
                 <div class="bg-white p-6 rounded-lg shadow-xl">
                     <div class="mb-4">
-                        <label for="imageUpload" class="block text-sm font-medium text-gray-700">Upload Image</label>
-                        <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full">
-                    </div>
-                    <div class="mb-4">
                         <label for="marginSlider" class="block text-sm font-medium text-gray-700">Margin</label>
                         <input type="range" id="marginSlider" min="0" max="50" value="10" class="mt-1 block w-full">
                     </div>
@@ -46,6 +42,10 @@
                 </div>
             </div>
             <div>
+                <div class="mb-4">
+                    <label for="imageUpload" class="block text-sm font-medium text-gray-700">Upload Image</label>
+                    <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full">
+                </div>
                 <canvas id="canvas" class="w-full bg-white rounded-lg shadow-xl"></canvas>
             </div>
             <div class="lg:col-span-2">
