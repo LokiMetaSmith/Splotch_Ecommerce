@@ -164,6 +164,17 @@ app.get('/api/orders', authenticateToken, (req, res) => {
 /**
  * Endpoint for the print shop to update an order's status.
  */
+app.get('/api/orders/:orderId', authenticateToken, (req, res) => {
+    const { orderId } = req.params;
+    const order = db.data.orders.find(o => o.orderId === orderId);
+
+    if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json(order);
+});
+
 app.post('/api/orders/:orderId/status', authenticateToken, [
     body('status').notEmpty().withMessage('status is required'),
 ], async (req, res) => {

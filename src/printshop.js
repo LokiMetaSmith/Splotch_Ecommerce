@@ -7,7 +7,7 @@ import SVGParser from './lib/svgparser.js';
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // --- DOM Elements ---
-let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput, registerBtn, loginBtn, authStatus, loadingIndicator, errorToast, errorMessage, closeErrorToast, successToast, successMessage, closeSuccessToast;
+let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput, registerBtn, loginBtn, authStatus, loadingIndicator, errorToast, errorMessage, closeErrorToast, successToast, successMessage, closeSuccessToast, searchInput, searchBtn;
 
 // --- Main Setup ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,9 +27,15 @@ document.addEventListener('DOMContentLoaded', () => {
     successToast = document.getElementById('success-toast');
     successMessage = document.getElementById('success-message');
     closeSuccessToast = document.getElementById('close-success-toast');
+    searchInput = document.getElementById('searchInput');
+    searchBtn = document.getElementById('searchBtn');
 
     if (refreshOrdersBtn) {
         refreshOrdersBtn.addEventListener('click', fetchAndDisplayOrders);
+    }
+
+    if (searchBtn) {
+        searchBtn.addEventListener('click', handleSearch);
     }
 
     if (nestStickersBtn) {
@@ -127,6 +133,37 @@ async function fetchAndDisplayOrders() {
     } catch (error) {
         console.error('[SHOP] Error fetching orders:', error);
         showErrorToast(`Error fetching orders: ${error.message}. Is the server running?`);
+    } finally {
+        hideLoadingIndicator();
+    }
+}
+
+async function handleSearch() {
+    const orderId = searchInput.value;
+
+    if (!orderId) {
+        return;
+    }
+
+    showLoadingIndicator();
+    ordersListDiv.innerHTML = '';
+
+    try {
+        const response = await fetch(`${serverUrl}/api/orders/${orderId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server responded with status: ${response.status}`);
+        }
+
+        const order = await response.json();
+        displayOrder(order);
+    } catch (error) {
+        console.error(`[SHOP] Error searching for order ${orderId}:`, error);
+        showErrorToast(`Error searching for order ${orderId}: ${error.message}`);
     } finally {
         hideLoadingIndicator();
     }
