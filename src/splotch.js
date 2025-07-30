@@ -2,11 +2,15 @@ const serverUrl = 'http://localhost:3000';
 
 const imageUpload = document.getElementById('imageUpload');
 const marginSlider = document.getElementById('marginSlider');
+const quantityInput = document.getElementById('quantityInput');
+const addToOrderBtn = document.getElementById('addToOrderBtn');
+const cartDiv = document.getElementById('cart');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
 let image = null;
 let margin = 10;
+let cart = [];
 
 imageUpload.addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -43,6 +47,50 @@ marginSlider.addEventListener('input', (e) => {
     margin = parseInt(e.target.value, 10);
     drawImage();
 });
+
+addToOrderBtn.addEventListener('click', () => {
+    if (!image) {
+        return;
+    }
+
+    const sticker = {
+        image: image.src,
+        quantity: parseInt(quantityInput.value, 10),
+        margin: margin,
+    };
+
+    cart.push(sticker);
+    displayCart();
+});
+
+function displayCart() {
+    cartDiv.innerHTML = '';
+
+    if (cart.length === 0) {
+        cartDiv.innerHTML = '<p>Your cart is empty.</p>';
+        return;
+    }
+
+    cart.forEach((item, index) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.classList.add('flex', 'justify-between', 'items-center', 'mb-2');
+        itemDiv.innerHTML = `
+            <img src="${item.image}" class="w-16 h-16 object-cover">
+            <span>Quantity: ${item.quantity}</span>
+            <button data-index="${index}" class="remove-from-cart px-2 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">&times;</button>
+        `;
+        cartDiv.appendChild(itemDiv);
+    });
+
+    const removeButtons = document.querySelectorAll('.remove-from-cart');
+    removeButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const index = e.target.dataset.index;
+            cart.splice(index, 1);
+            displayCart();
+        });
+    });
+}
 
 function drawImage() {
     if (!image) {
