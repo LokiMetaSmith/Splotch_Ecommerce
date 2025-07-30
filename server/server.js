@@ -57,6 +57,14 @@ console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
 // --- API Endpoints ---
 
+app.post('/api/upload-image', upload.single('image'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No image file uploaded' });
+    }
+
+    res.json({ success: true, filePath: `/uploads/${req.file.filename}` });
+});
+
 /**
  * Endpoint to create a new order.
  * Expects a `multipart/form-data` request with:
