@@ -1,5 +1,6 @@
 import express from 'express';
-import { SquareClient, Environment } from 'square';
+import pkg from 'square';
+const { Client, Environment } = pkg;
 import { randomUUID } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
@@ -51,7 +52,7 @@ if (!process.env.SQUARE_ACCESS_TOKEN) {
     console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
     process.exit(1);
 }
-const squareClient = new SquareClient({
+const squareClient = new Client({
     environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
 });
