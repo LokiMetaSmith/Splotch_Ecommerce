@@ -1,121 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <title>SVG.js</title>
-  <script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.0/dist/svg.min.js"></script>
-  <script
-    type="text/javascript"
-    src="https://sandbox.web.squarecdn.com/v1/square.js"
-  ></script>
-  <script type="module" crossorigin src="./assets/index-BGDtm1Iy.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BdWO7hhY.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Editor & Secure Pay - Custom Stickers</title>
+    <!-- PeerJS Library -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- SVG.js (if still needed, though not directly used by core image editing) -->
+    <script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.0/dist/svg.min.js"></script>
+    <!-- Square Web Payments SDK -->
+    <script
+        type="text/javascript"
+        src="https://sandbox.web.squarecdn.com/v1/square.js"
+    ></script> <!-- Your Tailwind CSS --> <!-- Your Splotch Theme CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-CNtv73Mo.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BWjlTUUT.css">
 </head>
-<body>
-    <main class="container">
-        <div id="payment-status-container" class="bg-blue"></div>
-        <form id="payment-form">
-            <div class="field">
-                <label class="label" for="givenName">First Name</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="firstName"
-                        name="firstName"
-                        type="text"
-                        placeholder="John"
-                    />
+<body class="bg-gray-100">
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8">
+        <h1 class="text-3xl font-bold text-center text-gray-700 mb-8">Custom Sticker Editor & Secure Pay</h1>
+
+        <!-- PeerJS Connection Status -->
+        <div id="peerjs-status-container" class="mb-4 p-3 rounded-md text-sm text-white bg-gray-400" style="visibility: hidden; text-align: center;">
+            PeerJS Status: Initializing...
+        </div>
+
+        <!-- Canvas for Image Editing -->
+        <div class="bg-gray-50 p-4 rounded-lg shadow-inner mb-6 relative">
+            <canvas id="imageCanvas" width="500" height="400" class="block mx-auto border-2 border-dashed border-gray-300 rounded-md bg-white">
+                Your browser does not support the HTML5 canvas tag.
+            </canvas>
+            <p id="designMarginNote" class="absolute bottom-2 right-2 text-xs text-splotch-red p-1 bg-white bg-opacity-75 rounded" style="font-family: var(--font-baumans); display: none;">
+                Keep important elements 2-3mm from edge!
+            </p>
+        </div>
+
+        <!-- Basic Image Editing Controls -->
+        <div id="editing-controls" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50">
+            <button id="rotateLeftBtn" title="Rotate Left 90°">Rotate Left</button>
+            <button id="rotateRightBtn" title="Rotate Right 90°">Rotate Right</button>
+            <input type="text" id="resizeInput" placeholder="e.g., 50%" title="Enter resize percentage (e.g., 50%)">
+            <button id="resizeBtn" title="Apply Resize">Apply Resize</button>
+            <button id="startCropBtn" title="Crop to Center 50%">Crop (Center 50%)</button>
+            <button id="grayscaleBtn" title="Apply Grayscale Filter">Grayscale</button>
+            <button id="sepiaBtn" title="Apply Sepia Filter">Sepia</button>
+        </div>
+<div id="payment-status-container" class="mb-4 p-3 rounded-md text-sm text-white" style="visibility: hidden;"></div>
+
+        <!-- Text Editing Controls -->
+        <div id="text-editing-controls" class="my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-100">
+            <h3 class="text-lg font-semibold text-splotch-navy mb-3" style="font-family: var(--font-modak);">Add Text to Sticker</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label for="textInput" class="block text-sm font-medium text-splotch-navy" style="font-family: var(--font-baumans);">Text:</label>
+                    <input type="text" id="textInput" placeholder="Your Text Here" class="input mt-1 w-full">
+                </div>
+                <div>
+                    <label for="textSizeInput" class="block text-sm font-medium text-splotch-navy" style="font-family: var(--font-baumans);">Size (px):</label>
+                    <input type="number" id="textSizeInput" value="30" min="8" max="200" class="input mt-1 w-full">
+                </div>
+                <div>
+                    <label for="textColorInput" class="block text-sm font-medium text-splotch-navy" style="font-family: var(--font-baumans);">Color:</label>
+                    <input type="color" id="textColorInput" value="#2A284D" class="input mt-1 h-10 w-full p-1 border-2 rounded-md cursor-pointer" style="border-color: var(--splotch-navy);">
+                </div>
+                <button id="addTextBtn" class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2.5 px-4 rounded-full shadow-md transition duration-150 ease-in-out transform hover:scale-105 self-end" style="font-family: var(--font-baumans); text-transform: uppercase;">Add Text</button>
+            </div>
+            <div class="mt-4">
+                <label for="textFontFamily" class="block text-sm font-medium text-splotch-navy" style="font-family: var(--font-baumans);">Font:</label>
+                <select id="textFontFamily" class="input mt-1 w-full md:w-1/2">
+                    <option value="Arial">Arial</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Modak">Modak (Display)</option>
+                    <option value="Baumans">Baumans (Body)</option>
+                    <option value="Monofett">Monofett (Display)</option>
+                </select>
+            </div>
+            <p class="text-xs text-gray-500 mt-2" style="font-family: var(--font-baumans);">Note: Text is added to the center. Advanced text positioning may require other tools.</p>
+        </div>
+
+        <!-- Payment Status and IPFS Link Containers -->
+        <div id="payment-status-container" class="mb-4 p-3 rounded-md text-sm text-white" style="visibility: hidden;"></div>
+        <div id="ipfsLinkContainer" class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow" style="visibility: hidden; word-wrap: break-word;"></div>
+
+        <!-- Payment Form -->
+        <form id="payment-form" class="space-y-6 bg-gray-50 p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">Order Your Custom Stickers & Pay</h2>
+
+            <!-- Sticker Options -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold text-splotch-navy pt-2" style="font-family: var(--font-modak);">Sticker Options</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="field">
+                        <label class="label text-sm font-medium text-gray-700" for="stickerQuantity">Quantity:</label>
+                        <div class="control">
+                            <input
+                                class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                id="stickerQuantity"
+                                name="stickerQuantity"
+                                type="number"
+                                value="50"
+                                min="1"
+                            />
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label text-sm font-medium text-gray-700" for="stickerMaterial">Material:</label>
+                        <div class="control">
+                            <select id="stickerMaterial" name="stickerMaterial" class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="pp_standard">Standard PP (Indoor)</option>
+                                <option value="pvc_laminated">Extra Durable PVC + Lamination (Outdoor 5-7 yrs)</option>
+                            </select>
+                        </div>
+                         <p class="text-xs text-gray-500 mt-1" style="font-family: var(--font-baumans);">Standard PP: Up to 1 yr outdoor. PVC: 5-7 yrs outdoor, laminated.</p>
+                    </div>
+                </div>
+                 <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="cutLineFile">Upload Cut Line for Custom Shape (Optional):</label>
+                    <div class="control">
+                        <input
+                            class="input mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                            id="cutLineFile"
+                            name="cutLineFile"
+                            type="file"
+                            accept=".ai,.svg,.eps,.pdf"
+                        />
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1" style="font-family: var(--font-baumans);">For custom shapes, please provide a vector cut line (.ai, .svg, .eps, .pdf). We can assist if needed (additional fee may apply).</p>
+                </div>
+
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700">Estimated Price:</label>
+                    <div id="calculatedPriceDisplay" class="mt-1 p-3 bg-white border border-gray-300 rounded-md shadow-sm text-lg font-semibold text-gray-700">
+                        $0.00
+                    </div>
+                </div>
+            </div>
+            <!-- End Sticker Options -->
+
+
+            <h3 class="text-lg font-semibold text-gray-700 mt-6 pt-4 border-t">Billing Information</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="firstName">First Name</label>
+                    <div class="control">
+                        <input class="input mt-1 block w-full" id="firstName" name="firstName" type="text" placeholder="John" required />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="lastName">Last Name</label>
+                    <div class="control">
+                        <input class="input mt-1 block w-full" id="lastName" name="lastName" type="text" placeholder="Doe" required />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="email">Email</label>
+                    <div class="control">
+                        <input class="input mt-1 block w-full" id="email" name="email" type="email" placeholder="you@example.com" required />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="phone">Phone</label>
+                    <div class="control">
+                        <input class="input mt-1 block w-full" id="phone" name="phone" type="tel" placeholder="(123) 456-7890" />
+                    </div>
+                </div>
+                <div class="field md:col-span-2">
+                    <label class="label text-sm font-medium text-gray-700" for="address">Address</label>
+                    <div class="control">
+                        <input class="input mt-1 block w-full" id="address" name="address" type="text" placeholder="123 Main Street" required />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="city">City</label>
+                    <div class="control">
+                        <input class="input mt-1 block w-full" id="city" name="city" type="text" placeholder="Oklahoma City" required />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="state">State</label>
+                    <div class="control">
+                        <input class="input mt-1 block w-full" id="state" name="state" type="text" placeholder="OK" required />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label text-sm font-medium text-gray-700" for="postalCode">Postal Code</label>
+                    <div class="control">
+                        <input class="input mt-1 block w-full" id="postalCode" name="postalCode" type="text" placeholder="73101" required />
+                    </div>
                 </div>
             </div>
             <div class="field">
-                <label class="label" for="lastName">Last Name</label>
+                <label class="label text-sm font-medium text-gray-700" for="file">Upload Sticker Design Image:</label>
                 <div class="control">
                     <input
-                        class="input"
-                        id="lastName"
-                        name="lastName"
-                        type="text"
-                        placeholder="Doe"
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="email">Email</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder=""
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="phone">Phone</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="phone"
-                        name="phone"
-                        type="tel"
-                        placeholder=""
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="addressLines">Address</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="address"
-                        name="address"
-                        type="text"
-                        placeholder="123 Main Street"
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="city">City</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="city"
-                        name="city"
-                        type="text"
-                        placeholder="Oklahoma City"
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="state">State</label>
-                <div class="control">
-                    <input
-                        class="input"
-                        id="state"
-                        name="state"
-                        type="text"
-                        placeholder="Oklahoma"
-                    />
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" for="state">File</label>
-                <div class="control">
-                    <input
-                        class="input"
+                        class="input mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                         id="file"
                         name="file"
                         type="file"
+                        accept="image/*"
                     />
+                    <span id="fileNameDisplay" class="text-sm text-gray-600 ml-2"></span>
                 </div>
+                 <p class="text-xs text-gray-500 mt-1" style="font-family: var(--font-baumans);">This is the main image for your sticker design.</p>
             </div>
-            <div id="card-container"></div>
+            <!-- Square Card Payment Element -->
+            <div id="card-container" class="p-3 border rounded-md bg-white shadow-sm min-h-[50px]"></div>
             <div class="field">
                 <div class="control">
-                    <button class="button is-primary" type="submit">
-                        Pay
+                    <button class="button is-primary w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50" type="submit">
+                        Pay & Process Order
                     </button>
                 </div>
             </div>
-
         </form>
+        <div id="ipfsLinkContainer" class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow"></div>
     </main>
 </body>
+</html>
