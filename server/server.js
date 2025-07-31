@@ -1,5 +1,6 @@
 import express from 'express';
-import { Client, Environment } from 'square';
+import square from 'square';
+const { Client, Environment } = square;
 import { randomUUID } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
