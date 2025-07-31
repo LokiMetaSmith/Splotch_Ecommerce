@@ -1,6 +1,9 @@
 import express from 'express';
 import square from 'square';
-const { Client, Environment } = square;
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+// Import the whole package into one variable
+const squarePackage = require('square');
 import { randomUUID } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
@@ -49,14 +52,23 @@ const upload = multer({ storage: storage });
 console.log('[SERVER] Multer configured for file uploads.');
 
 // --- Square Client Initialization ---
+
+// --- THE FINAL DIAGNOSTIC LINE ---
+console.log('[FINAL DIAGNOSTIC] Keys in square package:', Object.keys(squarePackage));
+
+// Now, attempt to get Client and Environment from it
+const { SquareClient, SquareEnvironment } = squarePackage;
 console.log('[SERVER] Initializing Square client...');
 if (!process.env.SQUARE_ACCESS_TOKEN) {
     console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
     process.exit(1);
 }
-const squareClient = new Client({
-    environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
+// Add this line for diagnosis:
+console.log('[DIAGNOSTIC] Is Environment defined?', SquareEnvironment);
+const squareClient = new SquareClient({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
+    environment: process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
+
 });
 console.log('[SERVER] Square client initialized.');
 
