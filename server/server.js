@@ -365,10 +365,11 @@ app.post('/api/auth/issue-temp-token', [
     if (!user) {
         user = {
             id: randomUUID(),
-            email,
+            email: email, // Use email here
             credentials: [],
         };
-        db.data.users[user.id] = user;
+        // Use email as the key for the user object, assuming emails are unique identifiers for this flow
+        db.data.users[email] = user;
         await db.write();
         console.log(`[SERVER] Created temporary user profile for ${email}`);
     }
@@ -395,10 +396,11 @@ app.post('/api/auth/magic-login', [
         // For passwordless login, we can create a new user if one doesn't exist
         user = {
             id: randomUUID(),
-            email,
+            email: email,
             credentials: [],
         };
-        db.data.users[user.id] = user;
+        // Corrected: Use email as the key for the user object
+        db.data.users[email] = user;
         await db.write();
     }
 
