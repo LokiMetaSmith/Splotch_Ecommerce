@@ -85,6 +85,33 @@ app.post('/api/upload-image', upload.single('image'), (req, res) => {
     res.json({ success: true, filePath: `/uploads/${req.file.filename}` });
 });
 
+app.post('/api/process-payment', async (req, res) => {
+    try {
+        const { sourceId, idempotencyKey, amountCents, currency } = req.body;
+
+        const paymentPayload = {
+            sourceId: sourceId,
+            idempotencyKey: idempotencyKey,
+            amountMoney: {
+                amount: BigInt(amountCents),
+                currency: currency || 'USD',
+            },
+        };
+
+        const { result: paymentResult, statusCode } = await squareClient.paymentsApi.createPayment(paymentPayload);
+
+        if (statusCode >= 300 || (paymentResult.errors && paymentResult.errors.length > 0)) {
+            return res.status(statusCode || 400).json({ error: 'Square API Error', details: paymentResult.errors });
+        }
+
+        return res.status(200).json({ success: true, payment: paymentResult.payment });
+
+    } catch (error) {
+        console.error('Error processing payment:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 app.post('/api/create-order', authenticateToken, upload.single('designImage'), [
     body('sourceId').notEmpty().withMessage('sourceId is required'),
     body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),

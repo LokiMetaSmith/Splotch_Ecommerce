@@ -28,7 +28,7 @@ function initializeShopPeer(requestedId = null) {
     try {
         if (typeof Peer === 'undefined') {
             console.error("PeerJS library is not loaded!");
-            updateShopPeerStatus("PeerJS library not loaded!", "error", "Error");
+            updateConnectionStatus("disconnected", "PeerJS library not loaded!");
             return;
         }
 
@@ -36,12 +36,12 @@ function initializeShopPeer(requestedId = null) {
         peer = new Peer(peerIdToUse, {
             // debug: 3 // Uncomment for verbose PeerJS logging
         });
-        updateShopPeerStatus("Initializing...", "pending", "Initializing...");
+        updateConnectionStatus("connecting");
 
         peer.on('open', (id) => {
             currentShopPeerId = id;
             console.log('Print Shop PeerJS ID is:', currentShopPeerId);
-            updateShopPeerStatus(`Listening for orders. Share this ID with the client app.`, "success", currentShopPeerId);
+            updateConnectionStatus("connected", `Connected as ${currentShopPeerId}`);
             if (shopPeerIdInput && !shopPeerIdInput.value && peerIdToUse === null) { // Update input if ID was auto-generated
                 shopPeerIdInput.value = currentShopPeerId;
             }
@@ -49,7 +49,7 @@ function initializeShopPeer(requestedId = null) {
 
         peer.on('connection', (conn) => {
             console.log(`Incoming connection from client: ${conn.peer}`);
-            updateShopPeerStatus(`Connected to client: ${conn.peer.substring(0,8)}...`, "success", currentShopPeerId);
+            updateConnectionStatus("connected", `Client ${conn.peer.substring(0,8)}... connected.`);
             if(noOrdersMessage) noOrdersMessage.style.display = 'none';
 
             connectedClients[conn.peer] = conn;
@@ -71,7 +71,7 @@ function initializeShopPeer(requestedId = null) {
 
             conn.on('error', (err) => {
                 console.error(`Error with connection from ${conn.peer}:`, err);
-                updateShopPeerStatus(`Error with client ${conn.peer.substring(0,8)}...`, "error", currentShopPeerId);
+                updateConnectionStatus("connected", `Error with client ${conn.peer.substring(0,8)}...`);
                 const orderCard = findOrderCardByClientPeerId(conn.peer);
                 if (orderCard) {
                     const statusEl = orderCard.querySelector('.payment-processing-status');
@@ -82,7 +82,7 @@ function initializeShopPeer(requestedId = null) {
 
         peer.on('disconnected', () => {
             console.warn('Shop peer disconnected from PeerJS server. Attempting to reconnect...');
-            updateShopPeerStatus("Disconnected from PeerJS server. Reconnecting...", "pending", "Reconnecting...");
+            updateConnectionStatus("connecting", "Reconnecting...");
             if (peer && !peer.destroyed) {
                 try { peer.reconnect(); } catch(e) { console.error("Error reconnecting peer:", e); }
             }
@@ -90,7 +90,7 @@ function initializeShopPeer(requestedId = null) {
 
         peer.on('close', () => {
             console.log('Shop peer instance closed.');
-            updateShopPeerStatus("Peer connection closed. Please Set/Refresh ID.", "error", "Closed");
+            updateConnectionStatus("disconnected", "Connection closed.");
             currentShopPeerId = null;
         });
 
@@ -103,19 +103,19 @@ function initializeShopPeer(requestedId = null) {
             } else if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(err.type)) {
                 message = "Error connecting to PeerJS server. Check network or try again later.";
             }
-            updateShopPeerStatus(message, "error", "Error");
+            updateConnectionStatus("disconnected", message);
             currentShopPeerId = null;
         });
 
     } catch (e) {
         console.error("Error initializing PeerJS:", e);
-        updateShopPeerStatus(`Critical PeerJS Init Error: ${e.message}`, "error", "Error");
+        updateConnectionStatus("disconnected", `Critical PeerJS Init Error: ${e.message}`);
     }
 }
 
 function handleClientDisconnect(clientPeerId) {
     console.log(`Connection from ${clientPeerId} closed.`);
-    updateShopPeerStatus(`Client ${clientPeerId.substring(0,8)}... disconnected.`, "pending", currentShopPeerId);
+    updateConnectionStatus("connected", `Client ${clientPeerId.substring(0,8)}... disconnected.`);
     delete connectedClients[clientPeerId];
 
     const orderCards = document.querySelectorAll(`.order-card[data-client-peer-id="${clientPeerId}"]`);
@@ -132,19 +132,35 @@ function handleClientDisconnect(clientPeerId) {
 }
 
 
-function updateShopPeerStatus(message, type = "info", peerIdText = "N/A") {
-    if (peerIdDisplaySpan) peerIdDisplaySpan.textContent = peerIdText;
-    if (peerConnectionMessage) peerConnectionMessage.textContent = message;
+function updateConnectionStatus(status, message) {
+    const statusDot = document.getElementById('connection-status-dot');
+    const statusText = document.getElementById('connection-status-text');
+    const errorDiv = document.getElementById('connection-error');
 
-    if (connectionStatusDot) {
-        connectionStatusDot.classList.remove('status-connected', 'status-disconnected', 'status-pending');
-        if (type === "success" && peerIdText !== "Error" && peerIdText !== "Closed" && peerIdText !== "N/A" && peerIdText !== "Initializing...") {
-            connectionStatusDot.classList.add('status-connected');
-        } else if (type === "error") {
-            connectionStatusDot.classList.add('status-disconnected');
-        } else {
-            connectionStatusDot.classList.add('status-pending');
-        }
+    if (!statusDot || !statusText || !errorDiv) {
+        return;
+    }
+
+    statusDot.classList.remove('bg-green-500', 'bg-red-500', 'bg-yellow-500');
+    errorDiv.classList.add('hidden');
+
+    switch (status) {
+        case 'connected':
+            statusDot.classList.add('bg-green-500');
+            statusText.textContent = message || 'Connected';
+            break;
+        case 'disconnected':
+            statusDot.classList.add('bg-red-500');
+            statusText.textContent = message || 'Disconnected';
+            errorDiv.classList.remove('hidden');
+            break;
+        case 'connecting':
+            statusDot.classList.add('bg-yellow-500');
+            statusText.textContent = message || 'Connecting...';
+            break;
+        default:
+            statusDot.classList.add('bg-gray-500');
+            statusText.textContent = 'Unknown';
     }
 }
 
@@ -242,66 +258,38 @@ async function handleProcessPayment(orderData, orderCardId, clientPeerId) {
     console.log("Attempting to process payment for order:", orderData);
     console.log("Using Square API Key (masked for log):", "********" + squareSecretKey.slice(-4));
 
-    // --- Direct Square API Call from Browser ---
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SECURITY WARNING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    // Making calls to the Square API directly from the client-side (browser) with a SECRET API key
-    // is highly insecure and NOT RECOMMENDED for production environments.
-    // 1. Exposure of Secret Key: Your Square Secret API Key can be exposed to anyone
-    //    inspecting the browser's network traffic or JavaScript code.
-    // 2. CORS Issues: Browsers enforce Cross-Origin Resource Sharing (CORS) policies.
-    //    Direct client-side API calls to Square (or many other third-party APIs) will often
-    //    fail due to CORS restrictions, as the API server may not explicitly allow
-    //    requests from your web application's origin. The `net::ERR_FAILED` in logs
-    //    is a common symptom of this.
-    //
-    // RECOMMENDED APPROACH:
-    // Use a backend proxy server. Your client application should send payment details to YOUR
-    // backend, and YOUR backend should securely communicate with the Square API using the
-    // secret key. This keeps the secret key off the client and manages CORS appropriately.
-    //
-    // This direct client-side call is included here for simplified demonstration purposes ONLY,
-    // and assumes a development context where such risks might be temporarily accepted or
-    // where browser security is relaxed (e.g. via specific browser extensions for development).
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    const SQUARE_API_URL = 'https://connect.squareupsandbox.com/v2/payments'; // For Sandbox
-    // For production, use: 'https://connect.squareup.com/v2/payments';
+    const YOUR_NODE_SERVER_URL = 'http://localhost:3000/api/process-payment';
 
     const paymentPayload = {
-        source_id: orderData.sourceId,
-        idempotency_key: orderData.idempotencyKey || `peer-order-${Date.now()}`, // Ensure idempotency key
-        amount_money: {
-            amount: orderData.amountCents, // Square API expects amount as integer in smallest currency unit
-            currency: orderData.currency || 'USD'
-        },
-        // Optional: Add more details if needed by Square API
-        // buyer_email_address: orderData.billingContact?.email,
-        // note: `Order for ${orderData.orderDetails?.quantity} stickers (${orderData.orderDetails?.material})`,
+        sourceId: orderData.sourceId,
+        idempotencyKey: orderData.idempotencyKey || `peer-order-${Date.now()}`,
+        amountCents: orderData.amountCents,
+        currency: orderData.currency || 'USD',
+        orderDetails: orderData.orderDetails,
+        billingContact: orderData.billingContact,
     };
 
     try {
-        console.log("Sending CreatePayment request to Square API:", JSON.stringify(paymentPayload));
-        const response = await fetch(SQUARE_API_URL, {
+        console.log("Sending payment request to local server:", JSON.stringify(paymentPayload));
+        const response = await fetch(YOUR_NODE_SERVER_URL, {
             method: 'POST',
             headers: {
-                'Square-Version': '2023-10-18', // Use a recent API version
-                'Authorization': `Bearer ${squareSecretKey}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(paymentPayload)
         });
 
         const responseData = await response.json();
-        console.log("Square API Response:", responseData);
+        console.log("Server Response:", responseData);
 
-        if (!response.ok || responseData.errors) {
+        if (!response.ok || responseData.error) {
             let errorMessage = "Payment processing failed.";
-            if (responseData.errors && responseData.errors.length > 0) {
-                errorMessage = responseData.errors.map(err => `[${err.category}/${err.code}]: ${err.detail}`).join('; ');
-            } else if (responseData.error && responseData.error.message) { // Older error format
-                 errorMessage = responseData.error.message;
+            if (responseData.details) {
+                errorMessage = responseData.details.map(err => `[${err.category}/${err.code}]: ${err.detail}`).join('; ');
+            } else if (responseData.error) {
+                errorMessage = responseData.error;
             } else if (response.statusText) {
-                errorMessage = `Square API Error: ${response.status} ${response.statusText}`;
+                errorMessage = `Server Error: ${response.status} ${response.statusText}`;
             }
             throw new Error(errorMessage);
         }
@@ -386,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("CRITICAL: Set Peer ID button (setPeerIdBtn) not found in the DOM. Click events will not work.");
     }
     // This sets the initial state. If it remains this state after a click, the event handler above did not run or failed to change the state.
-    updateShopPeerStatus("Ready to set Peer ID or auto-generate.", "pending", "Not Set");
+    updateConnectionStatus("connecting", "Ready to initialize.");
 });
 
 // --- Image Chunk Handling ---
