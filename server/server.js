@@ -1,6 +1,5 @@
 import express from 'express';
-import pkg from 'square';
-const { Client, Environment } = pkg;
+import { Client, Environment } from 'square';
 import { randomUUID } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
