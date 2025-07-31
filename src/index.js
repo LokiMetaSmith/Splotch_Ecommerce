@@ -213,8 +213,33 @@ async function handlePaymentFormSubmit(event) {
         return;
     }
 
+    const email = document.getElementById('email').value;
+    if (!email) {
+        showPaymentStatus('Please enter an email address to proceed.', 'error');
+        return;
+    }
+
 
     try {
+        // 0. Get temporary auth token
+        showPaymentStatus('Issuing temporary auth token...', 'info');
+        const authResponse = await fetch(`${serverUrl}/api/auth/issue-temp-token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email }),
+        });
+        if (!authResponse.ok) {
+            throw new Error('Could not issue a temporary authentication token.');
+        }
+        const { token: tempAuthToken } = await authResponse.json();
+        if (!tempAuthToken) {
+            throw new Error('Temporary authentication token was not received.');
+        }
+        console.log('[CLIENT] Temporary auth token received.');
+
+
         // 1. Tokenize the card
         showPaymentStatus('Tokenizing card...', 'info');
         console.log('[CLIENT] Tokenizing card.');
@@ -237,7 +262,7 @@ async function handlePaymentFormSubmit(event) {
         const billingContact = {
             givenName: document.getElementById('firstName').value || undefined,
             familyName: document.getElementById('lastName').value || undefined,
-            email: document.getElementById('email').value || undefined,
+            email: email,
             phone: document.getElementById('phone').value || undefined,
             addressLines: [document.getElementById('address').value || ''],
             city: document.getElementById('city').value || undefined,
@@ -261,6 +286,7 @@ async function handlePaymentFormSubmit(event) {
             method: 'POST',
             credentials: 'include', // Important for cookies
             headers: {
+                'Authorization': `Bearer ${tempAuthToken}`,
                 'X-CSRF-Token': csrfToken
             },
             body: formData, // No 'Content-Type' header needed; browser sets it for FormData

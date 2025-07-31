@@ -348,6 +348,37 @@ app.post('/api/auth/verify-magic-link', (req, res) => {
     });
 });
 
+app.post('/api/auth/issue-temp-token', [
+    body('email').isEmail().withMessage('A valid email is required'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email } = req.body;
+
+    // Find if user exists, or create a temporary one.
+    // This logic is similar to magic-login but returns the token directly.
+    let user = Object.values(db.data.users).find(u => u.email === email);
+
+    if (!user) {
+        user = {
+            id: randomUUID(),
+            email,
+            credentials: [],
+        };
+        db.data.users[user.id] = user;
+        await db.write();
+        console.log(`[SERVER] Created temporary user profile for ${email}`);
+    }
+
+    // Issue a short-lived token (e.g., 5 minutes)
+    const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '5m' });
+
+    res.json({ token });
+});
+
 app.post('/api/auth/magic-login', [
     body('email').isEmail().withMessage('email is not valid'),
 ], async (req, res) => {
