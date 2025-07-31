@@ -113,6 +113,7 @@ const corsOptions = {
             callback(new Error('Not allowed by CORS'));
         }
     },
+    credentials: true, // Important for cookies
     optionsSuccessStatus: 200, // For legacy browser support
 };
 

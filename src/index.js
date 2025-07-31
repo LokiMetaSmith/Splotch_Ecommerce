@@ -174,7 +174,9 @@ async function tokenize(paymentMethod) {
 // --- CSRF Token Fetching ---
 async function fetchCsrfToken() {
     try {
-        const response = await fetch(`${serverUrl}/api/csrf-token`);
+        const response = await fetch(`${serverUrl}/api/csrf-token`, {
+            credentials: 'include', // Important for cookies
+        });
         if (!response.ok) {
             throw new Error(`Server responded with ${response.status}`);
         }
@@ -257,6 +259,7 @@ async function handlePaymentFormSubmit(event) {
 
         const response = await fetch(`${serverUrl}/api/create-order`, {
             method: 'POST',
+            credentials: 'include', // Important for cookies
             headers: {
                 'X-CSRF-Token': csrfToken
             },
