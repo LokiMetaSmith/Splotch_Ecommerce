@@ -225,8 +225,10 @@ async function handlePaymentFormSubmit(event) {
         showPaymentStatus('Issuing temporary auth token...', 'info');
         const authResponse = await fetch(`${serverUrl}/api/auth/issue-temp-token`, {
             method: 'POST',
+            credentials: 'include', // Important for cookies
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
             },
             body: JSON.stringify({ email }),
         });
