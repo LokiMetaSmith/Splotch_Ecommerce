@@ -79,7 +79,44 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
-app.use(cors({ origin: 'https://lokimetasmith.github.io', optionsSuccessStatus: 200 }));
+
+// --- CORS Configuration ---
+const allowedOrigins = [
+    'https://lokimetasmith.github.io',
+    // Add other allowed origins here if needed
+];
+
+// Allow localhost for development using a regular expression
+if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push(/http:\/\/localhost:\d+/);
+}
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+
+        // Check if the origin is in the allowed list
+        const isAllowed = allowedOrigins.some(allowedOrigin => {
+            if (typeof allowedOrigin === 'string') {
+                return allowedOrigin === origin;
+            }
+            if (allowedOrigin instanceof RegExp) {
+                return allowedOrigin.test(origin);
+            }
+            return false;
+        });
+
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    optionsSuccessStatus: 200, // For legacy browser support
+};
+
+app.use(cors(corsOptions));
 app.use(express.json()); // To parse JSON request bodies (for APIs without file uploads)
 app.use(cookieParser());
 app.use(csrf({ cookie: true }));
