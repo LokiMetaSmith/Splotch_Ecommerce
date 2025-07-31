@@ -50,6 +50,26 @@ To start the server, run the following command from the `server/` directory:
 npm start
 ```
 
+## Local Development and Testing
+
+When testing the application locally, you cannot simply open the `printshop.html` file in your browser. This will cause a CORS error because the browser will block the JavaScript file from being loaded from the local file system.
+
+To avoid this, you need to serve the files from a local HTTP server. Here's how you can do it using the `serve` package:
+
+1.  **Install `serve` globally:**
+    ```bash
+    npm install -g serve
+    ```
+
+2.  **Start the local server:**
+    From the root of the project directory, run the following command:
+    ```bash
+    serve
+    ```
+
+3.  **Access the application:**
+    Open the URL provided by the `serve` command in your browser (usually `http://localhost:3000`) and navigate to `printshop.html`.
+
 ## Production Considerations
 
 For production deployments, consider the following:
