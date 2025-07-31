@@ -6,7 +6,6 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import cookieParser from 'cookie-parser';
 import csrf from 'csurf';
@@ -23,8 +22,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // --- Ensure upload directory exists ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -86,33 +84,6 @@ app.post('/api/upload-image', upload.single('image'), (req, res) => {
     }
 
     res.json({ success: true, filePath: `/uploads/${req.file.filename}` });
-});
-
-app.post('/api/process-payment', async (req, res) => {
-    try {
-        const { sourceId, idempotencyKey, amountCents, currency } = req.body;
-
-        const paymentPayload = {
-            sourceId: sourceId,
-            idempotencyKey: idempotencyKey,
-            amountMoney: {
-                amount: BigInt(amountCents),
-                currency: currency || 'USD',
-            },
-        };
-
-        const { result: paymentResult, statusCode } = await squareClient.paymentsApi.createPayment(paymentPayload);
-
-        if (statusCode >= 300 || (paymentResult.errors && paymentResult.errors.length > 0)) {
-            return res.status(statusCode || 400).json({ error: 'Square API Error', details: paymentResult.errors });
-        }
-
-        return res.status(200).json({ success: true, payment: paymentResult.payment });
-
-    } catch (error) {
-        console.error('Error processing payment:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
 });
 
 app.post('/api/create-order', authenticateToken, upload.single('designImage'), [
