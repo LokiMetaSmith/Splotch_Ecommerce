@@ -1,11 +1,12 @@
-// printshop.js
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import DOMPurify from 'dompurify';
 import SVGNest from './lib/svgnest.js';
 import SVGParser from './lib/svgparser.js';
 
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // --- DOM Elements ---
-let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer;
+let ordersListDiv, noOrdersMessage, refreshOrdersBtn, nestStickersBtn, nestedSvgContainer, spacingInput, registerBtn, loginBtn, authStatus, loadingIndicator, errorToast, errorMessage, closeErrorToast, successToast, successMessage, closeSuccessToast, searchInput, searchBtn, downloadCutFileBtn;
 
 // --- Main Setup ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,23 +15,98 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshOrdersBtn = document.getElementById('refreshOrdersBtn');
     nestStickersBtn = document.getElementById('nestStickersBtn');
     nestedSvgContainer = document.getElementById('nested-svg-container');
+    spacingInput = document.getElementById('spacingInput');
+    registerBtn = document.getElementById('registerBtn');
+    loginBtn = document.getElementById('loginBtn');
+    authStatus = document.getElementById('auth-status');
+    loadingIndicator = document.getElementById('loading-indicator');
+    errorToast = document.getElementById('error-toast');
+    errorMessage = document.getElementById('error-message');
+    closeErrorToast = document.getElementById('close-error-toast');
+    successToast = document.getElementById('success-toast');
+    successMessage = document.getElementById('success-message');
+    closeSuccessToast = document.getElementById('close-success-toast');
+    searchInput = document.getElementById('searchInput');
+    searchBtn = document.getElementById('searchBtn');
+    downloadCutFileBtn = document.getElementById('downloadCutFileBtn');
 
     if (refreshOrdersBtn) {
         refreshOrdersBtn.addEventListener('click', fetchAndDisplayOrders);
+    }
+
+    if (downloadCutFileBtn) {
+        downloadCutFileBtn.addEventListener('click', handleDownloadCutFile);
+    }
+
+    if (searchBtn) {
+        searchBtn.addEventListener('click', handleSearch);
     }
 
     if (nestStickersBtn) {
         nestStickersBtn.addEventListener('click', handleNesting);
     }
 
+    if (registerBtn) {
+        registerBtn.addEventListener('click', handleRegistration);
+    }
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleAuthentication);
+    }
+
     // Fetch orders when the page loads
     fetchAndDisplayOrders();
+    getCsrfToken();
 });
+
+let csrfToken;
+let authToken;
+
+async function getCsrfToken() {
+    try {
+        const response = await fetch(`${serverUrl}/api/csrf-token`);
+        const data = await response.json();
+        csrfToken = data.csrfToken;
+    } catch (error) {
+        console.error('Error fetching CSRF token:', error);
+    }
+}
+
+function showLoadingIndicator() {
+    loadingIndicator.classList.remove('hidden');
+}
+
+function hideLoadingIndicator() {
+    loadingIndicator.classList.add('hidden');
+}
+
+function showErrorToast(message) {
+    errorMessage.textContent = message;
+    errorToast.classList.remove('hidden');
+}
+
+function hideErrorToast() {
+    errorToast.classList.add('hidden');
+}
+
+closeErrorToast.addEventListener('click', hideErrorToast);
+
+function showSuccessToast(message) {
+    successMessage.textContent = message;
+    successToast.classList.remove('hidden');
+}
+
+function hideSuccessToast() {
+    successToast.classList.add('hidden');
+}
+
+closeSuccessToast.addEventListener('click', hideSuccessToast);
 
 /**
  * Fetches orders from the server and updates the UI.
  */
 async function fetchAndDisplayOrders() {
+    showLoadingIndicator();
     console.log('[SHOP] Fetching orders from server...');
     if (noOrdersMessage) {
         noOrdersMessage.textContent = 'Loading orders...';
@@ -40,7 +116,11 @@ async function fetchAndDisplayOrders() {
     ordersListDiv.innerHTML = '';
 
     try {
-        const response = await fetch(`${serverUrl}/api/orders`);
+        const response = await fetch(`${serverUrl}/api/orders`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
         if (!response.ok) {
             throw new Error(`Server responded with status: ${response.status}`);
         }
@@ -56,9 +136,77 @@ async function fetchAndDisplayOrders() {
 
     } catch (error) {
         console.error('[SHOP] Error fetching orders:', error);
-        if (noOrdersMessage) {
-            noOrdersMessage.textContent = `Error fetching orders: ${error.message}. Is the server running?`;
+        showErrorToast(`Error fetching orders: ${error.message}. Is the server running?`);
+    } finally {
+        hideLoadingIndicator();
+    }
+}
+
+function handleDownloadCutFile() {
+    if (!window.nestedSvg) {
+        showErrorToast('No nested SVG to generate a cut file from.');
+        return;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(window.nestedSvg, 'image/svg+xml');
+    const nestedSvgElement = doc.documentElement;
+
+    const cutFileSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    cutFileSvg.setAttribute('width', nestedSvgElement.getAttribute('width'));
+    cutFileSvg.setAttribute('height', nestedSvgElement.getAttribute('height'));
+    cutFileSvg.setAttribute('viewBox', nestedSvgElement.getAttribute('viewBox'));
+
+    const paths = nestedSvgElement.querySelectorAll('path');
+    paths.forEach(path => {
+        const newPath = path.cloneNode();
+        newPath.setAttribute('stroke', 'red');
+        newPath.setAttribute('fill', 'none');
+        cutFileSvg.appendChild(newPath);
+    });
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(cutFileSvg);
+
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cut-file.svg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function handleSearch() {
+    const orderId = searchInput.value;
+
+    if (!orderId) {
+        return;
+    }
+
+    showLoadingIndicator();
+    ordersListDiv.innerHTML = '';
+
+    try {
+        const response = await fetch(`${serverUrl}/api/orders/${orderId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server responded with status: ${response.status}`);
         }
+
+        const order = await response.json();
+        displayOrder(order);
+    } catch (error) {
+        console.error(`[SHOP] Error searching for order ${orderId}:`, error);
+        showErrorToast(`Error searching for order ${orderId}: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
     }
 }
 
@@ -76,7 +224,7 @@ function displayOrder(order) {
     const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
     const receivedDate = new Date(order.receivedAt).toLocaleString();
 
-    card.innerHTML = `
+    card.innerHTML = DOMPurify.sanitize(`
         <div class="flex justify-between items-start">
             <div>
                 <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
@@ -111,6 +259,7 @@ function displayOrder(order) {
                 <img src="${serverUrl}${order.designImagePath}" alt="Sticker Design" class="sticker-design">
             </a>
         </div>
+    `);
         <div class="mt-4 flex flex-wrap gap-2">
             <button class="action-btn bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded-md" data-order-id="${order.orderId}" data-status="ACCEPTED">Accept</button>
             <button class="action-btn bg-purple-500 hover:bg-purple-600 text-white py-1 px-3 rounded-md" data-order-id="${order.orderId}" data-status="PRINTING">Mark as Printing</button>
@@ -138,6 +287,7 @@ function displayOrder(order) {
  * @param {string} newStatus - The new status for the order.
  */
 async function updateOrderStatus(orderId, newStatus) {
+    showLoadingIndicator();
     console.log(`[SHOP] Updating order ${orderId} to status ${newStatus}`);
     const statusMsgEl = document.getElementById(`status-update-msg-${orderId}`);
     if (statusMsgEl) statusMsgEl.textContent = `Updating status to ${newStatus}...`;
@@ -147,6 +297,8 @@ async function updateOrderStatus(orderId, newStatus) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+                'Authorization': `Bearer ${authToken}`,
             },
             body: JSON.stringify({ status: newStatus }),
         });
@@ -158,7 +310,7 @@ async function updateOrderStatus(orderId, newStatus) {
         }
 
         console.log(`[SHOP] Successfully updated status for order ${orderId}.`, responseData);
-        if (statusMsgEl) statusMsgEl.textContent = `Status updated to ${newStatus} successfully!`;
+        showSuccessToast(`Status updated to ${newStatus} successfully!`);
 
         // Update the status badge in the UI
         const statusBadgeEl = document.getElementById(`status-badge-${orderId}`);
@@ -174,7 +326,9 @@ async function updateOrderStatus(orderId, newStatus) {
 
     } catch (error) {
         console.error(`[SHOP] Error updating status for order ${orderId}:`, error);
-        if (statusMsgEl) statusMsgEl.textContent = `Error: ${error.message}`;
+        showErrorToast(`Error updating status for order ${orderId}: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
     }
 }
 
@@ -182,6 +336,7 @@ async function updateOrderStatus(orderId, newStatus) {
  * Handles the sticker nesting process.
  */
 async function handleNesting() {
+    showLoadingIndicator();
     console.log('[SHOP] Starting nesting process...');
     nestedSvgContainer.innerHTML = '<p>Nesting in progress...</p>';
 
@@ -212,8 +367,9 @@ async function handleNesting() {
         const bin = parser.load(binSvg);
 
         // 5. Configure and run SVGNest
+        const spacing = parseInt(spacingInput.value, 10) || 0;
         const options = {
-            spacing: 10, // spacing between parts
+            spacing: spacing, // spacing between parts
             rotations: 4, // 0, 90, 180, 270 degrees
         };
         const nest = new SVGNest(bin, svgs, options);
@@ -222,9 +378,96 @@ async function handleNesting() {
         // 6. Display the nested SVG
         nestedSvgContainer.innerHTML = resultSvg;
         console.log('[SHOP] Nesting complete.');
+        showSuccessToast('Nesting complete.');
+
+        // 7. Generate and store the cut file
+        window.nestedSvg = resultSvg;
 
     } catch (error) {
         console.error('[SHOP] Error during nesting:', error);
-        nestedSvgContainer.innerHTML = `<p class="text-red-500">Nesting failed: ${error.message}</p>`;
+        showErrorToast(`Nesting failed: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
+    }
+}
+
+/**
+ * Handles the registration process.
+ */
+async function handleRegistration() {
+    showLoadingIndicator();
+    authStatus.innerHTML = '';
+
+    try {
+        // Get registration options from the server
+        const resp = await fetch(`${serverUrl}/api/auth/register-options`);
+        const opts = await resp.json();
+
+        // Start the registration process
+        const regResp = await startRegistration(opts);
+
+        // Send the registration response to the server
+        const verificationResp = await fetch(`${serverUrl}/api/auth/register-verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+            },
+            body: JSON.stringify(regResp),
+        });
+
+        const verificationJSON = await verificationResp.json();
+
+        if (verificationJSON && verificationJSON.verified) {
+            showSuccessToast('YubiKey registered successfully!');
+        } else {
+            showErrorToast(`Error registering YubiKey: ${verificationJSON.error}`);
+        }
+    } catch (error) {
+        console.error('[SHOP] Error during registration:', error);
+        showErrorToast(`Error registering YubiKey: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
+    }
+}
+
+/**
+ * Handles the authentication process.
+ */
+async function handleAuthentication() {
+    showLoadingIndicator();
+    authStatus.innerHTML = '';
+
+    try {
+        // Get authentication options from the server
+        const resp = await fetch(`${serverUrl}/api/auth/login-options`);
+        const opts = await resp.json();
+
+        // Start the authentication process
+        const authResp = await startAuthentication(opts);
+
+        // Send the authentication response to the server
+        const verificationResp = await fetch(`${serverUrl}/api/auth/login-verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+            },
+            body: JSON.stringify(authResp),
+        });
+
+        const verificationJSON = await verificationResp.json();
+
+        if (verificationJSON && verificationJSON.verified) {
+            authToken = verificationJSON.token;
+            showSuccessToast('Login successful!');
+        } else {
+            showErrorToast(`Error logging in: ${verificationJSON.error}`);
+        }
+    } catch (error) {
+        console.error('[SHOP] Error during authentication:', error);
+        showErrorToast(`Error logging in: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
     }
 }

@@ -17,12 +17,21 @@
             margin-bottom: 16px;
             background-color: #f9f9f9;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        .order-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         .order-card img.sticker-design {
             max-width: 200px;
             max-height: 200px;
             border: 1px solid #ccc;
             margin-top: 10px;
+            transition: all 0.3s ease-in-out;
+        }
+        .order-card img.sticker-design:hover {
+            transform: scale(1.1);
         }
         .order-details dt { font-weight: bold; }
         .order-details dd { margin-left: 0; margin-bottom: 0.5em; }
@@ -34,28 +43,71 @@
     </style>
     <script type="module" src="./src/printshop.js" defer></script>
 </head>
-<body class="bg-slate-200 text-slate-800 p-4 md:p-8">
-    <div class="container mx-auto max-w-4xl bg-white p-6 rounded-lg shadow-xl">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl text-splotch-navy">Print Shop - Order Dashboard</h1>
-            <button id="refreshOrdersBtn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh Orders</button>
-            <button id="nestStickersBtn" class="mt-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Nest Stickers</button>
-        </header>
-
-        <section id="nesting-section" class="mb-8">
-            <h2 class="text-3xl text-splotch-navy mb-4">Nested Artwork</h2>
-            <div id="nested-svg-container" class="bg-gray-100 p-4 border rounded-lg">
-                <!-- Nested SVG will be displayed here -->
+<body class="bg-slate-200 text-slate-800">
+    <header class="bg-white shadow-md">
+        <nav class="container mx-auto px-6 py-3">
+            <div class="flex justify-between items-center">
+                <a href="#" class="text-xl font-semibold text-gray-700">Print Shop</a>
+                <div class="flex items-center">
+                    <input type="text" id="searchInput" placeholder="Search by Order ID" class="px-4 py-2 border rounded-md">
+                    <button id="searchBtn" class="ml-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Search</button>
+                    <button id="refreshOrdersBtn" class="ml-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh Orders</button>
+                </div>
             </div>
-        </section>
+        </nav>
+    </header>
 
-        <section id="incoming-orders-section">
-            <h2 class="text-3xl text-splotch-navy mb-4">Incoming Orders</h2>
-            <div id="orders-list" class="space-y-4">
-                <p id="no-orders-message" class="text-gray-500 italic">Loading orders...</p>
-                <!-- Order cards will be dynamically inserted here by printshop.js -->
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2">
+                <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Incoming Orders</h2>
+                <div id="orders-list" class="space-y-4">
+                    <p id="no-orders-message" class="text-gray-500 italic">Loading orders...</p>
+                    <!-- Order cards will be dynamically inserted here by printshop.js -->
+                </div>
             </div>
-        </section>
+            <div class="space-y-8">
+                <div class="bg-white p-6 rounded-lg shadow-xl">
+                    <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Nesting</h2>
+                    <div class="mt-4">
+                        <label for="spacingInput" class="mr-2">Spacing:</label>
+                        <input type="number" id="spacingInput" value="10" class="w-20 p-1 border rounded-md">
+                    </div>
+                    <button id="nestStickersBtn" class="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Nest Stickers</button>
+                    <button id="downloadCutFileBtn" class="mt-4 w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600">Download Cut File</button>
+                    <div id="nested-svg-container" class="mt-4 bg-gray-100 p-4 border rounded-lg">
+                        <!-- Nested SVG will be displayed here -->
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-xl">
+                    <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Authentication</h2>
+                    <div id="auth-container">
+                        <button id="loginBtn" class="mt-4 w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Login with YubiKey</button>
+                        <div id="auth-status" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white shadow-md mt-8">
+        <div class="container mx-auto px-6 py-3 text-center text-gray-500">
+            &copy; 2025 Print Shop
+        </div>
+    </footer>
+
+    <div id="loading-indicator" class="hidden fixed top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center">
+        <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+    </div>
+
+    <div id="error-toast" class="hidden fixed bottom-0 right-0 mb-4 mr-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-md">
+        <span id="error-message"></span>
+        <button id="close-error-toast" class="ml-4 text-white font-bold">&times;</button>
+    </div>
+
+    <div id="success-toast" class="hidden fixed bottom-0 right-0 mb-4 mr-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-md">
+        <span id="success-message"></span>
+        <button id="close-success-toast" class="ml-4 text-white font-bold">&times;</button>
     </div>
 </body>
 </html>
