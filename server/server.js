@@ -468,12 +468,24 @@ async function startServer() {
 
 
         // --- Start Server ---
-        app.listen(port, () => {
+        const server = app.listen(port, () => {
             console.log(`[SERVER] Server listening at http://localhost:${port}`);
             console.log(`[SERVER] Uploads will be saved to: ${uploadDir}`);
             console.log(`[SERVER] Static files served from /uploads`);
             console.log(`[SERVER] Square client was initialized using environment: ${process.env.SQUARE_ENVIRONMENT || 'sandbox (default)'}`);
         });
+// Add this error handling block
+    server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(`❌ [FATAL] Port ${port} is already in use.`);
+        console.error('Please close the other process or specify a different port in your .env file.');
+        process.exit(1);
+    } else {
+        // Handle other unexpected startup errors
+        console.error(`❌ [FATAL] An unexpected error occurred:`, error);
+        process.exit(1);
+    }
+});
    } catch (error) {
     // This will now catch any error during startup
     console.error('[FATAL] Failed to start server:', error);
