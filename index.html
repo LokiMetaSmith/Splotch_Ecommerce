@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Editor & Secure Pay - Custom Stickers</title>
-    <!-- PeerJS Library -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <!-- SVG.js (if still needed, though not directly used by core image editing) -->
     <script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.0/dist/svg.min.js"></script>
     <!-- Square Web Payments SDK -->
@@ -19,6 +17,10 @@
     <script type="module" src="./src/index.js" defer></script>
 </head>
 <body class="bg-gray-100">
+    <div id="adblock-warning" style="display: none; padding: 1rem; background-color: #fffbe6; border: 1px solid #facc15; border-radius: 0.5rem; color: #713f12; margin: 1rem auto; max-width: 800px;">
+        <p style="font-weight: bold;">Payment Form Blocked 🛡️</p>
+        <p>It looks like an ad blocker is preventing our secure payment form from loading. Please disable it for this site to complete your purchase.</p>
+    </div>
     <main class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8">
         <h1 class="text-3xl font-bold text-center text-gray-700 mb-8">Custom Sticker Editor & Secure Pay</h1>
 
