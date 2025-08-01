@@ -1,7 +1,10 @@
 import express from 'express';
+import dns from 'dns';
+//const { Client, Environment } = square;
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const squarePackage = require('square');
+const { SquareClient, SquareEnvironment } = squarePackage;
 import { randomUUID } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
@@ -36,7 +39,7 @@ async function startServer() {
 
     // --- Database Setup ---
     const defaultData = { orders: [], users: {}, credentials: {} };
-    const db = await JSONFilePreset('db.json', defaultData);
+    const db = await JSONFilePreset(path.join(__dirname, 'db.json'), defaultData);
     console.log('[SERVER] LowDB database initialized.');
 
     // --- Multer Configuration for File Uploads ---
@@ -53,17 +56,49 @@ async function startServer() {
     console.log('[SERVER] Multer configured for file uploads.');
     
     // --- Square Client Initialization ---
-    const { SquareClient, SquareEnvironment } = squarePackage;
     console.log('[SERVER] Initializing Square client...');
     if (!process.env.SQUARE_ACCESS_TOKEN) {
       console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
       process.exit(1);
     }
     const squareClient = new SquareClient({
+      squareVersion: '2025-07-16',
       accessToken: process.env.SQUARE_ACCESS_TOKEN,
-      environment: process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
+      environment: process.env.SQUARE_ENVIRONMENT || 'sandbox',
     });
+    console.log('[SERVER] Verifying connection to Square servers...');
+    try {
+        await new Promise((resolve, reject) => {
+            dns.lookup('connect.squareup.com', (err) => {
+                if (err) return reject(err);
+                resolve();
+            });
+        });
+        console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
+    } catch (error) {
+        console.error('❌ [FATAL] Could not resolve Square API domain.');
+        console.error('   This is likely a network, DNS, or firewall issue on the server.');
+        console.error('   Full Error:', error.message);
+        process.exit(1);
+    }
     console.log('[SERVER] Square client initialized.');
+// --- NEW: Verify Square API Connection ---
+    console.log('[SERVER] Verifying Square API connection...');
+    try {
+        console.log('[LOCATIONS API INSPECTION] Functions available on squareClient.locations:', Object.keys(squareClient.locations));
+        const { result } = await squareClient.locations.listLocations();
+        // If the call succeeds, it means the token is valid and the connection works.
+        console.log('✅ [SERVER] Square API connection successful. Locations found:', result.locations.length);
+    } catch (error) {
+        console.error('❌ [FATAL] Square API connection failed.');
+        console.error('   Please check that your SQUARE_ACCESS_TOKEN is correct in the .env file.');
+		console.error('   Full Error Object:', error);
+        // Log the detailed error from Square if available
+        if (error.response) {
+            console.error('   API Error Details:', JSON.stringify(error.response.data, null, 2));
+        }
+        process.exit(1); // Stop the server from starting if the connection fails
+    }
 
     // --- Middleware ---
     const limiter = rateLimit({
@@ -122,6 +157,13 @@ async function startServer() {
     }
 
     // --- API Endpoints ---
+    app.get('/api/ping', (req, res) => {
+      res.status(200).json({
+        status: 'ok',
+        message: 'Server is running',
+        timestamp: new Date().toISOString(),
+      });
+    });
     app.get('/api/csrf-token', (req, res) => {
       res.json({ csrfToken: req.csrfToken() });
     });
@@ -154,7 +196,7 @@ async function startServer() {
           },
         };
         console.log('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
-        const { result: paymentResult, statusCode } = await squareClient.paymentsApi.createPayment(paymentPayload);
+        const { result: paymentResult, statusCode } = await squareClient.payments.createPayment(paymentPayload);
         if (statusCode >= 300 || (paymentResult.errors && paymentResult.errors.length > 0)) {
           console.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
           return res.status(statusCode || 400).json({ error: 'Square API Error', details: paymentResult.errors });
@@ -309,23 +351,6 @@ async function startServer() {
         const authToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
         res.json({ success: true, token: authToken });
       });
-    });
-
-    app.post('/api/auth/issue-temp-token', [
-      body('email').isEmail().withMessage('A valid email is required'),
-    ], (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { email } = req.body;
-
-      // Create a short-lived token for the purpose of placing one order
-      const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
-
-      console.log(`[SERVER] Issued temporary token for email: ${email}`);
-      res.json({ success: true, token });
     });
 
     // --- WebAuthn (Passkey) Endpoints ---
