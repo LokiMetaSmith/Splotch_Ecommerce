@@ -153,6 +153,7 @@ async function startServer() {
             currency: currency || 'USD',
           },
         };
+        console.log('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
         const { result: paymentResult, statusCode } = await squareClient.paymentsApi.createPayment(paymentPayload);
         if (statusCode >= 300 || (paymentResult.errors && paymentResult.errors.length > 0)) {
           console.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
