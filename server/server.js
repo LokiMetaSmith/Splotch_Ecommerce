@@ -1,17 +1,11 @@
 import express from 'express';
-
-//const { Client, Environment } = square;
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const squarePackage = require('square');
-const { SquareClient, SquareEnvironment } = squarePackage;
+import { Client, Environment } from 'square';
 import { randomUUID } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import dns from 'dns';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import cookieParser from 'cookie-parser';
 import csrf from 'csurf';
@@ -31,6 +25,7 @@ async function startServer() {
   try {
     const app = express();
     const port = process.env.PORT || 3000;
+    let locationId; // This will hold the primary location ID for transactions
 
     // --- Ensure upload directory exists ---
     const uploadDir = path.join(__dirname, 'uploads');
@@ -39,18 +34,15 @@ async function startServer() {
     }
 
     // --- Database Setup ---
-    const defaultData = { orders: [], users: {}, credentials: {} };
-    const db = await JSONFilePreset(path.join(__dirname, 'db.json'), defaultData);
+    const db = await JSONFilePreset(path.join(__dirname, 'db.json'), { orders: [], users: {}, credentials: {} });
     console.log('[SERVER] LowDB database initialized.');
 
     // --- Multer Configuration for File Uploads ---
     const storage = multer.diskStorage({
-      destination: function (req, file, cb) {
-        cb(null, uploadDir);
-      },
-      filename: function (req, file, cb) {
+      destination: (req, file, cb) => cb(null, uploadDir),
+      filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`);
       }
     });
     const upload = multer({ storage: storage });
@@ -62,87 +54,53 @@ async function startServer() {
       console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
       process.exit(1);
     }
-    const squareClient = new SquareClient({
+    const squareClient = new Client({
       squareVersion: '2025-07-16',
       accessToken: process.env.SQUARE_ACCESS_TOKEN,
-      environment: process.env.SQUARE_ENVIRONMENT || 'sandbox',
+      environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
     });
-    console.log('[SERVER] Verifying connection to Square servers...');
-    try {
-        await new Promise((resolve, reject) => {
-            dns.lookup('connect.squareup.com', (err) => {
-                if (err) return reject(err);
-                resolve();
-            });
-        });
-        console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
-    } catch (error) {
-        console.error('❌ [FATAL] Could not resolve Square API domain.');
-        console.error('   This is likely a network, DNS, or firewall issue on the server.');
-        console.error('   Full Error:', error.message);
-        process.exit(1);
-    }
-    console.log('[SERVER] Square client initialized.');
-  // --- NEW: Local Sanity Check for API properties ---
-    console.log('[SERVER] Performing sanity check on Square client...');
-    if (!squareClient.locations || !squareClient.payments) {
-        console.error('❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).');
-        console.error('   This may indicate an issue with the installed Square SDK package.');
-        process.exit(1);
-    }
-    console.log('✅ [SERVER] Sanity check passed. Client has required API properties.');
-
+    
+    // --- Verify Square API Connection & Get Location ID ---
     console.log('[SERVER] Verifying Square API connection...');
     try {
-        console.log('[LOCATIONS API INSPECTION] Functions available on squareClient.locations:', Object.keys(squareClient.locations));
-        const { result } = await squareClient.locations.listLocations();
-        // If the call succeeds, it means the token is valid and the connection works.
-        console.log('✅ [SERVER] Square API connection successful. Locations found:', result.locations.length);
-    } catch (error) {
-        console.error('❌ [FATAL] Square API connection failed.');
-        console.error('   Please check that your SQUARE_ACCESS_TOKEN is correct in the .env file.');
-		console.error('   Full Error Object:', error);
-        // Log the detailed error from Square if available
-        if (error.response) {
-            console.error('   API Error Details:', JSON.stringify(error.response.data, null, 2));
+      const { result } = await squareClient.locationsApi.listLocations();
+      if (result.locations && result.locations.length > 0) {
+        locationId = result.locations[0].id;
+        console.log(`✅ [SERVER] Square API connection successful. Using location: ${locationId}`);
+      } else {
+        console.warn('⚠️ [SERVER] API connection successful, but no locations were found.');
+        locationId = process.env.SQUARE_LOCATION_ID;
+        if (locationId) {
+            console.log(`[SERVER] Falling back to location ID from .env file: ${locationId}`);
+        } else {
+            console.error('❌ [FATAL] No locations found and SQUARE_LOCATION_ID is not set in .env file. Payment processing will fail.');
         }
-        process.exit(1); // Stop the server from starting if the connection fails
+      }
+    } catch (error) {
+      console.error('❌ [FATAL] Square API call failed. Please check your access token and network connection.');
+      if (error.response) {
+        console.error('   API Error:', JSON.stringify(error.response.data, null, 2));
+      } else {
+        console.error('   Full Error:', error);
+      }
+      process.exit(1);
     }
 
     // --- Middleware ---
-    const limiter = rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // Limit each IP to 100 requests per windowMs
-    });
-    
-    const allowedOrigins = [
-      'https://lokimetasmith.github.io',
-    ];
-    
+    const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+    const allowedOrigins = ['https://lokimetasmith.github.io'];
     if (process.env.NODE_ENV !== 'production') {
       allowedOrigins.push(/http:\/\/localhost:\d+/);
     }
-    
     const corsOptions = {
       origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        const isAllowed = allowedOrigins.some(allowedOrigin => {
-          if (typeof allowedOrigin === 'string') {
-            return allowedOrigin === origin;
-          }
-          if (allowedOrigin instanceof RegExp) {
-            return allowedOrigin.test(origin);
-          }
-          return false;
-        });
-        if (isAllowed) {
+        if (!origin || allowedOrigins.some(pattern => new RegExp(pattern).test(origin))) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
         }
       },
       credentials: true,
-      optionsSuccessStatus: 200,
     };
     
     app.use(limiter);
@@ -151,7 +109,7 @@ async function startServer() {
     app.use(cookieParser());
     app.use(csrf({ cookie: true }));
     app.use('/uploads', express.static(uploadDir));
-    console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
+    console.log('[SERVER] Middleware enabled.');
 
     // --- Helper Functions ---
     function authenticateToken(req, res, next) {
@@ -166,13 +124,6 @@ async function startServer() {
     }
 
     // --- API Endpoints ---
-    app.get('/api/ping', (req, res) => {
-      res.status(200).json({
-        status: 'ok',
-        message: 'Server is running',
-        timestamp: new Date().toISOString(),
-      });
-    });
     app.get('/api/csrf-token', (req, res) => {
       res.json({ csrfToken: req.csrfToken() });
     });
@@ -194,24 +145,24 @@ async function startServer() {
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
+      if (!locationId) {
+        return res.status(500).json({ error: "Server is misconfigured: Location ID is not available for payments." });
+      }
       try {
         const { sourceId, amountCents, currency, ...orderDetails } = req.body;
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
-          locationId: process.env.SQUARE_LOCATION_ID,
+          locationId: locationId,
           amountMoney: {
             amount: BigInt(amountCents),
             currency: currency || 'USD',
           },
         };
-        console.log('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
-        const { result: paymentResult, statusCode } = await squareClient.payments.createPayment(paymentPayload);
+        const { result: paymentResult, statusCode } = await squareClient.paymentsApi.createPayment(paymentPayload);
         if (statusCode >= 300 || (paymentResult.errors && paymentResult.errors.length > 0)) {
-          console.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
           return res.status(statusCode || 400).json({ error: 'Square API Error', details: paymentResult.errors });
         }
-        console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
         const newOrder = {
           orderId: randomUUID(),
           paymentId: paymentResult.payment.id,
@@ -226,11 +177,10 @@ async function startServer() {
         };
         db.data.orders.push(newOrder);
         await db.write();
-        console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
         return res.status(201).json({ success: true, order: newOrder });
       } catch (error) {
         console.error('[SERVER] Critical error in /api/create-order:', error);
-        if (error.response && error.response.data) {
+        if (error.response) {
           return res.status(error.statusCode || 500).json({ error: 'Square API Error', details: error.response.data.errors });
         }
         return res.status(500).json({ error: 'Internal Server Error', message: error.message });
@@ -271,7 +221,6 @@ async function startServer() {
       order.status = status;
       order.lastUpdatedAt = new Date().toISOString();
       await db.write();
-      console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
       res.status(200).json({ success: true, order: order });
     });
 
@@ -362,24 +311,6 @@ async function startServer() {
         res.json({ success: true, token: authToken });
       });
     });
-    
-    app.post('/api/auth/issue-temp-token', [
-      body('email').isEmail().withMessage('A valid email is required'),
-    ], (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { email } = req.body;
-
-      // Create a short-lived token for the purpose of placing one order
-      const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
-
-      console.log(`[SERVER] Issued temporary token for email: ${email}`);
-      res.json({ success: true, token });
-    });
-
 
     // --- WebAuthn (Passkey) Endpoints ---
     app.get('/api/auth/register-options', (req, res) => {
@@ -474,15 +405,11 @@ async function startServer() {
     // --- Start Server ---
     const server = app.listen(port, () => {
       console.log(`[SERVER] Server listening at http://localhost:${port}`);
-      console.log(`[SERVER] Uploads will be saved to: ${uploadDir}`);
-      console.log(`[SERVER] Static files served from /uploads`);
-      console.log(`[SERVER] Square client was initialized using environment: ${process.env.SQUARE_ENVIRONMENT || 'sandbox (default)'}`);
     });
     
     server.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`❌ [FATAL] Port ${port} is already in use.`);
-        console.error('Please close the other process or specify a different port in your .env file.');
         process.exit(1);
       } else {
         console.error(`❌ [FATAL] An unexpected error occurred:`, error);
