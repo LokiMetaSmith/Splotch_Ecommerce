@@ -1,5 +1,5 @@
 import express from 'express';
-import dns from 'dns';
+
 //const { Client, Environment } = square;
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -11,6 +11,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import dns from 'dns';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import cookieParser from 'cookie-parser';
 import csrf from 'csurf';
@@ -82,7 +83,15 @@ async function startServer() {
         process.exit(1);
     }
     console.log('[SERVER] Square client initialized.');
-// --- NEW: Verify Square API Connection ---
+  // --- NEW: Local Sanity Check for API properties ---
+    console.log('[SERVER] Performing sanity check on Square client...');
+    if (!squareClient.locations || !squareClient.payments) {
+        console.error('❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).');
+        console.error('   This may indicate an issue with the installed Square SDK package.');
+        process.exit(1);
+    }
+    console.log('✅ [SERVER] Sanity check passed. Client has required API properties.');
+
     console.log('[SERVER] Verifying Square API connection...');
     try {
         console.log('[LOCATIONS API INSPECTION] Functions available on squareClient.locations:', Object.keys(squareClient.locations));
@@ -190,6 +199,7 @@ async function startServer() {
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
+          locationId: process.env.SQUARE_LOCATION_ID,
           amountMoney: {
             amount: BigInt(amountCents),
             currency: currency || 'USD',
@@ -352,6 +362,24 @@ async function startServer() {
         res.json({ success: true, token: authToken });
       });
     });
+    
+    app.post('/api/auth/issue-temp-token', [
+      body('email').isEmail().withMessage('A valid email is required'),
+    ], (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email } = req.body;
+
+      // Create a short-lived token for the purpose of placing one order
+      const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
+
+      console.log(`[SERVER] Issued temporary token for email: ${email}`);
+      res.json({ success: true, token });
+    });
+
 
     // --- WebAuthn (Passkey) Endpoints ---
     app.get('/api/auth/register-options', (req, res) => {
