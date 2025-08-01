@@ -5,7 +5,7 @@ const locationId = "LTS82DEX24XR0";
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // Declare globals for SDK objects and key DOM elements
-let payments, card;
+let payments, card, csrfToken;
 let originalImage = null;
 let canvas, ctx;
 
@@ -55,6 +55,9 @@ async function BootStrap() {
     startCropBtnEl = document.getElementById('startCropBtn');
     grayscaleBtnEl = document.getElementById('grayscaleBtn');
     sepiaBtnEl = document.getElementById('sepiaBtn');
+
+    // Fetch CSRF token
+    await fetchCsrfToken();
 
     // Initialize Square Payments SDK
     console.log(`[CLIENT] Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`);
@@ -107,21 +110,9 @@ async function BootStrap() {
 }
 
 // --- Main execution ---
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        BootStrap();
-        // Check if the Square SDK was blocked after 2 seconds
-        setTimeout(() => {
-            if (typeof Square === 'undefined') {
-                console.error('[CLIENT] Square SDK appears to be blocked.');
-                // Function to show a warning message to the user
-                showAdBlockerWarning();
-            }
-        }, 2000);
-    });
-} else {
+document.addEventListener('DOMContentLoaded', () => {
     BootStrap();
-    // Also check if the document is already loaded
+    // Check if the Square SDK was blocked after 2 seconds
     setTimeout(() => {
         if (typeof Square === 'undefined') {
             console.error('[CLIENT] Square SDK appears to be blocked.');
@@ -129,7 +120,7 @@ if (document.readyState === 'loading') {
             showAdBlockerWarning();
         }
     }, 2000);
-}
+});
 
 function showAdBlockerWarning() {
     // For example, make a hidden div visible
@@ -138,6 +129,7 @@ function showAdBlockerWarning() {
         warningBanner.style.display = 'block';
     }
 }
+
 
 // --- Pricing Logic ---
 function calculateStickerPrice(quantity, material) {
@@ -194,6 +186,28 @@ async function tokenize(paymentMethod) {
     throw new Error(errorMessage);
 }
 
+// --- CSRF Token Fetching ---
+async function fetchCsrfToken() {
+    try {
+        const response = await fetch(`${serverUrl}/api/csrf-token`, {
+            credentials: 'include', // Important for cookies
+        });
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.csrfToken) {
+            throw new Error("CSRF token not found in server response");
+        }
+        csrfToken = data.csrfToken;
+        console.log('[CLIENT] CSRF Token fetched and stored.');
+    } catch (error) {
+        console.error('[CLIENT] Error fetching CSRF token:', error);
+        showPaymentStatus('A security token could not be loaded. Please refresh the page to continue.', 'error');
+    }
+}
+
+
 // --- Form Submission Logic ---
 async function handlePaymentFormSubmit(event) {
     console.log('[CLIENT] handlePaymentFormSubmit triggered.');
@@ -207,7 +221,44 @@ async function handlePaymentFormSubmit(event) {
         return;
     }
 
+    // Ensure CSRF token is available
+    if (!csrfToken) {
+        showPaymentStatus('Cannot submit form. A required security token is missing. Please refresh the page.', 'error');
+        console.error('[CLIENT] Aborting submission: CSRF token is missing.');
+        return;
+    }
+
+    const email = document.getElementById('email').value;
+    if (!email) {
+        showPaymentStatus('Please enter an email address to proceed.', 'error');
+        return;
+    }
+
+
     try {
+        // 0. Get temporary auth token
+        showPaymentStatus('Issuing temporary auth token...', 'info');
+        const authResponse = await fetch(`${serverUrl}/api/auth/issue-temp-token`, {
+            method: 'POST',
+            credentials: 'include', // Important for cookies
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({ email }),
+        });
+
+        if (!authResponse.ok) {
+            const errorText = await authResponse.text();
+            throw new Error(`Could not issue a temporary authentication token. Server responded with: ${errorText}`);
+        }
+        const { token: tempAuthToken } = await authResponse.json();
+        if (!tempAuthToken) {
+            throw new Error('Temporary authentication token was not received.');
+        }
+        console.log('[CLIENT] Temporary auth token received.');
+
+
         // 1. Tokenize the card
         showPaymentStatus('Tokenizing card...', 'info');
         console.log('[CLIENT] Tokenizing card.');
@@ -230,7 +281,7 @@ async function handlePaymentFormSubmit(event) {
         const billingContact = {
             givenName: document.getElementById('firstName').value || undefined,
             familyName: document.getElementById('lastName').value || undefined,
-            email: document.getElementById('email').value || undefined,
+            email: email,
             phone: document.getElementById('phone').value || undefined,
             addressLines: [document.getElementById('address').value || ''],
             city: document.getElementById('city').value || undefined,
@@ -252,12 +303,23 @@ async function handlePaymentFormSubmit(event) {
 
         const response = await fetch(`${serverUrl}/api/create-order`, {
             method: 'POST',
+            credentials: 'include', // Important for cookies
+            headers: {
+                'Authorization': `Bearer ${tempAuthToken}`,
+                'X-CSRF-Token': csrfToken
+            },
             body: formData, // No 'Content-Type' header needed; browser sets it for FormData
         });
 
         const responseData = await response.json();
 
         if (!response.ok) {
+            // Check if the error is a CSRF token error, and if so, fetch a new one
+            if (responseData.error && responseData.error.includes('csrf')) {
+                 showPaymentStatus('Your security token has expired. Please try submitting again.', 'error');
+                 console.warn('[CLIENT] CSRF token was invalid. Fetching a new one.');
+                 await fetchCsrfToken(); // Fetch a new token for the next attempt
+            }
             throw new Error(responseData.error || 'Failed to create order on server.');
         }
 

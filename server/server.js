@@ -79,7 +79,45 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
-app.use(cors({ origin: 'https://lokimetasmith.github.io', optionsSuccessStatus: 200 }));
+
+// --- CORS Configuration ---
+const allowedOrigins = [
+    'https://lokimetasmith.github.io',
+    // Add other allowed origins here if needed
+];
+
+// Allow localhost for development using a regular expression
+if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push(/http:\/\/localhost:\d+/);
+}
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+
+        // Check if the origin is in the allowed list
+        const isAllowed = allowedOrigins.some(allowedOrigin => {
+            if (typeof allowedOrigin === 'string') {
+                return allowedOrigin === origin;
+            }
+            if (allowedOrigin instanceof RegExp) {
+                return allowedOrigin.test(origin);
+            }
+            return false;
+        });
+
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true, // Important for cookies
+    optionsSuccessStatus: 200, // For legacy browser support
+};
+
+app.use(cors(corsOptions));
 app.use(express.json()); // To parse JSON request bodies (for APIs without file uploads)
 app.use(cookieParser());
 app.use(csrf({ cookie: true }));
@@ -310,6 +348,38 @@ app.post('/api/auth/verify-magic-link', (req, res) => {
     });
 });
 
+app.post('/api/auth/issue-temp-token', [
+    body('email').isEmail().withMessage('A valid email is required'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email } = req.body;
+
+    // Find if user exists, or create a temporary one.
+    // This logic is similar to magic-login but returns the token directly.
+    let user = Object.values(db.data.users).find(u => u.email === email);
+
+    if (!user) {
+        user = {
+            id: randomUUID(),
+            email: email, // Use email here
+            credentials: [],
+        };
+        // Use email as the key for the user object, assuming emails are unique identifiers for this flow
+        db.data.users[email] = user;
+        await db.write();
+        console.log(`[SERVER] Created temporary user profile for ${email}`);
+    }
+
+    // Issue a short-lived token (e.g., 5 minutes)
+    const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '5m' });
+
+    res.json({ token });
+});
+
 app.post('/api/auth/magic-login', [
     body('email').isEmail().withMessage('email is not valid'),
 ], async (req, res) => {
@@ -326,10 +396,11 @@ app.post('/api/auth/magic-login', [
         // For passwordless login, we can create a new user if one doesn't exist
         user = {
             id: randomUUID(),
-            email,
+            email: email,
             credentials: [],
         };
-        db.data.users[user.id] = user;
+        // Corrected: Use email as the key for the user object
+        db.data.users[email] = user;
         await db.write();
     }
 
