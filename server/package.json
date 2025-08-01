@@ -25,6 +25,7 @@
     "express-validator": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "lowdb": "^7.0.1",
+    "multer": "^2.0.1",
     "square": "^43.0.0"
   }
 }

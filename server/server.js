@@ -310,6 +310,23 @@ async function startServer() {
       });
     });
 
+    app.post('/api/auth/issue-temp-token', [
+      body('email').isEmail().withMessage('A valid email is required'),
+    ], (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email } = req.body;
+
+      // Create a short-lived token for the purpose of placing one order
+      const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
+
+      console.log(`[SERVER] Issued temporary token for email: ${email}`);
+      res.json({ success: true, token });
+    });
+
     // --- WebAuthn (Passkey) Endpoints ---
     app.get('/api/auth/register-options', (req, res) => {
       const { username } = req.query;
