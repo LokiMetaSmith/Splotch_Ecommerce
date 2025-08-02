@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
     "styles": "npx tailwindcss build styles.css -o output.css",
-    "build": "vite build --base=./"
+    "build": "vite build --base=./",
+    "start": "serve dist"
   },
   "repository": {
     "type": "git",
@@ -25,5 +26,8 @@
     "multer": "^2.0.1",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.4"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4"
   }
 }
