@@ -234,9 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (registerBtn) {
         registerBtn.addEventListener('click', handleRegistration);
     }
-
-    if (loginBtn) {
-if (authToken) {
+    if (authToken) {
             loginBtn.textContent = 'Log Out';
             loginBtn.addEventListener('click', logout);
             updateAuthStatus('Logged in.');
@@ -245,7 +243,9 @@ if (authToken) {
             loginBtn.addEventListener('click', handleLogin);
             updateAuthStatus('Please log in.');
         }
-    }
+    
+    if (loginBtn) {
+
         loginBtn.addEventListener('click', handleAuthentication);
     }
 
@@ -258,7 +258,7 @@ function bufferDecode(value) {
     return Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 }
 let csrfToken;
-let authToken;
+
 function bufferEncode(value) {
     return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
         .replace(/\+/g, '-')
