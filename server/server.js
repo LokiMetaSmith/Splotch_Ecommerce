@@ -112,6 +112,7 @@ async function startServer() {
     app.use(express.json());
     app.use(cookieParser());
     app.use(csrf({ cookie: true }));
+    app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(uploadDir));
     console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
