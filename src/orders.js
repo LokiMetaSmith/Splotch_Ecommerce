@@ -1,6 +1,30 @@
 const serverUrl = 'http://localhost:3000';
+let csrfToken;
 
-document.addEventListener('DOMContentLoaded', () => {
+async function fetchCsrfToken() {
+    try {
+        const response = await fetch(`${serverUrl}/api/csrf-token`);
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.csrfToken) {
+            throw new Error("CSRF token not found in server response");
+        }
+        csrfToken = data.csrfToken;
+    } catch (error) {
+        console.error('Error fetching CSRF token:', error);
+        const loginStatus = document.getElementById('login-status');
+        if (loginStatus) {
+            loginStatus.textContent = 'A security token could not be loaded. Please refresh the page.';
+            loginStatus.style.color = 'red';
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await fetchCsrfToken();
+
     const loginSection = document.getElementById('login-section');
     const orderHistorySection = document.getElementById('order-history-section');
     const loginBtn = document.getElementById('loginBtn');
@@ -26,9 +50,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            if (!csrfToken) {
+                throw new Error('CSRF token is not available. Please refresh the page.');
+            }
             const response = await fetch(`${serverUrl}/api/auth/magic-login`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
                 body: JSON.stringify({ email, redirectPath: '/orders.html' }),
             });
 
