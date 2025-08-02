@@ -1,5 +1,5 @@
 import express from 'express';
-import { SquareClient, SquareEnvironment } from "square";
+import { SquareClient, SquareEnvironment, SquareError } from "square";
 import { randomUUID } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
@@ -135,9 +135,16 @@ async function startServer() {
     app.use(cors(corsOptions));
     app.use(express.json());
     app.use(cookieParser());
-    app.use(csrf({ cookie: true }));
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(uploadDir));
+    app.use(csrf({ cookie: true }));
+    app.use(function (err, req, res, next) {
+      if (err.code !== 'EBADCSRFTOKEN') return next(err)
+
+      // handle CSRF token errors here
+      res.status(403)
+      res.send('form tampered with')
+    })
     console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
     // --- Helper Functions ---
@@ -224,12 +231,12 @@ async function startServer() {
         return res.status(201).json({ success: true, order: newOrder });
       } catch (error) {
         console.error('[SERVER] Critical error in /api/create-order:', error);
-        if (err instanceof SquareError) {
-            console.log(err.statusCode);
-            console.log(err.message);
-            console.log(err.body);
+        if (error instanceof SquareError) {
+            console.log(error.statusCode);
+            console.log(error.message);
+            console.log(error.body);
         }
-        if (error.result && error.result.errors ) {
+        if (error.result && error.result.errors) {
           return res.status(error.statusCode || 500).json({ error: 'Square API Error', details: error.result.errors });
         }
         return res.status(500).json({ error: 'Internal Server Error', message: error.message });
