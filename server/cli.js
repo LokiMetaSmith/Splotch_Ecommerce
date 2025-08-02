@@ -2,6 +2,8 @@
 
 import { Command } from 'commander';
 import { JSONFilePreset } from 'lowdb/node';
+import bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 
 const program = new Command();
 
