@@ -8,7 +8,6 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         printshop: resolve(__dirname, 'printshop.html'),
         magiclogin: resolve(__dirname, 'magic-login.html'),
-        splotch: resolve(__dirname, 'splotch.html'),
       },
     },
   },

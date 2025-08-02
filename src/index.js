@@ -95,6 +95,40 @@ async function BootStrap() {
         fileInputGlobalRef.addEventListener('change', handleFileChange);
     }
 
+    // Add drag-and-drop and paste listeners to the canvas
+    if (canvas) {
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            canvas.classList.add('border-dashed', 'border-2', 'border-blue-500');
+        });
+
+        canvas.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            canvas.classList.remove('border-dashed', 'border-2', 'border-blue-500');
+        });
+
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            canvas.classList.remove('border-dashed', 'border-2', 'border-blue-500');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                loadFileAsImage(file);
+            }
+        });
+    }
+
+    window.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (const item of items) {
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file) {
+                    loadFileAsImage(file);
+                }
+            }
+        }
+    });
+
     // Set up the payment form
     console.log('[CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef:', paymentFormGlobalRef);
     if (paymentFormGlobalRef) {
@@ -390,6 +424,12 @@ function updateEditingButtonsState(disabled) {
 // --- Image Loading and Editing Functions ---
 function handleFileChange(event) {
     const file = event.target.files[0];
+    if (file) {
+        loadFileAsImage(file);
+    }
+}
+
+function loadFileAsImage(file) {
     if (!file || !file.type.startsWith('image/')) {
         showPaymentStatus('Invalid file type. Please select an image.', 'error');
         return;
