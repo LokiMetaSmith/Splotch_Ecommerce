@@ -21,9 +21,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
+import { randomBytes } from 'crypto';
+
+let jwtSecret;
+
 // Define an async function to contain all server logic
 async function startServer() {
   try {
+    jwtSecret = randomBytes(32).toString('hex');
+    console.log('[SERVER] Generated new in-memory JWT secret.');
     const app = express();
     const port = process.env.PORT || 3000;
 
@@ -138,7 +144,7 @@ async function startServer() {
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
       if (token == null) return res.sendStatus(401);
-      jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      jwt.verify(token, jwtSecret, (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
         next();
@@ -309,7 +315,7 @@ async function startServer() {
       if (!validPassword) {
         return res.status(400).json({ error: 'Invalid username or password' });
       }
-      const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      const token = jwt.sign({ username: user.username }, jwtSecret, { expiresIn: '1h' });
       res.json({ token });
     });
     
@@ -331,7 +337,7 @@ async function startServer() {
             db.data.users[user.id] = user;
             await db.write();
         }
-        const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+        const token = jwt.sign({ email }, jwtSecret, { expiresIn: '15m' });
         const magicLink = `${process.env.BASE_URL}/magic-login?token=${token}`;
         console.log('Magic Link (for testing):', magicLink);
         res.json({ success: true, message: 'Check your email for a magic link to log in.' });
@@ -342,7 +348,7 @@ async function startServer() {
       if (!token) {
         return res.status(400).json({ error: 'No token provided' });
       }
-      jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      jwt.verify(token, jwtSecret, (err, decoded) => {
         if (err) {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
@@ -350,7 +356,7 @@ async function startServer() {
         if (!user) {
           return res.status(401).json({ error: 'User not found' });
         }
-        const authToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const authToken = jwt.sign({ email: user.email }, jwtSecret, { expiresIn: '1h' });
         res.json({ success: true, token: authToken });
       });
     });
@@ -366,7 +372,7 @@ async function startServer() {
       const { email } = req.body;
 
       // Create a short-lived token for the purpose of placing one order
-      const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
+      const token = jwt.sign({ email }, jwtSecret, { expiresIn: '5m' });
 
       console.log(`[SERVER] Issued temporary token for email: ${email}`);
       res.json({ success: true, token });
@@ -452,7 +458,7 @@ async function startServer() {
         });
         const { verified } = verification;
         if (verified) {
-          const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+          const token = jwt.sign({ username: user.username }, jwtSecret, { expiresIn: '1h' });
           res.json({ verified, token });
         } else {
           res.json({ verified });

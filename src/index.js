@@ -277,6 +277,8 @@ async function handlePaymentFormSubmit(event) {
             currencyCode: 'USD',
             intent: 'CHARGE',
             billingContact: billingContact,
+            customerInitiated: true,
+            sellerKeyedIn: false,
         };
         // --- END NEW ---
 
