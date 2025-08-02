@@ -172,9 +172,9 @@ async function initializeCard(paymentsSDK) {
     return cardInstance;
 }
 
-async function tokenize(paymentMethod) {
+async function tokenize(paymentMethod, verificationDetails) {
     if (!paymentMethod) throw new Error("Card payment method not initialized.");
-    const tokenResult = await paymentMethod.tokenize();
+    const tokenResult = await paymentMethod.tokenize(verificationDetails);
     if (tokenResult.status === "OK") {
         if (!tokenResult.token) throw new Error("Tokenization succeeded but no token was returned.");
         return tokenResult.token;
@@ -259,10 +259,34 @@ async function handlePaymentFormSubmit(event) {
         console.log('[CLIENT] Temporary auth token received.');
 
 
-        // 1. Tokenize the card
-        showPaymentStatus('Tokenizing card...', 'info');
-        console.log('[CLIENT] Tokenizing card.');
-        const sourceId = await tokenize(card);
+        // --- NEW: Build verificationDetails object ---
+        const billingContact = {
+            givenName: document.getElementById('firstName').value,
+            familyName: document.getElementById('lastName').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            addressLines: [document.getElementById('address').value],
+            city: document.getElementById('city').value,
+            state: document.getElementById('state').value,
+            postalCode: document.getElementById('postalCode').value,
+            countryCode: "US",
+        };
+
+        const verificationDetails = {
+            amount: (currentOrderAmountCents / 100).toFixed(2), // Must be a string
+            currencyCode: 'USD',
+            intent: 'CHARGE',
+            billingContact: billingContact,
+        };
+        // --- END NEW ---
+
+        // 1. Tokenize the card with verification details
+        showPaymentStatus('Securing card details...', 'info');
+        console.log('[CLIENT] Tokenizing card with verification details.');
+
+        // UPDATED: Pass the new verificationDetails object to tokenize
+        const sourceId = await tokenize(card, verificationDetails);
+
         console.log('[CLIENT] Tokenization successful. Nonce (sourceId):', sourceId);
 
         // 2. Get image data from canvas as a Blob
@@ -277,17 +301,6 @@ async function handlePaymentFormSubmit(event) {
             quantity: stickerQuantityInput ? parseInt(stickerQuantityInput.value, 10) : 0,
             material: stickerMaterialSelect ? stickerMaterialSelect.value : 'unknown',
             cutLineFileName: document.getElementById('cutLineFile')?.files[0]?.name || null,
-        };
-        const billingContact = {
-            givenName: document.getElementById('firstName').value || undefined,
-            familyName: document.getElementById('lastName').value || undefined,
-            email: email,
-            phone: document.getElementById('phone').value || undefined,
-            addressLines: [document.getElementById('address').value || ''],
-            city: document.getElementById('city').value || undefined,
-            state: document.getElementById('state').value || undefined,
-            postalCode: document.getElementById('postalCode').value || undefined,
-            countryCode: "US",
         };
 
         formData.append('designImage', designImageBlob, 'design.png');
