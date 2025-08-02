@@ -184,6 +184,13 @@ async function startServer() {
             amount: BigInt(amountCents),
             currency: currency || 'USD',
           },
+         appFeeMoney: {
+           amount: BigInt("10"),
+           currency: "USD"
+          },
+          autocomplete: true,
+          referenceId: randomUUID(),
+          note: "STICKERS!!!",
         };
         console.log('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
         const { result: paymentResult, statusCode } = await squareClient.payments.create(paymentPayload);
@@ -210,8 +217,13 @@ async function startServer() {
         return res.status(201).json({ success: true, order: newOrder });
       } catch (error) {
         console.error('[SERVER] Critical error in /api/create-order:', error);
-        if (error.response && error.response.data) {
-          return res.status(error.statusCode || 500).json({ error: 'Square API Error', details: error.response.data.errors });
+        if (err instanceof SquareError) {
+            console.log(err.statusCode);
+            console.log(err.message);
+            console.log(err.body);
+        }
+        if (error.result && error.result.errors ) {
+          return res.status(error.statusCode || 500).json({ error: 'Square API Error', details: error.result.errors });
         }
         return res.status(500).json({ error: 'Internal Server Error', message: error.message });
       }
