@@ -1,6 +1,6 @@
 // index.js
 
-const appId = "sandbox-sq0idb-nbW_Oje9Dm0L5YvQ7WP2ow";
+const appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
 const locationId = "LTS82DEX24XR0";
 const serverUrl = 'http://localhost:3000'; // Define server URL once
 
