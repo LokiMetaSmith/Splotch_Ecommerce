@@ -3,15 +3,12 @@
  * Licensed under the MIT license
  */
 
-(function(root){
-        'use strict';
+'use strict';
 
-        root.SvgNest = new SvgNest();
+function SvgNest(){
+        var self = this;
 
-        function SvgNest(){
-                var self = this;
-
-                var svg = null;
+        var svg = null;
 
                 // keep a reference to any style nodes, to maintain color/fill info
                 this.style = null;
@@ -1010,4 +1007,4 @@ nfp.push(cnfp[j]);
                 return pop[0];
         }
 
-})(window);
+export default SvgNest;

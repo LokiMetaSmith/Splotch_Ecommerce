@@ -245,6 +245,15 @@ async function startServer() {
       res.status(200).json(userOrders.slice().reverse());
     });
 
+    app.get('/api/orders/my-orders', authenticateToken, (req, res) => {
+      if (!req.user || !req.user.email) {
+        return res.status(401).json({ error: 'Authentication token is invalid or missing email.' });
+      }
+      const userEmail = req.user.email;
+      const userOrders = db.data.orders.filter(order => order.billingContact.email === userEmail);
+      res.status(200).json(userOrders.slice().reverse());
+    });
+
     app.get('/api/orders/:orderId', authenticateToken, (req, res) => {
       const { orderId } = req.params;
       const order = db.data.orders.find(o => o.orderId === orderId);
