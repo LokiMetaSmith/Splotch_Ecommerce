@@ -179,16 +179,22 @@ async function startServer() {
     });
 
     // --- Order Endpoints ---
-    app.post('/api/create-order', authenticateToken, upload.single('designImage'), [
+    app.post('/api/create-order', authenticateToken, [
       body('sourceId').notEmpty().withMessage('sourceId is required'),
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      try {
+    ], (req, res) => {
+        upload.single('designImage')(req, res, async (err) => {
+            if (err) {
+                return res.status(400).json({ error: 'Error uploading file.', details: err.message });
+            }
+
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(400).json({ errors: errors.array() });
+            }
+
+            try {
         const { sourceId, amountCents, currency, ...orderDetails } = req.body;
         const paymentPayload = {
           sourceId: sourceId,
@@ -208,7 +214,7 @@ async function startServer() {
         };
         console.log('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
         const { result: paymentResult, statusCode } = await squareClient.payments.create(paymentPayload);
-        if (statusCode >= 300 || (paymentResult.errors && paymentResult.errors.length > 0)) {
+        if (statusCode >= 300 || (paymentResult && paymentResult.errors && paymentResult.errors.length > 0)) {
           console.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
           return res.status(statusCode || 400).json({ error: 'Square API Error', details: paymentResult.errors });
         }
@@ -241,6 +247,7 @@ async function startServer() {
         }
         return res.status(500).json({ error: 'Internal Server Error', message: error.message });
       }
+    });
     });
     
     app.get('/api/orders', authenticateToken, (req, res) => {
