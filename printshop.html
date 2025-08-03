@@ -43,6 +43,8 @@
         .status-shipped { background-color: #10B981; color: white; }
         .status-canceled { background-color: #EF4444; color: white; }
     </style>
+    <script src="./src/lib/clipper.js"></script>
+    <script src="./src/lib/parallel.js"></script>
     <script type="module" src="/src/printshop.js"></script>
 </head>
 <body class="bg-slate-200 text-slate-800">
@@ -59,6 +61,11 @@
                     <button id="searchBtn" class="ml-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Search</button>
                     <button id="refreshOrdersBtn" class="ml-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh Orders</button>
                 </div>
+                <div id="auth-container">
+                    <button id="loginBtn" class="mt-4 w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Login with YubiKey</button>
+                    <button id="registerBtn" class="mt-2 w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600" style="display: none;">Register New Key</button>
+                <div id="auth-status" class="mt-4"></div>
+</div>
             </div>
         </nav>
         <div id="connection-error" class="hidden bg-red-500 text-white text-center py-2">
@@ -98,7 +105,34 @@
             </div>
         </div>
     </main>
+<div id="login-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl sm:text-3xl text-splotch-navy">Login</h2>
+            <button id="close-modal-btn" class="text-2xl font-bold text-gray-500 hover:text-gray-800">&times;</button>
+        </div>
 
+        <div class="space-y-4">
+            <div>
+                <label for="username-input" class="block font-bold">Username</label>
+                <input type="text" id="username-input" class="w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label for="password-input" class="block font-bold">Password</label>
+                <input type="password" id="password-input" class="w-full p-2 border rounded-md">
+            </div>
+            <button id="password-login-btn" class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Login with Password</button>
+        </div>
+
+        <div class="my-6 flex items-center">
+            <hr class="flex-grow border-t border-gray-300">
+            <span class="mx-4 text-gray-500">OR</span>
+            <hr class="flex-grow border-t border-gray-300">
+        </div>
+
+        <button id="webauthn-login-btn" class="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Login with Security Key</button>
+    </div>
+</div>
     <footer class="bg-white shadow-md mt-8">
         <div class="container mx-auto px-6 py-3 text-center text-gray-500">
             &copy; 2025 Print Shop

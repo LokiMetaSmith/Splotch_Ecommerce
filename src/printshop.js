@@ -1,8 +1,9 @@
 // printshop.js
+import '/src/styles.css'; // Or your main CSS file
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import DOMPurify from 'dompurify';
-import SVGNest from './lib/svgnest.js';
-import SVGParser from './lib/svgparser.js';
+import { SvgNest } from './lib/svgnest.js';
+import { SvgParser } from './lib/svgparser.js';
 import * as jose from 'jose';
 
 // --- Global Variables ---
@@ -353,7 +354,13 @@ function displayOrder(order) {
     ui.ordersList.prepend(card);
 
     card.querySelectorAll('.action-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => updateOrderStatus(e.target.dataset.orderId, e.target.dataset.status));
+      //  btn.addEventListener('click', (e) => updateOrderStatus(e.target.dataset.orderId, e.target.dataset.status));
+		btn.addEventListener('click', (e) => {
+            const orderId = e.target.dataset.orderId;
+            const status = e.target.dataset.status;
+            // This function calls your server to update the status
+            updateOrderStatus(orderId, status);
+        });
     });
 }
 

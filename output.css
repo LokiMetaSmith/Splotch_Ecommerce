@@ -1012,6 +1012,8 @@ video {
 
 .text-white {
   --tw-text-opacity: 1;
+    border: 1px solid red;
+  background-color: rgb(85, 85, 85);
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
 

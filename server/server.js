@@ -239,10 +239,10 @@ async function startServer() {
           note: "STICKERS!!!",
         };
         console.log('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
-        const { result: paymentResult, statusCode } = await squareClient.payments.create(paymentPayload);
-        if (statusCode >= 300 || (paymentResult && paymentResult.errors && paymentResult.errors.length > 0)) {
+        const paymentResult = await squareClient.payments.create(paymentPayload);
+        if ( paymentResult.errors ) {
           console.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
-          return res.status(statusCode || 400).json({ error: 'Square API Error', details: paymentResult.errors });
+          return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
         }
         console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
         const newOrder = {
