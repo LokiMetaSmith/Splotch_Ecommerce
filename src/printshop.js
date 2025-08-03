@@ -110,7 +110,7 @@ function setLoggedInState(token, username) {
     ui.registerBtn.style.display = 'block'; // Show registration button for admins
 
     // Clear and attach the correct event listener
-    ui.loginBtn.removeEventListener('click', showLoginModal);
+    ui.loginBtn.removeEventListener('click', handleWebAuthnLogin);
     ui.loginBtn.addEventListener('click', logout);
 
     hideLoginModal();
@@ -125,12 +125,12 @@ function logout() {
     localStorage.removeItem('authToken');
 
     ui.authStatus.textContent = 'You are logged out.';
-    ui.loginBtn.textContent = 'Login';
+    ui.loginBtn.textContent = 'Login with YubiKey';
     ui.registerBtn.style.display = 'none';
 
     // Clear and attach the correct event listener
     ui.loginBtn.removeEventListener('click', logout);
-    ui.loginBtn.addEventListener('click', showLoginModal);
+    ui.loginBtn.addEventListener('click', handleWebAuthnLogin);
 
     ui.ordersList.innerHTML = '';
     ui.noOrdersMessage.textContent = 'Please log in to view orders.';
@@ -545,7 +545,9 @@ async function init() {
     // Login Modal Listeners
     ui.closeModalBtn?.addEventListener('click', hideLoginModal);
     ui.passwordLoginBtn?.addEventListener('click', handlePasswordLogin);
-    ui.webauthnLoginBtn?.addEventListener('click', handleWebAuthnLogin);
+
+    // The main login button is for WebAuthn
+    ui.loginBtn?.addEventListener('click', handleWebAuthnLogin);
 
     // Check initial authentication state
     if (!(await verifyInitialToken())) {
