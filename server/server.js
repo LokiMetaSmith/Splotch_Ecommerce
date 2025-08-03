@@ -17,6 +17,7 @@ import { body, validationResult } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import { google } from 'googleapis';
 import { getCurrentSigningKey, getJwks } from './keyManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +48,13 @@ async function startServer() {
     console.log('[SERVER] Generated new in-memory JWT secret.');
     const app = express();
     const port = process.env.PORT || 3000;
+
+    // --- Google OAuth2 Client ---
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      `http://localhost:${port}/oauth2callback`
+    );
 
     // --- Ensure upload directory exists ---
     const uploadDir = path.join(__dirname, 'uploads');
@@ -425,6 +433,51 @@ async function startServer() {
 
       console.log(`[SERVER] Issued temporary token for email: ${email}`);
       res.json({ success: true, token });
+    });
+
+    // --- Google OAuth Endpoints ---
+    app.get('/auth/google', (req, res) => {
+      const scopes = [
+        'https://www.googleapis.com/auth/gmail.send',
+        'https://www.googleapis.com/auth/userinfo.email',
+      ];
+
+      const url = oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: scopes,
+      });
+
+      res.redirect(url);
+    });
+
+    app.get('/oauth2callback', async (req, res) => {
+      const { code } = req.query;
+      try {
+        const { tokens } = await oauth2Client.getToken(code);
+        oauth2Client.setCredentials(tokens);
+
+        // Here you would typically associate the tokens with a user in your database
+        // For now, we'll just log them.
+        console.log('Google OAuth tokens received:', tokens);
+
+        // You could also fetch user info to link the account
+        const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+        const userInfo = await gmail.users.getProfile({ userId: 'me' });
+        console.log('User info:', userInfo.data);
+
+        // Store tokens against the user email
+        const userEmail = userInfo.data.emailAddress;
+        let user = Object.values(db.data.users).find(u => u.email === userEmail);
+        if (user) {
+            user.google_tokens = tokens;
+            await db.write();
+        }
+
+        res.send('Authentication successful! You can close this tab.');
+      } catch (error) {
+        console.error('Error retrieving access token', error);
+        res.status(500).send('Authentication failed.');
+      }
     });
 
 
