@@ -27,7 +27,6 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 import { randomBytes } from 'crypto';
 
-let jwtSecret;
 let serverSessionToken;
 const SERVER_INSTANCE_ID = randomUUID();
 
@@ -69,10 +68,11 @@ async function startServer() {
   }
 
   try {
-    jwtSecret = randomBytes(32).toString('hex');
-    console.log('[SERVER] Generated new in-memory JWT secret.');
     const app = express();
     const port = process.env.PORT || 3000;
+
+    const rpID = process.env.RP_ID;
+    const expectedOrigin = process.env.EXPECTED_ORIGIN;
 
     // --- Google OAuth2 Client ---
     const oauth2Client = new google.auth.OAuth2(
@@ -206,7 +206,9 @@ async function startServer() {
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
       if (token == null) return res.sendStatus(401);
-      jwt.verify(token, jwtSecret, (err, user) => {
+
+      const { publicKey } = getCurrentSigningKey();
+      jwt.verify(token, publicKey, { algorithms: ['RS256'] }, (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
         next();
@@ -413,7 +415,8 @@ async function startServer() {
       if (!validPassword) {
         return res.status(400).json({ error: 'Invalid username or password' });
       }
-      const token = jwt.sign({ username: user.username }, jwtSecret, { expiresIn: '1h' });
+      const { privateKey, kid } = getCurrentSigningKey();
+      const token = jwt.sign({ username: user.username }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
       res.json({ token });
     });
     
@@ -454,7 +457,8 @@ async function startServer() {
         if (!user) {
           return res.status(401).json({ error: 'User not found' });
         }
-        const authToken = jwt.sign({ email: user.email }, jwtSecret, { expiresIn: '1h' });
+        const { privateKey, kid } = getCurrentSigningKey();
+        const authToken = jwt.sign({ email: user.email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
         res.json({ success: true, token: authToken });
       });
     });
@@ -470,7 +474,8 @@ async function startServer() {
       const { email } = req.body;
 
       // Create a short-lived token for the purpose of placing one order
-      const token = jwt.sign({ email }, jwtSecret, { expiresIn: '5m' });
+      const { privateKey, kid } = getCurrentSigningKey();
+      const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '5m', header: { kid } });
 
       console.log(`[SERVER] Issued temporary token for email: ${email}`);
       res.json({ success: true, token });
@@ -529,7 +534,7 @@ async function startServer() {
         return res.status(400).json({ error: 'User not found' });
       }
       const options = generateRegistrationOptions({
-        rpID: process.env.RP_ID,
+        rpID: rpID,
         rpName: 'Splotch',
         userName: username,
         authenticatorSelection: {
@@ -549,8 +554,8 @@ async function startServer() {
         const verification = await verifyRegistrationResponse({
           response: body,
           expectedChallenge: user.challenge,
-          expectedOrigin: process.env.EXPECTED_ORIGIN,
-          expectedRPID: process.env.RP_ID,
+          expectedOrigin: expectedOrigin,
+          expectedRPID: rpID,
         });
         const { verified, registrationInfo } = verification;
         if (verified) {
@@ -595,13 +600,14 @@ async function startServer() {
         const verification = await verifyAuthenticationResponse({
           response: body,
           expectedChallenge: user.challenge,
-          expectedOrigin: process.env.EXPECTED_ORIGIN,
-          expectedRPID: process.env.RP_ID,
+          expectedOrigin: expectedOrigin,
+          expectedRPID: rpID,
           authenticator: credential,
         });
         const { verified } = verification;
         if (verified) {
-          const token = jwt.sign({ username: user.username }, jwtSecret, { expiresIn: '1h' });
+          const { privateKey, kid } = getCurrentSigningKey();
+          const token = jwt.sign({ username: user.username }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
           res.json({ verified, token });
         } else {
           res.json({ verified });
