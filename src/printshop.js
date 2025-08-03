@@ -111,7 +111,7 @@ function setLoggedInState(token, username) {
     ui.registerBtn.style.display = 'block'; // Show registration button for admins
 
     // Clear and attach the correct event listener
-    ui.loginBtn.removeEventListener('click', handleWebAuthnLogin);
+    ui.loginBtn.removeEventListener('click', showLoginModal);
     ui.loginBtn.addEventListener('click', logout);
 
     hideLoginModal();
@@ -125,13 +125,13 @@ function logout() {
     authToken = null;
     localStorage.removeItem('authToken');
 
-    ui.authStatus.textContent = 'You are logged out.';
-    ui.loginBtn.textContent = 'Login with YubiKey';
+    ui.authStatus.textContent = '';
+    ui.loginBtn.textContent = 'Login';
     ui.registerBtn.style.display = 'none';
 
     // Clear and attach the correct event listener
     ui.loginBtn.removeEventListener('click', logout);
-    ui.loginBtn.addEventListener('click', handleWebAuthnLogin);
+    ui.loginBtn.addEventListener('click', showLoginModal);
 
     ui.ordersList.innerHTML = '';
     ui.noOrdersMessage.textContent = 'Please log in to view orders.';
@@ -142,12 +142,22 @@ function logout() {
  * Handles the WebAuthn (YubiKey) login flow.
  */
 async function handleWebAuthnLogin() {
-    const username = prompt("Please enter your username:");
-    if (!username) return;
+    const username = ui.usernameInput.value;
+    if (!username) {
+        showErrorToast('Please enter your username.');
+        return;
+    }
 
     showLoadingIndicator();
     try {
         const opts = await fetchWithAuth(`${serverUrl}/api/auth/login-options?username=${encodeURIComponent(username)}`);
+
+        if (opts.allowCredentials && opts.allowCredentials.length === 0) {
+            hideLoadingIndicator();
+            showErrorToast('No security key registered for this user. Please register a key first.');
+            return;
+        }
+
         const authResp = await startAuthentication(opts);
         
         // Encode binary data to Base64URL before sending to server
@@ -197,16 +207,16 @@ async function handlePasswordLogin() {
 
     showLoadingIndicator();
     try {
-        const verification = await fetchWithAuth(`${serverUrl}/api/auth/login-password`, {
+        const data = await fetchWithAuth(`${serverUrl}/api/auth/login`, {
             method: 'POST',
             body: JSON.stringify({ username, password }),
         });
 
-        if (verification.verified) {
-            setLoggedInState(verification.token, username);
+        if (data.token) {
+            setLoggedInState(data.token, username);
             showSuccessToast('Login successful!');
         } else {
-            throw new Error(verification.error || 'Password verification failed.');
+            throw new Error('Password verification failed.');
         }
     } catch (error) {
         showErrorToast(`Password Login Failed: ${error.message}`);
@@ -220,8 +230,11 @@ async function handlePasswordLogin() {
  * Handles the registration of a new WebAuthn credential.
  */
 async function handleRegistration() {
-    const username = prompt("Enter username for the new key:");
-    if (!username) return;
+    const username = ui.usernameInput.value;
+    if (!username) {
+        showErrorToast('Please enter a username to register a key.');
+        return;
+    }
 
     showLoadingIndicator();
     try {
@@ -528,7 +541,7 @@ async function init() {
     await getServerSessionToken();
 
     // Assign all DOM elements to the ui object
-    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn'];
+    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn'];
     ids.forEach(id => {
         // Convert kebab-case to camelCase for keys
         const key = id.replace(/-(\w)/g, (match, letter) => letter.toUpperCase());
@@ -552,9 +565,12 @@ async function init() {
     // Login Modal Listeners
     ui.closeModalBtn?.addEventListener('click', hideLoginModal);
     ui.passwordLoginBtn?.addEventListener('click', handlePasswordLogin);
+    ui.webauthnLoginBtn?.addEventListener('click', handleWebAuthnLogin);
+    ui.webauthnRegisterBtn?.addEventListener('click', handleRegistration);
 
-    // The main login button is for WebAuthn
-    ui.loginBtn?.addEventListener('click', handleWebAuthnLogin);
+
+    // The main login button opens the modal
+    ui.loginBtn?.addEventListener('click', showLoginModal);
 
     // Check initial authentication state
     if (!(await verifyInitialToken())) {

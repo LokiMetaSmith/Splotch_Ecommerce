@@ -69,7 +69,8 @@ program
     .description('Add a new key for a user')
     .argument('<username>', 'username')
     .action((username) => {
-        console.log(`Please use the web interface to add a new key for ${username}`);
+        console.log(`Registering a security key requires interaction with a browser's WebAuthn API.`);
+        console.log(`Please use the web interface at the login page to add a new key for ${username}.`);
     });
 
 program
