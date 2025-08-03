@@ -49,7 +49,7 @@ async function fetchWithAuth(url, options = {}) {
         headers['X-CSRF-Token'] = csrfToken;
     }
 
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { ...options, headers, credentials: 'include' });
 
     const storedToken = localStorage.getItem('serverSessionToken');
     const liveToken = response.headers.get('X-Server-Session-Token');
@@ -426,7 +426,7 @@ async function handleNesting() {
     }
 
     try {
-        const svgStrings = await Promise.all(svgUrls.map(url => fetch(url).then(res => res.text())));
+        const svgStrings = await Promise.all(svgUrls.map(url => fetch(url, { credentials: 'include' }).then(res => res.text())));
         const binWidth = 12 * 96;
         const binHeight = 12 * 96;
         const binSvg = `<svg width="${binWidth}" height="${binHeight}"><rect x="0" y="0" width="${binWidth}" height="${binHeight}" fill="none" stroke="blue" stroke-width="2"/></svg>`;
@@ -487,7 +487,8 @@ function handleDownloadCutFile() {
 // --- Initialization ---
 async function getServerSessionToken() {
     try {
-        const { serverSessionToken } = await fetch(`${serverUrl}/api/server-info`).then(res => res.json());
+        const response = await fetch(`${serverUrl}/api/server-info`, { credentials: 'include' });
+        const { serverSessionToken } = await response.json();
         localStorage.setItem('serverSessionToken', serverSessionToken);
         console.log('[CLIENT] Initial server session token acquired.');
     } catch (error) {
@@ -522,7 +523,8 @@ async function verifyInitialToken() {
  */
 async function getCsrfToken() {
     try {
-        const data = await fetch(`${serverUrl}/api/csrf-token`).then(res => res.json());
+        const response = await fetch(`${serverUrl}/api/csrf-token`, { credentials: 'include' });
+        const data = await response.json();
         csrfToken = data.csrfToken;
     } catch (error) {
         console.error('Fatal: Could not fetch CSRF token. App may not function correctly.', error);
