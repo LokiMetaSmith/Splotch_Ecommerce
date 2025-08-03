@@ -19,7 +19,16 @@ const generateKeyPair = () => {
 // Get the current key for signing (always the newest one)
 export const getCurrentSigningKey = () => {
     if (activeKeys.length === 0) {
-        activeKeys.push(generateKeyPair());
+        if (process.env.JWT_PRIVATE_KEY && process.env.JWT_PUBLIC_KEY) {
+            console.log('[KEY_MANAGER] Loading keys from environment variables.');
+            const kid = 'env_key';
+            const privateKey = process.env.JWT_PRIVATE_KEY.replace(/\\n/g, '\n');
+            const publicKey = process.env.JWT_PUBLIC_KEY.replace(/\\n/g, '\n');
+            activeKeys.push({ kid, privateKey, publicKey, createdAt: Date.now() });
+        } else {
+            console.log('[KEY_MANAGER] No environment keys found, generating new key pair.');
+            activeKeys.push(generateKeyPair());
+        }
     }
     return activeKeys[activeKeys.length - 1];
 };
