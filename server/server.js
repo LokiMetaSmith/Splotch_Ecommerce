@@ -18,6 +18,7 @@ import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import { google } from 'googleapis';
+import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks } from './keyManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,6 +44,30 @@ const signInstanceToken = () => {
 
 // Define an async function to contain all server logic
 async function startServer() {
+  // --- Google OAuth2 Client ---
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    `http://localhost:3000/oauth2callback`
+  );
+
+  async function logAndEmailError(error, context = 'General Error') {
+    console.error(`[${context}]`, error);
+    if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
+      try {
+        await sendEmail({
+          to: process.env.ADMIN_EMAIL,
+          subject: `Print Shop Server Error: ${context}`,
+          text: `An error occurred in the Print Shop server.\n\nContext: ${context}\n\nError: ${error.stack}`,
+          html: `<p>An error occurred in the Print Shop server.</p><p><b>Context:</b> ${context}</p><pre>${error.stack}</pre>`,
+          oauth2Client,
+        });
+      } catch (emailError) {
+        console.error('CRITICAL: Failed to send error notification email:', emailError);
+      }
+    }
+  }
+
   try {
     jwtSecret = randomBytes(32).toString('hex');
     console.log('[SERVER] Generated new in-memory JWT secret.');
@@ -270,7 +295,7 @@ async function startServer() {
         console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
         return res.status(201).json({ success: true, order: newOrder });
       } catch (error) {
-        console.error('[SERVER] Critical error in /api/create-order:', error);
+        await logAndEmailError(error, 'Critical error in /api/create-order');
         if (error instanceof SquareError) {
             console.log(error.statusCode);
             console.log(error.message);
@@ -352,6 +377,22 @@ async function startServer() {
       };
       db.data.users[username] = user;
       await db.write();
+
+      // Send notification email to admin
+      if (process.env.ADMIN_EMAIL) {
+        try {
+          await sendEmail({
+            to: process.env.ADMIN_EMAIL,
+            subject: 'New User Account Created',
+            text: `A new user has registered on the Print Shop.\n\nUsername: ${username}`,
+            html: `<p>A new user has registered on the Print Shop.</p><p><b>Username:</b> ${username}</p>`,
+            oauth2Client,
+          });
+        } catch (emailError) {
+          console.error('Failed to send new user notification email:', emailError);
+        }
+      }
+
       res.json({ success: true });
     });
 
@@ -475,7 +516,7 @@ async function startServer() {
 
         res.send('Authentication successful! You can close this tab.');
       } catch (error) {
-        console.error('Error retrieving access token', error);
+        await logAndEmailError(error, 'Error in /oauth2callback');
         res.status(500).send('Authentication failed.');
       }
     });
@@ -519,7 +560,7 @@ async function startServer() {
         }
         res.json({ verified });
       } catch (error) {
-        console.error(error);
+        await logAndEmailError(error, 'Error in /api/auth/register-verify');
         res.status(400).json({ error: error.message });
       }
     });
@@ -566,7 +607,7 @@ async function startServer() {
           res.json({ verified });
         }
       } catch (error) {
-        console.error(error);
+        await logAndEmailError(error, 'Error in /api/auth/login-verify');
         res.status(400).json({ error: error.message });
       }
     });
@@ -594,7 +635,7 @@ async function startServer() {
     });
     
   } catch (error) {
-    console.error('[FATAL] Failed to start server:', error);
+    await logAndEmailError(error, 'FATAL: Failed to start server');
     process.exit(1);
   }
 }
