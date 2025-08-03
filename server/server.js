@@ -41,8 +41,10 @@ const signInstanceToken = () => {
     console.log(`[SERVER] Signed new session token with key ID: ${kid}`);
 };
 
+let app;
+
 // Define an async function to contain all server logic
-async function startServer() {
+async function startServer(dbPath = path.join(__dirname, 'db.json')) {
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -68,7 +70,7 @@ async function startServer() {
   }
 
   try {
-    const app = express();
+    app = express();
     const port = process.env.PORT || 3000;
 
     const rpID = process.env.RP_ID;
@@ -89,8 +91,8 @@ async function startServer() {
 
     // --- Database Setup ---
     const defaultData = { orders: [], users: {}, credentials: {} };
-    const db = await JSONFilePreset(path.join(__dirname, 'db.json'), defaultData);
-    console.log('[SERVER] LowDB database initialized.');
+    const db = await JSONFilePreset(dbPath, defaultData);
+    console.log('[SERVER] LowDB database initialized at:', dbPath);
 
     // --- Multer Configuration for File Uploads ---
     const storage = multer.diskStorage({
@@ -685,27 +687,11 @@ async function startServer() {
       }
     });
 
-    // --- Start Server ---
     // Sign the initial token and re-sign periodically
     signInstanceToken();
     setInterval(signInstanceToken, 30 * 60 * 1000); // Re-sign every 30 minutes
-    const server = app.listen(port, () => {
-      console.log(`[SERVER] Server listening at http://localhost:${port}`);
-      console.log(`[SERVER] Uploads will be saved to: ${uploadDir}`);
-      console.log(`[SERVER] Static files served from /uploads`);
-      console.log(`[SERVER] Square client was initialized using environment: ${process.env.SQUARE_ENVIRONMENT || 'sandbox (default)'}`);
-    });
     
-    server.on('error', (error) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`❌ [FATAL] Port ${port} is already in use.`);
-        console.error('Please close the other process or specify a different port in your .env file.');
-        process.exit(1);
-      } else {
-        console.error(`❌ [FATAL] An unexpected error occurred:`, error);
-        process.exit(1);
-      }
-    });
+    return app;
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');
@@ -713,4 +699,4 @@ async function startServer() {
   }
 }
 
-startServer();
+export { app, startServer };

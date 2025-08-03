@@ -4,8 +4,8 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "start": "node index.js",
     "build": "npm install"
   },
   "keywords": [],
@@ -29,5 +29,10 @@
     "multer": "^2.0.2",
     "nodemailer": "^6.9.14",
     "square": "^43.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-mock-extended": "^3.0.7",
+    "supertest": "^7.0.0"
   }
 }
