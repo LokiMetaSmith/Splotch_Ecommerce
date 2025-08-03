@@ -20,7 +20,13 @@ cd <your-project-folder>
 #### 2. Install Dependencies
 Install the necessary Node.js packages for both the server and the client.
 ```bash
+# From the root directory
 npm install
+
+# For the server
+cd server
+npm install
+cd ..
 ```
 
 #### 3. Set Up Third-Party Services
@@ -63,6 +69,9 @@ GOOGLE_CLIENT_SECRET="YOUR_GOOGLE_CLIENT_SECRET"
 # SendGrid API Key
 SENDGRID_API_KEY="YOUR_SENDGRID_API_KEY"
 
+# Admin Configuration
+ADMIN_EMAIL="your-admin-email@example.com"
+
 # JWT Asymmetric Keys (Copy the entire file content, including headers/footers)
 JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
@@ -75,4 +84,40 @@ The nesting feature relies on two older libraries. Place `clipper.js` and `paral
 
 You will need to run the backend server and the frontend development server in two separate terminals.
 
-#### 1. Start
+#### 1. Start the Backend Server
+```bash
+# In a terminal, navigate to the server directory
+cd server
+
+# Start the server
+npm start
+```
+The backend server will be running at `http://localhost:3000`.
+
+#### 2. Start the Frontend Dev Server
+```bash
+# In a second terminal, from the root directory
+npm run dev
+```
+The frontend application will be available at `http://localhost:5173`.
+
+## Production Build
+
+To create a production-ready build of the application, follow these steps:
+
+1.  **Build the Application:**
+    This command will bundle the application and output the static files to the `dist` directory.
+    ```bash
+    npm run build
+    ```
+
+2.  **Serve the Production Build:**
+    This command will serve the contents of the `dist` directory. This is a simple way to preview the production build locally.
+    ```bash
+    npm run start
+    ```
+    The production build will be available at `http://localhost:3000` by default.
+
+## Deployment
+
+For detailed deployment instructions, please see the [Deployment Guide](DEPLOY.md).
