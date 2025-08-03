@@ -3,7 +3,7 @@ let csrfToken;
 
 async function fetchCsrfToken() {
     try {
-        const response = await fetch(`${serverUrl}/api/csrf-token`);
+        const response = await fetch(`${serverUrl}/api/csrf-token`, { credentials: 'include' });
         if (!response.ok) {
             throw new Error(`Server responded with ${response.status}`);
         }
@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             const response = await fetch(`${serverUrl}/api/auth/magic-login`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
@@ -82,6 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             const response = await fetch(`${serverUrl}/api/orders/my-orders`, {
+                credentials: 'include',
                 headers: {
                     'Authorization': `Bearer ${authToken}`
                 }

@@ -238,7 +238,10 @@ async function handleRegistration() {
 
     showLoadingIndicator();
     try {
-        const opts = await fetchWithAuth(`${serverUrl}/api/auth/register-options?username=${encodeURIComponent(username)}`);
+        const opts = await fetchWithAuth(`${serverUrl}/api/auth/pre-register`, {
+            method: 'POST',
+            body: JSON.stringify({ username }),
+        });
         const regResp = await startRegistration(opts);
         
         // Encode binary data before sending for verification

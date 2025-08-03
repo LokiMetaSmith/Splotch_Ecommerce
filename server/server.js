@@ -319,6 +319,20 @@ async function startServer() {
       res.status(200).json(userOrders.slice().reverse());
     });
 
+    app.get('/api/orders/search', authenticateToken, (req, res) => {
+      const { q } = req.query;
+      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
+      const filteredOrders = userOrders.filter(order => order.orderId.includes(q));
+      if (filteredOrders.length === 0) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+      res.status(200).json(filteredOrders.slice().reverse());
+    });
+
     app.get('/api/orders/my-orders', authenticateToken, (req, res) => {
       if (!req.user || !req.user.email) {
         return res.status(401).json({ error: 'Authentication token is invalid or missing email.' });
@@ -560,11 +574,30 @@ async function startServer() {
 
 
     // --- WebAuthn (Passkey) Endpoints ---
-    app.get('/api/auth/register-options', (req, res) => {
-      const { username } = req.query;
-      if (!username || !db.data.users[username]) {
-        return res.status(400).json({ error: 'User not found' });
+    app.post('/api/auth/pre-register', [
+      body('username').notEmpty().withMessage('username is required'),
+    ], async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
       }
+
+      const { username } = req.body;
+      let user = db.data.users[username];
+
+      if (!user) {
+        // Create a new user if they don't exist
+        user = {
+          id: randomUUID(),
+          username: username,
+          password: null, // No password for WebAuthn-only users
+          credentials: [],
+        };
+        db.data.users[username] = user;
+        await db.write();
+        console.log(`New user created for WebAuthn pre-registration: ${username}`);
+      }
+
       const options = generateRegistrationOptions({
         rpID: rpID,
         rpName: 'Splotch',
@@ -573,8 +606,10 @@ async function startServer() {
           userVerification: 'preferred',
         },
       });
-      db.data.users[username].challenge = options.challenge;
-      db.write();
+
+      user.challenge = options.challenge;
+      await db.write();
+
       res.json(options);
     });
 
