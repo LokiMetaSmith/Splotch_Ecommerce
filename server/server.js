@@ -71,6 +71,9 @@ async function startServer() {
     const app = express();
     const port = process.env.PORT || 3000;
 
+    const rpID = process.env.RP_ID;
+    const expectedOrigin = process.env.EXPECTED_ORIGIN;
+
     // --- Google OAuth2 Client ---
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -531,7 +534,7 @@ async function startServer() {
         return res.status(400).json({ error: 'User not found' });
       }
       const options = generateRegistrationOptions({
-        rpID: process.env.RP_ID,
+        rpID: rpID,
         rpName: 'Splotch',
         userName: username,
         authenticatorSelection: {
@@ -551,8 +554,8 @@ async function startServer() {
         const verification = await verifyRegistrationResponse({
           response: body,
           expectedChallenge: user.challenge,
-          expectedOrigin: process.env.EXPECTED_ORIGIN,
-          expectedRPID: process.env.RP_ID,
+          expectedOrigin: expectedOrigin,
+          expectedRPID: rpID,
         });
         const { verified, registrationInfo } = verification;
         if (verified) {
@@ -597,8 +600,8 @@ async function startServer() {
         const verification = await verifyAuthenticationResponse({
           response: body,
           expectedChallenge: user.challenge,
-          expectedOrigin: process.env.EXPECTED_ORIGIN,
-          expectedRPID: process.env.RP_ID,
+          expectedOrigin: expectedOrigin,
+          expectedRPID: rpID,
           authenticator: credential,
         });
         const { verified } = verification;
