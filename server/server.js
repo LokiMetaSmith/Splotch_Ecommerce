@@ -502,24 +502,56 @@ async function startServer() {
         const { tokens } = await oauth2Client.getToken(code);
         oauth2Client.setCredentials(tokens);
 
-        // Here you would typically associate the tokens with a user in your database
-        // For now, we'll just log them.
-        console.log('Google OAuth tokens received:', tokens);
-
-        // You could also fetch user info to link the account
+        // The user is authenticated with Google, now get their profile info
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
         const userInfo = await gmail.users.getProfile({ userId: 'me' });
-        console.log('User info:', userInfo.data);
-
-        // Store tokens against the user email
         const userEmail = userInfo.data.emailAddress;
+        console.log('Google authentication successful for:', userEmail);
+
+        // Find or create a user in our database
         let user = Object.values(db.data.users).find(u => u.email === userEmail);
-        if (user) {
-            user.google_tokens = tokens;
-            await db.write();
+        if (!user) {
+          // Create a new user if they don't exist
+          const newUsername = userEmail.split('@')[0]; // Use email prefix as username
+          user = {
+            id: randomUUID(),
+            username: newUsername,
+            email: userEmail,
+            password: null, // No password for OAuth-only users
+            credentials: [],
+            google_tokens: tokens,
+          };
+          db.data.users[user.id] = user;
+          await db.write();
+          console.log(`New user created for ${userEmail}`);
+
+          // Send notification email to admin
+          if (process.env.ADMIN_EMAIL) {
+            try {
+              await sendEmail({
+                to: process.env.ADMIN_EMAIL,
+                subject: 'New User Account Created (via Google)',
+                text: `A new user has registered using their Google account.\n\nEmail: ${userEmail}\nUsername: ${newUsername}`,
+                html: `<p>A new user has registered using their Google account.</p><p><b>Email:</b> ${userEmail}</p><p><b>Username:</b> ${newUsername}</p>`,
+                oauth2Client,
+              });
+            } catch (emailError) {
+              console.error('Failed to send new user notification email:', emailError);
+            }
+          }
+
+        } else {
+          // User exists, just update their tokens
+          user.google_tokens = tokens;
+          await db.write();
         }
 
-        res.send('Authentication successful! You can close this tab.');
+        // Create a JWT for the user to log them in
+        const { privateKey, kid } = getCurrentSigningKey();
+        const token = jwt.sign({ username: user.username, email: user.email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
+
+        // Redirect back to the printshop dashboard with the token
+        res.redirect(`/printshop.html?token=${token}`);
       } catch (error) {
         await logAndEmailError(error, 'Error in /oauth2callback');
         res.status(500).send('Authentication failed.');

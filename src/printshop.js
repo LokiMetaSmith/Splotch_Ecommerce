@@ -574,9 +574,22 @@ async function init() {
     // The main login button opens the modal
     ui.loginBtn?.addEventListener('click', showLoginModal);
 
-    // Check initial authentication state
-    if (!(await verifyInitialToken())) {
-        logout();
+    // Check for a token in the URL from OAuth redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthToken = urlParams.get('token');
+    if (oauthToken) {
+        // We got a token from the OAuth redirect. Use it to log in.
+        // The token is already verified by the server, but we call verifyInitialToken
+        // to fetch user info and set the UI state correctly.
+        localStorage.setItem('authToken', oauthToken);
+        await verifyInitialToken();
+        // Clean the token from the URL
+        window.history.replaceState({}, document.title, "/printshop.html");
+    } else {
+        // Standard token check
+        if (!(await verifyInitialToken())) {
+            logout();
+        }
     }
 }
 
