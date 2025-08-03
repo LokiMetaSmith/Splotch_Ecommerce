@@ -1,3 +1,4 @@
+// server.js
 import express from 'express';
 import { SquareClient, SquareEnvironment, SquareError } from "square";
 import { randomUUID } from 'crypto';
@@ -16,6 +17,7 @@ import { body, validationResult } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import { getCurrentSigningKey, getJwks } from './keyManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +26,19 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 import { randomBytes } from 'crypto';
 
 let jwtSecret;
+let serverSessionToken;
+const SERVER_INSTANCE_ID = randomUUID();
+
+// Function to sign the instance token with the current key
+const signInstanceToken = () => {
+    const { privateKey, kid } = getCurrentSigningKey();
+    serverSessionToken = jwt.sign(
+        { instanceId: SERVER_INSTANCE_ID },
+        privateKey,
+        { algorithm: 'RS256', expiresIn: '1h', header: { kid } }
+    );
+    console.log(`[SERVER] Signed new session token with key ID: ${kid}`);
+};
 
 // Define an async function to contain all server logic
 async function startServer() {
@@ -145,6 +160,12 @@ async function startServer() {
       res.status(403)
       res.send('form tampered with')
     })
+
+    // Middleware to add the token to every response
+    app.use((req, res, next) => {
+        res.setHeader('X-Server-Session-Token', serverSessionToken);
+        next();
+    });
     console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
     // --- Helper Functions ---
@@ -160,6 +181,16 @@ async function startServer() {
     }
 
     // --- API Endpoints ---
+    app.get('/.well-known/jwks.json', async (req, res) => {
+        const jwks = await getJwks();
+        res.json(jwks);
+    });
+
+    // Endpoint for the client's initial token fetch
+    app.get('/api/server-info', (req, res) => {
+        res.json({ serverSessionToken });
+    });
+
     app.get('/api/ping', (req, res) => {
       res.status(200).json({
         status: 'ok',
@@ -494,6 +525,9 @@ async function startServer() {
     });
 
     // --- Start Server ---
+    // Sign the initial token and re-sign periodically
+    signInstanceToken();
+    setInterval(signInstanceToken, 30 * 60 * 1000); // Re-sign every 30 minutes
     const server = app.listen(port, () => {
       console.log(`[SERVER] Server listening at http://localhost:${port}`);
       console.log(`[SERVER] Uploads will be saved to: ${uploadDir}`);
