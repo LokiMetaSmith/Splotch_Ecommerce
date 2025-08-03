@@ -292,6 +292,33 @@ async function handlePaymentFormSubmit(event) {
         }
         console.log('[CLIENT] Temporary auth token received.');
 
+        // 1. Get image data from canvas as a Blob
+        const designImageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (!designImageBlob) {
+            throw new Error("Could not get image data from canvas.");
+        }
+
+        // 2. Upload the design image
+        showPaymentStatus('Uploading design...', 'info');
+        const uploadFormData = new FormData();
+        uploadFormData.append('designImage', designImageBlob, 'design.png');
+
+        const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Authorization': `Bearer ${tempAuthToken}`,
+                'X-CSRF-Token': csrfToken
+            },
+            body: uploadFormData,
+        });
+
+        const uploadData = await uploadResponse.json();
+        if (!uploadResponse.ok) {
+            throw new Error(uploadData.error || 'Failed to upload design.');
+        }
+        const designImagePath = uploadData.filePath;
+        console.log('[CLIENT] Design uploaded. Path:', designImagePath);
 
         // --- NEW: Build verificationDetails object ---
         const billingContact = {
@@ -316,7 +343,7 @@ async function handlePaymentFormSubmit(event) {
         };
         // --- END NEW ---
 
-        // 1. Tokenize the card with verification details
+        // 3. Tokenize the card with verification details
         showPaymentStatus('Securing card details...', 'info');
         console.log('[CLIENT] Tokenizing card with verification details.');
 
@@ -325,28 +352,23 @@ async function handlePaymentFormSubmit(event) {
 
         console.log('[CLIENT] Tokenization successful. Nonce (sourceId):', sourceId);
 
-        // 2. Get image data from canvas as a Blob
-        const designImageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        if (!designImageBlob) {
-            throw new Error("Could not get image data from canvas.");
-        }
-
-        // 3. Create FormData to send to the server
-        const formData = new FormData();
+        // 4. Create JSON payload for the order
         const orderDetails = {
             quantity: stickerQuantityInput ? parseInt(stickerQuantityInput.value, 10) : 0,
             material: stickerMaterialSelect ? stickerMaterialSelect.value : 'unknown',
             cutLineFileName: document.getElementById('cutLineFile')?.files[0]?.name || null,
         };
 
-        formData.append('designImage', designImageBlob, 'design.png');
-        formData.append('sourceId', sourceId);
-        formData.append('amountCents', currentOrderAmountCents);
-        formData.append('currency', 'USD');
-        formData.append('orderDetails', JSON.stringify(orderDetails));
-        formData.append('billingContact', JSON.stringify(billingContact));
+        const orderPayload = {
+            sourceId,
+            amountCents: currentOrderAmountCents,
+            currency: 'USD',
+            designImagePath,
+            orderDetails,
+            billingContact,
+        };
 
-        // 4. Submit the order to the server
+        // 5. Submit the order to the server
         showPaymentStatus('Submitting order to server...', 'info');
         console.log('[CLIENT] Submitting order to server at /api/create-order');
 
@@ -354,10 +376,11 @@ async function handlePaymentFormSubmit(event) {
             method: 'POST',
             credentials: 'include', // Important for cookies
             headers: {
+                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${tempAuthToken}`,
                 'X-CSRF-Token': csrfToken
             },
-            body: formData, // No 'Content-Type' header needed; browser sets it for FormData
+            body: JSON.stringify(orderPayload),
         });
 
         const responseData = await response.json();

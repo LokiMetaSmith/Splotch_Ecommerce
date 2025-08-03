@@ -3,11 +3,13 @@ import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
 import DOMPurify from 'dompurify';
 import SVGNest from './lib/svgnest.js';
 import SVGParser from './lib/svgparser.js';
+import * as jose from 'jose';
 
 // --- Global Variables ---
 const serverUrl = 'http://localhost:3000';
 let authToken = localStorage.getItem('authToken');
 let csrfToken;
+let JWKS; // To hold the remote key set verifier
 
 // --- DOM Elements ---
 // A single object to hold all DOM elements for cleaner management
@@ -27,13 +29,12 @@ function bufferEncode(value) {
         .replace(/=/g, '');
 }
 
-/**
- * A helper function to fetch data from the server with authentication and CSRF protection.
- * @param {string} url The URL to fetch from.
- * @param {object} options The options for the fetch request.
- * @returns {Promise<any>} The JSON response from the server.
- */
+// The final fetchWithAuth function with robust verification
 async function fetchWithAuth(url, options = {}) {
+    if (!JWKS) {
+        throw new Error("Cannot make requests: JWKS verifier is not available.");
+    }
+
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -48,6 +49,30 @@ async function fetchWithAuth(url, options = {}) {
     }
 
     const response = await fetch(url, { ...options, headers });
+
+    const storedToken = localStorage.getItem('serverSessionToken');
+    const liveToken = response.headers.get('X-Server-Session-Token');
+
+    if (liveToken && storedToken && liveToken !== storedToken) {
+        console.warn('New server session token detected. Verifying signature...');
+        try {
+            // Verify the new token. `jose` automatically uses the `kid` from the
+            // token header to find the correct key in the remote JWKS set.
+            await jose.jwtVerify(liveToken, JWKS);
+
+            console.log('New token is valid. Server has restarted or rotated keys. Refreshing.');
+            localStorage.setItem('serverSessionToken', liveToken);
+
+            localStorage.removeItem('authToken'); // Clear user auth token
+            window.location.reload();
+            throw new Error("Server restarted.");
+
+        } catch (err) {
+            console.error('CRITICAL SECURITY ALERT: Invalid server session token signature! Halting.', err);
+            showErrorToast('Security Alert: Server identity mismatch. Disconnecting.');
+            throw new Error("Invalid server token signature.");
+        }
+    }
 
     if (response.status === 401) {
         logout(); // Token is invalid/expired, log out user
@@ -440,6 +465,15 @@ function handleDownloadCutFile() {
 
 
 // --- Initialization ---
+async function getServerSessionToken() {
+    try {
+        const { serverSessionToken } = await fetch(`${serverUrl}/api/server-info`).then(res => res.json());
+        localStorage.setItem('serverSessionToken', serverSessionToken);
+        console.log('[CLIENT] Initial server session token acquired.');
+    } catch (error) {
+        console.error('Could not acquire server session token.', error);
+    }
+}
 
 /**
  * Verifies the current token with the server to ensure it's still valid.
@@ -480,6 +514,12 @@ async function getCsrfToken() {
  * Main application entry point.
  */
 async function init() {
+    // This creates a verifier that automatically fetches and caches keys from your JWKS endpoint
+    JWKS = jose.createRemoteJWKSet(new URL(`${serverUrl}/.well-known/jwks.json`));
+    console.log('[CLIENT] Remote JWKS verifier created.');
+
+    await getServerSessionToken();
+
     // Assign all DOM elements to the ui object
     const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn'];
     ids.forEach(id => {

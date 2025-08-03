@@ -1,3 +1,4 @@
+// server.js
 import express from 'express';
 import { SquareClient, SquareEnvironment, SquareError } from "square";
 import { randomUUID } from 'crypto';
@@ -16,6 +17,7 @@ import { body, validationResult } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import { getCurrentSigningKey, getJwks } from './keyManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +26,19 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 import { randomBytes } from 'crypto';
 
 let jwtSecret;
+let serverSessionToken;
+const SERVER_INSTANCE_ID = randomUUID();
+
+// Function to sign the instance token with the current key
+const signInstanceToken = () => {
+    const { privateKey, kid } = getCurrentSigningKey();
+    serverSessionToken = jwt.sign(
+        { instanceId: SERVER_INSTANCE_ID },
+        privateKey,
+        { algorithm: 'RS256', expiresIn: '1h', header: { kid } }
+    );
+    console.log(`[SERVER] Signed new session token with key ID: ${kid}`);
+};
 
 // Define an async function to contain all server logic
 async function startServer() {
@@ -145,6 +160,12 @@ async function startServer() {
       res.status(403)
       res.send('form tampered with')
     })
+
+    // Middleware to add the token to every response
+    app.use((req, res, next) => {
+        res.setHeader('X-Server-Session-Token', serverSessionToken);
+        next();
+    });
     console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
     // --- Helper Functions ---
@@ -160,6 +181,16 @@ async function startServer() {
     }
 
     // --- API Endpoints ---
+    app.get('/.well-known/jwks.json', async (req, res) => {
+        const jwks = await getJwks();
+        res.json(jwks);
+    });
+
+    // Endpoint for the client's initial token fetch
+    app.get('/api/server-info', (req, res) => {
+        res.json({ serverSessionToken });
+    });
+
     app.get('/api/ping', (req, res) => {
       res.status(200).json({
         status: 'ok',
@@ -171,11 +202,11 @@ async function startServer() {
       res.json({ csrfToken: req.csrfToken() });
     });
 
-    app.post('/api/upload-image', upload.single('image'), (req, res) => {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No image file uploaded' });
-      }
-      res.json({ success: true, filePath: `/uploads/${req.file.filename}` });
+    app.post('/api/upload-design', authenticateToken, upload.single('designImage'), (req, res) => {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image file uploaded' });
+        }
+        res.json({ success: true, filePath: `/uploads/${req.file.filename}` });
     });
 
     // --- Order Endpoints ---
@@ -183,19 +214,14 @@ async function startServer() {
       body('sourceId').notEmpty().withMessage('sourceId is required'),
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
-    ], (req, res) => {
-        upload.single('designImage')(req, res, async (err) => {
-            if (err) {
-                return res.status(400).json({ error: 'Error uploading file.', details: err.message });
-            }
-
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ errors: errors.array() });
-            }
-
-            try {
-        const { sourceId, amountCents, currency, ...orderDetails } = req.body;
+      body('designImagePath').notEmpty().withMessage('designImagePath is required'),
+    ], async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+      try {
+        const { sourceId, amountCents, currency, designImagePath, ...orderDetails } = req.body;
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
@@ -226,9 +252,9 @@ async function startServer() {
           amount: Number(amountCents),
           currency: currency || 'USD',
           status: 'NEW',
-          orderDetails: JSON.parse(orderDetails.orderDetails),
-          billingContact: JSON.parse(orderDetails.billingContact),
-          designImagePath: `/uploads/${req.file.filename}`,
+          orderDetails: orderDetails.orderDetails,
+          billingContact: orderDetails.billingContact,
+          designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
         };
         db.data.orders.push(newOrder);
@@ -247,7 +273,6 @@ async function startServer() {
         }
         return res.status(500).json({ error: 'Internal Server Error', message: error.message });
       }
-    });
     });
     
     app.get('/api/orders', authenticateToken, (req, res) => {
@@ -494,6 +519,9 @@ async function startServer() {
     });
 
     // --- Start Server ---
+    // Sign the initial token and re-sign periodically
+    signInstanceToken();
+    setInterval(signInstanceToken, 30 * 60 * 1000); // Re-sign every 30 minutes
     const server = app.listen(port, () => {
       console.log(`[SERVER] Server listening at http://localhost:${port}`);
       console.log(`[SERVER] Uploads will be saved to: ${uploadDir}`);
