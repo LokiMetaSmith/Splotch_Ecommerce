@@ -396,13 +396,12 @@ async function handlePaymentFormSubmit(event) {
         }
 
         console.log('[CLIENT] Order created successfully on server:', responseData);
-        showPaymentStatus(`Order successfully placed! Order ID: ${responseData.order.orderId.substring(0, 8)}...`, 'success');
+        showPaymentStatus(`Order successfully placed! Redirecting to your order history...`, 'success');
 
-        // Optionally display IPFS link if server provides it
-        if (responseData.order.designIpfsHash && ipfsLinkContainer) {
-            ipfsLinkContainer.innerHTML = `Design IPFS Hash: ${responseData.order.designIpfsHash}`;
-            ipfsLinkContainer.style.visibility = 'visible';
-        }
+        // Redirect to the order history page with the token
+        setTimeout(() => {
+            window.location.href = `/orders.html?token=${tempAuthToken}`;
+        }, 2000);
 
     } catch (error) {
         console.error("[CLIENT] Error during payment form submission:", error);
