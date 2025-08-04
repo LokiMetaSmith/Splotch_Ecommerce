@@ -41,8 +41,10 @@ const signInstanceToken = () => {
     console.log(`[SERVER] Signed new session token with key ID: ${kid}`);
 };
 
+let app;
+
 // Define an async function to contain all server logic
-async function startServer() {
+async function startServer(dbPath = path.join(__dirname, 'db.json')) {
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -68,7 +70,7 @@ async function startServer() {
   }
 
   try {
-    const app = express();
+    app = express();
     const port = process.env.PORT || 3000;
 
     const rpID = process.env.RP_ID;
@@ -89,8 +91,8 @@ async function startServer() {
 
     // --- Database Setup ---
     const defaultData = { orders: [], users: {}, credentials: {} };
-    const db = await JSONFilePreset(path.join(__dirname, 'db.json'), defaultData);
-    console.log('[SERVER] LowDB database initialized.');
+    const db = await JSONFilePreset(dbPath, defaultData);
+    console.log('[SERVER] LowDB database initialized at:', dbPath);
 
     // --- Multer Configuration for File Uploads ---
     const storage = multer.diskStorage({
@@ -317,6 +319,20 @@ async function startServer() {
       }
       const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
       res.status(200).json(userOrders.slice().reverse());
+    });
+
+    app.get('/api/orders/search', authenticateToken, (req, res) => {
+      const { q } = req.query;
+      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
+      const filteredOrders = userOrders.filter(order => order.orderId.includes(q));
+      if (filteredOrders.length === 0) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+      res.status(200).json(filteredOrders.slice().reverse());
     });
 
     app.get('/api/orders/my-orders', authenticateToken, (req, res) => {
@@ -560,11 +576,30 @@ async function startServer() {
 
 
     // --- WebAuthn (Passkey) Endpoints ---
-    app.get('/api/auth/register-options', (req, res) => {
-      const { username } = req.query;
-      if (!username || !db.data.users[username]) {
-        return res.status(400).json({ error: 'User not found' });
+    app.post('/api/auth/pre-register', [
+      body('username').notEmpty().withMessage('username is required'),
+    ], async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
       }
+
+      const { username } = req.body;
+      let user = db.data.users[username];
+
+      if (!user) {
+        // Create a new user if they don't exist
+        user = {
+          id: randomUUID(),
+          username: username,
+          password: null, // No password for WebAuthn-only users
+          credentials: [],
+        };
+        db.data.users[username] = user;
+        await db.write();
+        console.log(`New user created for WebAuthn pre-registration: ${username}`);
+      }
+
       const options = generateRegistrationOptions({
         rpID: rpID,
         rpName: 'Splotch',
@@ -573,8 +608,10 @@ async function startServer() {
           userVerification: 'preferred',
         },
       });
-      db.data.users[username].challenge = options.challenge;
-      db.write();
+
+      user.challenge = options.challenge;
+      await db.write();
+
       res.json(options);
     });
 
@@ -650,27 +687,11 @@ async function startServer() {
       }
     });
 
-    // --- Start Server ---
     // Sign the initial token and re-sign periodically
     signInstanceToken();
     setInterval(signInstanceToken, 30 * 60 * 1000); // Re-sign every 30 minutes
-    const server = app.listen(port, () => {
-      console.log(`[SERVER] Server listening at http://localhost:${port}`);
-      console.log(`[SERVER] Uploads will be saved to: ${uploadDir}`);
-      console.log(`[SERVER] Static files served from /uploads`);
-      console.log(`[SERVER] Square client was initialized using environment: ${process.env.SQUARE_ENVIRONMENT || 'sandbox (default)'}`);
-    });
     
-    server.on('error', (error) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`❌ [FATAL] Port ${port} is already in use.`);
-        console.error('Please close the other process or specify a different port in your .env file.');
-        process.exit(1);
-      } else {
-        console.error(`❌ [FATAL] An unexpected error occurred:`, error);
-        process.exit(1);
-      }
-    });
+    return app;
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');
@@ -678,4 +699,4 @@ async function startServer() {
   }
 }
 
-startServer();
+export { app, startServer };
