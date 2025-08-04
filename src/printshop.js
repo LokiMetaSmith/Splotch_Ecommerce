@@ -19,6 +19,40 @@ const ui = {};
 // --- Helper Functions ---
 
 /**
+ * Updates the connection status indicator.
+ * @param {'connected' | 'error' | 'connecting' | 'idle'} status - The new status.
+ */
+function updateConnectionStatus(status) {
+    const dot = ui.connectionStatusDot;
+    const text = ui.connectionStatusText;
+
+    if (!dot || !text) return; // Guard against elements not being ready
+
+    // Reset classes
+    dot.classList.remove('bg-green-500', 'bg-red-500', 'bg-yellow-500');
+
+    switch (status) {
+        case 'connected':
+            dot.classList.add('bg-green-500');
+            text.textContent = 'Connected';
+            break;
+        case 'error':
+            dot.classList.add('bg-red-500');
+            text.textContent = 'Error';
+            break;
+        case 'connecting':
+            dot.classList.add('bg-yellow-500');
+            text.textContent = 'Connecting...';
+            break;
+        default: // idle
+            dot.classList.add('bg-yellow-500');
+            text.textContent = 'Status';
+            break;
+    }
+}
+
+
+/**
  * Encodes an ArrayBuffer into a Base64URL string.
  * @param {ArrayBuffer} value The buffer to encode.
  * @returns {string} The encoded string.
@@ -299,9 +333,11 @@ function hideSuccessToast() { ui.successToast?.classList.add('hidden'); }
 async function fetchAndDisplayOrders(query = '') {
     if (!authToken) {
         ui.noOrdersMessage.textContent = 'Please log in to view orders.';
+        updateConnectionStatus('idle');
         return;
     }
     showLoadingIndicator();
+    updateConnectionStatus('connecting');
     ui.noOrdersMessage.textContent = 'Loading orders...';
     ui.noOrdersMessage.style.display = 'block';
     ui.ordersList.innerHTML = '';
@@ -315,8 +351,10 @@ async function fetchAndDisplayOrders(query = '') {
             ui.noOrdersMessage.style.display = 'none';
             orders.forEach(displayOrder);
         }
+        updateConnectionStatus('connected');
     } catch (error) {
         console.error('[SHOP] Error fetching orders:', error);
+        updateConnectionStatus('error');
         // Error is already shown by fetchWithAuth on 401, this handles other network errors
         if (error.message !== 'Authentication failed') {
            showErrorToast(`Could not fetch orders: ${error.message}`);
@@ -503,17 +541,24 @@ async function getServerSessionToken() {
  * Verifies the current token with the server to ensure it's still valid.
  */
 async function verifyInitialToken() {
-    if (!authToken) return false;
+    if (!authToken) {
+        updateConnectionStatus('idle');
+        return false;
+    }
 
+    updateConnectionStatus('connecting');
     try {
         // This endpoint should return user info if the token is valid, and 401 if not.
         const data = await fetchWithAuth(`${serverUrl}/api/auth/verify-token`);
         if (data.username) {
             setLoggedInState(authToken, data.username);
+            // fetchAndDisplayOrders will set the final 'connected' status
             return true;
         }
+        updateConnectionStatus('error');
         return false;
     } catch (error) {
+        updateConnectionStatus('error');
         // fetchWithAuth handles the logout on 401, so we just catch other errors.
         console.error("Token verification failed:", error);
         logout(); // Ensure logout state if verification fails for any reason
@@ -546,7 +591,7 @@ async function init() {
     await getServerSessionToken();
 
     // Assign all DOM elements to the ui object
-    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn'];
+    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text'];
     ids.forEach(id => {
         // Convert kebab-case to camelCase for keys
         const key = id.replace(/-(\w)/g, (match, letter) => letter.toUpperCase());
