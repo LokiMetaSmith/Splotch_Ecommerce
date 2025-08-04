@@ -1,10 +1,29 @@
 const serverUrl = 'http://localhost:3000';
+let csrfToken;
 
 const loginStatus = document.getElementById('login-status');
 const orderHistory = document.getElementById('order-history');
 const ordersList = document.getElementById('orders-list');
 
+async function fetchCsrfToken() {
+    try {
+        const response = await fetch(`${serverUrl}/api/csrf-token`, { credentials: 'include' });
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.csrfToken) {
+            throw new Error("CSRF token not found in server response");
+        }
+        csrfToken = data.csrfToken;
+    } catch (error) {
+        console.error('Error fetching CSRF token:', error);
+        loginStatus.innerHTML = '<p>A security token could not be loaded. Please refresh the page.</p>';
+    }
+}
+
 window.addEventListener('load', async () => {
+    await fetchCsrfToken();
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
 
@@ -16,8 +35,10 @@ window.addEventListener('load', async () => {
     try {
         const response = await fetch(`${serverUrl}/api/auth/verify-magic-link`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
             },
             body: JSON.stringify({ token }),
         });
@@ -40,6 +61,7 @@ window.addEventListener('load', async () => {
 async function fetchOrderHistory(token) {
     try {
         const response = await fetch(`${serverUrl}/api/orders`, {
+            credentials: 'include',
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
