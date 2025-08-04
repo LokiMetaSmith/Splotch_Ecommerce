@@ -465,7 +465,6 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
             await db.write();
         }
         const { privateKey, kid } = getCurrentSigningKey();
-        const { privateKey, kid } = getCurrentSigningKey();
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
         const magicLink = `${process.env.BASE_URL}/magic-login.html?token=${token}`;
 
