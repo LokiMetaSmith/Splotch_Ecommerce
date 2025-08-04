@@ -25,6 +25,7 @@
     "dompurify": "^3.2.6",
     "jose": "^6.0.12",
     "multer": "^2.0.1",
+    "node-telegram-bot-api": "^0.66.0",
     "vite": "^5.1.4"
   },
   "devDependencies": {

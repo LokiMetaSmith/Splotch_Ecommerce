@@ -1,6 +1,7 @@
 import { startServer } from './server.js';
+import { bot } from './bot.js';
 
-const app = await startServer();
+const { app, db } = await startServer();
 const port = process.env.PORT || 3000;
 
 const server = app.listen(port, () => {
@@ -17,3 +18,31 @@ server.on('error', (error) => {
     process.exit(1);
   }
 });
+
+// Check for stalled orders every hour
+setInterval(async () => {
+  const now = new Date();
+  const stalledOrders = db.data.orders.filter(order => {
+    if (order.status === 'SHIPPED' || order.status === 'CANCELED') {
+      return false;
+    }
+    const lastUpdatedAt = new Date(order.lastUpdatedAt || order.receivedAt);
+    const hoursSinceUpdate = (now - lastUpdatedAt) / 1000 / 60 / 60;
+    return hoursSinceUpdate > 4;
+  });
+
+  for (const order of stalledOrders) {
+    const message = `
+⚠️ Order Stalled: ${order.orderId}
+Status: ${order.status}
+Last Update: ${new Date(order.lastUpdatedAt || order.receivedAt).toLocaleString()}
+    `;
+    try {
+      await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, {
+        reply_to_message_id: order.telegramMessageId,
+      });
+    } catch (error) {
+      console.error('[TELEGRAM] Failed to send stalled order notification:', error);
+    }
+  }
+}, 1000 * 60 * 60);
