@@ -276,12 +276,11 @@ async function startServer() {
     });
     
     app.get('/api/orders', authenticateToken, (req, res) => {
-      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
-      if (!user) {
-        return res.status(401).json({ error: 'User not found' });
-      }
-      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
-      res.status(200).json(userOrders.slice().reverse());
+      // This endpoint is for the print shop dashboard, which needs to see all orders.
+      // The `authenticateToken` middleware already ensures the user is logged in and authorized.
+      // The previous implementation incorrectly filtered orders by the logged-in user's email.
+      const allOrders = db.data.orders;
+      res.status(200).json(allOrders.slice().reverse());
     });
 
     app.get('/api/orders/my-orders', authenticateToken, (req, res) => {
