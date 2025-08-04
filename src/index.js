@@ -298,10 +298,15 @@ async function handlePaymentFormSubmit(event) {
             throw new Error("Could not get image data from canvas.");
         }
 
-        // 2. Upload the design image
+        // 2. Upload the design image and optional cut line file
         showPaymentStatus('Uploading design...', 'info');
         const uploadFormData = new FormData();
         uploadFormData.append('designImage', designImageBlob, 'design.png');
+
+        const cutLineFileInput = document.getElementById('cutLineFile');
+        if (cutLineFileInput && cutLineFileInput.files[0]) {
+            uploadFormData.append('cutLineFile', cutLineFileInput.files[0]);
+        }
 
         const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {
             method: 'POST',
@@ -317,8 +322,12 @@ async function handlePaymentFormSubmit(event) {
         if (!uploadResponse.ok) {
             throw new Error(uploadData.error || 'Failed to upload design.');
         }
-        const designImagePath = uploadData.filePath;
+        const designImagePath = uploadData.designImagePath;
+        const cutLinePath = uploadData.cutLinePath;
         console.log('[CLIENT] Design uploaded. Path:', designImagePath);
+        if (cutLinePath) {
+            console.log('[CLIENT] Cut line uploaded. Path:', cutLinePath);
+        }
 
         // --- NEW: Build verificationDetails object ---
         const billingContact = {
@@ -356,7 +365,7 @@ async function handlePaymentFormSubmit(event) {
         const orderDetails = {
             quantity: stickerQuantityInput ? parseInt(stickerQuantityInput.value, 10) : 0,
             material: stickerMaterialSelect ? stickerMaterialSelect.value : 'unknown',
-            cutLineFileName: document.getElementById('cutLineFile')?.files[0]?.name || null,
+            cutLinePath: cutLinePath,
         };
 
         const orderPayload = {
