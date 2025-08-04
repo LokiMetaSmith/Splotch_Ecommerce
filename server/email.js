@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 
 async function sendEmail({ to, subject, text, html, oauth2Client }) {
+  console.log('[sendEmail] OAuth2 Client Credentials:', oauth2Client.credentials);
   try {
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 

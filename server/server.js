@@ -146,7 +146,7 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
    
 
     // --- Middleware ---
-    const limiter = rateLimit({
+    const apiLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
       max: 100, // Limit each IP to 100 requests per windowMs
       message: 'Too many requests from this IP, please try again after 15 minutes',
@@ -219,7 +219,7 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
     }
 
     // --- API Endpoints ---
-    app.use('/api', limiter);
+    app.use('/api', apiLimiter);
     app.get('/.well-known/jwks.json', async (req, res) => {
         const jwks = await getJwks();
         res.json(jwks);
@@ -493,6 +493,9 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
 
         console.log('Magic Link (for testing):', magicLink);
 
+        console.log('[magic-login] Checking OAuth2 client state before sending email:');
+        console.log(oauth2Client.credentials);
+
         try {
             await sendEmail({
                 to: email,
@@ -525,6 +528,24 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
         const { privateKey, kid } = getCurrentSigningKey();
         const authToken = jwt.sign({ email: user.email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
         res.json({ success: true, token: authToken });
+      });
+    });
+
+    app.get('/api/auth/verify-token', authenticateToken, (req, res) => {
+      // If the middleware succeeds, req.user is populated with the token payload.
+      // The client expects an object with a `username` property for the welcome message.
+      const userPayload = req.user;
+      const username = userPayload.username || userPayload.email; // Fallback to email
+
+      if (!username) {
+        // This case should be rare, but it's good practice to handle it.
+        return res.status(400).json({ error: 'Token is valid, but contains no user identifier.' });
+      }
+
+      // Return a consistent object that includes the username.
+      res.status(200).json({
+        username: username,
+        ...userPayload
       });
     });
     
@@ -568,9 +589,9 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
         oauth2Client.setCredentials(tokens);
 
         // The user is authenticated with Google, now get their profile info
-        const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-        const userInfo = await gmail.users.getProfile({ userId: 'me' });
-        const userEmail = userInfo.data.emailAddress;
+        const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+        const userInfo = await oauth2.userinfo.get();
+        const userEmail = userInfo.data.email;
         console.log('Google authentication successful for:', userEmail);
 
         // Find or create a user in our database
