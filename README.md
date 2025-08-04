@@ -117,10 +117,12 @@ You will need to run the backend server and the frontend development server in t
 # In a terminal, navigate to the server directory
 cd server
 
-# Start the server
+# Start the server using the npm script
 npm start
 ```
 The backend server will be running at `http://localhost:3000`.
+
+**Note:** The main server file is `server.js`, but the entry point for running the server is `index.js`, which is executed by the `npm start` command. Do not run `node server.js` directly.
 
 #### 2. Start the Frontend Dev Server
 ```bash
