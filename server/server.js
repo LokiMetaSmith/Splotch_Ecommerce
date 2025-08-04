@@ -239,11 +239,21 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
       res.json({ csrfToken: req.csrfToken() });
     });
 
-    app.post('/api/upload-design', authenticateToken, upload.single('designImage'), (req, res) => {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No image file uploaded' });
+    app.post('/api/upload-design', authenticateToken, upload.fields([
+        { name: 'designImage', maxCount: 1 },
+        { name: 'cutLineFile', maxCount: 1 }
+    ]), (req, res) => {
+        if (!req.files || !req.files.designImage) {
+            return res.status(400).json({ error: 'No design image file uploaded' });
         }
-        res.json({ success: true, filePath: `/uploads/${req.file.filename}` });
+        const designImagePath = `/uploads/${req.files.designImage[0].filename}`;
+        const cutLinePath = req.files.cutLineFile ? `/uploads/${req.files.cutLineFile[0].filename}` : null;
+
+        res.json({
+            success: true,
+            designImagePath: designImagePath,
+            cutLinePath: cutLinePath
+        });
     });
 
     // --- Order Endpoints ---
