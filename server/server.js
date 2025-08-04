@@ -90,9 +90,17 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
     }
 
     // --- Database Setup ---
-    const defaultData = { orders: [], users: {}, credentials: {} };
+    const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
     const db = await JSONFilePreset(dbPath, defaultData);
     console.log('[SERVER] LowDB database initialized at:', dbPath);
+
+    // Load the refresh token from the database if it exists
+    if (db.data.config?.google_refresh_token) {
+      oauth2Client.setCredentials({
+        refresh_token: db.data.config.google_refresh_token,
+      });
+      console.log('[SERVER] Google OAuth2 client configured with stored refresh token.');
+    }
 
     // --- Multer Configuration for File Uploads ---
     const storage = multer.diskStorage({
@@ -572,6 +580,13 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
       try {
         const { tokens } = await oauth2Client.getToken(code);
         oauth2Client.setCredentials(tokens);
+
+        // If a refresh token is received, store it securely for future use.
+        if (tokens.refresh_token) {
+          db.data.config.google_refresh_token = tokens.refresh_token;
+          await db.write();
+          console.log('[SERVER] Google OAuth2 refresh token stored.');
+        }
 
         // The user is authenticated with Google, now get their profile info
         const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
