@@ -465,10 +465,25 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
             await db.write();
         }
         const { privateKey, kid } = getCurrentSigningKey();
+        const { privateKey, kid } = getCurrentSigningKey();
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
-        const magicLink = `${process.env.BASE_URL}/magic-login?token=${token}`;
+        const magicLink = `${process.env.BASE_URL}/magic-login.html?token=${token}`;
+
         console.log('Magic Link (for testing):', magicLink);
-        res.json({ success: true, message: 'Check your email for a magic link to log in.' });
+
+        try {
+            await sendEmail({
+                to: email,
+                subject: 'Your Magic Link for Splotch',
+                text: `Click here to log in: ${magicLink}`,
+                html: `<p>Click here to log in: <a href="${magicLink}">${magicLink}</a></p>`,
+                oauth2Client,
+            });
+            res.json({ success: true, message: 'Magic link sent! Please check your email.' });
+        } catch (error) {
+            await logAndEmailError(error, 'Failed to send magic link email');
+            res.status(500).json({ error: 'Failed to send magic link email.' });
+        }
     });
     
     app.post('/api/auth/verify-magic-link', (req, res) => {
