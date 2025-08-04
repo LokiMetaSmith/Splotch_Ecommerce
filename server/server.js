@@ -149,6 +149,7 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
     const limiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
       max: 100, // Limit each IP to 100 requests per windowMs
+      message: 'Too many requests from this IP, please try again after 15 minutes',
     });
     
     const allowedOrigins = [
@@ -181,7 +182,7 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
       optionsSuccessStatus: 200,
     };
     
-    app.use(limiter);
+   // app.use(limiter);
     app.use(cors(corsOptions));
     app.use(express.json());
     app.use(cookieParser());
@@ -218,6 +219,7 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
     }
 
     // --- API Endpoints ---
+    app.use('/api', limiter);
     app.get('/.well-known/jwks.json', async (req, res) => {
         const jwks = await getJwks();
         res.json(jwks);
@@ -321,14 +323,30 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
         return res.status(500).json({ error: 'Internal Server Error', message: error.message });
       }
     });
-    
+    app.get('/api/auth/verify-token', authenticateToken, (req, res) => {
+  // If the middleware succeeds, req.user is populated with the token payload.
+  // The client expects an object with a `username` property for the welcome message.
+  const userPayload = req.user;
+  const username = userPayload.username || userPayload.email; // Fallback to email
+
+  if (!username) {
+    // This case should be rare, but it's good practice to handle it.
+    return res.status(400).json({ error: 'Token is valid, but contains no user identifier.' });
+  }
+
+  // Return a consistent object that includes the username.
+  res.status(200).json({
+    username: username,
+    ...userPayload
+  });
+    });
     app.get('/api/orders', authenticateToken, (req, res) => {
 //      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
 //      if (!user) {
 //        return res.status(401).json({ error: 'User not found' });
 //      }
--      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
--      res.status(200).json(userOrders.slice().reverse());
+//      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
+//      res.status(200).json(userOrders.slice().reverse());
       // This endpoint is for the print shop dashboard, which needs to see all orders.
       // The `authenticateToken` middleware already ensures the user is logged in and authorized.
       // The previous implementation incorrectly filtered orders by the logged-in user's email.
