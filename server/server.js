@@ -20,6 +20,7 @@ import dotenv from 'dotenv';
 import { google } from 'googleapis';
 import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks } from './keyManager.js';
+import { bot } from './bot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,6 +43,7 @@ const signInstanceToken = () => {
 };
 
 let app;
+let db;
 
 // Define an async function to contain all server logic
 async function startServer(dbPath = path.join(__dirname, 'db.json')) {
@@ -91,7 +93,7 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
 
     // --- Database Setup ---
     const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
-    const db = await JSONFilePreset(dbPath, defaultData);
+    db = await JSONFilePreset(dbPath, defaultData);
     console.log('[SERVER] LowDB database initialized at:', dbPath);
 
     // Load the refresh token from the database if it exists
@@ -318,6 +320,41 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
         db.data.orders.push(newOrder);
         await db.write();
         console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
+
+        // Send Telegram notification
+        if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID) {
+          const message = `
+New Order: ${newOrder.orderId}
+Customer: ${newOrder.billingContact.givenName} ${newOrder.billingContact.familyName}
+Email: ${newOrder.billingContact.email}
+Quantity: ${newOrder.orderDetails.quantity}
+Amount: $${(newOrder.amount / 100).toFixed(2)}
+          `;
+          try {
+            const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
+            const orderIndex = db.data.orders.findIndex(o => o.orderId === newOrder.orderId);
+            if (orderIndex !== -1) {
+              db.data.orders[orderIndex].telegramMessageId = sentMessage.message_id;
+              await db.write();
+            }
+
+            // Send the design image
+            if (newOrder.designImagePath) {
+              const imagePath = path.join(__dirname, newOrder.designImagePath);
+              await bot.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, imagePath);
+            }
+
+            // Send the cut line file
+            const cutLinePath = db.data.orders[orderIndex].cutLinePath;
+            if (cutLinePath) {
+              const docPath = path.join(__dirname, cutLinePath);
+              await bot.sendDocument(process.env.TELEGRAM_CHANNEL_ID, docPath);
+            }
+          } catch (error) {
+            console.error('[TELEGRAM] Failed to send message or files:', error);
+          }
+        }
+
         return res.status(201).json({ success: true, order: newOrder });
       } catch (error) {
         await logAndEmailError(error, 'Critical error in /api/create-order');
@@ -396,6 +433,38 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
       order.lastUpdatedAt = new Date().toISOString();
       await db.write();
       console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
+
+      // Update Telegram message
+      if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
+        const statusChecklist = `
+✅ New
+${status === 'ACCEPTED' || status === 'PRINTING' || status === 'SHIPPED' ? '✅' : '⬜️'} Accepted
+${status === 'PRINTING' || status === 'SHIPPED' ? '✅' : '⬜️'} Printing
+${status === 'SHIPPED' ? '✅' : '⬜️'} Shipped
+        `;
+        const message = `
+Order: ${order.orderId}
+Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
+Email: ${order.billingContact.email}
+Quantity: ${order.orderDetails.quantity}
+Amount: $${(order.amount / 100).toFixed(2)}
+
+${statusChecklist}
+        `;
+        try {
+          if (status === 'SHIPPED') {
+            await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+          } else {
+            await bot.editMessageText(message, {
+              chat_id: process.env.TELEGRAM_CHANNEL_ID,
+              message_id: order.telegramMessageId,
+            });
+          }
+        } catch (error) {
+          console.error('[TELEGRAM] Failed to edit or delete message:', error);
+        }
+      }
+
       res.status(200).json({ success: true, order: order });
     });
 
@@ -769,4 +838,12 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
   }
 }
 
-export { app, startServer };
+let db;
+// ...
+async function startServer(dbPath = path.join(__dirname, 'db.json')) {
+//...
+    db = await JSONFilePreset(dbPath, defaultData);
+//...
+}
+//...
+export { app, startServer, db };
