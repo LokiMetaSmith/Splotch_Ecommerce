@@ -1,14 +1,21 @@
 // getRefreshToken.js
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
 
 // Paste the code from the previous step here
 const an_authorization_code = 'PASTE_THE_CODE_FROM_YOUR_BROWSER_URL_HERE';
 
 const oAuth2Client = new google.auth.OAuth2(
-  process.env.GMAIL_CLIENT_ID,
-  process.env.GMAIL_CLIENT_SECRET,
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
   process.env.GMAIL_REDIRECT_URI
 );
 
