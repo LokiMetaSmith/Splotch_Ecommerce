@@ -43,7 +43,6 @@ const signInstanceToken = () => {
 };
 
 let app;
-let db;
 
 // Define an async function to contain all server logic
 async function startServer(dbPath = path.join(__dirname, 'db.json')) {
@@ -846,4 +845,4 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
 //...
 }
 //...
-export { app, startServer, db };
+export { startServer };
