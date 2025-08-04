@@ -464,7 +464,8 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
             db.data.users[user.id] = user;
             await db.write();
         }
-        const token = jwt.sign({ email }, jwtSecret, { expiresIn: '15m' });
+        const { privateKey, kid } = getCurrentSigningKey();
+        const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
         const magicLink = `${process.env.BASE_URL}/magic-login?token=${token}`;
         console.log('Magic Link (for testing):', magicLink);
         res.json({ success: true, message: 'Check your email for a magic link to log in.' });
@@ -475,7 +476,8 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
       if (!token) {
         return res.status(400).json({ error: 'No token provided' });
       }
-      jwt.verify(token, jwtSecret, (err, decoded) => {
+      const { publicKey } = getCurrentSigningKey();
+      jwt.verify(token, publicKey, { algorithms: ['RS256'] }, (err, decoded) => {
         if (err) {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
