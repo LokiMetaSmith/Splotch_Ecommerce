@@ -20,7 +20,7 @@ import dotenv from 'dotenv';
 import { google } from 'googleapis';
 import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks } from './keyManager.js';
-import { bot } from './bot.js';
+import { initializeBot } from './bot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,7 +41,7 @@ const signInstanceToken = () => {
     );
     console.log(`[SERVER] Signed new session token with key ID: ${kid}`);
 };
-
+let db;
 let app;
 
 // Define an async function to contain all server logic
@@ -53,6 +53,8 @@ async function startServer(dbPath = path.join(__dirname, 'db.json')) {
     `http://localhost:3000/oauth2callback`
   );
 
+   db = await JSONFilePreset(dbPath, defaultData);
+  
   async function logAndEmailError(error, context = 'General Error') {
     console.error(`[${context}]`, error);
     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
@@ -852,12 +854,5 @@ ${statusChecklist}
   }
 }
 
-let db;
-// ...
-async function startServer(dbPath = path.join(__dirname, 'db.json')) {
-//...
-    db = await JSONFilePreset(dbPath, defaultData);
-//...
-}
-//...
+
 export { startServer };
