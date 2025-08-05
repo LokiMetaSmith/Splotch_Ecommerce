@@ -44,6 +44,8 @@ const signInstanceToken = () => {
 
 let app;
 
+const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
+
 // Define an async function to contain all server logic
 async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
   // --- Google OAuth2 Client ---
@@ -91,7 +93,6 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     }
 
     // --- Database Setup ---
-    const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
     db = await JSONFilePreset(dbPath, defaultData);
     console.log('[SERVER] LowDB database initialized at:', dbPath);
 
