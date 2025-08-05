@@ -7,7 +7,7 @@
 
 'use strict';
 
-import { SvgParser } from './svgparser.js';
+import { SVGParser } from './svgparser.js';
 import { GeometryUtil } from './geometryutil.js';
 import { PlacementWorker } from './placementworker.js';
 
