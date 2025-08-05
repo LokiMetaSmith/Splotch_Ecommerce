@@ -392,6 +392,7 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
 //      if (!user) {
 //        return res.status(401).json({ error: 'User not found' });
 //      }
+      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
       const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
       res.status(200).json(userOrders.slice().reverse());
       // This endpoint is for the print shop dashboard, which needs to see all orders.
