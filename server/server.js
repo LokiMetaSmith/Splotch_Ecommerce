@@ -45,7 +45,7 @@ const signInstanceToken = () => {
 let app;
 
 // Define an async function to contain all server logic
-async function startServer(dbPath = path.join(__dirname, 'db.json')) {
+async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -374,8 +374,8 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
 //      if (!user) {
 //        return res.status(401).json({ error: 'User not found' });
 //      }
--      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
--      res.status(200).json(userOrders.slice().reverse());
+      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
+      res.status(200).json(userOrders.slice().reverse());
       // This endpoint is for the print shop dashboard, which needs to see all orders.
       // The `authenticateToken` middleware already ensures the user is logged in and authorized.
       // The previous implementation incorrectly filtered orders by the logged-in user's email.
@@ -837,12 +837,5 @@ ${statusChecklist}
   }
 }
 
-let db;
-// ...
-async function startServer(dbPath = path.join(__dirname, 'db.json')) {
-//...
-    db = await JSONFilePreset(dbPath, defaultData);
-//...
-}
 //...
 export { startServer };

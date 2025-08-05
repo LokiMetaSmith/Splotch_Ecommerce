@@ -1,9 +1,17 @@
 import { startServer } from './server.js';
 import { initializeBot } from './bot.js';
+import { JSONFilePreset } from 'lowdb/node';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 async function main() {
-  const { app, db } = await startServer();
+  const db = await JSONFilePreset(path.join(__dirname, 'db.json'), { orders: [], users: {}, credentials: {}, config: {} });
   const bot = initializeBot(db);
+  const app = await startServer(db, bot);
 
   const port = process.env.PORT || 3000;
 

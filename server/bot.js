@@ -60,4 +60,4 @@ function initializeBot(database) {
   return bot;
 }
 
-export { initializeBot };
+export { initializeBot, bot };
