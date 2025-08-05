@@ -3,7 +3,7 @@ import '/src/styles.css'; // Or your main CSS file
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import DOMPurify from 'dompurify';
 import { SvgNest } from './lib/svgnest.js';
-import { SvgParser } from './lib/svgparser.js';
+import { SVGParser } from './lib/svgparser.js';
 import * as jose from 'jose';
 
 // --- Global Variables ---

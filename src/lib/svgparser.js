@@ -10,7 +10,7 @@
 import { Matrix } from './matrix.js';
 import { GeometryUtil } from './geometryutil.js';
 
-export class SvgParser {
+export class SVGParser {
     constructor() {
         this.svg = null;
         this.svgRoot = null;
