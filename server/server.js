@@ -196,7 +196,7 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     app.use(express.json());
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, '..')));
-    app.use('/uploads', express.static(uploadDir));
+    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
     app.use(csrf({ cookie: true }));
     app.use(function (err, req, res, next) {
       if (err.code !== 'EBADCSRFTOKEN') return next(err)
