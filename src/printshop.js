@@ -467,7 +467,17 @@ async function handleNesting() {
     }
 
     try {
-        const svgStrings = await Promise.all(svgUrls.map(url => fetch(url, { credentials: 'include' }).then(res => res.text())));
+        const svgStrings = await Promise.all(svgUrls.map(async (url, i) => {
+            try {
+                const res = await fetch(url, { credentials: 'include' });
+                const text = await res.text();
+                console.log(`SVG ${i} content:`, text);
+                return text;
+            } catch (error) {
+                console.error(`Failed to fetch SVG ${i} from ${url}:`, error);
+                throw new Error(`Could not fetch SVG from ${url}`);
+            }
+        }));
         const binWidth = 12 * 96;
         const binHeight = 12 * 96;
         const binSvg = `<svg width="${binWidth}" height="${binHeight}"><rect x="0" y="0" width="${binWidth}" height="${binHeight}" fill="none" stroke="blue" stroke-width="2"/></svg>`;
