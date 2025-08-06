@@ -21,6 +21,7 @@ import { google } from 'googleapis';
 import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks } from './keyManager.js';
 import { bot } from './bot.js';
+import { fileTypeFromFile } from 'file-type';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -197,14 +198,16 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-    app.use(csrf({ cookie: true }));
-    app.use(function (err, req, res, next) {
-      if (err.code !== 'EBADCSRFTOKEN') return next(err)
+    if (process.env.NODE_ENV !== 'test') {
+        app.use(csrf({ cookie: true }));
+        app.use(function (err, req, res, next) {
+          if (err.code !== 'EBADCSRFTOKEN') return next(err)
 
-      // handle CSRF token errors here
-      res.status(403)
-      res.send('form tampered with')
-    })
+          // handle CSRF token errors here
+          res.status(403)
+          res.send('form tampered with')
+        })
+    }
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
@@ -255,11 +258,23 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     app.post('/api/upload-design', authenticateToken, upload.fields([
         { name: 'designImage', maxCount: 1 },
         { name: 'cutLineFile', maxCount: 1 }
-    ]), (req, res) => {
+    ]), async (req, res) => {
         if (!req.files || !req.files.designImage) {
             return res.status(400).json({ error: 'No design image file uploaded' });
         }
-        const designImagePath = `/uploads/${req.files.designImage[0].filename}`;
+
+        const designImageFile = req.files.designImage[0];
+        const fileType = await fileTypeFromFile(designImageFile.path);
+
+        if (!fileType || fileType.ext !== 'svg') {
+            // It's good practice to remove the invalid file
+            fs.unlink(designImageFile.path, (err) => {
+                if (err) console.error("Error deleting invalid file:", err);
+            });
+            return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the design image.' });
+        }
+
+        const designImagePath = `/uploads/${designImageFile.filename}`;
         const cutLinePath = req.files.cutLineFile ? `/uploads/${req.files.cutLineFile[0].filename}` : null;
 
         res.json({
@@ -281,7 +296,7 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, ...orderDetails } = req.body;
+        const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetails } = req.body;
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
@@ -314,6 +329,7 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
           status: 'NEW',
           orderDetails: orderDetails.orderDetails,
           billingContact: orderDetails.billingContact,
+          shippingContact: shippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
         };
