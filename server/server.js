@@ -21,7 +21,6 @@ import { google } from 'googleapis';
 import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks } from './keyManager.js';
 import { bot } from './bot.js';
-import { fileTypeFromFile } from 'file-type';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -256,23 +255,11 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     app.post('/api/upload-design', authenticateToken, upload.fields([
         { name: 'designImage', maxCount: 1 },
         { name: 'cutLineFile', maxCount: 1 }
-    ]), async (req, res) => {
+    ]), (req, res) => {
         if (!req.files || !req.files.designImage) {
             return res.status(400).json({ error: 'No design image file uploaded' });
         }
-
-        const designImageFile = req.files.designImage[0];
-        const fileType = await fileTypeFromFile(designImageFile.path);
-
-        if (!fileType || fileType.ext !== 'svg') {
-            // It's good practice to remove the invalid file
-            fs.unlink(designImageFile.path, (err) => {
-                if (err) console.error("Error deleting invalid file:", err);
-            });
-            return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the design image.' });
-        }
-
-        const designImagePath = `/uploads/${designImageFile.filename}`;
+        const designImagePath = `/uploads/${req.files.designImage[0].filename}`;
         const cutLinePath = req.files.cutLineFile ? `/uploads/${req.files.cutLineFile[0].filename}` : null;
 
         res.json({
