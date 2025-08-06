@@ -396,7 +396,7 @@ function displayOrder(order) {
         </div>
         <div class="mt-4">
             <dt>Sticker Design:</dt>
-            <a href="${serverUrl}${order.designImagePath}" target="_blank"><img src="${serverUrl}${order.designImagePath}" alt="Sticker Design" class="sticker-design"></a>
+            <a href="${serverUrl}${order.designImagePath}" target="_blank"><img src="${serverUrl}${order.designImagePath}" alt="Sticker Design" class="sticker-design" data-cut-file-path="${order.cutLinePath || ''}"></a>
         </div>
         <div class="mt-4 flex flex-wrap gap-2">
             <button class="action-btn" data-order-id="${order.orderId}" data-status="ACCEPTED">Accept</button>
@@ -467,17 +467,19 @@ async function handleNesting() {
     }
 
     try {
-        const svgStrings = await Promise.all(svgUrls.map(async (url, i) => {
-            try {
-                const res = await fetch(url, { credentials: 'include' });
-                const text = await res.text();
-                console.log(`SVG ${i} content:`, text);
-                return text;
-            } catch (error) {
-                console.error(`Failed to fetch SVG ${i} from ${url}:`, error);
-                throw new Error(`Could not fetch SVG from ${url}`);
+        const svgPromises = Array.from(ui.ordersList.querySelectorAll('.sticker-design')).map(async (img, i) => {
+            const cutFilePath = img.dataset.cutFilePath;
+            if (cutFilePath) {
+                const res = await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' });
+                return res.text();
+            } else {
+                const res = await fetch(img.src, { credentials: 'include' });
+                const svgString = await res.text();
+                return generateCutFile(svgString);
             }
-        }));
+        });
+
+        const svgStrings = await Promise.all(svgPromises);
         const binWidth = 12 * 96;
         const binHeight = 12 * 96;
         const binSvg = `<svg width="${binWidth}" height="${binHeight}"><rect x="0" y="0" width="${binWidth}" height="${binHeight}" fill="none" stroke="blue" stroke-width="2"/></svg>`;
@@ -501,29 +503,33 @@ async function handleNesting() {
     }
 }
 
-function handleDownloadCutFile() {
-    if (!window.nestedSvg) {
-        showErrorToast('No nested SVG to generate a cut file from.');
-        return;
-    }
-
+function generateCutFile(svgString) {
     const parser = new DOMParser();
-    const doc = parser.parseFromString(window.nestedSvg, 'image/svg+xml');
-    const nestedSvgElement = doc.documentElement;
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const svgElement = doc.documentElement;
     const cutFileSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    cutFileSvg.setAttribute('width', nestedSvgElement.getAttribute('width'));
-    cutFileSvg.setAttribute('height', nestedSvgElement.getAttribute('height'));
-    cutFileSvg.setAttribute('viewBox', nestedSvgElement.getAttribute('viewBox'));
+    cutFileSvg.setAttribute('width', svgElement.getAttribute('width'));
+    cutFileSvg.setAttribute('height', svgElement.getAttribute('height'));
+    cutFileSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox'));
 
-    nestedSvgElement.querySelectorAll('path').forEach(path => {
+    svgElement.querySelectorAll('path').forEach(path => {
         const newPath = path.cloneNode();
         newPath.setAttribute('stroke', 'red');
         newPath.setAttribute('fill', 'none');
         cutFileSvg.appendChild(newPath);
     });
 
-    const svgString = new XMLSerializer().serializeToString(cutFileSvg);
-    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    return new XMLSerializer().serializeToString(cutFileSvg);
+}
+
+function handleDownloadCutFile() {
+    if (!window.nestedSvg) {
+        showErrorToast('No nested SVG to generate a cut file from.');
+        return;
+    }
+
+    const cutFileString = generateCutFile(window.nestedSvg);
+    const blob = new Blob([cutFileString], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
