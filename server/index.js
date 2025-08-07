@@ -3,15 +3,58 @@ import { initializeBot } from './bot.js';
 import { JSONFilePreset } from 'lowdb/node';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const ENCRYPTION_KEY = process.env.JWT_SECRET; // 32 bytes
+const IV_LENGTH = 16; // For AES, this is always 16
+
+function encrypt(text) {
+    let iv = crypto.randomBytes(IV_LENGTH);
+    let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+    let encrypted = cipher.update(text);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function decrypt(text) {
+    let textParts = text.split(':');
+    let iv = Buffer.from(textParts.shift(), 'hex');
+    let encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+}
 
 async function main() {
-  const db = await JSONFilePreset(path.join(__dirname, 'db.json'), { orders: [], users: {}, credentials: {}, config: {} });
-  const bot = initializeBot(db);
-  const app = await startServer(db, bot);
+    const dbPath = path.join(__dirname, 'db.json');
+    let db;
+
+    if (process.env.ENCRYPT_CLIENT_JSON === 'true') {
+        if (fs.existsSync(dbPath)) {
+            const encryptedData = fs.readFileSync(dbPath, 'utf8');
+            const decryptedData = decrypt(encryptedData);
+            fs.writeFileSync(dbPath, decryptedData);
+        }
+    }
+
+    db = await JSONFilePreset(dbPath, { orders: [], users: {}, credentials: {}, config: {} });
+
+    if (process.env.ENCRYPT_CLIENT_JSON === 'true') {
+        const originalWrite = db.write;
+        db.write = async function() {
+            const data = JSON.stringify(this.data);
+            const encryptedData = encrypt(data);
+            fs.writeFileSync(dbPath, encryptedData);
+        }
+    }
+
+    const bot = initializeBot(db);
+    const app = await startServer(db, bot);
 
   const port = process.env.PORT || 3000;
 
