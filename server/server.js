@@ -787,19 +787,32 @@ ${statusChecklist}
 
     app.post('/api/auth/register-verify', async (req, res) => {
       const { body } = req;
-      const { username } = req.query;
+      const { username } = body; // Get username from body
       const user = db.data.users[username];
+
+      if (!user) {
+        return res.status(404).json({ error: `User not found: ${username}` });
+      }
+
       try {
         const verification = await verifyRegistrationResponse({
-          response: body,
+          response: body.response, // Pass the nested response object
           expectedChallenge: user.challenge,
           expectedOrigin: expectedOrigin,
           expectedRPID: rpID,
         });
+
         const { verified, registrationInfo } = verification;
-        if (verified) {
+        if (verified && registrationInfo) {
           user.credentials.push(registrationInfo);
-          db.data.credentials[registrationInfo.credentialID] = registrationInfo;
+          // It's good practice to store the credential by its ID for easy lookup
+          db.data.credentials[registrationInfo.credentialID] = {
+            credentialID: registrationInfo.credentialID,
+            credentialPublicKey: registrationInfo.credentialPublicKey,
+            counter: registrationInfo.counter,
+            credentialDeviceType: registrationInfo.credentialDeviceType,
+            credentialBackedUp: registrationInfo.credentialBackedUp,
+          };
           await db.write();
         }
         res.json({ verified });
@@ -829,27 +842,38 @@ ${statusChecklist}
 
     app.post('/api/auth/login-verify', async (req, res) => {
       const { body } = req;
-      const { username } = req.query;
+      const { username } = body; // Get username from body
       const user = db.data.users[username];
-      const credential = db.data.credentials[body.id];
-      if (!credential) {
-        return res.status(400).json({ error: 'Credential not found.' });
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
       }
+
+      const credential = user.credentials.find(cred => cred.credentialID === body.id);
+      if (!credential) {
+        return res.status(400).json({ error: 'Credential not found for this user.' });
+      }
+
       try {
         const verification = await verifyAuthenticationResponse({
-          response: body,
+          response: body.response, // Pass the nested response object
           expectedChallenge: user.challenge,
           expectedOrigin: expectedOrigin,
           expectedRPID: rpID,
           authenticator: credential,
         });
-        const { verified } = verification;
+
+        const { verified, authenticationInfo } = verification;
         if (verified) {
+          // Update the authenticator's counter
+          credential.counter = authenticationInfo.newCounter;
+          await db.write();
+
           const { privateKey, kid } = getCurrentSigningKey();
           const token = jwt.sign({ username: user.username }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
           res.json({ verified, token });
         } else {
-          res.json({ verified });
+          res.status(401).json({ verified });
         }
       } catch (error) {
         await logAndEmailError(error, 'Error in /api/auth/login-verify');
