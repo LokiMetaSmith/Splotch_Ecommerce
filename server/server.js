@@ -753,7 +753,7 @@ ${statusChecklist}
         console.log(`New user created for WebAuthn pre-registration: ${username}`);
       }
 
-      const options = generateRegistrationOptions({
+      const options = await generateRegistrationOptions({
         rpID: rpID,
         rpName: 'Splotch',
         userName: username,
@@ -792,13 +792,13 @@ ${statusChecklist}
       }
     });
 
-    app.get('/api/auth/login-options', (req, res) => {
+    app.get('/api/auth/login-options', async (req, res) => {
       const { username } = req.query;
       const user = db.data.users[username];
       if (!user) {
         return res.status(400).json({ error: 'User not found' });
       }
-      const options = generateAuthenticationOptions({
+      const options = await generateAuthenticationOptions({
         allowCredentials: user.credentials.map(cred => ({
           id: cred.credentialID,
           type: 'public-key',
