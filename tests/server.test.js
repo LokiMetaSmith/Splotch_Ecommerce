@@ -16,18 +16,26 @@ describe('Server', () => {
     let tokenRotationTimer;
     const testDbPath = path.join(__dirname, 'test-db.json');
 
-
     beforeAll(async () => {
+        // Create a single db instance for the test suite
         db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
         bot = initializeBot(db);
+        // Initialize the app with the test database instance
         const server = await startServer(db, bot, testDbPath);
         app = server.app;
         tokenRotationTimer = server.tokenRotationTimer;
     });
 
+    beforeEach(async () => {
+        // Reset the test database state before each test
+        db.data = { orders: [], users: {}, credentials: {}, config: {} };
+        await db.write();
+    });
+
     afterAll(async () => {
         clearInterval(tokenRotationTimer);
-        await fs.promises.unlink(testDbPath);
+        // Use fs.unlink, not fs.promises.unlink, to match the import
+        await fs.unlink(testDbPath, () => {});
     });
 
     it('should respond to ping', async () => {

@@ -9,19 +9,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let app;
+let db;
 let tokenRotationTimer;
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
-  // Initialize the app with a null bot and the test database path
-  const server = await startServer(null, null, testDbPath);
+  // Create a single db instance for the test suite
+  db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
+  // Initialize the app with the test database instance
+  const server = await startServer(db, null, testDbPath);
   app = server.app;
   tokenRotationTimer = server.tokenRotationTimer;
 });
 
 beforeEach(async () => {
-  // Reset the test database before each test
-  await fs.writeFile(testDbPath, JSON.stringify({ orders: [], users: {}, credentials: {} }));
+  // Reset the test database state before each test using the shared db instance
+  db.data = { orders: [], users: {}, credentials: {} };
+  await db.write();
 });
 
 afterAll(async () => {
@@ -51,7 +55,7 @@ describe('Auth Endpoints', () => {
     expect(res.statusCode).toEqual(200);
     expect(res.body.challenge).toBeDefined();
 
-    const db = await JSONFilePreset(testDbPath, {});
+    // The user should now exist in the db instance shared with the server
     await db.read();
     expect(db.data.users['testuser']).toBeDefined();
   });
