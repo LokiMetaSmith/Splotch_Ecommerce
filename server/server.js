@@ -124,7 +124,10 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     console.log('[SERVER] Initializing Square client...');
     if (!process.env.SQUARE_ACCESS_TOKEN) {
       console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
-      process.exit(1);
+      // In a test environment, we don't want to kill the test runner.
+      if (process.env.NODE_ENV !== 'test') {
+        process.exit(1);
+      }
     }
     const squareClient = new SquareClient({
       version: '2025-07-16',
@@ -132,19 +135,21 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
       environment: SquareEnvironment.Sandbox,
     });
     console.log('[SERVER] Verifying connection to Square servers...');
-    try {
-        await new Promise((resolve, reject) => {
-            dns.lookup('connect.squareup.com', (err) => {
-                if (err) return reject(err);
-                resolve();
+    if (process.env.NODE_ENV !== 'test') {
+        try {
+            await new Promise((resolve, reject) => {
+                dns.lookup('connect.squareup.com', (err) => {
+                    if (err) return reject(err);
+                    resolve();
+                });
             });
-        });
-        console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
-    } catch (error) {
-        console.error('❌ [FATAL] Could not resolve Square API domain.');
-        console.error('   This is likely a network, DNS, or firewall issue on the server.');
-        console.error('   Full Error:', error.message);
-        process.exit(1);
+            console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
+        } catch (error) {
+            console.error('❌ [FATAL] Could not resolve Square API domain.');
+            console.error('   This is likely a network, DNS, or firewall issue on the server.');
+            console.error('   Full Error:', error.message);
+            process.exit(1);
+        }
     }
     console.log('[SERVER] Square client initialized.');
   // --- NEW: Local Sanity Check for API properties ---
@@ -201,16 +206,16 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-    if (process.env.NODE_ENV !== 'test') {
-        app.use(csrf({ cookie: true }));
-        app.use(function (err, req, res, next) {
-          if (err.code !== 'EBADCSRFTOKEN') return next(err)
+    // Enable CSRF protection for all environments, including test.
+    // The tests are written to handle CSRF, so this should be enabled.
+    app.use(csrf({ cookie: true }));
+    app.use(function (err, req, res, next) {
+      if (err.code !== 'EBADCSRFTOKEN') return next(err)
 
-          // handle CSRF token errors here
-          res.status(403)
-          res.send('form tampered with')
-        })
-    }
+      // handle CSRF token errors here
+      console.error('CSRF Token Error:', err);
+      res.status(403).json({ error: 'Invalid CSRF token. Form tampered with.' });
+    })
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
@@ -883,9 +888,9 @@ ${statusChecklist}
 
     // Sign the initial token and re-sign periodically
     signInstanceToken();
-    setInterval(signInstanceToken, 30 * 60 * 1000); // Re-sign every 30 minutes
+    const tokenRotationTimer = setInterval(signInstanceToken, 30 * 60 * 1000); // Re-sign every 30 minutes
     
-    return app;
+    return { app, tokenRotationTimer };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');

@@ -9,11 +9,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let app;
+let tokenRotationTimer;
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
-  // Initialize the app with the test database path
-  app = await startServer(testDbPath);
+  // Initialize the app with a null bot and the test database path
+  const server = await startServer(null, null, testDbPath);
+  app = server.app;
+  tokenRotationTimer = server.tokenRotationTimer;
 });
 
 beforeEach(async () => {
@@ -22,7 +25,8 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  // Clean up the test database file
+  // Clean up the test database file and clear the timer
+  clearInterval(tokenRotationTimer);
   await fs.unlink(testDbPath);
 });
 

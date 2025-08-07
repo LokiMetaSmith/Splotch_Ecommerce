@@ -12,9 +12,13 @@ let db;
 function initializeBot(database) {
   db = database;
   if (token) {
-    // Create a bot that uses 'polling' to fetch new updates
-    bot = new TelegramBot(token, { polling: true });
-    console.log('Telegram bot is running...');
+    const isTestEnv = process.env.NODE_ENV === 'test';
+    // Create a bot that uses 'polling' to fetch new updates, but disable it for tests.
+    bot = new TelegramBot(token, { polling: !isTestEnv });
+
+    if (!isTestEnv) {
+      console.log('Telegram bot is running...');
+    }
 
     const commands = [
       {
