@@ -13,13 +13,13 @@ This document tracks the features and bug fixes that need to be implemented for 
 
 ## Telegram Bot
 
-- [ ] **Delete "Order Stalled" Message:** When an order's status changes from "Stalled", the corresponding notification message in the Telegram chat should be deleted.
-- [ ] **Delete Order Images on Completion:** When an order is marked as "Completed", the associated images posted in the Telegram chat should be deleted.
-- [ ] **Expanded Menu Functions:** Add more menu functions to the bot to list orders by specific statuses:
-    - [ ] List New Orders
-    - [ ] List In-Process Orders
-    - [ ] List Shipped Orders
-    - [ ] List Canceled Orders
+- [x] **Delete "Order Stalled" Message:** When an order's status changes from "Stalled", the corresponding notification message in the Telegram chat should be deleted.
+- [x] **Delete Order Images on Completion:** When an order is marked as "Completed", the associated images posted in the Telegram chat should be deleted.
+- [x] **Expanded Menu Functions:** Add more menu functions to the bot to list orders by specific statuses:
+    - [x] List New Orders
+    - [x] List In-Process Orders
+    - [x] List Shipped Orders
+    - [x] List Canceled Orders
     - [ ] List Delivered Orders
 
 ## SVG, Pricing, and Customer Workflow
