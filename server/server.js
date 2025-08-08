@@ -55,8 +55,6 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     process.env.GOOGLE_CLIENT_SECRET,
     `http://localhost:3000/oauth2callback`
   );
-
-   db = await JSONFilePreset(dbPath, defaultData);
   
   async function logAndEmailError(error, context = 'General Error') {
     console.error(`[${context}]`, error);
