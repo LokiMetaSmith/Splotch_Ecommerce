@@ -19,7 +19,7 @@ let currentBounds = null;
 let pricingConfig = null;
 
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
-let stickerMaterialSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
+let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, startCropBtnEl, grayscaleBtnEl, sepiaBtnEl;
 
@@ -48,6 +48,7 @@ async function BootStrap() {
     addTextBtn = document.getElementById('addTextBtn');
     textFontFamilySelect = document.getElementById('textFontFamily');
     stickerMaterialSelect = document.getElementById('stickerMaterial');
+    stickerResolutionSelect = document.getElementById('stickerResolution');
     designMarginNote = document.getElementById('designMarginNote');
     stickerQuantityInput = document.getElementById('stickerQuantity');
     calculatedPriceDisplay = document.getElementById('calculatedPriceDisplay');
@@ -93,6 +94,9 @@ async function BootStrap() {
     }
     if (stickerMaterialSelect) {
         stickerMaterialSelect.addEventListener('change', calculateAndUpdatePrice);
+    }
+    if (stickerResolutionSelect) {
+        stickerResolutionSelect.addEventListener('change', calculateAndUpdatePrice);
     }
     if (addTextBtn) {
         addTextBtn.addEventListener('click', handleAddText);
@@ -199,15 +203,16 @@ function calculatePerimeter(polygons) {
     return totalPerimeter;
 }
 
-function calculateStickerPrice(quantity, material, bounds, cutline) {
+function calculateStickerPrice(quantity, material, bounds, cutline, resolution) {
     if (!pricingConfig) {
         console.error("Pricing config not loaded.");
-        return 0;
+        return { total: 0, complexityMultiplier: 1.0 };
     }
-    if (quantity <= 0) return 0;
-    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return 0;
+    if (quantity <= 0) return { total: 0, complexityMultiplier: 1.0 };
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return { total: 0, complexityMultiplier: 1.0 };
+    if (!resolution) return { total: 0, complexityMultiplier: 1.0 };
 
-    const ppi = pricingConfig.pixelsPerInch;
+    const ppi = resolution.ppi;
     const squareInches = (bounds.width / ppi) * (bounds.height / ppi);
 
     const basePriceCents = squareInches * pricingConfig.pricePerSquareInchCents;
@@ -239,7 +244,8 @@ function calculateStickerPrice(quantity, material, bounds, cutline) {
         }
     }
 
-    const totalCents = basePriceCents * quantity * materialMultiplier * complexityMultiplier;
+    const resolutionMultiplier = resolution.costMultiplier;
+    const totalCents = basePriceCents * quantity * materialMultiplier * complexityMultiplier * resolutionMultiplier;
     const discountedTotal = totalCents * (1 - discount);
 
     return {
@@ -250,11 +256,14 @@ function calculateStickerPrice(quantity, material, bounds, cutline) {
 
 
 function calculateAndUpdatePrice() {
-    if (!pricingConfig || !stickerQuantityInput || !calculatedPriceDisplay) {
+    if (!pricingConfig || !stickerQuantityInput || !calculatedPriceDisplay || !stickerResolutionSelect) {
         return;
     }
 
-    const selectedMaterial = stickerMaterialSelect ? stickerMaterialSelect.value : 'pp_standard';
+    const selectedMaterial = stickerMaterialSelect.value;
+    const selectedResolutionId = stickerResolutionSelect.value;
+    const selectedResolution = pricingConfig.resolutions.find(r => r.id === selectedResolutionId);
+
     const quantity = parseInt(stickerQuantityInput.value, 10);
     const bounds = currentBounds;
     const cutline = currentCutline;
@@ -265,16 +274,16 @@ function calculateAndUpdatePrice() {
         return;
     }
 
-    if (!bounds || !cutline) {
+    if (!bounds || !cutline || !selectedResolution) {
         currentOrderAmountCents = 0;
         calculatedPriceDisplay.innerHTML = `Price: <span class="text-gray-500">---</span>`;
         return;
     }
 
-    const priceResult = calculateStickerPrice(quantity, selectedMaterial, bounds, cutline);
+    const priceResult = calculateStickerPrice(quantity, selectedMaterial, bounds, cutline, selectedResolution);
     currentOrderAmountCents = priceResult.total;
 
-    const ppi = pricingConfig.pixelsPerInch;
+    const ppi = selectedResolution.ppi;
     const widthInches = (bounds.width / ppi).toFixed(2);
     const heightInches = (bounds.height / ppi).toFixed(2);
 
@@ -317,6 +326,19 @@ async function tokenize(paymentMethod, verificationDetails) {
 }
 
 // --- Config Fetching ---
+function populateResolutionDropdown() {
+    if (!pricingConfig || !stickerResolutionSelect) return;
+    stickerResolutionSelect.innerHTML = ''; // Clear existing options
+    pricingConfig.resolutions.forEach(res => {
+        const option = document.createElement('option');
+        option.value = res.id;
+        option.textContent = res.name;
+        stickerResolutionSelect.appendChild(option);
+    });
+    // Set a default selection
+    stickerResolutionSelect.value = 'dpi_300';
+}
+
 async function fetchPricingInfo() {
     try {
         const response = await fetch(`${serverUrl}/api/pricing-info`);
@@ -325,6 +347,8 @@ async function fetchPricingInfo() {
         }
         pricingConfig = await response.json();
         console.log('[CLIENT] Pricing config loaded:', pricingConfig);
+        // Once config is loaded, populate the dropdown
+        populateResolutionDropdown();
     } catch (error) {
         console.error('[CLIENT] Error fetching pricing info:', error);
         showPaymentStatus('Could not load pricing information. Please refresh.', 'error');
