@@ -27,11 +27,11 @@ This document tracks the features and bug fixes that need to be implemented for 
 - [x] **SVG Cut Path Generation:**
     - [x] Fix the existing SVG edge cut outline tool.
     - [x] Automatically generate a cut path when a customer uploads an image.
-- [ ] **Square Inch Pricing:**
-    - [ ] Move the pricing model to be based on the square inch bounding box of the sticker.
-    - [ ] Adjust the price based on the complexity or length of the generated/provided cut path.
-- [ ] **Visual Bounding Box:**
-    - [ ] Allow the customer to see the calculated bounding box when they are scaling their uploaded image.
+- [x] **Square Inch Pricing:**
+    - [x] Move the pricing model to be based on the square inch bounding box of the sticker.
+    - [x] Adjust the price based on the complexity or length of the generated/provided cut path.
+- [x] **Visual Bounding Box:**
+    - [x] Allow the customer to see the calculated bounding box when they are scaling their uploaded image.
 
 ## Authentication
 

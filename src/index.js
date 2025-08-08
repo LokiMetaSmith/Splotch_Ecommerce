@@ -212,7 +212,9 @@ function calculateStickerPrice(quantity, material, bounds, cutline) {
     const perimeterPixels = calculatePerimeter(cutline);
     const perimeterInches = perimeterPixels / ppi;
     let complexityMultiplier = 1.0;
-    for (const tier of pricingConfig.complexity.tiers) {
+    // Sort tiers ascending to find the first one the perimeter is less than.
+    const sortedTiers = [...pricingConfig.complexity.tiers].sort((a,b) => (a.thresholdInches === 'Infinity' ? 1 : b.thresholdInches === 'Infinity' ? -1 : a.thresholdInches - b.thresholdInches));
+    for (const tier of sortedTiers) {
         if (tier.thresholdInches === "Infinity" || perimeterInches < tier.thresholdInches) {
             complexityMultiplier = tier.multiplier;
             break;
