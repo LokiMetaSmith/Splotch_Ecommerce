@@ -591,6 +591,19 @@ function loadFileAsImage(file) {
                     canvas.height = newHeight;
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+
+                    // For raster images, the bounds and cutline are the canvas itself.
+                    currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
+                    currentCutline = [[
+                        { x: 0, y: 0 },
+                        { x: newWidth, y: 0 },
+                        { x: newWidth, y: newHeight },
+                        { x: 0, y: newHeight }
+                    ]];
+                    currentPolygons = []; // Clear any previous SVG data
+
+                    // Update the price now that we have dimensions
+                    calculateAndUpdatePrice();
                 }
             };
             img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
