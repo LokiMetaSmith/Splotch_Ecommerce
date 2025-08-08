@@ -12,6 +12,7 @@ let originalImage = null;
 let canvas, ctx;
 
 // Globals for SVG processing state
+let basePolygons = []; // The original, unscaled polygons from the SVG
 let currentPolygons = [];
 let currentCutline = [];
 let currentBounds = null;
@@ -58,8 +59,8 @@ async function BootStrap() {
 
     rotateLeftBtnEl = document.getElementById('rotateLeftBtn');
     rotateRightBtnEl = document.getElementById('rotateRightBtn');
-    resizeInputEl = document.getElementById('resizeInput');
-    resizeBtnEl = document.getElementById('resizeBtn');
+    const resizeSliderEl = document.getElementById('resizeSlider');
+    const resizeValueEl = document.getElementById('resizeValue');
     startCropBtnEl = document.getElementById('startCropBtn');
     grayscaleBtnEl = document.getElementById('grayscaleBtn');
     sepiaBtnEl = document.getElementById('sepiaBtn');
@@ -100,7 +101,12 @@ async function BootStrap() {
     if (rotateRightBtnEl) rotateRightBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(90));
     if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', applyGrayscaleFilter);
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', applySepiaFilter);
-    if (resizeBtnEl) resizeBtnEl.addEventListener('click', handleResize);
+    if (resizeSliderEl) {
+        resizeSliderEl.addEventListener('input', () => {
+            if(resizeValueEl) resizeValueEl.textContent = `${resizeSliderEl.value}%`;
+        });
+        resizeSliderEl.addEventListener('change', () => handleResize(resizeSliderEl.value));
+    }
     if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
     if(generateCutlineBtn) generateCutlineBtn.addEventListener('click', handleGenerateCutline);
@@ -673,6 +679,7 @@ function handleSvgUpload(svgText) {
         const cutline = generateCutLine(polygons, 10); // 10px offset
 
         // Store the results globally
+        basePolygons = polygons; // Store the original, unscaled polygons
         currentPolygons = polygons;
         currentCutline = cutline;
         // Calculate the bounds of the final cutline for pricing and display
@@ -732,8 +739,10 @@ function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke =
 
         if (stroke) {
             ctx.strokeStyle = style;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]); // Make the cutline dashed
             ctx.stroke();
+            ctx.setLineDash([]); // Reset for other drawing operations
         } else {
             ctx.fillStyle = style;
             ctx.fill();
@@ -742,11 +751,15 @@ function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke =
 }
 
 function drawBoundingBox(bounds, style, offset = { x: 0, y: 0 }) {
-    if (!ctx || !bounds) return;
+    if (!ctx || !bounds || !pricingConfig) return;
 
-    ctx.strokeStyle = style;
+    const ppi = pricingConfig.pixelsPerInch;
+    const inchDash = ppi; // 1 inch dash
+    const inchGap = ppi / 4; // 1/4 inch gap
+
+    ctx.strokeStyle = '#808080'; // Grey color
     ctx.lineWidth = 1;
-    ctx.setLineDash([5, 5]); // Dashed line
+    ctx.setLineDash([inchDash, inchGap]);
     ctx.strokeRect(
         bounds.left + offset.x,
         bounds.top + offset.y,
@@ -847,17 +860,14 @@ function applySepiaFilter() {
     ctx.putImageData(imageData, 0, 0);
 }
 
-function handleResize() {
-    const percentageText = resizeInputEl.value;
-    if (!percentageText.endsWith('%')) return;
-    const percentage = parseFloat(percentageText.replace('%', ''));
+function handleResize(percentage) {
     if (isNaN(percentage) || percentage <= 0) return;
 
     const scale = percentage / 100;
 
-    if (currentPolygons.length > 0) {
-        // SVG Vector Resizing
-        currentPolygons = currentPolygons.map(poly =>
+    if (basePolygons.length > 0) {
+        // SVG Vector Resizing - always scale from the original
+        currentPolygons = basePolygons.map(poly =>
             poly.map(point => ({ x: point.x * scale, y: point.y * scale }))
         );
         redrawAll();
@@ -899,6 +909,9 @@ function handleGenerateCutline() {
     if (!canvas || !ctx) return;
     showPaymentStatus('Generating smart cutline...', 'info');
 
+    // Save the current canvas state so we can restore it if tracing fails.
+    const originalCanvasData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
     // Use a timeout to allow the UI to update before the heavy computation
     setTimeout(() => {
         try {
@@ -917,11 +930,14 @@ function handleGenerateCutline() {
                 throw new Error("Could not detect a usable outline. Try an image with a transparent background.");
             }
 
-            currentPolygons = [simplifiedContour];
+            basePolygons = [simplifiedContour]; // Store the original
+            currentPolygons = basePolygons; // Start with 100% scale
             redrawAll();
             showPaymentStatus('Smart cutline generated successfully.', 'success');
 
         } catch (error) {
+            // Restore the original canvas if the process failed
+            ctx.putImageData(originalCanvasData, 0, 0);
             showPaymentStatus(`Error: ${error.message}`, 'error');
             console.error(error);
         }

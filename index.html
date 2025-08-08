@@ -51,8 +51,10 @@
         <div id="editing-controls" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50">
             <button id="rotateLeftBtn" title="Rotate Left 90°">Rotate Left</button>
             <button id="rotateRightBtn" title="Rotate Right 90°">Rotate Right</button>
-            <input type="text" id="resizeInput" placeholder="e.g., 50%" title="Enter resize percentage (e.g., 50%)">
-            <button id="resizeBtn" title="Apply Resize">Apply Resize</button>
+            <div class="flex flex-col">
+                <label for="resizeSlider" class="text-sm text-center">Scale: <span id="resizeValue">100%</span></label>
+                <input type="range" id="resizeSlider" min="10" max="200" value="100" class="w-full">
+            </div>
             <button id="startCropBtn" title="Crop to Center 50%">Crop (Center 50%)</button>
             <button id="grayscaleBtn" title="Apply Grayscale Filter">Grayscale</button>
             <button id="sepiaBtn" title="Apply Sepia Filter">Sepia</button>
