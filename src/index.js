@@ -11,6 +11,11 @@ let payments, card, csrfToken;
 let originalImage = null;
 let canvas, ctx;
 
+// Globals for SVG processing state
+let currentPolygons = [];
+let currentCutline = [];
+let currentBounds = null;
+
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
 let stickerMaterialSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
@@ -503,6 +508,33 @@ function loadFileAsImage(file) {
     }
 }
 
+function redrawAll() {
+    if (currentPolygons.length === 0) {
+        // Handle raster image redrawing if necessary (or do nothing if canvas is source of truth)
+        return;
+    }
+
+    // Generate the cutline from the current state of the polygons
+    const cutline = generateCutLine(currentPolygons, 10); // 10px offset
+
+    // Store the results globally
+    currentCutline = cutline;
+    currentBounds = ClipperLib.JS.BoundsOfPaths(cutline);
+
+    // Set canvas size based on the final cutline bounds
+    canvas.width = currentBounds.right - currentBounds.left + 40; // Add padding
+    canvas.height = currentBounds.bottom - currentBounds.top + 40;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Create an offset for drawing, so the shape isn't at the very edge
+    const drawOffset = { x: -currentBounds.left + 20, y: -currentBounds.top + 20 };
+
+    // Draw everything
+    drawPolygonsToCanvas(currentPolygons, 'black', drawOffset);
+    drawPolygonsToCanvas(currentCutline, 'red', drawOffset, true);
+    drawBoundingBox(currentBounds, 'blue', drawOffset);
+}
+
 function handleSvgUpload(svgText) {
     const parser = new SVGParser();
     try {
@@ -524,19 +556,24 @@ function handleSvgUpload(svgText) {
             throw new Error("No parsable shapes found in the SVG.");
         }
 
-        // For now, let's just generate a cutline and draw it
+        // Generate the cutline
         const cutline = generateCutLine(polygons, 10); // 10px offset
 
-        // Find bounds to set canvas size
-        const bounds = ClipperLib.JS.BoundsOfPaths(polygons);
-        canvas.width = bounds.right - bounds.left + 40; // Add some padding
-        canvas.height = bounds.bottom - bounds.top + 40;
+        // Store the results globally
+        currentPolygons = polygons;
+        currentCutline = cutline;
+        // Calculate the bounds of the final cutline for pricing and display
+        currentBounds = ClipperLib.JS.BoundsOfPaths(cutline);
+
+        // Set canvas size based on the final cutline bounds
+        canvas.width = currentBounds.right - currentBounds.left + 40; // Add padding
+        canvas.height = currentBounds.bottom - currentBounds.top + 40;
 
         // Create an offset for drawing, so the shape isn't at the very edge
-        const drawOffset = { x: -bounds.left + 20, y: -bounds.top + 20 };
+        const drawOffset = { x: -currentBounds.left + 20, y: -currentBounds.top + 20 };
 
-        drawPolygonsToCanvas(polygons, 'black', drawOffset);
-        drawPolygonsToCanvas(cutline, 'red', drawOffset, true); // Draw cutline as stroke
+        // Initial drawing
+        redrawAll();
 
         showPaymentStatus('SVG processed and cutline generated.', 'success');
         updateEditingButtonsState(false); // Enable editing buttons
@@ -591,6 +628,21 @@ function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke =
     });
 }
 
+function drawBoundingBox(bounds, style, offset = { x: 0, y: 0 }) {
+    if (!ctx || !bounds) return;
+
+    ctx.strokeStyle = style;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]); // Dashed line
+    ctx.strokeRect(
+        bounds.left + offset.x,
+        bounds.top + offset.y,
+        bounds.right - bounds.left,
+        bounds.bottom - bounds.top
+    );
+    ctx.setLineDash([]); // Reset to solid line
+}
+
 function handleAddText() {
     if (!canvas || !ctx || !originalImage) {
         showPaymentStatus('Please load an image before adding text.', 'error');
@@ -613,24 +665,49 @@ function handleAddText() {
 }
 
 function rotateCanvasContentFixedBounds(angleDegrees) {
-    if (!canvas || !ctx || !originalImage) return;
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
-    const currentDataUrl = canvas.toDataURL();
-    const imgToRotate = new Image();
-    imgToRotate.onload = () => {
-        const w = canvas.width, h = canvas.height;
-        const newW = (angleDegrees === 90 || angleDegrees === -90) ? h : w;
-        const newH = (angleDegrees === 90 || angleDegrees === -90) ? w : h;
-        tempCanvas.width = newW; tempCanvas.height = newH;
-        tempCtx.translate(newW / 2, newH / 2);
-        tempCtx.rotate(angleDegrees * Math.PI / 180);
-        tempCtx.drawImage(imgToRotate, -w / 2, -h / 2, w, h);
-        canvas.width = newW; canvas.height = newH;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(tempCanvas, 0, 0);
-    };
-    imgToRotate.src = currentDataUrl;
+    if (currentPolygons.length > 0) {
+        // SVG Vector Rotation
+        const bounds = ClipperLib.JS.BoundsOfPaths(currentPolygons);
+        const centerX = bounds.left + (bounds.right - bounds.left) / 2;
+        const centerY = bounds.top + (bounds.bottom - bounds.top) / 2;
+        const angleRad = angleDegrees * Math.PI / 180;
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+
+        currentPolygons = currentPolygons.map(poly =>
+            poly.map(point => {
+                // Translate point to origin
+                const translatedX = point.x - centerX;
+                const translatedY = point.y - centerY;
+                // Rotate point
+                const rotatedX = translatedX * cos - translatedY * sin;
+                const rotatedY = translatedX * sin + translatedY * cos;
+                // Translate point back
+                return { x: rotatedX + centerX, y: rotatedY + centerY };
+            })
+        );
+        redrawAll();
+
+    } else if (originalImage) {
+        // Raster Image Rotation
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        const currentDataUrl = canvas.toDataURL();
+        const imgToRotate = new Image();
+        imgToRotate.onload = () => {
+            const w = canvas.width, h = canvas.height;
+            const newW = (angleDegrees === 90 || angleDegrees === -90) ? h : w;
+            const newH = (angleDegrees === 90 || angleDegrees === -90) ? w : h;
+            tempCanvas.width = newW; tempCanvas.height = newH;
+            tempCtx.translate(newW / 2, newH / 2);
+            tempCtx.rotate(angleDegrees * Math.PI / 180);
+            tempCtx.drawImage(imgToRotate, -w / 2, -h / 2, w, h);
+            canvas.width = newW; canvas.height = newH;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(tempCanvas, 0, 0);
+        };
+        imgToRotate.src = currentDataUrl;
+    }
 }
 
 function applyGrayscaleFilter() {
@@ -658,22 +735,33 @@ function applySepiaFilter() {
 }
 
 function handleResize() {
-    if (!canvas || !ctx || !originalImage) return;
-    const currentCanvasDataUrl = canvas.toDataURL();
-    const imgToResize = new Image();
-    imgToResize.onload = () => {
-        const percentageText = resizeInputEl.value;
-        if (!percentageText.endsWith('%')) return;
-        const percentage = parseFloat(percentageText.replace('%', ''));
-        if (isNaN(percentage) || percentage <= 0) return;
-        const newWidth = imgToResize.width * (percentage / 100);
-        const newHeight = imgToResize.height * (percentage / 100);
-        canvas.width = newWidth; canvas.height = newHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(imgToResize, 0, 0, newWidth, newHeight);
-        if (resizeInputEl) resizeInputEl.value = '';
-    };
-    imgToResize.src = currentCanvasDataUrl;
+    const percentageText = resizeInputEl.value;
+    if (!percentageText.endsWith('%')) return;
+    const percentage = parseFloat(percentageText.replace('%', ''));
+    if (isNaN(percentage) || percentage <= 0) return;
+
+    const scale = percentage / 100;
+
+    if (currentPolygons.length > 0) {
+        // SVG Vector Resizing
+        currentPolygons = currentPolygons.map(poly =>
+            poly.map(point => ({ x: point.x * scale, y: point.y * scale }))
+        );
+        redrawAll();
+    } else if (originalImage) {
+        // Raster Image Resizing
+        const currentCanvasDataUrl = canvas.toDataURL();
+        const imgToResize = new Image();
+        imgToResize.onload = () => {
+            const newWidth = imgToResize.width * scale;
+            const newHeight = imgToResize.height * scale;
+            canvas.width = newWidth; canvas.height = newHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(imgToResize, 0, 0, newWidth, newHeight);
+        };
+        imgToResize.src = currentCanvasDataUrl;
+    }
+    if (resizeInputEl) resizeInputEl.value = '';
 }
 
 function handleCrop() {
