@@ -10,6 +10,7 @@ import * as jose from 'jose';
 const serverUrl = 'http://localhost:3000';
 let authToken = localStorage.getItem('authToken');
 let csrfToken;
+let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
 
 // --- DOM Elements ---
@@ -340,17 +341,14 @@ async function fetchAndDisplayOrders(query = '') {
     updateConnectionStatus('connecting');
     ui.noOrdersMessage.textContent = 'Loading orders...';
     ui.noOrdersMessage.style.display = 'block';
-    ui.ordersList.innerHTML = '';
 
     try {
         const endpoint = query ? `${serverUrl}/api/orders/search?q=${encodeURIComponent(query)}` : `${serverUrl}/api/orders`;
-        const orders = await fetchWithAuth(endpoint);
-        if (orders.length === 0) {
-            ui.noOrdersMessage.textContent = 'No orders found.';
-        } else {
-            ui.noOrdersMessage.style.display = 'none';
-            orders.forEach(displayOrder);
-        }
+        allOrders = await fetchWithAuth(endpoint);
+        // After fetching, display with the current filter (defaults to ALL)
+        const activeFilter = document.querySelector('#filter-container .filter-btn.active')?.dataset.status || 'ALL';
+        filterAndDisplayOrders(activeFilter);
+
         updateConnectionStatus('connected');
     } catch (error) {
         console.error('[SHOP] Error fetching orders:', error);
@@ -361,6 +359,26 @@ async function fetchAndDisplayOrders(query = '') {
         }
     } finally {
         hideLoadingIndicator();
+    }
+}
+
+/**
+ * Filters the global `allOrders` array and renders the matching orders.
+ * @param {string} status - The status to filter by (e.g., 'NEW', 'ALL').
+ */
+function filterAndDisplayOrders(status) {
+    ui.ordersList.innerHTML = ''; // Clear the current list
+
+    const ordersToDisplay = (status === 'ALL')
+        ? allOrders
+        : allOrders.filter(order => order.status === status);
+
+    if (ordersToDisplay.length === 0) {
+        ui.noOrdersMessage.textContent = `No orders found with status: ${status}.`;
+        ui.noOrdersMessage.style.display = 'block';
+    } else {
+        ui.noOrdersMessage.style.display = 'none';
+        ordersToDisplay.forEach(displayOrder);
     }
 }
 
@@ -406,6 +424,8 @@ function displayOrder(order) {
             <button class="action-btn" data-order-id="${order.orderId}" data-status="ACCEPTED">Accept</button>
             <button class="action-btn" data-order-id="${order.orderId}" data-status="PRINTING">Print</button>
             <button class="action-btn" data-order-id="${order.orderId}" data-status="SHIPPED">Ship</button>
+            <button class="action-btn" data-order-id="${order.orderId}" data-status="DELIVERED">Deliver</button>
+            <button class="action-btn" data-order-id="${order.orderId}" data-status="COMPLETED">Complete</button>
             <button class="action-btn" data-order-id="${order.orderId}" data-status="CANCELED">Cancel</button>
         </div>`);
 
@@ -641,6 +661,20 @@ async function init() {
 
     // The main login button opens the modal
     ui.loginBtn?.addEventListener('click', showLoginModal);
+
+    // Filter button logic
+    const filterContainer = document.getElementById('filter-container');
+    filterContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('filter-btn')) {
+            // Remove active class from all buttons
+            filterContainer.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            // Add active class to the clicked button
+            e.target.classList.add('active');
+            // Actually filter the orders
+            const status = e.target.dataset.status;
+            filterAndDisplayOrders(status);
+        }
+    });
 
     // Check for a token in the URL from OAuth redirect
     const urlParams = new URLSearchParams(window.location.search);
