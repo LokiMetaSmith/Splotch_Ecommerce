@@ -94,8 +94,7 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     }
 
     // --- Database Setup ---
-    db = await JSONFilePreset(dbPath, defaultData);
-    console.log('[SERVER] LowDB database initialized at:', dbPath);
+    console.log('[SERVER] Using LowDB database at:', dbPath);
 
     // Load the refresh token from the database if it exists
     if (db.data.config?.google_refresh_token) {
