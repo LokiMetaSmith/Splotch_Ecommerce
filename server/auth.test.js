@@ -16,8 +16,10 @@ const testDbPath = path.join(__dirname, 'test-db.json');
 beforeAll(async () => {
   // Create a single db instance for the test suite
   db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
-  // Initialize the app with the test database instance
-  const server = await startServer(db, null, testDbPath);
+  // Create a mock sendEmail function
+  const mockSendEmail = jest.fn();
+  // Initialize the app with the test database instance and mock emailer
+  const server = await startServer(db, null, mockSendEmail, testDbPath);
   app = server.app;
   tokenRotationTimer = server.tokenRotationTimer;
 });

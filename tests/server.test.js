@@ -20,8 +20,10 @@ describe('Server', () => {
         // Create a single db instance for the test suite
         db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
         bot = initializeBot(db);
-        // Initialize the app with the test database instance
-        const server = await startServer(db, bot, testDbPath);
+        // Create a mock sendEmail function
+        const mockSendEmail = jest.fn();
+        // Initialize the app with the test database instance and mock emailer
+        const server = await startServer(db, bot, mockSendEmail, testDbPath);
         app = server.app;
         tokenRotationTimer = server.tokenRotationTimer;
     });

@@ -18,7 +18,7 @@ import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import { google } from 'googleapis';
-import { sendEmail } from './email.js';
+// No longer import sendEmail here, it will be injected.
 import { getCurrentSigningKey, getJwks } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { fileTypeFromFile } from 'file-type';
@@ -48,7 +48,7 @@ let app;
 const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
 
 // Define an async function to contain all server logic
-async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
+async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,

@@ -1,5 +1,6 @@
 import { startServer } from './server.js';
 import { initializeBot } from './bot.js';
+import { sendEmail } from './email.js';
 import { JSONFilePreset } from 'lowdb/node';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -54,7 +55,7 @@ async function main() {
     }
 
     const bot = initializeBot(db);
-    const app = await startServer(db, bot);
+    const { app } = await startServer(db, bot, sendEmail);
 
   const port = process.env.PORT || 3000;
 
