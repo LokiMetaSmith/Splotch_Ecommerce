@@ -284,12 +284,15 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         const designImageFile = req.files.designImage[0];
         const fileType = await fileTypeFromFile(designImageFile.path);
 
-        if (!fileType || fileType.ext !== 'svg') {
+        const allowedExtensions = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
+
+        if (!fileType || !allowedExtensions.includes(fileType.ext)) {
             // It's good practice to remove the invalid file
             fs.unlink(designImageFile.path, (err) => {
                 if (err) console.error("Error deleting invalid file:", err);
             });
-            return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the design image.' });
+            const allowedTypes = allowedExtensions.join(', ');
+            return res.status(400).json({ error: `Invalid file type. Allowed types are: ${allowedTypes}` });
         }
 
         const designImagePath = `/uploads/${designImageFile.filename}`;
