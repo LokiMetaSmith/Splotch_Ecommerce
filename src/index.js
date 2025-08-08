@@ -102,6 +102,8 @@ async function BootStrap() {
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', applySepiaFilter);
     if (resizeBtnEl) resizeBtnEl.addEventListener('click', handleResize);
     if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
+    const generateCutlineBtn = document.getElementById('generateCutlineBtn');
+    if(generateCutlineBtn) generateCutlineBtn.addEventListener('click', handleGenerateCutline);
     if (fileInputGlobalRef) {
         fileInputGlobalRef.addEventListener('change', handleFileChange);
     }
@@ -889,4 +891,148 @@ function handleCrop() {
         ctx.drawImage(imgToCrop, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
     };
     imgToCrop.src = currentCanvasDataUrl;
+}
+
+// --- Smart Cutline Generation ---
+
+function handleGenerateCutline() {
+    if (!canvas || !ctx) return;
+    showPaymentStatus('Generating smart cutline...', 'info');
+
+    // Use a timeout to allow the UI to update before the heavy computation
+    setTimeout(() => {
+        try {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const contour = traceContour(imageData);
+
+            if (!contour || contour.length < 3) {
+                throw new Error("Could not find a distinct contour. Image may be empty or too complex.");
+            }
+
+            // The raw contour is too detailed, simplify it using the RDP algorithm.
+            const simplifiedContour = simplifyPolygon(contour, 2.0); // Epsilon of 2.0 pixels
+
+            currentPolygons = [simplifiedContour];
+            redrawAll();
+            showPaymentStatus('Smart cutline generated successfully.', 'success');
+
+        } catch (error) {
+            showPaymentStatus(`Error: ${error.message}`, 'error');
+            console.error(error);
+        }
+    }, 50);
+}
+
+function traceContour(imageData) {
+    const { data, width, height } = imageData;
+    const isOpaque = (x, y) => {
+        if (x < 0 || x >= width || y < 0 || y >= height) return false;
+        // Alpha channel is the 4th component (R,G,B,A)
+        // A threshold of 128 is used to treat semi-transparent pixels as opaque
+        return data[(y * width + x) * 4 + 3] > 128;
+    };
+
+    // 1. Find the first non-transparent pixel
+    let startPos = null;
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            if (isOpaque(x, y)) {
+                startPos = { x, y };
+                break;
+            }
+        }
+        if (startPos) break;
+    }
+
+    if (!startPos) {
+        return null; // No opaque pixels found
+    }
+
+    const contour = [];
+    let currentPos = startPos;
+    let lastDirection = 6; // Start by checking the pixel to the left
+
+    // Moore-Neighbor tracing algorithm
+    const neighbors = [
+        { x: 1, y: 0 },   // 0: E
+        { x: 1, y: -1 },  // 1: NE
+        { x: 0, y: -1 },  // 2: N
+        { x: -1, y: -1 }, // 3: NW
+        { x: -1, y: 0 },  // 4: W
+        { x: -1, y: 1 },  // 5: SW
+        { x: 0, y: 1 },   // 6: S
+        { x: 1, y: 1 },   // 7: SE
+    ];
+
+    do {
+        contour.push({ x: currentPos.x, y: currentPos.y });
+
+        // Start checking neighbors from the one after the direction we came from
+        let checkDirection = (lastDirection + 5) % 8;
+        let nextPos = null;
+        let foundNext = false;
+
+        for (let i = 0; i < 8; i++) {
+            const neighborOffset = neighbors[checkDirection];
+            const neighborPos = { x: currentPos.x + neighborOffset.x, y: currentPos.y + neighborOffset.y };
+
+            if (isOpaque(neighborPos.x, neighborPos.y)) {
+                nextPos = neighborPos;
+                lastDirection = checkDirection;
+                foundNext = true;
+                break;
+            }
+            checkDirection = (checkDirection + 1) % 8;
+        }
+
+        if (!foundNext) {
+            // This can happen on a 1px line, we just stop.
+            break;
+        }
+
+        currentPos = nextPos;
+
+    } while (currentPos.x !== startPos.x || currentPos.y !== startPos.y);
+
+    return contour;
+}
+
+// --- Path Simplification (Ramer-Douglas-Peucker) ---
+
+function perpendicularDistance(point, lineStart, lineEnd) {
+    const dx = lineEnd.x - lineStart.x;
+    const dy = lineEnd.y - lineStart.y;
+    if (dx === 0 && dy === 0) {
+        return Math.sqrt(Math.pow(point.x - lineStart.x, 2) + Math.pow(point.y - lineStart.y, 2));
+    }
+    const numerator = Math.abs(dy * point.x - dx * point.y + lineEnd.x * lineStart.y - lineEnd.y * lineStart.x);
+    const denominator = Math.sqrt(dx * dx + dy * dy);
+    return numerator / denominator;
+}
+
+function rdp(points, epsilon) {
+    let dmax = 0;
+    let index = 0;
+    const end = points.length - 1;
+
+    for (let i = 1; i < end; i++) {
+        const d = perpendicularDistance(points[i], points[0], points[end]);
+        if (d > dmax) {
+            index = i;
+            dmax = d;
+        }
+    }
+
+    if (dmax > epsilon) {
+        const recResults1 = rdp(points.slice(0, index + 1), epsilon);
+        const recResults2 = rdp(points.slice(index, end + 1), epsilon);
+        return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
+    } else {
+        return [points[0], points[end]];
+    }
+}
+
+function simplifyPolygon(points, epsilon = 1.0) {
+    if (points.length < 3) return points;
+    return rdp(points, epsilon);
 }
