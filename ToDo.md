@@ -24,9 +24,9 @@ This document tracks the features and bug fixes that need to be implemented for 
 
 ## SVG, Pricing, and Customer Workflow
 
-- [ ] **SVG Cut Path Generation:**
-    - [ ] Fix the existing SVG edge cut outline tool.
-    - [ ] Automatically generate a cut path when a customer uploads an image.
+- [x] **SVG Cut Path Generation:**
+    - [x] Fix the existing SVG edge cut outline tool.
+    - [x] Automatically generate a cut path when a customer uploads an image.
 - [ ] **Square Inch Pricing:**
     - [ ] Move the pricing model to be based on the square inch bounding box of the sticker.
     - [ ] Adjust the price based on the complexity or length of the generated/provided cut path.
