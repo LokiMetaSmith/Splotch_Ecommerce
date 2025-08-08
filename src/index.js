@@ -1,3 +1,5 @@
+import { SVGParser } from './lib/svgparser.js';
+
 // index.js
 
 const appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
@@ -461,34 +463,132 @@ function handleFileChange(event) {
 }
 
 function loadFileAsImage(file) {
-    if (!file || !file.type.startsWith('image/')) {
-        showPaymentStatus('Invalid file type. Please select an image.', 'error');
-        return;
-    }
+    if (!file) return;
+
     if (fileNameDisplayEl) fileNameDisplayEl.textContent = file.name;
     const reader = new FileReader();
-    reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-            originalImage = img;
-            updateEditingButtonsState(false);
-            showPaymentStatus('Image loaded successfully.', 'success');
-            const maxWidth = 500, maxHeight = 400;
-            let newWidth = img.width, newHeight = img.height;
-            if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
-            if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
-            if (canvas && ctx) {
-                canvas.width = newWidth;
-                canvas.height = newHeight;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
-            }
+
+    // Handle SVGs differently from other images
+    if (file.type === 'image/svg+xml') {
+        reader.onload = (e) => {
+            handleSvgUpload(e.target.result);
         };
-        img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
-        img.src = reader.result;
-    };
-    reader.onerror = () => showPaymentStatus('Error reading file.', 'error');
-    reader.readAsDataURL(file);
+        reader.onerror = () => showPaymentStatus('Error reading SVG file.', 'error');
+        reader.readAsText(file);
+    } else if (file.type.startsWith('image/')) {
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                originalImage = img;
+                updateEditingButtonsState(false);
+                showPaymentStatus('Image loaded successfully.', 'success');
+                const maxWidth = 500, maxHeight = 400;
+                let newWidth = img.width, newHeight = img.height;
+                if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
+                if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
+                if (canvas && ctx) {
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+                }
+            };
+            img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
+            img.src = reader.result;
+        };
+        reader.onerror = () => showPaymentStatus('Error reading file.', 'error');
+        reader.readAsDataURL(file);
+    } else {
+        showPaymentStatus('Invalid file type. Please select an image or SVG file.', 'error');
+    }
+}
+
+function handleSvgUpload(svgText) {
+    const parser = new SVGParser();
+    try {
+        parser.load(svgText);
+        parser.cleanInput();
+
+        const polygons = [];
+        const elements = parser.svgRoot.querySelectorAll('path, rect, circle, ellipse, polygon, polyline');
+
+        elements.forEach(element => {
+            // polygonify will convert each shape to an array of points
+            const poly = parser.polygonify(element);
+            if (poly && poly.length > 0) {
+                polygons.push(poly);
+            }
+        });
+
+        if (polygons.length === 0) {
+            throw new Error("No parsable shapes found in the SVG.");
+        }
+
+        // For now, let's just generate a cutline and draw it
+        const cutline = generateCutLine(polygons, 10); // 10px offset
+
+        // Find bounds to set canvas size
+        const bounds = ClipperLib.JS.BoundsOfPaths(polygons);
+        canvas.width = bounds.right - bounds.left + 40; // Add some padding
+        canvas.height = bounds.bottom - bounds.top + 40;
+
+        // Create an offset for drawing, so the shape isn't at the very edge
+        const drawOffset = { x: -bounds.left + 20, y: -bounds.top + 20 };
+
+        drawPolygonsToCanvas(polygons, 'black', drawOffset);
+        drawPolygonsToCanvas(cutline, 'red', drawOffset, true); // Draw cutline as stroke
+
+        showPaymentStatus('SVG processed and cutline generated.', 'success');
+        updateEditingButtonsState(false); // Enable editing buttons
+
+    } catch (error) {
+        showPaymentStatus(`SVG Processing Error: ${error.message}`, 'error');
+        console.error(error);
+    }
+}
+
+function generateCutLine(polygons, offset) {
+    const scale = 100; // Scale for integer precision
+    const scaledPolygons = polygons.map(p => {
+        return p.map(point => ({ X: point.x * scale, Y: point.y * scale }));
+    });
+
+    const co = new ClipperLib.ClipperOffset();
+    const offsetted_paths = new ClipperLib.Paths();
+
+    co.AddPaths(scaledPolygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co.Execute(offsetted_paths, offset * scale);
+
+    // Scale back down
+    const cutline = offsetted_paths.map(p => {
+        return p.map(point => ({ x: point.X / scale, y: point.Y / scale }));
+    });
+
+    return cutline;
+}
+
+function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke = false) {
+    if (!ctx) return;
+
+    polygons.forEach(poly => {
+        if (poly.length === 0) return;
+
+        ctx.beginPath();
+        ctx.moveTo(poly[0].x + offset.x, poly[0].y + offset.y);
+        for (let i = 1; i < poly.length; i++) {
+            ctx.lineTo(poly[i].x + offset.x, poly[i].y + offset.y);
+        }
+        ctx.closePath();
+
+        if (stroke) {
+            ctx.strokeStyle = style;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        } else {
+            ctx.fillStyle = style;
+            ctx.fill();
+        }
+    });
 }
 
 function handleAddText() {
