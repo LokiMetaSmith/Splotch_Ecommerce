@@ -1,0 +1,47 @@
+{
+  "pixelsPerInch": 96,
+  "pricePerSquareInchCents": 15,
+  "materials": [
+    {
+      "id": "pp_standard",
+      "name": "Standard Polypropylene",
+      "costMultiplier": 1.0
+    },
+    {
+      "id": "pvc_laminated",
+      "name": "Laminated PVC",
+      "costMultiplier": 1.5
+    }
+  ],
+  "complexity": {
+    "description": "Multiplier based on the perimeter of the cut path.",
+    "tiers": [
+      {
+        "thresholdInches": 12,
+        "multiplier": 1.0
+      },
+      {
+        "thresholdInches": 24,
+        "multiplier": 1.1
+      },
+      {
+        "thresholdInches": "Infinity",
+        "multiplier": 1.25
+      }
+    ]
+  },
+  "quantityDiscounts": [
+    {
+      "quantity": 1,
+      "discount": 0.0
+    },
+    {
+      "quantity": 200,
+      "discount": 0.10
+    },
+    {
+      "quantity": 500,
+      "discount": 0.15
+    }
+  ]
+}

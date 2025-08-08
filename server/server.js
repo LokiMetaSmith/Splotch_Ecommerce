@@ -27,6 +27,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
+// Load pricing configuration
+let pricingConfig = {};
+try {
+    const pricingData = fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8');
+    pricingConfig = JSON.parse(pricingData);
+    console.log('[SERVER] Pricing configuration loaded.');
+} catch (error) {
+    console.error('[SERVER] FATAL: Could not load pricing.json.', error);
+    process.exit(1);
+}
+
 import { randomBytes } from 'crypto';
 
 let serverSessionToken;
@@ -245,6 +256,10 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     // Endpoint for the client's initial token fetch
     app.get('/api/server-info', (req, res) => {
         res.json({ serverSessionToken });
+    });
+
+    app.get('/api/pricing-info', (req, res) => {
+      res.json(pricingConfig);
     });
 
     app.get('/api/ping', (req, res) => {

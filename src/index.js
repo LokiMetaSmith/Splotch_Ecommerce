@@ -15,6 +15,7 @@ let canvas, ctx;
 let currentPolygons = [];
 let currentCutline = [];
 let currentBounds = null;
+let pricingConfig = null;
 
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
 let stickerMaterialSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
@@ -63,8 +64,11 @@ async function BootStrap() {
     grayscaleBtnEl = document.getElementById('grayscaleBtn');
     sepiaBtnEl = document.getElementById('sepiaBtn');
 
-    // Fetch CSRF token
-    await fetchCsrfToken();
+    // Fetch CSRF token and pricing info
+    await Promise.all([
+        fetchCsrfToken(),
+        fetchPricingInfo()
+    ]);
 
     // Initialize Square Payments SDK
     console.log(`[CLIENT] Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`);
@@ -173,31 +177,81 @@ function showAdBlockerWarning() {
 
 
 // --- Pricing Logic ---
-function calculateStickerPrice(quantity, material) {
+function calculateStickerPrice(quantity, material, bounds) {
+    if (!pricingConfig) {
+        console.error("Pricing config not loaded.");
+        return 0;
+    }
     if (quantity <= 0) return 0;
-    let pricePerStickerCents;
-    if (quantity < 50) pricePerStickerCents = 80;
-    else if (quantity < 100) pricePerStickerCents = 70;
-    else if (quantity < 250) pricePerStickerCents = 60;
-    else if (quantity < 500) pricePerStickerCents = 50;
-    else pricePerStickerCents = 40;
-    let materialMultiplier = 1.0;
-    if (material === 'pvc_laminated') materialMultiplier = 1.5;
-    return Math.round((quantity * pricePerStickerCents) * materialMultiplier);
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return 0; // Cannot price without dimensions
+
+    const ppi = pricingConfig.pixelsPerInch;
+    const squareInches = (bounds.width / ppi) * (bounds.height / ppi);
+
+    const basePriceCents = squareInches * pricingConfig.pricePerSquareInchCents;
+
+    // Get material multiplier
+    const materialInfo = pricingConfig.materials.find(m => m.id === material);
+    const materialMultiplier = materialInfo ? materialInfo.costMultiplier : 1.0;
+
+    // Get quantity discount
+    let discount = 0;
+    // Sort discounts by quantity descending to find the correct tier
+    const sortedDiscounts = [...pricingConfig.quantityDiscounts].sort((a, b) => b.quantity - a.quantity);
+    for (const tier of sortedDiscounts) {
+        if (quantity >= tier.quantity) {
+            discount = tier.discount;
+            break;
+        }
+    }
+
+    // Total price for all stickers
+    const totalCents = basePriceCents * quantity * materialMultiplier;
+    const discountedTotal = totalCents * (1 - discount);
+
+    return Math.round(discountedTotal);
 }
 
+
 function calculateAndUpdatePrice() {
-    const selectedMaterial = stickerMaterialSelect ? stickerMaterialSelect.value : 'pp_standard';
-    if (stickerQuantityInput && calculatedPriceDisplay) {
-        const quantity = parseInt(stickerQuantityInput.value, 10);
-        if (isNaN(quantity) || quantity < 0) {
-            currentOrderAmountCents = 0;
-            calculatedPriceDisplay.textContent = quantity < 0 ? "Invalid Quantity" : formatPrice(0);
-            return;
-        }
-        currentOrderAmountCents = calculateStickerPrice(quantity, selectedMaterial);
-        calculatedPriceDisplay.textContent = formatPrice(currentOrderAmountCents);
+    // This function is now the central point for all price updates.
+    if (!pricingConfig || !stickerQuantityInput || !calculatedPriceDisplay) {
+        // Don't run if the necessary components aren't ready.
+        return;
     }
+
+    const selectedMaterial = stickerMaterialSelect ? stickerMaterialSelect.value : 'pp_standard';
+    const quantity = parseInt(stickerQuantityInput.value, 10);
+
+    // Use the globally stored bounds of the cutline
+    const bounds = currentBounds;
+
+    if (isNaN(quantity) || quantity < 0) {
+        currentOrderAmountCents = 0;
+        calculatedPriceDisplay.textContent = quantity < 0 ? "Invalid Quantity" : formatPrice(0);
+        return;
+    }
+
+    if (!bounds) {
+        // If there's no image/SVG yet, we can't calculate a price.
+        // We could show a message or just default to 0.
+        currentOrderAmountCents = 0;
+        calculatedPriceDisplay.innerHTML = `Price: <span class="text-gray-500">---</span>`;
+        return;
+    }
+
+    currentOrderAmountCents = calculateStickerPrice(quantity, selectedMaterial, bounds);
+
+    const ppi = pricingConfig.pixelsPerInch;
+    const widthInches = (bounds.width / ppi).toFixed(2);
+    const heightInches = (bounds.height / ppi).toFixed(2);
+
+    calculatedPriceDisplay.innerHTML = `
+        <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
+        <span class="text-sm text-gray-600 block">
+            Size: ${widthInches}" x ${heightInches}"
+        </span>
+    `;
 }
 
 function formatPrice(amountInCents) {
@@ -227,7 +281,21 @@ async function tokenize(paymentMethod, verificationDetails) {
     throw new Error(errorMessage);
 }
 
-// --- CSRF Token Fetching ---
+// --- Config Fetching ---
+async function fetchPricingInfo() {
+    try {
+        const response = await fetch(`${serverUrl}/api/pricing-info`);
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+        }
+        pricingConfig = await response.json();
+        console.log('[CLIENT] Pricing config loaded:', pricingConfig);
+    } catch (error) {
+        console.error('[CLIENT] Error fetching pricing info:', error);
+        showPaymentStatus('Could not load pricing information. Please refresh.', 'error');
+    }
+}
+
 async function fetchCsrfToken() {
     try {
         const response = await fetch(`${serverUrl}/api/csrf-token`, {
@@ -533,6 +601,9 @@ function redrawAll() {
     drawPolygonsToCanvas(currentPolygons, 'black', drawOffset);
     drawPolygonsToCanvas(currentCutline, 'red', drawOffset, true);
     drawBoundingBox(currentBounds, 'blue', drawOffset);
+
+    // After redrawing, the bounds may have changed, so update the price.
+    calculateAndUpdatePrice();
 }
 
 function handleSvgUpload(svgText) {
