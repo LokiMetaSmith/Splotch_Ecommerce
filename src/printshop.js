@@ -450,17 +450,23 @@ function displayOrder(order) {
 async function updateOrderStatus(orderId, newStatus) {
     showLoadingIndicator();
     try {
-        await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
+        const updatedOrder = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
             method: 'POST',
             body: JSON.stringify({ status: newStatus }),
         });
 
-        showSuccessToast(`Order status updated to ${newStatus}.`);
-        const statusBadgeEl = document.getElementById(`status-badge-${orderId}`);
-        if (statusBadgeEl) {
-            statusBadgeEl.className = `status-${newStatus.toLowerCase()} font-bold py-1 px-3 rounded-full text-sm`;
-            statusBadgeEl.textContent = newStatus;
+        // Update the order in our local cache
+        const orderIndex = allOrders.findIndex(o => o.orderId === orderId);
+        if (orderIndex !== -1) {
+            allOrders[orderIndex].status = newStatus;
         }
+
+        showSuccessToast(`Order status updated to ${newStatus}.`);
+
+        // Re-filter the list to reflect the change
+        const activeFilter = document.querySelector('#filter-container .filter-btn.active')?.dataset.status || 'ALL';
+        filterAndDisplayOrders(activeFilter);
+
     } catch (error) {
         showErrorToast(`Update Failed: ${error.message}`);
         console.error(error);
