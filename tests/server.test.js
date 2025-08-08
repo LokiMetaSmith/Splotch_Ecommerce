@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { startServer } from '../server/server.js';
 import { initializeBot } from '../server/bot.js';
 import { JSONFilePreset } from 'lowdb/node';
