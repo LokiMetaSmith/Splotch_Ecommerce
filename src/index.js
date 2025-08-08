@@ -177,13 +177,27 @@ function showAdBlockerWarning() {
 
 
 // --- Pricing Logic ---
-function calculateStickerPrice(quantity, material, bounds) {
+function calculatePerimeter(polygons) {
+    let totalPerimeter = 0;
+    const distance = (p1, p2) => Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+
+    polygons.forEach(poly => {
+        for (let i = 0; i < poly.length; i++) {
+            const p1 = poly[i];
+            const p2 = poly[(i + 1) % poly.length]; // Wrap around to the first point
+            totalPerimeter += distance(p1, p2);
+        }
+    });
+    return totalPerimeter;
+}
+
+function calculateStickerPrice(quantity, material, bounds, cutline) {
     if (!pricingConfig) {
         console.error("Pricing config not loaded.");
         return 0;
     }
     if (quantity <= 0) return 0;
-    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return 0; // Cannot price without dimensions
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return 0;
 
     const ppi = pricingConfig.pixelsPerInch;
     const squareInches = (bounds.width / ppi) * (bounds.height / ppi);
@@ -194,9 +208,19 @@ function calculateStickerPrice(quantity, material, bounds) {
     const materialInfo = pricingConfig.materials.find(m => m.id === material);
     const materialMultiplier = materialInfo ? materialInfo.costMultiplier : 1.0;
 
+    // Get complexity multiplier
+    const perimeterPixels = calculatePerimeter(cutline);
+    const perimeterInches = perimeterPixels / ppi;
+    let complexityMultiplier = 1.0;
+    for (const tier of pricingConfig.complexity.tiers) {
+        if (tier.thresholdInches === "Infinity" || perimeterInches < tier.thresholdInches) {
+            complexityMultiplier = tier.multiplier;
+            break;
+        }
+    }
+
     // Get quantity discount
     let discount = 0;
-    // Sort discounts by quantity descending to find the correct tier
     const sortedDiscounts = [...pricingConfig.quantityDiscounts].sort((a, b) => b.quantity - a.quantity);
     for (const tier of sortedDiscounts) {
         if (quantity >= tier.quantity) {
@@ -205,26 +229,25 @@ function calculateStickerPrice(quantity, material, bounds) {
         }
     }
 
-    // Total price for all stickers
-    const totalCents = basePriceCents * quantity * materialMultiplier;
+    const totalCents = basePriceCents * quantity * materialMultiplier * complexityMultiplier;
     const discountedTotal = totalCents * (1 - discount);
 
-    return Math.round(discountedTotal);
+    return {
+        total: Math.round(discountedTotal),
+        complexityMultiplier: complexityMultiplier
+    };
 }
 
 
 function calculateAndUpdatePrice() {
-    // This function is now the central point for all price updates.
     if (!pricingConfig || !stickerQuantityInput || !calculatedPriceDisplay) {
-        // Don't run if the necessary components aren't ready.
         return;
     }
 
     const selectedMaterial = stickerMaterialSelect ? stickerMaterialSelect.value : 'pp_standard';
     const quantity = parseInt(stickerQuantityInput.value, 10);
-
-    // Use the globally stored bounds of the cutline
     const bounds = currentBounds;
+    const cutline = currentCutline;
 
     if (isNaN(quantity) || quantity < 0) {
         currentOrderAmountCents = 0;
@@ -232,15 +255,14 @@ function calculateAndUpdatePrice() {
         return;
     }
 
-    if (!bounds) {
-        // If there's no image/SVG yet, we can't calculate a price.
-        // We could show a message or just default to 0.
+    if (!bounds || !cutline) {
         currentOrderAmountCents = 0;
         calculatedPriceDisplay.innerHTML = `Price: <span class="text-gray-500">---</span>`;
         return;
     }
 
-    currentOrderAmountCents = calculateStickerPrice(quantity, selectedMaterial, bounds);
+    const priceResult = calculateStickerPrice(quantity, selectedMaterial, bounds, cutline);
+    currentOrderAmountCents = priceResult.total;
 
     const ppi = pricingConfig.pixelsPerInch;
     const widthInches = (bounds.width / ppi).toFixed(2);
@@ -250,6 +272,9 @@ function calculateAndUpdatePrice() {
         <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
         <span class="text-sm text-gray-600 block">
             Size: ${widthInches}" x ${heightInches}"
+        </span>
+        <span class="text-xs text-gray-500 block">
+            Complexity Modifier: x${priceResult.complexityMultiplier}
         </span>
     `;
 }
