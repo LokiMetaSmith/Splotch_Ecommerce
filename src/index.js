@@ -912,6 +912,11 @@ function handleGenerateCutline() {
             // The raw contour is too detailed, simplify it using the RDP algorithm.
             const simplifiedContour = simplifyPolygon(contour, 2.0); // Epsilon of 2.0 pixels
 
+            // Add validation to ensure we have a usable polygon
+            if (!simplifiedContour || simplifiedContour.length < 3) {
+                throw new Error("Could not detect a usable outline. Try an image with a transparent background.");
+            }
+
             currentPolygons = [simplifiedContour];
             redrawAll();
             showPaymentStatus('Smart cutline generated successfully.', 'success');
