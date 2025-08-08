@@ -184,6 +184,19 @@ export class SvgNest {
         this.binBounds = GeometryUtil.getPolygonBounds(this.binPolygon);
     }
 
+    setBinPolygon(polygon) {
+        // A new method to accept a pre-computed polygon
+        this.binPolygon = this._cleanPolygon(polygon);
+
+        if (!this.binPolygon || this.binPolygon.length < 3) {
+            console.error("Bin polygon is not valid.");
+            this.binPolygon = null;
+            return;
+        }
+
+        this.binBounds = GeometryUtil.getPolygonBounds(this.binPolygon);
+    }
+
     start() {
         if (!this.binPolygon || !this.tree) {
             console.error("Bin or parts not set.");

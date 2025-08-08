@@ -483,45 +483,91 @@ async function handleSearch() {
 async function handleNesting() {
     showLoadingIndicator();
     ui.nestedSvgContainer.innerHTML = '<p>Nesting in progress...</p>';
-    const svgUrls = Array.from(ui.ordersList.querySelectorAll('.sticker-design')).map(img => img.src);
-    if (svgUrls.length === 0) {
+
+    const svgElements = Array.from(ui.ordersList.querySelectorAll('.sticker-design'));
+    if (svgElements.length === 0) {
         ui.nestedSvgContainer.innerHTML = '<p>No designs to nest.</p>';
         hideLoadingIndicator();
         return;
     }
 
     try {
-        const svgPromises = Array.from(ui.ordersList.querySelectorAll('.sticker-design')).map(async (img, i) => {
+        // 1. Generate the complex bin polygon
+        const binWidth = 12 * 96; // 12 inches
+        const binHeight = 12 * 96; // 12 inches
+        const scale = 10000; // Use a high scale for precision
+
+        const cpr = new ClipperLib.Clipper();
+        const subj = [{ X: 0, Y: 0 }, { X: binWidth * scale, Y: 0 }, { X: binWidth * scale, Y: binHeight * scale }, { X: 0, Y: binHeight * scale }];
+        cpr.AddPath(subj, ClipperLib.PolyType.ptSubject, true);
+
+        const clip = [];
+        // Add edge margins
+        const marginTop = parseInt(document.getElementById('marginTop').value, 10) || 0;
+        const marginBottom = parseInt(document.getElementById('marginBottom').value, 10) || 0;
+        const marginLeft = parseInt(document.getElementById('marginLeft').value, 10) || 0;
+        const marginRight = parseInt(document.getElementById('marginRight').value, 10) || 0;
+
+        // Top margin as a keep-out
+        clip.push([{ X: -10, Y: -10 }, { X: (binWidth + 10) * scale, Y: -10 }, { X: (binWidth + 10) * scale, Y: marginTop * scale }, { X: -10, Y: marginTop * scale }]);
+        // Bottom margin
+        clip.push([{ X: -10, Y: (binHeight - marginBottom) * scale }, { X: (binWidth + 10) * scale, Y: (binHeight - marginBottom) * scale }, { X: (binWidth + 10) * scale, Y: (binHeight + 10) * scale }, { X: -10, Y: (binHeight + 10) * scale }]);
+        // Left margin
+        clip.push([{ X: -10, Y: -10 }, { X: marginLeft * scale, Y: -10 }, { X: marginLeft * scale, Y: (binHeight + 10) * scale }, { X: -10, Y: (binHeight + 10) * scale }]);
+        // Right margin
+        clip.push([{ X: (binWidth - marginRight) * scale, Y: -10 }, { X: (binWidth + 10) * scale, Y: -10 }, { X: (binWidth + 10) * scale, Y: (binHeight + 10) * scale }, { X: (binWidth - marginRight) * scale, Y: (binHeight + 10) * scale }]);
+
+        // Add internal keep-outs
+        const keepoutAreasText = document.getElementById('keepoutAreas').value;
+        const keepoutAreas = JSON.parse(keepoutAreasText);
+        keepoutAreas.forEach(area => {
+            clip.push([
+                { X: area.x * scale, Y: area.y * scale },
+                { X: (area.x + area.width) * scale, Y: area.y * scale },
+                { X: (area.x + area.width) * scale, Y: (area.y + area.height) * scale },
+                { X: area.x * scale, Y: (area.y + area.height) * scale }
+            ]);
+        });
+
+        cpr.AddPaths(clip, ClipperLib.PolyType.ptClip, true);
+
+        const solution = new ClipperLib.Paths();
+        cpr.Execute(ClipperLib.ClipType.ctDifference, solution, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
+
+        const complexBinPolygon = solution[0].map(p => ({ x: p.X / scale, y: p.Y / scale }));
+
+        // 2. Fetch and prepare the sticker SVGs
+        const svgPromises = svgElements.map(async (img) => {
             const cutFilePath = img.dataset.cutFilePath;
             if (cutFilePath) {
-                const res = await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' });
-                return res.text();
+                return (await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' })).text();
             } else {
-                const res = await fetch(img.src, { credentials: 'include' });
-                const svgString = await res.text();
+                const svgString = await (await fetch(img.src, { credentials: 'include' })).text();
                 return generateCutFile(svgString);
             }
         });
-
         const svgStrings = await Promise.all(svgPromises);
-        const binWidth = 12 * 96;
-        const binHeight = 12 * 96;
-        const binSvg = `<svg width="${binWidth}" height="${binHeight}"><rect x="0" y="0" width="${binWidth}" height="${binHeight}" fill="none" stroke="blue" stroke-width="2"/></svg>`;
 
+        // 3. Set up and run SVGNest
         const parser = new SVGParser();
         const svgs = svgStrings.map(s => parser.load(s));
-        const bin = parser.load(binSvg);
 
         const spacing = parseInt(ui.spacingInput.value, 10) || 0;
         const options = { spacing, rotations: 4 };
-        const nest = new SVGNest(bin, svgs, options);
+
+        const nest = new SVGNest(null, svgs, options); // Pass null for binElement
+        nest.setBinPolygon(complexBinPolygon); // Use the new method
+
         const resultSvg = nest.start();
 
+        // 4. Display result
         ui.nestedSvgContainer.innerHTML = resultSvg;
-        window.nestedSvg = resultSvg; // Store for download
+        window.nestedSvg = resultSvg;
         showSuccessToast('Nesting complete.');
+
     } catch (error) {
         showErrorToast(`Nesting failed: ${error.message}`);
+        console.error(error);
     } finally {
         hideLoadingIndicator();
     }
