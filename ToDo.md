@@ -35,10 +35,10 @@ This document tracks the features and bug fixes that need to be implemented for 
 
 ## Authentication
 
-- [ ] **YubiKey FIDO Authentication:**
-    - [ ] Create a test script to verify that the FIDO/WebAuthn libraries are working correctly.
-    - [ ] Fix the YubiKey FIDO authentication flow.
-    - [ ] Fully integrate FIDO as a primary authentication method.
+- [x] **YubiKey FIDO Authentication:**
+    - [x] Create a test script to verify that the FIDO/WebAuthn libraries are working correctly.
+    - [x] Fix the YubiKey FIDO authentication flow.
+    - [x] Fully integrate FIDO as a primary authentication method.
 
 ## Order Fulfillment
 

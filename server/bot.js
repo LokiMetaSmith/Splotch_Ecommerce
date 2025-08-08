@@ -21,31 +21,51 @@ function initializeBot(database) {
     }
 
     const commands = [
-      {
-        command: 'jobs',
-        description: 'Lists available jobs to do',
-      },
+      { command: 'jobs', description: 'Lists all active jobs' },
+      { command: 'new_orders', description: 'Lists all NEW orders' },
+      { command: 'in_process_orders', description: 'Lists all ACCEPTED or PRINTING orders' },
+      { command: 'shipped_orders', description: 'Lists all SHIPPED orders' },
+      { command: 'canceled_orders', description: 'Lists all CANCELED orders' },
     ];
     bot.setMyCommands(commands);
 
+    const listOrdersByStatus = (chatId, statuses, title) => {
+        const orders = db.data.orders.filter(o => statuses.includes(o.status));
+
+        if (orders.length === 0) {
+            bot.sendMessage(chatId, `No orders with status: ${statuses.join(', ')}`);
+            return;
+        }
+
+        let list = `*${title}:*\n\n`;
+        orders.forEach(order => {
+            list += `• *Order ID:* ${order.orderId.substring(0, 8)}...\n`;
+            list += `  *Status:* ${order.status}\n`;
+            list += `  *Customer:* ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
+        });
+
+        bot.sendMessage(chatId, list, { parse_mode: 'Markdown' });
+    };
+
     // Listen for the /jobs command
     bot.onText(/\/jobs/, (msg) => {
-      const chatId = msg.chat.id;
-      const orders = db.data.orders.filter(o => o.status !== 'SHIPPED' && o.status !== 'CANCELED');
+      listOrdersByStatus(msg.chat.id, ['NEW', 'ACCEPTED', 'PRINTING'], 'All Active Jobs');
+    });
 
-      if (orders.length === 0) {
-        bot.sendMessage(chatId, 'No active jobs.');
-        return;
-      }
+    bot.onText(/\/new_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['NEW'], 'New Orders');
+    });
 
-      let jobsList = '*Current Jobs:*\n\n';
-      orders.forEach(order => {
-        jobsList += `• *Order ID:* ${order.orderId.substring(0, 8)}...\n`;
-        jobsList += `  *Status:* ${order.status}\n`;
-        jobsList += `  *Customer:* ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
-      });
+    bot.onText(/\/in_process_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['ACCEPTED', 'PRINTING'], 'In Process Orders');
+    });
 
-      bot.sendMessage(chatId, jobsList, { parse_mode: 'Markdown' });
+    bot.onText(/\/shipped_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['SHIPPED'], 'Shipped Orders');
+    });
+
+    bot.onText(/\/canceled_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['CANCELED'], 'Canceled Orders');
     });
 
   } else {

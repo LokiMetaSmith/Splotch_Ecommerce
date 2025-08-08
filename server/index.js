@@ -93,9 +93,15 @@ async function main() {
   Last Update: ${new Date(order.lastUpdatedAt || order.receivedAt).toLocaleString()}
       `;
       try {
-        await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, {
+        const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, {
           reply_to_message_id: order.telegramMessageId,
         });
+        // Store the message ID so we can delete it later
+        const orderInDb = db.data.orders.find(o => o.orderId === order.orderId);
+        if (orderInDb) {
+            orderInDb.stalledMessageId = sentMessage.message_id;
+            await db.write();
+        }
       } catch (error) {
         console.error('[TELEGRAM] Failed to send stalled order notification:', error);
       }
