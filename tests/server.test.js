@@ -37,8 +37,18 @@ describe('Server', () => {
 
     afterAll(async () => {
         clearInterval(tokenRotationTimer);
-        // Use fs.unlink, not fs.promises.unlink, to match the import
-        await fs.unlink(testDbPath, () => {});
+        try {
+            // Use fs.unlinkSync as we are in a sync-like afterAll hook and need to ensure cleanup.
+            // Using the callback version can be tricky with async/await.
+            if (fs.existsSync(testDbPath)) {
+                fs.unlinkSync(testDbPath);
+            }
+        } catch (error) {
+            // This block is primarily for safety, though existsSync should prevent ENOENT.
+            if (error.code !== 'ENOENT') {
+                throw error;
+            }
+        }
     });
 
     it('should respond to ping', async () => {

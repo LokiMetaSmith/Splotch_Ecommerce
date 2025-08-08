@@ -32,9 +32,15 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  // Clean up the test database file and clear the timer
   clearInterval(tokenRotationTimer);
-  await fs.unlink(testDbPath);
+  try {
+    await fs.unlink(testDbPath);
+  } catch (error) {
+    // Ignore the error if the file doesn't exist, but throw any other errors.
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
 });
 
 describe('Auth Endpoints', () => {
