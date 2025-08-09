@@ -661,6 +661,14 @@ function redrawAll() {
     currentCutline = cutline;
     currentBounds = ClipperLib.JS.BoundsOfPaths(cutline);
 
+    // --- VALIDATION ---
+    // Ensure the bounds are valid before attempting to redraw the canvas
+    if (!currentBounds || (currentBounds.right - currentBounds.left) <= 0 || (currentBounds.bottom - currentBounds.top) <= 0) {
+        console.error("Invalid bounds calculated, aborting redraw.", currentBounds);
+        // We don't show a user-facing error here because the calling function should have already done so.
+        return;
+    }
+
     // Set canvas size based on the final cutline bounds
     canvas.width = currentBounds.right - currentBounds.left + 40; // Add padding
     canvas.height = currentBounds.bottom - currentBounds.top + 40;
