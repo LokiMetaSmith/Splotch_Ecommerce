@@ -605,12 +605,18 @@ function loadFileAsImage(file) {
 
     // Handle SVGs differently from other images
     if (file.type === 'image/svg+xml') {
+        // Reset raster image state
+        originalImage = null;
         reader.onload = (e) => {
             handleSvgUpload(e.target.result);
         };
         reader.onerror = () => showPaymentStatus('Error reading SVG file.', 'error');
         reader.readAsText(file);
     } else if (file.type.startsWith('image/')) {
+        // Reset vector state
+        currentPolygons = [];
+        basePolygons = [];
+        currentCutline = [];
         reader.onload = () => {
             const img = new Image();
             img.onload = () => {
@@ -826,7 +832,7 @@ function handleAddText() {
 }
 
 function rotateCanvasContentFixedBounds(angleDegrees) {
-    if (currentPolygons.length > 0) {
+    if (basePolygons.length > 0) {
         // SVG Vector Rotation
         const bounds = ClipperLib.JS.BoundsOfPaths(currentPolygons);
         const centerX = bounds.left + (bounds.right - bounds.left) / 2;
@@ -940,7 +946,10 @@ function handleCrop() {
 // --- Smart Cutline Generation ---
 
 function handleGenerateCutline() {
-    if (!canvas || !ctx) return;
+    if (!canvas || !ctx || !originalImage) {
+        showPaymentStatus('Smart cutline requires a raster image (PNG, JPG). Please upload one.', 'error');
+        return;
+    }
     showPaymentStatus('Generating smart cutline...', 'info');
 
     // Save the current canvas state so we can restore it if tracing fails.
