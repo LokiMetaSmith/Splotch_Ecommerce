@@ -968,13 +968,21 @@ function handleGenerateCutline() {
             // The raw contour is too detailed, simplify it using the RDP algorithm.
             const simplifiedContour = simplifyPolygon(contour, 2.0); // Epsilon of 2.0 pixels
 
-            // Add validation to ensure we have a usable polygon
-            if (!simplifiedContour || simplifiedContour.length < 3) {
+            // Clean the polygon to remove self-intersections and other issues before offsetting.
+            // This requires scaling up for Clipper's integer math.
+            const scale = 100;
+            const scaledPoly = simplifiedContour.map(p => ({ X: p.x * scale, Y: p.y * scale }));
+            const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(scaledPoly, 1.415);
+
+            // Add validation to ensure we have a usable polygon AFTER cleaning
+            if (!cleanedScaledPoly || cleanedScaledPoly.length < 3) {
                 throw new Error("Could not detect a usable outline. Try an image with a transparent background.");
             }
 
-            basePolygons = [simplifiedContour]; // Store the original
-            currentPolygons = basePolygons; // Start with 100% scale
+            const finalContour = cleanedScaledPoly.map(p => ({ x: p.X / scale, y: p.Y / scale }));
+
+            basePolygons = [finalContour];
+            currentPolygons = [finalContour];
             redrawAll();
             showPaymentStatus('Smart cutline generated successfully.', 'success');
 
