@@ -847,24 +847,25 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         redrawAll();
 
     } else if (originalImage) {
-        // Raster Image Rotation
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        const currentDataUrl = canvas.toDataURL();
-        const imgToRotate = new Image();
-        imgToRotate.onload = () => {
-            const w = canvas.width, h = canvas.height;
-            const newW = (angleDegrees === 90 || angleDegrees === -90) ? h : w;
-            const newH = (angleDegrees === 90 || angleDegrees === -90) ? w : h;
-            tempCanvas.width = newW; tempCanvas.height = newH;
-            tempCtx.translate(newW / 2, newH / 2);
-            tempCtx.rotate(angleDegrees * Math.PI / 180);
-            tempCtx.drawImage(imgToRotate, -w / 2, -h / 2, w, h);
-            canvas.width = newW; canvas.height = newH;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(tempCanvas, 0, 0);
-        };
-        imgToRotate.src = currentDataUrl;
+        // Raster Image Rotation - always use the original image to prevent quality loss
+        const w = originalImage.width;
+        const h = originalImage.height;
+
+        // Swap dimensions for 90/270 degree rotations
+        const newW = (angleDegrees === 90 || angleDegrees === -90) ? h : w;
+        const newH = (angleDegrees === 90 || angleDegrees === -90) ? w : h;
+
+        canvas.width = newW;
+        canvas.height = newH;
+
+        ctx.clearRect(0, 0, newW, newH);
+        // Translate to the center of the new canvas, rotate, and draw the original image
+        ctx.translate(newW / 2, newH / 2);
+        ctx.rotate(angleDegrees * Math.PI / 180);
+        ctx.drawImage(originalImage, -w / 2, -h / 2, w, h);
+
+        // Reset the transformation matrix
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
 }
 
@@ -904,17 +905,13 @@ function handleResize(percentage) {
         );
         redrawAll();
     } else if (originalImage) {
-        // Raster Image Resizing
-        const currentCanvasDataUrl = canvas.toDataURL();
-        const imgToResize = new Image();
-        imgToResize.onload = () => {
-            const newWidth = imgToResize.width * scale;
-            const newHeight = imgToResize.height * scale;
-            canvas.width = newWidth; canvas.height = newHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(imgToResize, 0, 0, newWidth, newHeight);
-        };
-        imgToResize.src = currentCanvasDataUrl;
+        // Raster Image Resizing - always use the original image to prevent quality loss
+        const newWidth = originalImage.width * scale;
+        const newHeight = originalImage.height * scale;
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
     }
     if (resizeInputEl) resizeInputEl.value = '';
 }
