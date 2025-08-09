@@ -106,10 +106,13 @@ async function BootStrap() {
     if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', applyGrayscaleFilter);
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', applySepiaFilter);
     if (resizeSliderEl) {
-        resizeSliderEl.addEventListener('input', () => {
-            if(resizeValueEl) resizeValueEl.textContent = `${resizeSliderEl.value}%`;
+        resizeSliderEl.addEventListener('input', (e) => {
+            const percentage = parseInt(e.target.value, 10);
+            if(resizeValueEl) resizeValueEl.textContent = `${percentage}%`;
+            // For raster images, we can apply this in real-time.
+            // For vector redraws, this could be slow, but we'll try it.
+            handleResize(percentage);
         });
-        resizeSliderEl.addEventListener('change', () => handleResize(resizeSliderEl.value));
     }
     if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
@@ -908,12 +911,14 @@ function handleResize(percentage) {
         // Raster Image Resizing - always use the original image to prevent quality loss
         const newWidth = originalImage.width * scale;
         const newHeight = originalImage.height * scale;
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+        if (newWidth > 0 && newHeight > 0) {
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+        }
     }
-    if (resizeInputEl) resizeInputEl.value = '';
 }
 
 function handleCrop() {
