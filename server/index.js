@@ -77,8 +77,9 @@ async function main() {
   // Check for stalled orders every hour
   setInterval(async () => {
     const now = new Date();
+    const finalStatuses = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
     const stalledOrders = db.data.orders.filter(order => {
-      if (order.status === 'SHIPPED' || order.status === 'CANCELED') {
+      if (finalStatuses.includes(order.status)) {
         return false;
       }
       const lastUpdatedAt = new Date(order.lastUpdatedAt || order.receivedAt);
