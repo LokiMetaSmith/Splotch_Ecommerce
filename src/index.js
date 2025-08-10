@@ -40,7 +40,7 @@ async function BootStrap() {
         }
         return;
     }
-    ctx = canvas.getContext('2d');
+    ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     textInput = document.getElementById('textInput');
     textSizeInput = document.getElementById('textSizeInput');
@@ -575,8 +575,9 @@ function showPaymentStatus(message, type = 'info') {
 
 function updateEditingButtonsState(disabled) {
     const elements = [
-        rotateLeftBtnEl, rotateRightBtnEl, resizeBtnEl, startCropBtnEl, grayscaleBtnEl, sepiaBtnEl,
-        resizeInputEl, textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect
+        rotateLeftBtnEl, rotateRightBtnEl, startCropBtnEl, grayscaleBtnEl, sepiaBtnEl,
+        document.getElementById('resizeSlider'), document.getElementById('generateCutlineBtn'),
+        textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect
     ];
     const disabledClasses = ['opacity-50', 'cursor-not-allowed'];
     elements.forEach(el => {
