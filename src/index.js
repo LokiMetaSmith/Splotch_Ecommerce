@@ -14,6 +14,7 @@ let canvas, ctx;
 // Globals for SVG processing state
 let basePolygons = []; // The original, unscaled polygons from the SVG
 let currentPolygons = [];
+let isMetric = false; // To track unit preference
 let currentCutline = [];
 let currentBounds = null;
 let pricingConfig = null;
@@ -117,6 +118,26 @@ async function BootStrap() {
     if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
     if(generateCutlineBtn) generateCutlineBtn.addEventListener('click', handleGenerateCutline);
+
+    const standardSizesContainer = document.getElementById('standard-sizes-controls');
+    if (standardSizesContainer) {
+        standardSizesContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('size-btn')) {
+                const targetInches = parseFloat(e.target.dataset.size);
+                handleStandardResize(targetInches);
+            }
+        });
+    }
+
+    const unitToggle = document.getElementById('unitToggle');
+    if (unitToggle) {
+        unitToggle.addEventListener('change', (e) => {
+            isMetric = e.target.checked;
+            calculateAndUpdatePrice(); // Re-calculate and re-render with new units
+            redrawAll(); // Also redraw the on-canvas indicator
+        });
+    }
+
     if (fileInputGlobalRef) {
         fileInputGlobalRef.addEventListener('change', handleFileChange);
     }
@@ -287,13 +308,20 @@ function calculateAndUpdatePrice() {
     currentOrderAmountCents = priceResult.total;
 
     const ppi = selectedResolution.ppi;
-    const widthInches = (bounds.width / ppi).toFixed(2);
-    const heightInches = (bounds.height / ppi).toFixed(2);
+    let width = (bounds.width / ppi);
+    let height = (bounds.height / ppi);
+    let unit = 'in';
+
+    if (isMetric) {
+        width *= 25.4;
+        height *= 25.4;
+        unit = 'mm';
+    }
 
     calculatedPriceDisplay.innerHTML = `
         <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
         <span class="text-sm text-gray-600 block">
-            Size: ${widthInches}" x ${heightInches}"
+            Size: ${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}
         </span>
         <span class="text-xs text-gray-500 block">
             Complexity Modifier: x${priceResult.complexityMultiplier}
@@ -692,6 +720,34 @@ function redrawAll() {
     drawPolygonsToCanvas(currentCutline, 'red', drawOffset, true);
     drawBoundingBox(currentBounds, drawOffset);
 
+    // Draw size indicators on the canvas
+    if (currentBounds && pricingConfig) {
+        const ppi = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96;
+        let width = (currentBounds.width / ppi);
+        let height = (currentBounds.height / ppi);
+        let unit = 'in';
+
+        if (isMetric) {
+            width *= 25.4;
+            height *= 25.4;
+            unit = 'mm';
+        }
+
+        ctx.fillStyle = "black";
+        ctx.font = "12px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(`${width.toFixed(1)} ${unit}`, drawOffset.x + currentBounds.width / 2, drawOffset.y - 5);
+
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.save();
+        ctx.translate(drawOffset.x - 5, drawOffset.y + currentBounds.height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText(`${height.toFixed(1)} ${unit}`, 0, 0);
+        ctx.restore();
+    }
+
     // After redrawing, the bounds may have changed, so update the price.
     calculateAndUpdatePrice();
 }
@@ -905,6 +961,40 @@ function applySepiaFilter() {
     ctx.putImageData(imageData, 0, 0);
 }
 
+function handleStandardResize(targetInches) {
+    if (!pricingConfig || (!originalImage && basePolygons.length === 0)) {
+        showPaymentStatus('Please load an image first.', 'error');
+        return;
+    }
+
+    const selectedResolution = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value);
+    if (!selectedResolution) return;
+
+    const ppi = selectedResolution.ppi;
+    const targetPixels = targetInches * ppi;
+
+    let currentMaxWidthPixels;
+    if (basePolygons.length > 0) {
+        const bounds = ClipperLib.JS.BoundsOfPaths(basePolygons);
+        currentMaxWidthPixels = Math.max(bounds.width, bounds.height);
+    } else {
+        currentMaxWidthPixels = Math.max(originalImage.width, originalImage.height);
+    }
+
+    if (currentMaxWidthPixels <= 0) return;
+
+    const scale = targetPixels / currentMaxWidthPixels;
+    const percentage = scale * 100;
+
+    // Update the slider and call the main resize handler
+    const resizeSliderEl = document.getElementById('resizeSlider');
+    const resizeValueEl = document.getElementById('resizeValue');
+    if (resizeSliderEl) resizeSliderEl.value = percentage;
+    if (resizeValueEl) resizeValueEl.textContent = `${Math.round(percentage)}%`;
+
+    handleResize(percentage);
+}
+
 function handleResize(percentage) {
     if (isNaN(percentage) || percentage <= 0) return;
 
@@ -926,6 +1016,13 @@ function handleResize(percentage) {
             canvas.height = newHeight;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+            // Update the bounds and cutline for the new raster size
+            currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
+            currentCutline = [[ { x: 0, y: 0 }, { x: newWidth, y: 0 }, { x: newWidth, y: newHeight }, { x: 0, y: newHeight } ]];
+
+            // Trigger the price update
+            calculateAndUpdatePrice();
         }
     }
 }
