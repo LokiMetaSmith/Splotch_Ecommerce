@@ -690,7 +690,7 @@ function redrawAll() {
     // Draw everything
     drawPolygonsToCanvas(currentPolygons, 'black', drawOffset);
     drawPolygonsToCanvas(currentCutline, 'red', drawOffset, true);
-    drawBoundingBox(currentBounds, 'blue', drawOffset);
+    drawBoundingBox(currentBounds, drawOffset);
 
     // After redrawing, the bounds may have changed, so update the price.
     calculateAndUpdatePrice();
@@ -792,16 +792,18 @@ function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke =
     });
 }
 
-function drawBoundingBox(bounds, style, offset = { x: 0, y: 0 }) {
+function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
     if (!ctx || !bounds || !pricingConfig) return;
 
-    const ppi = pricingConfig.pixelsPerInch;
-    const inchDash = ppi; // 1 inch dash
-    const inchGap = ppi / 4; // 1/4 inch gap
+    // The user wanted a grey box with 1-inch dashes for pricing.
+    // Let's make it visible.
+    const ppi = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96;
+    const inchDash = ppi;
+    const inchGap = ppi / 4;
 
-    ctx.strokeStyle = '#808080'; // Grey color
-    ctx.lineWidth = 1;
-    ctx.setLineDash([inchDash, inchGap]);
+    ctx.strokeStyle = 'rgba(128, 128, 128, 0.75)'; // Semi-transparent grey
+    ctx.lineWidth = 2; // Make it thicker
+    ctx.setLineDash([10, 10]); // A more visible dash pattern
     ctx.strokeRect(
         bounds.left + offset.x,
         bounds.top + offset.y,
@@ -946,11 +948,47 @@ function handleCrop() {
 
 // --- Smart Cutline Generation ---
 
+function imageHasTransparentBorder() {
+    if (!canvas || !ctx) return false;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { data, width, height } = imageData;
+    const borderSampleSize = 10; // Check this many pixels on each edge
+
+    const isTransparentOrWhite = (i) => {
+        if (data[i+3] < 128) return true; // Alpha check
+        if (data[i] > 250 && data[i+1] > 250 && data[i+2] > 250) return true; // White check
+        return false;
+    };
+
+    // Check top and bottom borders
+    for (let x = 0; x < width; x += Math.floor(width / borderSampleSize)) {
+        if (!isTransparentOrWhite((0 * width + x) * 4) || !isTransparentOrWhite(((height - 1) * width + x) * 4)) {
+            return false;
+        }
+    }
+    // Check left and right borders
+    for (let y = 0; y < height; y += Math.floor(height / borderSampleSize)) {
+        if (!isTransparentOrWhite((y * width + 0) * 4) || !isTransparentOrWhite((y * width + (width - 1)) * 4)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 function handleGenerateCutline() {
     if (!canvas || !ctx || !originalImage) {
         showPaymentStatus('Smart cutline requires a raster image (PNG, JPG). Please upload one.', 'error');
         return;
     }
+
+    // --- Feedforward Check ---
+    if (!imageHasTransparentBorder()) {
+        const proceed = confirm("This image does not appear to have a transparent or white background. The 'Smart Cutline' feature may not produce a good result. Proceed anyway?");
+        if (!proceed) {
+            return;
+        }
+    }
+
     showPaymentStatus('Generating smart cutline...', 'info');
 
     // Save the current canvas state so we can restore it if tracing fails.
@@ -1000,9 +1038,18 @@ function traceContour(imageData) {
     const { data, width, height } = imageData;
     const isOpaque = (x, y) => {
         if (x < 0 || x >= width || y < 0 || y >= height) return false;
-        // Alpha channel is the 4th component (R,G,B,A)
-        // A threshold of 128 is used to treat semi-transparent pixels as opaque
-        return data[(y * width + x) * 4 + 3] > 128;
+        const i = (y * width + x) * 4;
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
+        const a = data[i+3];
+
+        // Treat pixels with low alpha as transparent
+        if (a < 128) return false;
+        // Treat pure white pixels as transparent
+        if (r > 250 && g > 250 && b > 250) return false;
+
+        return true; // Otherwise, pixel is opaque
     };
 
     // 1. Find the first non-transparent pixel
