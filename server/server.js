@@ -871,7 +871,7 @@ ${statusChecklist}
 
       try {
         const verification = await verifyRegistrationResponse({
-          response: body.response, // Pass the nested response object
+          response: body, // Pass the entire body from the client
           expectedChallenge: user.challenge,
           expectedOrigin: expectedOrigin,
           expectedRPID: rpID,
