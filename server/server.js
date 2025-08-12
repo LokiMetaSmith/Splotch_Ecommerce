@@ -22,6 +22,7 @@ import { google } from 'googleapis';
 import { getCurrentSigningKey, getJwks } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { fileTypeFromFile } from 'file-type';
+import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -317,13 +318,38 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetails } = req.body;
+        const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetailsBody } = req.body;
+
+        // --- Server-Side Price Calculation ---
+        const designDimensions = await getDesignDimensions(path.join(__dirname, designImagePath));
+
+        // For now, we assume the default resolution and material if not provided,
+        // but this could be passed from the client in the future.
+        const resolution = pricingConfig.resolutions.find(r => r.id === 'dpi_300'); // Default to 300 DPI
+        const material = orderDetailsBody.orderDetails.material || 'pp_standard';
+
+        const serverPriceResult = calculateStickerPrice(
+            orderDetailsBody.orderDetails.quantity,
+            material,
+            designDimensions.bounds,
+            designDimensions.cutline,
+            resolution,
+            pricingConfig
+        );
+        const trustedAmountCents = serverPriceResult.total;
+
+        // --- Price Validation ---
+        if (Math.abs(trustedAmountCents - amountCents) > 1) { // Allow for 1 cent rounding difference
+            console.warn(`[SECURITY] Price mismatch for order. Client: ${amountCents}, Server: ${trustedAmountCents}`);
+            return res.status(400).json({ error: 'Price mismatch. Please refresh and try again.' });
+        }
+
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
           locationId: process.env.SQUARE_LOCATION_ID,
           amountMoney: {
-            amount: BigInt(amountCents),
+            amount: BigInt(trustedAmountCents), // Use the trusted, server-calculated price
             currency: currency || 'USD',
           },
          appFeeMoney: {

@@ -29,7 +29,9 @@
     "multer": "^2.0.2",
     "node-telegram-bot-api": "^0.66.0",
     "nodemailer": "^6.9.14",
-    "square": "^43.0.1"
+    "square": "^43.0.1",
+    "image-size": "^1.1.1",
+    "svg-parser": "^2.0.4"
   },
   "devDependencies": {
     "file-type": "^21.0.0",
