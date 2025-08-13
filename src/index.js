@@ -441,17 +441,20 @@ async function handlePaymentFormSubmit(event) {
         showPaymentStatus('Issuing temporary auth token...', 'info');
         const authResponse = await fetch(`${serverUrl}/api/auth/issue-temp-token`, {
             method: 'POST',
-            credentials: 'include', // Important for cookies
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': csrfToken
-            },
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
             body: JSON.stringify({ email }),
         });
 
         if (!authResponse.ok) {
-            const errorText = await authResponse.text();
-            throw new Error(`Could not issue a temporary authentication token. Server responded with: ${errorText}`);
+            const errorData = await authResponse.json().catch(() => ({})); // Catch JSON parsing errors
+            if (errorData.error && errorData.error.includes('csrf')) {
+                console.warn('[CLIENT] CSRF token was invalid during auth token issuance. Fetching a new one.');
+                await fetchCsrfToken(); // Fetch a new token
+                showPaymentStatus('Your session expired. It has been refreshed. Please try submitting again.', 'error');
+                return; // Stop the submission process
+            }
+            throw new Error(`Could not issue a temporary authentication token. Server responded with: ${errorData.error || authResponse.statusText}`);
         }
         const { token: tempAuthToken } = await authResponse.json();
         if (!tempAuthToken) {
