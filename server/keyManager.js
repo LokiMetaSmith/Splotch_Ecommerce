@@ -46,13 +46,19 @@ export const rotateKeys = () => {
 
 // Generate the public JWKS document
 export const getJwks = async () => {
-    const keys = await Promise.all(
-        activeKeys.map(async (key) => {
-            const jwk = await exportJWK(key.publicKey);
-            return { ...jwk, kid: key.kid, use: 'sig', alg: 'RS256' };
-        })
-    );
-    return { keys };
+    try {
+        const keys = await Promise.all(
+            activeKeys.map(async (key) => {
+                const jwk = await exportJWK(key.publicKey);
+                return { ...jwk, kid: key.kid, use: 'sig', alg: 'RS256' };
+            })
+        );
+        return { keys };
+    } catch (error) {
+        console.error('❌ [KEY_MANAGER] Error generating JWKS:', error);
+        // Return an empty JWKS document in case of an error
+        return { keys: [] };
+    }
 };
 
 // Initial key generation
