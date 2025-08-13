@@ -18,26 +18,14 @@ import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import { google } from 'googleapis';
-// No longer import sendEmail here, it will be injected.
-import { getCurrentSigningKey, getJwks } from './keyManager.js';
+import { sendEmail } from './email.js';
+import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { fileTypeFromFile } from 'file-type';
-import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
-
-// Load pricing configuration
-let pricingConfig = {};
-try {
-    const pricingData = fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8');
-    pricingConfig = JSON.parse(pricingData);
-    console.log('[SERVER] Pricing configuration loaded.');
-} catch (error) {
-    console.error('[SERVER] FATAL: Could not load pricing.json.', error);
-    process.exit(1);
-}
 
 import { randomBytes } from 'crypto';
 
@@ -60,13 +48,15 @@ let app;
 const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
 
 // Define an async function to contain all server logic
-async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
+async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     `http://localhost:3000/oauth2callback`
   );
+
+   db = await JSONFilePreset(dbPath, defaultData);
   
   async function logAndEmailError(error, context = 'General Error') {
     console.error(`[${context}]`, error);
@@ -106,7 +96,8 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     }
 
     // --- Database Setup ---
-    console.log('[SERVER] Using LowDB database at:', dbPath);
+    db = await JSONFilePreset(dbPath, defaultData);
+    console.log('[SERVER] LowDB database initialized at:', dbPath);
 
     // Load the refresh token from the database if it exists
     if (db.data.config?.google_refresh_token) {
@@ -133,10 +124,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     console.log('[SERVER] Initializing Square client...');
     if (!process.env.SQUARE_ACCESS_TOKEN) {
       console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
-      // In a test environment, we don't want to kill the test runner.
-      if (process.env.NODE_ENV !== 'test') {
-        process.exit(1);
-      }
+      process.exit(1);
     }
     const squareClient = new SquareClient({
       version: '2025-07-16',
@@ -144,21 +132,19 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       environment: SquareEnvironment.Sandbox,
     });
     console.log('[SERVER] Verifying connection to Square servers...');
-    if (process.env.NODE_ENV !== 'test') {
-        try {
-            await new Promise((resolve, reject) => {
-                dns.lookup('connect.squareup.com', (err) => {
-                    if (err) return reject(err);
-                    resolve();
-                });
+    try {
+        await new Promise((resolve, reject) => {
+            dns.lookup('connect.squareup.com', (err) => {
+                if (err) return reject(err);
+                resolve();
             });
-            console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
-        } catch (error) {
-            console.error('❌ [FATAL] Could not resolve Square API domain.');
-            console.error('   This is likely a network, DNS, or firewall issue on the server.');
-            console.error('   Full Error:', error.message);
-            process.exit(1);
-        }
+        });
+        console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
+    } catch (error) {
+        console.error('❌ [FATAL] Could not resolve Square API domain.');
+        console.error('   This is likely a network, DNS, or firewall issue on the server.');
+        console.error('   Full Error:', error.message);
+        process.exit(1);
     }
     console.log('[SERVER] Square client initialized.');
   // --- NEW: Local Sanity Check for API properties ---
@@ -215,16 +201,16 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-    // Enable CSRF protection for all environments, including test.
-    // The tests are written to handle CSRF, so this should be enabled.
-    app.use(csrf({ cookie: true }));
-    app.use(function (err, req, res, next) {
-      if (err.code !== 'EBADCSRFTOKEN') return next(err)
+    if (process.env.NODE_ENV !== 'test') {
+        app.use(csrf({ cookie: true }));
+        app.use(function (err, req, res, next) {
+          if (err.code !== 'EBADCSRFTOKEN') return next(err)
 
-      // handle CSRF token errors here
-      console.error('CSRF Token Error:', err);
-      res.status(403).json({ error: 'Invalid CSRF token. Form tampered with.' });
-    })
+          // handle CSRF token errors here
+          res.status(403)
+          res.send('form tampered with')
+        })
+    }
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
@@ -259,10 +245,6 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         res.json({ serverSessionToken });
     });
 
-    app.get('/api/pricing-info', (req, res) => {
-      res.json(pricingConfig);
-    });
-
     app.get('/api/ping', (req, res) => {
       res.status(200).json({
         status: 'ok',
@@ -285,15 +267,12 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         const designImageFile = req.files.designImage[0];
         const fileType = await fileTypeFromFile(designImageFile.path);
 
-        const allowedExtensions = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
-
-        if (!fileType || !allowedExtensions.includes(fileType.ext)) {
+        if (!fileType || fileType.ext !== 'svg') {
             // It's good practice to remove the invalid file
             fs.unlink(designImageFile.path, (err) => {
                 if (err) console.error("Error deleting invalid file:", err);
             });
-            const allowedTypes = allowedExtensions.join(', ');
-            return res.status(400).json({ error: `Invalid file type. Allowed types are: ${allowedTypes}` });
+            return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the design image.' });
         }
 
         const designImagePath = `/uploads/${designImageFile.filename}`;
@@ -318,38 +297,13 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetailsBody } = req.body;
-
-        // --- Server-Side Price Calculation ---
-        const designDimensions = await getDesignDimensions(path.join(__dirname, designImagePath));
-
-        // For now, we assume the default resolution and material if not provided,
-        // but this could be passed from the client in the future.
-        const resolution = pricingConfig.resolutions.find(r => r.id === 'dpi_300'); // Default to 300 DPI
-        const material = orderDetailsBody.orderDetails.material || 'pp_standard';
-
-        const serverPriceResult = calculateStickerPrice(
-            orderDetailsBody.orderDetails.quantity,
-            material,
-            designDimensions.bounds,
-            designDimensions.cutline,
-            resolution,
-            pricingConfig
-        );
-        const trustedAmountCents = serverPriceResult.total;
-
-        // --- Price Validation ---
-        if (Math.abs(trustedAmountCents - amountCents) > 1) { // Allow for 1 cent rounding difference
-            console.warn(`[SECURITY] Price mismatch for order. Client: ${amountCents}, Server: ${trustedAmountCents}`);
-            return res.status(400).json({ error: 'Price mismatch. Please refresh and try again.' });
-        }
-
+        const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetails } = req.body;
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
           locationId: process.env.SQUARE_LOCATION_ID,
           amountMoney: {
-            amount: BigInt(trustedAmountCents), // Use the trusted, server-calculated price
+            amount: BigInt(amountCents),
             currency: currency || 'USD',
           },
          appFeeMoney: {
@@ -401,23 +355,18 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
               await db.write();
             }
 
-            db.data.orders[orderIndex].imageMessageIds = [];
-
             // Send the design image
             if (newOrder.designImagePath) {
               const imagePath = path.join(__dirname, newOrder.designImagePath);
-              const photoMessage = await bot.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, imagePath);
-              db.data.orders[orderIndex].imageMessageIds.push(photoMessage.message_id);
+              await bot.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, imagePath);
             }
 
             // Send the cut line file
             const cutLinePath = db.data.orders[orderIndex].cutLinePath;
             if (cutLinePath) {
               const docPath = path.join(__dirname, cutLinePath);
-              const docMessage = await bot.sendDocument(process.env.TELEGRAM_CHANNEL_ID, docPath);
-              db.data.orders[orderIndex].imageMessageIds.push(docMessage.message_id);
+              await bot.sendDocument(process.env.TELEGRAM_CHANNEL_ID, docPath);
             }
-            await db.write();
           } catch (error) {
             console.error('[TELEGRAM] Failed to send message or files:', error);
           }
@@ -511,34 +460,20 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
       if (!order) {
         return res.status(404).json({ error: 'Order not found.' });
       }
-      // Store previous status to check if it was stalled
-      const previousStatus = order.status;
       order.status = status;
       order.lastUpdatedAt = new Date().toISOString();
-
+      await db.write();
       console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
       // Update Telegram message
-      if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID) {
-        // If the order had a "stalled" message, delete it now that the status has changed.
-        if (order.stalledMessageId) {
-          try {
-            await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.stalledMessageId);
-            // Clear the stored message ID
-            delete order.stalledMessageId;
-          } catch (error) {
-            console.error(`[TELEGRAM] Failed to delete stalled message ${order.stalledMessageId}:`, error);
-          }
-        }
-
-        if (order.telegramMessageId) {
-          const statusChecklist = `
+      if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
+        const statusChecklist = `
 ✅ New
 ${status === 'ACCEPTED' || status === 'PRINTING' || status === 'SHIPPED' ? '✅' : '⬜️'} Accepted
 ${status === 'PRINTING' || status === 'SHIPPED' ? '✅' : '⬜️'} Printing
 ${status === 'SHIPPED' ? '✅' : '⬜️'} Shipped
-          `;
-          const message = `
+        `;
+        const message = `
 Order: ${order.orderId}
 Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
 Email: ${order.billingContact.email}
@@ -546,31 +481,21 @@ Quantity: ${order.orderDetails.quantity}
 Amount: $${(order.amount / 100).toFixed(2)}
 
 ${statusChecklist}
-          `;
-          try {
-            if (status === 'SHIPPED') {
-              // Delete the main order message
-              await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
-
-              // Delete associated images
-              if (order.imageMessageIds && order.imageMessageIds.length > 0) {
-                for (const msgId of order.imageMessageIds) {
-                  await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, msgId);
-                }
-              }
-            } else {
-              await bot.editMessageText(message, {
-                chat_id: process.env.TELEGRAM_CHANNEL_ID,
-                message_id: order.telegramMessageId,
-              });
-            }
-          } catch (error) {
-            console.error('[TELEGRAM] Failed to edit or delete message:', error);
+        `;
+        try {
+          if (status === 'SHIPPED') {
+            await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+          } else {
+            await bot.editMessageText(message, {
+              chat_id: process.env.TELEGRAM_CHANNEL_ID,
+              message_id: order.telegramMessageId,
+            });
           }
+        } catch (error) {
+          console.error('[TELEGRAM] Failed to edit or delete message:', error);
         }
       }
 
-      await db.write();
       res.status(200).json({ success: true, order: order });
     });
 
@@ -862,32 +787,19 @@ ${statusChecklist}
 
     app.post('/api/auth/register-verify', async (req, res) => {
       const { body } = req;
-      const { username } = body; // Get username from body
+      const { username } = req.query;
       const user = db.data.users[username];
-
-      if (!user) {
-        return res.status(404).json({ error: `User not found: ${username}` });
-      }
-
       try {
         const verification = await verifyRegistrationResponse({
-          response: body, // Pass the entire body from the client
+          response: body,
           expectedChallenge: user.challenge,
           expectedOrigin: expectedOrigin,
           expectedRPID: rpID,
         });
-
         const { verified, registrationInfo } = verification;
-        if (verified && registrationInfo) {
+        if (verified) {
           user.credentials.push(registrationInfo);
-          // It's good practice to store the credential by its ID for easy lookup
-          db.data.credentials[registrationInfo.credentialID] = {
-            credentialID: registrationInfo.credentialID,
-            credentialPublicKey: registrationInfo.credentialPublicKey,
-            counter: registrationInfo.counter,
-            credentialDeviceType: registrationInfo.credentialDeviceType,
-            credentialBackedUp: registrationInfo.credentialBackedUp,
-          };
+          db.data.credentials[registrationInfo.credentialID] = registrationInfo;
           await db.write();
         }
         res.json({ verified });
@@ -917,38 +829,27 @@ ${statusChecklist}
 
     app.post('/api/auth/login-verify', async (req, res) => {
       const { body } = req;
-      const { username } = body; // Get username from body
+      const { username } = req.query;
       const user = db.data.users[username];
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found.' });
-      }
-
-      const credential = user.credentials.find(cred => cred.credentialID === body.id);
+      const credential = db.data.credentials[body.id];
       if (!credential) {
-        return res.status(400).json({ error: 'Credential not found for this user.' });
+        return res.status(400).json({ error: 'Credential not found.' });
       }
-
       try {
         const verification = await verifyAuthenticationResponse({
-          response: body.response, // Pass the nested response object
+          response: body,
           expectedChallenge: user.challenge,
           expectedOrigin: expectedOrigin,
           expectedRPID: rpID,
           authenticator: credential,
         });
-
-        const { verified, authenticationInfo } = verification;
+        const { verified } = verification;
         if (verified) {
-          // Update the authenticator's counter
-          credential.counter = authenticationInfo.newCounter;
-          await db.write();
-
           const { privateKey, kid } = getCurrentSigningKey();
           const token = jwt.sign({ username: user.username }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
           res.json({ verified, token });
         } else {
-          res.status(401).json({ verified });
+          res.json({ verified });
         }
       } catch (error) {
         await logAndEmailError(error, 'Error in /api/auth/login-verify');
@@ -958,9 +859,13 @@ ${statusChecklist}
 
     // Sign the initial token and re-sign periodically
     signInstanceToken();
-    const tokenRotationTimer = setInterval(signInstanceToken, 30 * 60 * 1000); // Re-sign every 30 minutes
+    const sessionTokenTimer = setInterval(signInstanceToken, 30 * 60 * 1000);
+
+    // The key rotation timer is now also managed here
+    const keyRotationTimer = setInterval(rotateKeys, 60 * 60 * 1000);
     
-    return { app, tokenRotationTimer };
+    // Return the app and the timers so they can be managed by the caller
+    return { app, timers: [sessionTokenTimer, keyRotationTimer] };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');
