@@ -201,16 +201,14 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-    if (process.env.NODE_ENV !== 'test') {
-        app.use(csrf({ cookie: true }));
-        app.use(function (err, req, res, next) {
-          if (err.code !== 'EBADCSRFTOKEN') return next(err)
+    app.use(csrf({ cookie: true }));
+    app.use(function (err, req, res, next) {
+      if (err.code !== 'EBADCSRFTOKEN') return next(err)
 
-          // handle CSRF token errors here
-          res.status(403)
-          res.send('form tampered with')
-        })
-    }
+      // handle CSRF token errors here
+      console.error('CSRF Token Error:', err);
+      res.status(403).json({ error: 'Invalid CSRF token. Form tampered with.' });
+    })
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
