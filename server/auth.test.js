@@ -11,36 +11,33 @@ const __dirname = path.dirname(__filename);
 
 let app;
 let db;
-let tokenRotationTimer;
+let serverInstance; // To hold the server instance
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
-  // Create a single db instance for the test suite
   db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
-  // Create a mock sendEmail function
   const mockSendEmail = jest.fn();
-  // Initialize the app with the test database instance and mock emailer
   const server = await startServer(db, null, mockSendEmail, testDbPath);
   app = server.app;
-  tokenRotationTimer = server.tokenRotationTimer;
+  serverInstance = server.instance; // Store the instance
 });
 
 beforeEach(async () => {
-  // Reset the test database state before each test using the shared db instance
   db.data = { orders: [], users: {}, credentials: {} };
   await db.write();
 });
 
-afterAll(async () => {
-  clearInterval(tokenRotationTimer);
-  try {
-    await fs.unlink(testDbPath);
-  } catch (error) {
-    // Ignore the error if the file doesn't exist, but throw any other errors.
-    if (error.code !== 'ENOENT') {
-      throw error;
+afterAll((done) => {
+  serverInstance.close(async () => {
+    try {
+      await fs.unlink(testDbPath);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
     }
-  }
+    done();
+  });
 });
 
 describe('Auth Endpoints', () => {
