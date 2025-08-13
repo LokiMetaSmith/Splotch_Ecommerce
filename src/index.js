@@ -18,6 +18,8 @@ let isMetric = false; // To track unit preference
 let currentCutline = [];
 let currentBounds = null;
 let pricingConfig = null;
+let isGrayscale = false;
+let isSepia = false;
 
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
 let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
@@ -104,8 +106,8 @@ async function BootStrap() {
     }
     if (rotateLeftBtnEl) rotateLeftBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(-90));
     if (rotateRightBtnEl) rotateRightBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(90));
-    if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', applyGrayscaleFilter);
-    if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', applySepiaFilter);
+    if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', toggleGrayscaleFilter);
+    if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
     if (resizeSliderEl) {
         resizeSliderEl.addEventListener('input', (e) => {
             const percentage = parseInt(e.target.value, 10);
@@ -857,9 +859,9 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
     const inchDash = ppi;
     const inchGap = ppi / 4;
 
-    ctx.strokeStyle = 'rgba(128, 128, 128, 0.75)'; // Semi-transparent grey
-    ctx.lineWidth = 2; // Make it thicker
-    ctx.setLineDash([10, 10]); // A more visible dash pattern
+    ctx.strokeStyle = 'rgba(0, 100, 255, 0.9)'; // A strong, visible blue
+    ctx.lineWidth = 3; // Make it thicker
+    ctx.setLineDash([8, 4]); // "Marching ants" style
     ctx.strokeRect(
         bounds.left + offset.x,
         bounds.top + offset.y,
@@ -915,50 +917,89 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         redrawAll();
 
     } else if (originalImage) {
-        // Raster Image Rotation - always use the original image to prevent quality loss
-        const w = originalImage.width;
-        const h = originalImage.height;
+        // Use the current canvas dimensions, which represent the scaled image size
+        const w = canvas.width;
+        const h = canvas.height;
 
         // Swap dimensions for 90/270 degree rotations
         const newW = (angleDegrees === 90 || angleDegrees === -90) ? h : w;
         const newH = (angleDegrees === 90 || angleDegrees === -90) ? w : h;
 
+        // Create a new in-memory canvas to draw the rotated image on
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+
+        // Set the dimensions of the temp canvas to the new width and height
+        tempCanvas.width = newW;
+        tempCanvas.height = newH;
+
+        // Translate to the center of the temp canvas, rotate, and draw the current canvas content
+        tempCtx.translate(newW / 2, newH / 2);
+        tempCtx.rotate(angleDegrees * Math.PI / 180);
+
+        // Draw the image from the main canvas onto the temp canvas
+        // This preserves all current transformations (scale, filters)
+        tempCtx.drawImage(canvas, -w / 2, -h / 2);
+
+        // Now, update the main canvas with the rotated image
         canvas.width = newW;
         canvas.height = newH;
-
         ctx.clearRect(0, 0, newW, newH);
-        // Translate to the center of the new canvas, rotate, and draw the original image
-        ctx.translate(newW / 2, newH / 2);
-        ctx.rotate(angleDegrees * Math.PI / 180);
-        ctx.drawImage(originalImage, -w / 2, -h / 2, w, h);
+        ctx.drawImage(tempCanvas, 0, 0);
 
-        // Reset the transformation matrix
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        // Update bounds and price
+        currentBounds = { left: 0, top: 0, right: newW, bottom: newH, width: newW, height: newH };
+        calculateAndUpdatePrice();
     }
 }
 
-function applyGrayscaleFilter() {
-    if (!canvas || !ctx || !originalImage) return;
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        data[i] = avg; data[i + 1] = avg; data[i + 2] = avg;
+function redrawOriginalImageWithFilters() {
+    if (!originalImage || !ctx || !canvas) return;
+
+    // Start with the fresh, original image
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+
+    // Apply filters based on state
+    if (isGrayscale) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            data[i] = avg; data[i + 1] = avg; data[i + 2] = avg;
+        }
+        ctx.putImageData(imageData, 0, 0);
+    } else if (isSepia) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            data[i] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
+            data[i + 1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
+            data[i + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+        }
+        ctx.putImageData(imageData, 0, 0);
     }
-    ctx.putImageData(imageData, 0, 0);
 }
 
-function applySepiaFilter() {
+function toggleGrayscaleFilter() {
     if (!canvas || !ctx || !originalImage) return;
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-        const r = data[i], g = data[i + 1], b = data[i + 2];
-        data[i] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
-        data[i + 1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
-        data[i + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
-    }
-    ctx.putImageData(imageData, 0, 0);
+
+    const wasOn = isGrayscale;
+    isGrayscale = !wasOn; // Toggle state
+    isSepia = false; // Ensure sepia is off
+
+    redrawOriginalImageWithFilters();
+}
+
+function toggleSepiaFilter() {
+    if (!canvas || !ctx || !originalImage) return;
+
+    const wasOn = isSepia;
+    isSepia = !wasOn; // Toggle state
+    isGrayscale = false; // Ensure grayscale is off
+
+    redrawOriginalImageWithFilters();
 }
 
 function handleStandardResize(targetInches) {
