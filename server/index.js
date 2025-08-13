@@ -1,3 +1,17 @@
+// --- Global Error Handlers ---
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ [FATAL] Unhandled Rejection at:', promise, 'reason:', reason);
+  // Optional: exit process, but it's often better to log and monitor
+  // process.exit(1);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ [FATAL] Uncaught Exception:', error);
+  // It's generally recommended to exit after an uncaught exception
+  process.exit(1);
+});
+// -----------------------------
+
 import { startServer } from './server.js';
 import { initializeBot } from './bot.js';
 import { sendEmail } from './email.js';

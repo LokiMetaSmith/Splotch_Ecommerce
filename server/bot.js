@@ -30,21 +30,29 @@ function initializeBot(database) {
     bot.setMyCommands(commands);
 
     const listOrdersByStatus = (chatId, statuses, title) => {
-        const orders = db.data.orders.filter(o => statuses.includes(o.status));
+        try {
+            const orders = db.data.orders.filter(o => statuses.includes(o.status));
 
-        if (orders.length === 0) {
-            bot.sendMessage(chatId, `No orders with status: ${statuses.join(', ')}`);
-            return;
+            if (orders.length === 0) {
+                bot.sendMessage(chatId, `No orders with status: ${statuses.join(', ')}`)
+                   .catch(err => console.error('[TELEGRAM] Error sending message:', err));
+                return;
+            }
+
+            let list = `*${title}:*\n\n`;
+            orders.forEach(order => {
+                list += `• *Order ID:* ${order.orderId.substring(0, 8)}...\n`;
+                list += `  *Status:* ${order.status}\n`;
+                list += `  *Customer:* ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
+            });
+
+            bot.sendMessage(chatId, list, { parse_mode: 'Markdown' })
+               .catch(err => console.error('[TELEGRAM] Error sending message:', err));
+        } catch (error) {
+            console.error('[TELEGRAM] A critical error occurred in listOrdersByStatus:', error);
+            bot.sendMessage(chatId, 'Sorry, an internal error occurred while fetching the order list.')
+               .catch(err => console.error('[TELEGRAM] Error sending critical error message:', err));
         }
-
-        let list = `*${title}:*\n\n`;
-        orders.forEach(order => {
-            list += `• *Order ID:* ${order.orderId.substring(0, 8)}...\n`;
-            list += `  *Status:* ${order.status}\n`;
-            list += `  *Customer:* ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
-        });
-
-        bot.sendMessage(chatId, list, { parse_mode: 'Markdown' });
     };
 
     // Listen for the /jobs command
