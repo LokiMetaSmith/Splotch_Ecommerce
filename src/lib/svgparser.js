@@ -62,54 +62,6 @@ export class SVGParser {
         return this.svgRoot ? this.svgRoot.querySelector('style') : false;
     }
 
-    /**
-     * NOTE: This method relies on the `pathSegList` API, which is deprecated in modern browsers
-     * and has been removed from Chrome and Firefox. It may not function as expected.
-     * A robust solution requires a proper path data parser.
-     */
-    pathToAbsolute(path) {
-        if (!path || path.tagName !== 'path' || !path.pathSegList) {
-            console.warn("SvgParser.pathToAbsolute: pathSegList API is deprecated and may not be supported.");
-            return;
-        }
-
-        let x = 0, y = 0, x0 = 0, y0 = 0;
-        const seglist = path.pathSegList;
-
-        for (let i = 0; i < seglist.numberOfItems; i++) {
-            const s = seglist.getItem(i);
-            const command = s.pathSegTypeAsLetter;
-
-            if (/[MLHVCSQTA]/.test(command)) {
-                if ('x' in s) x = s.x;
-                if ('y' in s) y = s.y;
-            } else {
-                let x1 = 'x1' in s ? x + s.x1 : 0;
-                let y1 = 'y1' in s ? y + s.y1 : 0;
-                let x2 = 'x2' in s ? x + s.x2 : 0;
-                let y2 = 'y2' in s ? y + s.y2 : 0;
-                if ('x' in s) x += s.x;
-                if ('y' in s) y += s.y;
-
-                switch (command) {
-                    case 'm': seglist.replaceItem(path.createSVGPathSegMovetoAbs(x, y), i); break;
-                    case 'l': seglist.replaceItem(path.createSVGPathSegLinetoAbs(x, y), i); break;
-                    case 'h': seglist.replaceItem(path.createSVGPathSegLinetoHorizontalAbs(x), i); break;
-                    case 'v': seglist.replaceItem(path.createSVGPathSegLinetoVerticalAbs(y), i); break;
-                    case 'c': seglist.replaceItem(path.createSVGPathSegCurvetoCubicAbs(x, y, x1, y1, x2, y2), i); break;
-                    case 's': seglist.replaceItem(path.createSVGPathSegCurvetoCubicSmoothAbs(x, y, x2, y2), i); break;
-                    case 'q': seglist.replaceItem(path.createSVGPathSegCurvetoQuadraticAbs(x, y, x1, y1), i); break;
-                    case 't': seglist.replaceItem(path.createSVGPathSegCurvetoQuadraticSmoothAbs(x, y), i); break;
-                    case 'a': seglist.replaceItem(path.createSVGPathSegArcAbs(x, y, s.r1, s.r2, s.angle, s.largeArcFlag, s.sweepFlag), i); break;
-                    case 'z': case 'Z': x = x0; y = y0; break;
-                }
-            }
-            if (command.toUpperCase() === 'M') {
-                x0 = x;
-                y0 = y;
-            }
-        }
-    }
 
     transformParse(transformString) {
         const CMD_SPLIT_RE = /\s*(matrix|translate|scale|rotate|skewX|skewY)\s*\(\s*(.*?)\s*\)[\s,]*/;
@@ -185,35 +137,6 @@ export class SVGParser {
         }
     }
 
-    splitPath(path) {
-        if (path.tagName !== 'path' || !path.parentElement || !path.pathSegList) return;
-
-        const seglist = Array.from(path.pathSegList);
-        if (seglist.filter(s => s.pathSegTypeAsLetter.toUpperCase() === 'M').length <= 1) {
-            return; // No subpaths to split
-        }
-        
-        const subpaths = [];
-        let currentPath = null;
-        
-        seglist.forEach(seg => {
-            const command = seg.pathSegTypeAsLetter;
-            if (command.toUpperCase() === 'M') {
-                currentPath = path.cloneNode(false);
-                currentPath.setAttribute('d', '');
-                for(const attr of path.attributes){
-                    if(attr.name !== 'd'){
-                        currentPath.setAttribute(attr.name, attr.value);
-                    }
-                }
-                subpaths.push(currentPath);
-            }
-            currentPath.pathSegList.appendItem(seg);
-        });
-
-        subpaths.forEach(p => path.parentElement.insertBefore(p, path));
-        path.parentElement.removeChild(path);
-    }
     
     recurse(element, func) {
         const children = Array.from(element.children);
@@ -221,8 +144,109 @@ export class SVGParser {
         func(element);
     }
 
+    parsePath(d) {
+        const COMMAND = /([a-zA-Z])/;
+        const WSP = /[\s,]+/;
+        const tokens = d.split(WSP).filter(t => t.length > 0);
+
+        const polygons = [];
+        let currentPolygon = [];
+        let cx = 0, cy = 0; // current point
+        let startX = 0, startY = 0; // start of current subpath
+
+        let command = '';
+        while(tokens.length > 0) {
+            let token = tokens.shift();
+            const isCommand = token.match(COMMAND);
+            if (isCommand) {
+                command = token;
+            } else {
+                tokens.unshift(token); // put it back
+            }
+
+            // Helper to get the next number from tokens
+            const next = () => parseFloat(tokens.shift());
+
+            switch(command) {
+                case 'M':
+                    if (currentPolygon.length > 0) polygons.push(currentPolygon);
+                    currentPolygon = [];
+                    cx = next(); cy = next();
+                    currentPolygon.push({x: cx, y: cy});
+                    startX = cx; startY = cy;
+                    command = 'L'; // Subsequent pairs are lineto
+                    break;
+                case 'm':
+                    if (currentPolygon.length > 0) polygons.push(currentPolygon);
+                    currentPolygon = [];
+                    cx += next(); cy += next();
+                    currentPolygon.push({x: cx, y: cy});
+                    startX = cx; startY = cy;
+                    command = 'l'; // Subsequent pairs are lineto
+                    break;
+                case 'L':
+                    cx = next(); cy = next();
+                    currentPolygon.push({x: cx, y: cy});
+                    break;
+                case 'l':
+                    cx += next(); cy += next();
+                    currentPolygon.push({x: cx, y: cy});
+                    break;
+                case 'H':
+                    cx = next();
+                    currentPolygon.push({x: cx, y: cy});
+                    break;
+                case 'h':
+                    cx += next();
+                    currentPolygon.push({x: cx, y: cy});
+                    break;
+                case 'V':
+                    cy = next();
+                    currentPolygon.push({x: cx, y: cy});
+                    break;
+                case 'v':
+                    cy += next();
+                    currentPolygon.push({x: cx, y: cy});
+                    break;
+                case 'Z':
+                case 'z':
+                    if (currentPolygon.length > 0) {
+                        // Close the path by adding the starting point
+                        currentPolygon.push({x: startX, y: startY});
+                        polygons.push(currentPolygon);
+                        currentPolygon = [];
+                    }
+                    // The "pen" moves back to the start of the subpath
+                    cx = startX;
+                    cy = startY;
+                    break;
+                // --- Approximating Curves as Lines ---
+                case 'C': cx = next(); cy = next(); next(); next(); next(); next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 'c': cx += next(); cy += next(); next(); next(); next(); next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 'S': cx = next(); cy = next(); next(); next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 's': cx += next(); cy += next(); next(); next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 'Q': cx = next(); cy = next(); next(); next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 'q': cx += next(); cy += next(); next(); next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 'T': cx = next(); cy = next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 't': cx += next(); cy += next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 'A': cx = next(); cy = next(); next(); next(); next(); next(); next(); currentPolygon.push({x: cx, y: cy}); break;
+                case 'a': cx += next(); cy += next(); next(); next(); next(); next(); next(); currentPolygon.push({x: cx, y: cy}); break;
+
+                default:
+                    // If we encounter an unknown command, we stop parsing this path
+                    console.warn(`Unsupported SVG path command: ${command}`);
+                    if (currentPolygon.length > 0) polygons.push(currentPolygon);
+                    return polygons;
+            }
+        }
+        if (currentPolygon.length > 0) {
+            polygons.push(currentPolygon);
+        }
+        return polygons;
+    }
+
     polygonify(element) {
-        const poly = [];
+        let poly = []; // Use let since it can be reassigned
         switch (element.tagName) {
             case 'polygon':
             case 'polyline':
@@ -254,9 +278,16 @@ export class SVGParser {
                 }
                 break;
             case 'path':
-                // Linearizing paths requires the GeometryUtil library and a path data parser
-                // since pathSegList is deprecated. This is a placeholder for that complex logic.
-                console.warn("Polygonify for <path> elements is complex and not fully implemented in this version.");
+                const d = element.getAttribute('d');
+                if (d) {
+                    // A path can contain multiple sub-paths, so parsePath returns an array of polygons.
+                    // For the purpose of this function, we'll return the first one.
+                    // A more robust implementation might handle multiple polygons differently.
+                    const polygons = this.parsePath(d);
+                    if (polygons.length > 0) {
+                        poly = polygons[0]; // Return the first polygon
+                    }
+                }
                 break;
         }
         
