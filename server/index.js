@@ -69,7 +69,8 @@ async function main() {
     }
 
     const bot = initializeBot(db);
-    const { app } = await startServer(db, bot, sendEmail);
+    // startServer now returns the app and timers
+    const { app, timers } = await startServer(db, bot, sendEmail);
 
   const port = process.env.PORT || 3000;
 

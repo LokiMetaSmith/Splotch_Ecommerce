@@ -14,16 +14,18 @@ describe('Server', () => {
     let app;
     let db;
     let bot;
-    let serverInstance; // To hold the server instance for closing
+    let serverInstance;
+    let timers;
     const testDbPath = path.join(__dirname, 'test-db.json');
 
     beforeAll(async () => {
         db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
         bot = initializeBot(db);
         const mockSendEmail = jest.fn();
-        const server = await startServer(db, bot, mockSendEmail, testDbPath);
-        app = server.app;
-        serverInstance = server.instance; // Store the instance
+        const serverResult = await startServer(db, bot, mockSendEmail, testDbPath);
+        app = serverResult.app;
+        timers = serverResult.timers;
+        serverInstance = app.listen();
     });
 
     beforeEach(async () => {
@@ -32,13 +34,14 @@ describe('Server', () => {
     });
 
     afterAll((done) => {
+        // Clear all timers
+        timers.forEach(clearInterval);
         // Stop the bot from polling
-        if (bot && bot.isPolling()) {
+        if (bot && typeof bot.isPolling === 'function' && bot.isPolling()) {
             bot.stopPolling();
         }
         // Close the server
         serverInstance.close(() => {
-            // Clean up the test database file
             if (fs.existsSync(testDbPath)) {
                 fs.unlinkSync(testDbPath);
             }

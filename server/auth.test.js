@@ -11,15 +11,19 @@ const __dirname = path.dirname(__filename);
 
 let app;
 let db;
-let serverInstance; // To hold the server instance
+let serverInstance;
+let timers;
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
   db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
   const mockSendEmail = jest.fn();
-  const server = await startServer(db, null, mockSendEmail, testDbPath);
-  app = server.app;
-  serverInstance = server.instance; // Store the instance
+  // Get the app and timers from startServer
+  const serverResult = await startServer(db, null, mockSendEmail, testDbPath);
+  app = serverResult.app;
+  timers = serverResult.timers;
+  // Start a server for testing
+  serverInstance = app.listen();
 });
 
 beforeEach(async () => {
@@ -28,6 +32,9 @@ beforeEach(async () => {
 });
 
 afterAll((done) => {
+  // Clear all timers
+  timers.forEach(clearInterval);
+  // Close the server
   serverInstance.close(async () => {
     try {
       await fs.unlink(testDbPath);
