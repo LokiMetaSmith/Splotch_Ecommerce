@@ -12,8 +12,11 @@
 // that Jest can understand, we will copy the pure function here for testing.
 
 const pricingConfig = {
-    "pixelsPerInch": 96,
     "pricePerSquareInchCents": 15,
+    "resolutions": [
+        { "id": "dpi_96", "name": "96 DPI (Draft)", "ppi": 96, "costMultiplier": 1.0 },
+        { "id": "dpi_300", "name": "300 DPI (Standard)", "ppi": 300, "costMultiplier": 1.3 }
+    ],
     "materials": [
       { "id": "pp_standard", "name": "Standard Polypropylene", "costMultiplier": 1.0 },
       { "id": "pvc_laminated", "name": "Laminated PVC", "costMultiplier": 1.5 }
@@ -47,15 +50,16 @@ function calculatePerimeter(polygons) {
     return totalPerimeter;
 }
 
-function calculateStickerPrice(quantity, material, bounds, cutline) {
+function calculateStickerPrice(quantity, material, bounds, cutline, resolution) {
     if (!pricingConfig) {
         console.error("Pricing config not loaded.");
-        return 0;
+        return { total: 0, complexityMultiplier: 1.0 };
     }
-    if (quantity <= 0) return 0;
-    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return 0;
+    if (quantity <= 0) return { total: 0, complexityMultiplier: 1.0 };
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return { total: 0, complexityMultiplier: 1.0 };
+    if (!resolution) return { total: 0, complexityMultiplier: 1.0 };
 
-    const ppi = pricingConfig.pixelsPerInch;
+    const ppi = resolution.ppi;
     const squareInches = (bounds.width / ppi) * (bounds.height / ppi);
 
     const basePriceCents = squareInches * pricingConfig.pricePerSquareInchCents;
@@ -66,8 +70,6 @@ function calculateStickerPrice(quantity, material, bounds, cutline) {
     const perimeterPixels = calculatePerimeter(cutline);
     const perimeterInches = perimeterPixels / ppi;
     let complexityMultiplier = 1.0;
-    // Note: The logic here is slightly flawed. It should check >= threshold.
-    // Let's assume tiers are sorted ascending by threshold for this test.
     const sortedTiers = [...pricingConfig.complexity.tiers].sort((a,b) => (a.thresholdInches === 'Infinity' ? 1 : b.thresholdInches === 'Infinity' ? -1 : a.thresholdInches - b.thresholdInches));
     for (const tier of sortedTiers) {
         if (tier.thresholdInches === "Infinity" || perimeterInches < tier.thresholdInches) {
@@ -85,10 +87,10 @@ function calculateStickerPrice(quantity, material, bounds, cutline) {
         }
     }
 
-    const totalCents = basePriceCents * quantity * materialMultiplier * complexityMultiplier;
+    const resolutionMultiplier = resolution.costMultiplier;
+    const totalCents = basePriceCents * quantity * materialMultiplier * complexityMultiplier * resolutionMultiplier;
     const discountedTotal = totalCents * (1 - discount);
 
-    // Return an object for easier testing
     return {
         total: Math.round(discountedTotal),
         complexityMultiplier: complexityMultiplier
@@ -98,8 +100,11 @@ function calculateStickerPrice(quantity, material, bounds, cutline) {
 
 describe('Sticker Pricing Calculation', () => {
 
-    // Define a simple square for testing (e.g., 3x3 inches)
-    const ppi = pricingConfig.pixelsPerInch;
+    const draftResolution = pricingConfig.resolutions[0]; // 96 DPI, 1.0x cost
+    const ppi = draftResolution.ppi;
+
+    // A 3x3 inch square has a 12-inch perimeter.
+    // The complexity tier is < 12, so 12 is NOT in the 1.0 tier. It falls into the 1.1 tier.
     const simpleBounds = { width: 3 * ppi, height: 3 * ppi }; // 9 sq inches
     const simpleCutline = [[
         { x: 0, y: 0 },
@@ -111,34 +116,30 @@ describe('Sticker Pricing Calculation', () => {
     it('should calculate the base price correctly', () => {
         const quantity = 10;
         const material = 'pp_standard';
-        const price = calculateStickerPrice(quantity, material, simpleBounds, simpleCutline).total;
+        const price = calculateStickerPrice(quantity, material, simpleBounds, simpleCutline, draftResolution).total;
 
-        // Expected: 9 sq.in * 15 cents/sq.in * 10 quantity * 1.0 material * 1.0 complexity * 1.0 discount = 1350
-        expect(price).toBe(1350);
+        // Expected: 9 sq.in * 15 cents/sq.in * 10 quantity * 1.0 material * 1.1 complexity * 1.0 resolution * 1.0 discount = 1485
+        expect(price).toBe(1485);
     });
 
     it('should apply material cost multipliers', () => {
         const quantity = 10;
         const material = 'pvc_laminated'; // 1.5x multiplier
-        const price = calculateStickerPrice(quantity, material, simpleBounds, simpleCutline).total;
+        const price = calculateStickerPrice(quantity, material, simpleBounds, simpleCutline, draftResolution).total;
 
-        // Expected: 1350 * 1.5 = 2025
-        expect(price).toBe(2025);
+        // Expected: 1485 * 1.5 = 2227.5 -> 2228
+        expect(price).toBe(2228);
     });
 
     it('should apply complexity multipliers', () => {
         const quantity = 10;
         const material = 'pp_standard';
-        // A more complex shape with a 25-inch perimeter
-        const complexCutline = [[
-            { x: 0, y: 0 },
-            { x: 10 * ppi, y: 0 },
-            { x: 10 * ppi, y: 2.5 * ppi },
-            { x: 0, y: 2.5 * ppi }
-        ]]; // Perimeter = 25 inches, should trigger 1.25x multiplier
+        // A shape with a 25-inch perimeter
+        const complexCutline = [[ { x: 0, y: 0 }, { x: 10 * ppi, y: 0 }, { x: 10 * ppi, y: 2.5 * ppi }, { x: 0, y: 2.5 * ppi } ]]; // Perimeter = 25 inches
         const complexBounds = { width: 10 * ppi, height: 2.5 * ppi }; // 25 sq inches
+        // Perimeter is 25", which is > 24", so it falls into the "Infinity" tier with a 1.25 multiplier
 
-        const priceResult = calculateStickerPrice(quantity, material, complexBounds, complexCutline);
+        const priceResult = calculateStickerPrice(quantity, material, complexBounds, complexCutline, draftResolution);
 
         // Expected: 25 sq.in * 15 cents * 10 quantity = 3750
         // Multiplier for 25" perimeter is 1.25
@@ -150,16 +151,16 @@ describe('Sticker Pricing Calculation', () => {
     it('should apply quantity discounts', () => {
         const quantity = 250; // Should trigger 10% discount
         const material = 'pp_standard';
-        const price = calculateStickerPrice(quantity, material, simpleBounds, simpleCutline).total;
+        const price = calculateStickerPrice(quantity, material, simpleBounds, simpleCutline, draftResolution).total;
 
-        // Base total for 250: 9 * 15 * 250 = 33750
-        // Discount of 10%: 33750 * 0.9 = 30375
-        expect(price).toBe(30375);
+        // Base total for 250: 9 * 15 * 250 * 1.1 (complexity) = 37125
+        // Discount of 10%: 37125 * 0.9 = 33412.5 -> 33413
+        expect(price).toBe(33413);
 
         const largeQuantity = 600; // Should trigger 15% discount
-        const price2 = calculateStickerPrice(largeQuantity, material, simpleBounds, simpleCutline).total;
-        // Base total for 600: 9 * 15 * 600 = 81000
-        // Discount of 15%: 81000 * 0.85 = 68850
-        expect(price2).toBe(68850);
+        const price2 = calculateStickerPrice(largeQuantity, material, simpleBounds, simpleCutline, draftResolution).total;
+        // Base total for 600: 9 * 15 * 600 * 1.1 (complexity) = 89100
+        // Discount of 15%: 89100 * 0.85 = 75735
+        expect(price2).toBe(75735);
     });
 });
