@@ -676,6 +676,7 @@ function loadFileAsImage(file) {
 
                     // Update the price now that we have dimensions
                     calculateAndUpdatePrice();
+                    drawBoundingBox(currentBounds); // Draw the initial bounding box
                 }
             };
             img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
@@ -947,9 +948,10 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         ctx.clearRect(0, 0, newW, newH);
         ctx.drawImage(tempCanvas, 0, 0);
 
-        // Update bounds and price
+        // Update bounds and price, and redraw the bounding box
         currentBounds = { left: 0, top: 0, right: newW, bottom: newH, width: newW, height: newH };
         calculateAndUpdatePrice();
+        drawBoundingBox(currentBounds);
     }
 }
 
@@ -1062,8 +1064,9 @@ function handleResize(percentage) {
             currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
             currentCutline = [[ { x: 0, y: 0 }, { x: newWidth, y: 0 }, { x: newWidth, y: newHeight }, { x: 0, y: newHeight } ]];
 
-            // Trigger the price update
+            // Trigger the price update and redraw the bounding box
             calculateAndUpdatePrice();
+            drawBoundingBox(currentBounds);
         }
     }
 }
