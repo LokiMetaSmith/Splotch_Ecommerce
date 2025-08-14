@@ -64,7 +64,7 @@ describe('Auth Endpoints', () => {
     expect(res.statusCode).toEqual(200);
     expect(res.body.challenge).toBeDefined();
 
-    const db = await JSONFilePreset(testDbPath, {});
+    //const db = await JSONFilePreset(testDbPath, {});
     await db.read();
     expect(db.data.users['testuser']).toBeDefined();
   });

@@ -22,10 +22,21 @@ import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { fileTypeFromFile } from 'file-type';
-
+import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+// Load pricing configuration
+let pricingConfig = {};
+try {
+    const pricingData = fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8');
+    pricingConfig = JSON.parse(pricingData);
+    console.log('[SERVER] Pricing configuration loaded.');
+} catch (error) {
+    console.error('[SERVER] FATAL: Could not load pricing.json.', error);
+    process.exit(1);
+}
 
 import { randomBytes } from 'crypto';
 
@@ -48,7 +59,7 @@ let app;
 const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
 
 // Define an async function to contain all server logic
-async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
+async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -124,7 +135,10 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
     console.log('[SERVER] Initializing Square client...');
     if (!process.env.SQUARE_ACCESS_TOKEN) {
       console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
-      process.exit(1);
+      // In a test environment, we don't want to kill the test runner.
+      if (process.env.NODE_ENV !== 'test') {
+        process.exit(1);
+      }
     }
     const squareClient = new SquareClient({
       version: '2025-07-16',
@@ -132,6 +146,7 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
       environment: SquareEnvironment.Sandbox,
     });
     console.log('[SERVER] Verifying connection to Square servers...');
+    if (process.env.NODE_ENV !== 'test') {
     try {
         await new Promise((resolve, reject) => {
             dns.lookup('connect.squareup.com', (err) => {
@@ -139,6 +154,13 @@ async function startServer(db, bot, dbPath = path.join(__dirname, 'db.json')) {
                 resolve();
             });
         });
+		-            console.log('âœ… [SERVER] DNS resolution successful. Network connection appears to be working.');
+        } catch (error) {
+            console.error('âŒ [FATAL] Could not resolve Square API domain.');
+            console.error('   This is likely a network, DNS, or firewall issue on the server.');
+            console.error('   Full Error:', error.message);
+            process.exit(1);
+        }
         console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
     } catch (error) {
         console.error('❌ [FATAL] Could not resolve Square API domain.');

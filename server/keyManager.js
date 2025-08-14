@@ -64,4 +64,4 @@ export const getJwks = async () => {
 // Initial key generation
 rotateKeys();
 // Set up automatic rotation - This will be handled by the main server entry point
-// setInterval(rotateKeys, KEY_LIFETIME_MS);
+ setInterval(rotateKeys, KEY_LIFETIME_MS);
