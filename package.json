@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "jest",
     "dev": "vite",
     "styles": "npx tailwindcss build styles.css -o output.css",
     "build": "vite build --base=./",
