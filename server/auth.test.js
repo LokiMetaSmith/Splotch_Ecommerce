@@ -1,5 +1,3 @@
-import pkg from '@jest/globals';
-const { jest } = pkg;
 import request from 'supertest';
 import { startServer } from './server.js';
 import { JSONFilePreset } from 'lowdb/node';
