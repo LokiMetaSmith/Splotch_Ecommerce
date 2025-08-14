@@ -1,4 +1,5 @@
-import { jest } from '@jest/globals';
+import pkg from '@jest/globals';
+const { jest } = pkg;
 import { startServer } from '../server/server.js';
 import { initializeBot } from '../server/bot.js';
 import { JSONFilePreset } from 'lowdb/node';
