@@ -47,6 +47,7 @@
     "vite": "^5.1.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.45.0",
     "autoprefixer": "^10.4.21",
     "image-size": "^1.1.1",
     "postcss": "^8.5.6",
