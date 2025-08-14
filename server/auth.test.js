@@ -10,31 +10,28 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let app;
-let db;
 let serverInstance;
 let timers;
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
-  db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
+  // Let the server create its own DB instance by only passing the path
   const mockSendEmail = jest.fn();
-  // Get the app and timers from startServer
-  const serverResult = await startServer(db, null, mockSendEmail, testDbPath);
+  const serverResult = await startServer(null, null, mockSendEmail, testDbPath);
   app = serverResult.app;
   timers = serverResult.timers;
-  // Start a server for testing
   serverInstance = app.listen();
 });
 
 beforeEach(async () => {
+  // Clear the test database before each test by writing default data to it
+  const db = await JSONFilePreset(testDbPath, {});
   db.data = { orders: [], users: {}, credentials: {} };
   await db.write();
 });
 
 afterAll((done) => {
-  // Clear all timers
   timers.forEach(clearInterval);
-  // Close the server
   serverInstance.close(async () => {
     try {
       await fs.unlink(testDbPath);
@@ -68,7 +65,8 @@ describe('Auth Endpoints', () => {
     expect(res.statusCode).toEqual(200);
     expect(res.body.challenge).toBeDefined();
 
-    // The user should now exist in the db instance shared with the server
+    // The user should now exist in the db file
+    const db = await JSONFilePreset(testDbPath, {});
     await db.read();
     expect(db.data.users['testuser']).toBeDefined();
   });
