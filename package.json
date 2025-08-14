@@ -48,8 +48,10 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",
+    "image-size": "^1.1.1",
     "postcss": "^8.5.6",
     "serve": "^14.2.4",
+    "svg-parser": "^2.0.4",
     "tailwindcss": "^4.1.11"
   }
 }

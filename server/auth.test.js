@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { describe, beforeAll, beforeEach, afterAll, it, expect, jest } from '@jest/globals';
 import request from 'supertest';
 import { startServer } from './server.js';
 import { JSONFilePreset } from 'lowdb/node';
@@ -29,18 +29,16 @@ beforeEach(async () => {
   await db.write();
 });
 
-afterAll((done) => {
+afterAll(async () => {
   clearInterval(tokenRotationTimer);
-  serverInstance.close(async () => {
-    try {
-      await fs.unlink(testDbPath);
-    } catch (error) {
-      if (error.code !== 'ENOENT') {
-        throw error;
-      }
+  await new Promise(resolve => serverInstance.close(resolve));
+  try {
+    await fs.unlink(testDbPath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
     }
-    done();
-  });
+  }
 });
 
 describe('Auth Endpoints', () => {
