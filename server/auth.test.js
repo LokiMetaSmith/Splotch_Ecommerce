@@ -11,16 +11,16 @@ const __dirname = path.dirname(__filename);
 
 let app;
 let db;
-let serverInstance;
-let timers;
+let serverInstance; // To hold the server instance
+let tokenRotationTimer; // To hold the timer for clearing
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
   db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
   const mockSendEmail = jest.fn();
-  const serverResult = await startServer(db, null, mockSendEmail, testDbPath);
-  app = serverResult.app;
-  timers = serverResult.timers;
+  const server = await startServer(db, null, mockSendEmail, testDbPath);
+  app = server.app;
+  tokenRotationTimer = server.tokenRotationTimer;
   serverInstance = app.listen();
 });
 
@@ -30,7 +30,7 @@ beforeEach(async () => {
 });
 
 afterAll((done) => {
-  timers.forEach(clearInterval);
+  clearInterval(tokenRotationTimer);
   serverInstance.close(async () => {
     try {
       await fs.unlink(testDbPath);

@@ -87,6 +87,8 @@ function initializeBot(database) {
       deleteMessage: () => Promise.resolve(),
       onText: () => {},
       setMyCommands: () => {},
+      isPolling: () => false,
+      stopPolling: () => {},
     };
   }
   return bot;

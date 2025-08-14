@@ -72,8 +72,7 @@ function calculateStickerPrice(quantity, material, bounds, cutline, resolution) 
     let complexityMultiplier = 1.0;
     const sortedTiers = [...pricingConfig.complexity.tiers].sort((a,b) => (a.thresholdInches === 'Infinity' ? 1 : b.thresholdInches === 'Infinity' ? -1 : a.thresholdInches - b.thresholdInches));
     for (const tier of sortedTiers) {
-        // Find the first tier that the perimeter is less than or equal to.
-        if (perimeterInches <= tier.thresholdInches) {
+        if (tier.thresholdInches === "Infinity" || perimeterInches < tier.thresholdInches) {
             complexityMultiplier = tier.multiplier;
             break;
         }
