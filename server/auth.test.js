@@ -1,4 +1,5 @@
-import { jest } from '@jest/globals';
+import pkg from '@jest/globals';
+const { jest } = pkg;
 import request from 'supertest';
 import { startServer } from './server.js';
 import { JSONFilePreset } from 'lowdb/node';
@@ -16,11 +17,8 @@ let timers;
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
-  // Create a single, shared db instance for all tests in this file
   db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
-
   const mockSendEmail = jest.fn();
-  // Pass the db instance to the server
   const serverResult = await startServer(db, null, mockSendEmail, testDbPath);
   app = serverResult.app;
   timers = serverResult.timers;
@@ -28,13 +26,11 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  // Reset the data using the shared db instance
   db.data = { orders: [], users: {}, credentials: {} };
   await db.write();
 });
 
 afterAll((done) => {
-  // Clear timers and close the server
   timers.forEach(clearInterval);
   serverInstance.close(async () => {
     try {
@@ -69,7 +65,7 @@ describe('Auth Endpoints', () => {
     expect(res.statusCode).toEqual(200);
     expect(res.body.challenge).toBeDefined();
 
-    // The user should now exist in the shared db instance
+    const db = await JSONFilePreset(testDbPath, {});
     await db.read();
     expect(db.data.users['testuser']).toBeDefined();
   });
