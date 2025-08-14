@@ -10,27 +10,31 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let app;
+let db;
 let serverInstance;
 let timers;
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
-  // Let the server create its own DB instance by only passing the path
+  // Create a single, shared db instance for all tests in this file
+  db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
+
   const mockSendEmail = jest.fn();
-  const serverResult = await startServer(null, null, mockSendEmail, testDbPath);
+  // Pass the db instance to the server
+  const serverResult = await startServer(db, null, mockSendEmail, testDbPath);
   app = serverResult.app;
   timers = serverResult.timers;
   serverInstance = app.listen();
 });
 
 beforeEach(async () => {
-  // Clear the test database before each test by writing default data to it
-  const db = await JSONFilePreset(testDbPath, {});
+  // Reset the data using the shared db instance
   db.data = { orders: [], users: {}, credentials: {} };
   await db.write();
 });
 
 afterAll((done) => {
+  // Clear timers and close the server
   timers.forEach(clearInterval);
   serverInstance.close(async () => {
     try {
@@ -65,8 +69,7 @@ describe('Auth Endpoints', () => {
     expect(res.statusCode).toEqual(200);
     expect(res.body.challenge).toBeDefined();
 
-    // The user should now exist in the db file
-    const db = await JSONFilePreset(testDbPath, {});
+    // The user should now exist in the shared db instance
     await db.read();
     expect(db.data.users['testuser']).toBeDefined();
   });
