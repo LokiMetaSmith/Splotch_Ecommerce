@@ -1,8 +1,6 @@
 /** @type {import('jest').Config} */
-const config = {
+export default {
   testEnvironment: 'node',
   testMatch: ['**/*.test.js'],
   transform: {},
 };
-
-export default config;

@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { describe, beforeAll, beforeEach, afterAll, it, expect, jest } from '@jest/globals';
 import { startServer } from '../server/server.js';
 import { initializeBot } from '../server/bot.js';
 import { JSONFilePreset } from 'lowdb/node';
@@ -33,19 +33,18 @@ describe('Server', () => {
         await db.write();
     });
 
-    afterAll((done) => {
+    afterAll(async () => {
         clearInterval(tokenRotationTimer);
         // Stop the bot from polling
-        if (bot && typeof bot.isPolling === 'function' && bot.isPolling()) {
-            bot.stopPolling();
+        if (bot && bot.isPolling()) {
+            await bot.stopPolling();
         }
         // Close the server
-        serverInstance.close(() => {
+        await new Promise(resolve => serverInstance.close(resolve));
+        // Clean up the test database file
             if (fs.existsSync(testDbPath)) {
                 fs.unlinkSync(testDbPath);
             }
-            done();
-        });
     });
 
     it('should respond to ping', async () => {
