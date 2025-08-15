@@ -53,13 +53,13 @@ const signInstanceToken = () => {
     );
     console.log(`[SERVER] Signed new session token with key ID: ${kid}`);
 };
-let db;
 let app;
 
 const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
 
 // Define an async function to contain all server logic
-async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
+async function startServer(bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
+  const db = await JSONFilePreset(dbPath, defaultData);
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -67,8 +67,6 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     `http://localhost:3000/oauth2callback`
   );
 
-   db = await JSONFilePreset(dbPath, defaultData);
-  
   async function logAndEmailError(error, context = 'General Error') {
     console.error(`[${context}]`, error);
     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
@@ -107,7 +105,6 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     }
 
     // --- Database Setup ---
-    db = await JSONFilePreset(dbPath, defaultData);
     console.log('[SERVER] LowDB database initialized at:', dbPath);
 
     // Load the refresh token from the database if it exists
@@ -147,26 +144,20 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     });
     console.log('[SERVER] Verifying connection to Square servers...');
     if (process.env.NODE_ENV !== 'test') {
-    try {
-        await new Promise((resolve, reject) => {
-            dns.lookup('connect.squareup.com', (err) => {
-                if (err) return reject(err);
-                resolve();
+        try {
+            await new Promise((resolve, reject) => {
+                dns.lookup('connect.squareup.com', (err) => {
+                    if (err) return reject(err);
+                    resolve();
+                });
             });
-        });
-		-            console.log('âœ… [SERVER] DNS resolution successful. Network connection appears to be working.');
+            console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
         } catch (error) {
-            console.error('âŒ [FATAL] Could not resolve Square API domain.');
+            console.error('❌ [FATAL] Could not resolve Square API domain.');
             console.error('   This is likely a network, DNS, or firewall issue on the server.');
             console.error('   Full Error:', error.message);
             process.exit(1);
         }
-        console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
-    } catch (error) {
-        console.error('❌ [FATAL] Could not resolve Square API domain.');
-        console.error('   This is likely a network, DNS, or firewall issue on the server.');
-        console.error('   Full Error:', error.message);
-        process.exit(1);
     }
     console.log('[SERVER] Square client initialized.');
   // --- NEW: Local Sanity Check for API properties ---
@@ -885,7 +876,7 @@ ${statusChecklist}
     const keyRotationTimer = setInterval(rotateKeys, 60 * 60 * 1000);
     
     // Return the app and the timers so they can be managed by the caller
-    return { app, timers: [sessionTokenTimer, keyRotationTimer] };
+    return { app, timers: [sessionTokenTimer, keyRotationTimer], db };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');

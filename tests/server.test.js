@@ -15,16 +15,19 @@ describe('Server', () => {
     let db;
     let bot;
     let serverInstance; // To hold the server instance for closing
-    let tokenRotationTimer; // To hold the timer for clearing
+    let timers; // To hold the timer for clearing
     const testDbPath = path.join(__dirname, 'test-db.json');
 
     beforeAll(async () => {
-        db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
-        bot = initializeBot(db);
+        // db will be initialized by startServer, but we need the bot before that.
+        // For the purpose of the test, we can create a temporary db instance for the bot.
+        const tempDb = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
+        bot = initializeBot(tempDb);
         const mockSendEmail = jest.fn();
-        const server = await startServer(db, bot, mockSendEmail, testDbPath);
+        const server = await startServer(bot, mockSendEmail, testDbPath);
         app = server.app;
-        tokenRotationTimer = server.tokenRotationTimer;
+        timers = server.timers;
+        db = server.db; // Get the db instance from the server
         serverInstance = app.listen(); // Start the server
     });
 
@@ -34,7 +37,7 @@ describe('Server', () => {
     });
 
     afterAll(async () => {
-        clearInterval(tokenRotationTimer);
+        timers.forEach(timer => clearInterval(timer));
         // Stop the bot from polling
         if (bot && bot.isPolling()) {
             await bot.stopPolling();
