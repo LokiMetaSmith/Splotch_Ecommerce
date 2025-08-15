@@ -25,6 +25,7 @@
     "express-validator": "^7.2.1",
     "googleapis": "^140.0.1",
     "image-size": "^1.2.1",
+    "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
     "lowdb": "^7.0.1",
     "multer": "^2.0.2",
