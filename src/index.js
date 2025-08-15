@@ -443,7 +443,7 @@ async function handlePaymentFormSubmit(event) {
         const authResponse = await fetch(`${serverUrl}/api/auth/issue-temp-token`, {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
             body: JSON.stringify({ email }),
         });
 
@@ -484,7 +484,7 @@ async function handlePaymentFormSubmit(event) {
             credentials: 'include',
             headers: {
                 'Authorization': `Bearer ${tempAuthToken}`,
-                'X-CSRF-Token': csrfToken
+                'CSRF-Token': csrfToken
             },
             body: uploadFormData,
         });
@@ -558,7 +558,7 @@ async function handlePaymentFormSubmit(event) {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${tempAuthToken}`,
-                'X-CSRF-Token': csrfToken
+                'CSRF-Token': csrfToken
             },
             body: JSON.stringify(orderPayload),
         });
