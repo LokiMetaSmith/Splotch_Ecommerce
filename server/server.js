@@ -213,8 +213,8 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     
    // app.use(limiter);
     app.use(cors(corsOptions));
-    app.use(express.json());
     app.use(cookieParser());
+    app.use(express.json());
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
     app.use(csrf({ cookie: true }));
