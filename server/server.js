@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import dns from 'dns';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import cookieParser from 'cookie-parser';
-import csrf from 'csurf';
+import csrf from 'tiny-csrf';
 import { JSONFilePreset } from 'lowdb/node';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
@@ -213,18 +213,20 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     
    // app.use(limiter);
     app.use(cors(corsOptions));
-    app.use(cookieParser());
+    // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
+    const csrfSecret = process.env.CSRF_SECRET || 'a-very-secret-and-random-string-for-dev';
+    app.use(cookieParser(csrfSecret));
     app.use(express.json());
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-    app.use(csrf({ cookie: true }));
-    app.use(function (err, req, res, next) {
-      if (err.code !== 'EBADCSRFTOKEN') return next(err)
+    // The csrfProtection middleware comes after the cookie/body parsers
+    const csrfProtection = csrf(
+        csrfSecret, // The secret
+        ["POST", "PUT", "DELETE"], // The methods to protect
+        ["/api/webhook"] // Optional: An array of routes to ignore
+    );
 
-      // handle CSRF token errors here
-      console.error('CSRF Token Error:', err);
-      res.status(403).json({ error: 'Invalid CSRF token. Form tampered with.' });
-    })
+    app.use(csrfProtection);
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
@@ -267,7 +269,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       });
     });
     app.get('/api/csrf-token', (req, res) => {
-      res.json({ csrfToken: req.csrfToken() });
+      res.json({ csrfToken: req.csrfToken });
     });
 
     app.get('/api/pricing-info', (req, res) => {
