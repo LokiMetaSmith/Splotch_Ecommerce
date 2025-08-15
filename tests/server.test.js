@@ -19,15 +19,12 @@ describe('Server', () => {
     const testDbPath = path.join(__dirname, 'test-db.json');
 
     beforeAll(async () => {
-        // db will be initialized by startServer, but we need the bot before that.
-        // For the purpose of the test, we can create a temporary db instance for the bot.
-        const tempDb = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
-        bot = initializeBot(tempDb);
+        db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
+        bot = initializeBot(db);
         const mockSendEmail = jest.fn();
-        const server = await startServer(bot, mockSendEmail, testDbPath);
+        const server = await startServer(db, bot, mockSendEmail, testDbPath);
         app = server.app;
         timers = server.timers;
-        db = server.db; // Get the db instance from the server
         serverInstance = app.listen(); // Start the server
     });
 

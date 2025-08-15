@@ -53,13 +53,16 @@ const signInstanceToken = () => {
     );
     console.log(`[SERVER] Signed new session token with key ID: ${kid}`);
 };
+let db;
 let app;
 
 const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
 
 // Define an async function to contain all server logic
-async function startServer(bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
-  const db = await JSONFilePreset(dbPath, defaultData);
+async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
+  if (!db) {
+    db = await JSONFilePreset(dbPath, defaultData);
+  }
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -876,7 +879,7 @@ ${statusChecklist}
     const keyRotationTimer = setInterval(rotateKeys, 60 * 60 * 1000);
     
     // Return the app and the timers so they can be managed by the caller
-    return { app, timers: [sessionTokenTimer, keyRotationTimer], db };
+    return { app, timers: [sessionTokenTimer, keyRotationTimer] };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');

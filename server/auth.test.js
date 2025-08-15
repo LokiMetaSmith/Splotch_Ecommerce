@@ -16,11 +16,11 @@ let timers; // To hold the timer for clearing
 const testDbPath = path.join(__dirname, 'test-db.json');
 
 beforeAll(async () => {
+  db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
   const mockSendEmail = jest.fn();
-  const server = await startServer(null, mockSendEmail, testDbPath);
+  const server = await startServer(db, null, mockSendEmail, testDbPath);
   app = server.app;
   timers = server.timers;
-  db = server.db;
   serverInstance = app.listen();
 });
 
