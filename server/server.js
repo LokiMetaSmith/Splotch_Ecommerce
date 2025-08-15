@@ -267,6 +267,10 @@ async function startServer(bot, sendEmail, dbPath = path.join(__dirname, 'db.jso
       res.json({ csrfToken: req.csrfToken() });
     });
 
+    app.get('/api/pricing-info', (req, res) => {
+        res.json(pricingConfig);
+    });
+
     app.post('/api/upload-design', authenticateToken, upload.fields([
         { name: 'designImage', maxCount: 1 },
         { name: 'cutLineFile', maxCount: 1 }
