@@ -54,7 +54,6 @@ export class SVGParser {
         this.applyTransform(this.svgRoot);
         this.flatten(this.svgRoot);
         this.filter(this.allowedElements);
-        this.recurse(this.svgRoot, (el) => this.splitPath(el));
         return this.svgRoot;
     }
 
@@ -95,7 +94,6 @@ export class SVGParser {
 
         if (transformAttr) {
             const localMatrix = this.transformParse(transformAttr);
-            // Combine matrices by creating a new matrix from the arrays
             currentMatrix = new Matrix();
             const combined = currentMatrix.combine(globalTransformMatrix.toArray(), localMatrix.toArray());
             currentMatrix.matrix(combined);
@@ -103,15 +101,37 @@ export class SVGParser {
 
         if (['g', 'svg', 'defs'].includes(element.tagName)) {
             element.removeAttribute('transform');
-        } else if (!currentMatrix.isIdentity()) {
-             // A robust implementation requires converting shapes to paths and applying matrix math.
-             // This is a complex task beyond simple attribute changes for accurate transforms.
-             console.warn(`Applying transform to <${element.tagName}>. For full accuracy, convert shape to path first.`);
-             element.removeAttribute('transform');
-        }
+            for (const child of Array.from(element.children)) {
+                this.applyTransform(child, currentMatrix);
+            }
+        } else if (!currentMatrix.isIdentity() && this.allowedElements.includes(element.tagName) && element.tagName !== 'svg') {
+            const poly = this.polygonify(element);
+            const transformedPoly = poly.map(p => {
+                const [x, y] = currentMatrix.calc(p.x, p.y);
+                return { x, y };
+            });
 
-        for (const child of Array.from(element.children)) {
-            this.applyTransform(child, currentMatrix);
+            if (transformedPoly.length > 0) {
+                let d = transformedPoly.map((p, i) => (i === 0 ? 'M ' : 'L ') + p.x + ' ' + p.y).join(' ');
+                if (element.tagName !== 'polyline' && element.tagName !== 'line') {
+                    d += ' Z';
+                }
+                const newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                newPath.setAttribute('d', d);
+
+                for (const attr of element.attributes) {
+                    if (!['transform', 'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'points', 'd', 'x1', 'y1', 'x2', 'y2'].includes(attr.name)) {
+                        newPath.setAttribute(attr.name, attr.value);
+                    }
+                }
+                if (element.parentElement) {
+                    element.parentElement.replaceChild(newPath, element);
+                }
+            }
+        } else {
+            for (const child of Array.from(element.children)) {
+                this.applyTransform(child, currentMatrix);
+            }
         }
     }
 
@@ -250,7 +270,8 @@ export class SVGParser {
         switch (element.tagName) {
             case 'polygon':
             case 'polyline':
-                for (const point of element.points) {
+                for (let i = 0; i < element.points.length; i++) {
+                    const point = element.points.getItem(i);
                     poly.push({ x: point.x, y: point.y });
                 }
                 break;
@@ -276,6 +297,13 @@ export class SVGParser {
                         y: ry * Math.sin(theta) + cy
                     });
                 }
+                break;
+            case 'line':
+                const x1 = parseFloat(element.getAttribute('x1')) || 0;
+                const y1 = parseFloat(element.getAttribute('y1')) || 0;
+                const x2 = parseFloat(element.getAttribute('x2')) || 0;
+                const y2 = parseFloat(element.getAttribute('y2')) || 0;
+                poly.push({ x: x1, y: y1 }, { x: x2, y: y2 });
                 break;
             case 'path':
                 const d = element.getAttribute('d');
