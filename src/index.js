@@ -443,8 +443,8 @@ async function handlePaymentFormSubmit(event) {
         const authResponse = await fetch(`${serverUrl}/api/auth/issue-temp-token`, {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-            body: JSON.stringify({ email }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, _csrf: csrfToken }),
         });
 
         if (!authResponse.ok) {
@@ -473,6 +473,7 @@ async function handlePaymentFormSubmit(event) {
         showPaymentStatus('Uploading design...', 'info');
         const uploadFormData = new FormData();
         uploadFormData.append('designImage', designImageBlob, 'design.png');
+        uploadFormData.append('_csrf', csrfToken); // Add CSRF token to form data
 
         const cutLineFileInput = document.getElementById('cutLineFile');
         if (cutLineFileInput && cutLineFileInput.files[0]) {
@@ -483,8 +484,7 @@ async function handlePaymentFormSubmit(event) {
             method: 'POST',
             credentials: 'include',
             headers: {
-                'Authorization': `Bearer ${tempAuthToken}`,
-                'X-CSRF-Token': csrfToken
+                'Authorization': `Bearer ${tempAuthToken}`
             },
             body: uploadFormData,
         });
@@ -546,6 +546,7 @@ async function handlePaymentFormSubmit(event) {
             designImagePath,
             orderDetails,
             billingContact,
+            _csrf: csrfToken // Add CSRF token to payload
         };
 
         // 5. Submit the order to the server
@@ -557,8 +558,7 @@ async function handlePaymentFormSubmit(event) {
             credentials: 'include', // Important for cookies
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${tempAuthToken}`,
-                'X-CSRF-Token': csrfToken
+                'Authorization': `Bearer ${tempAuthToken}`
             },
             body: JSON.stringify(orderPayload),
         });
