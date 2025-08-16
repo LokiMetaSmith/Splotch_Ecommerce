@@ -573,7 +573,7 @@ ${statusChecklist}
       }
       const { username, password } = req.body;
       const user = db.data.users[username];
-      if (!user) {
+      if (!user || !user.password) {
         return res.status(400).json({ error: 'Invalid username or password' });
       }
       const validPassword = await bcrypt.compare(password, user.password);

@@ -113,4 +113,26 @@ describe('Auth Endpoints', () => {
     expect(res.statusCode).toEqual(400);
     expect(res.body.error).toEqual('Invalid username or password');
   });
+
+  it('should not login a user who has no password set', async () => {
+    // Manually add a user without a password to the database
+    db.data.users['passwordlessuser'] = {
+      id: 'some-uuid',
+      username: 'passwordlessuser',
+      password: null // Explicitly null
+    };
+    await db.write();
+
+    const agent = request.agent(app);
+    const csrfRes = await agent.get('/api/csrf-token');
+    const csrfToken = csrfRes.body.csrfToken;
+
+    const res = await agent
+      .post('/api/auth/login')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ username: 'passwordlessuser', password: 'anypassword' });
+
+    expect(res.statusCode).toEqual(400);
+    expect(res.body.error).toEqual('Invalid username or password');
+  });
 });
