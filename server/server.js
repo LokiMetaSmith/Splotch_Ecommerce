@@ -883,9 +883,12 @@ ${statusChecklist}
     // Sign the initial token and re-sign periodically
     signInstanceToken();
     const sessionTokenTimer = setInterval(signInstanceToken, 30 * 60 * 1000);
-
-    // The key rotation timer is now also managed here
     const keyRotationTimer = setInterval(rotateKeys, 60 * 60 * 1000);
+
+    if (process.env.NODE_ENV === 'test') {
+      sessionTokenTimer.unref();
+      keyRotationTimer.unref();
+    }
     
     // Return the app and the timers so they can be managed by the caller
     return { app, timers: [sessionTokenTimer, keyRotationTimer] };
