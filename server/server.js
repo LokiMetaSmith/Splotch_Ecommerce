@@ -68,6 +68,8 @@ async function startServer(bot, sendEmail, dbPath = path.join(__dirname, 'db.jso
   );
 
   async function logAndEmailError(error, context = 'General Error') {
+    const errorMessage = `[${new Date().toISOString()}] [${context}] ${error.stack}\n`;
+    fs.appendFileSync(path.join(__dirname, 'error.log'), errorMessage);
     console.error(`[${context}]`, error);
     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
       try {
@@ -211,7 +213,7 @@ async function startServer(bot, sendEmail, dbPath = path.join(__dirname, 'db.jso
    // app.use(limiter);
     app.use(cors(corsOptions));
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
-    const csrfSecret = process.env.CSRF_SECRET || 'a-very-secret-and-random-string-for-dev';
+    const csrfSecret = process.env.CSRF_SECRET || '12345678901234567890123456789012';
     app.use(cookieParser(csrfSecret));
     app.use(express.json());
     app.use(express.static(path.join(__dirname, '..')));
