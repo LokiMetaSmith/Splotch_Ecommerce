@@ -37,6 +37,7 @@
     "jest": "^30.0.5",
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^3.0.1",
     "lowdb": "^7.0.1",
     "multer": "^2.0.1",
     "node-telegram-bot-api": "^0.66.0",
@@ -45,6 +46,7 @@
     "supertest": "^7.1.4",
     "lusca": "^1.7.0",
     "express-session": "^1.17.3",
+    "svg-to-pdfkit": "^0.1.8",
     "vite": "^5.1.4"
   },
   "devDependencies": {
