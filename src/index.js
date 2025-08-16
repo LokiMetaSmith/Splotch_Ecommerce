@@ -487,7 +487,7 @@ async function handlePaymentFormSubmit(event) {
             method: 'POST',
             credentials: 'include',
             headers: {
-                'Authorization': `Bearer ${tempAuthToken}`
+                'Authorization': `Bearer ${tempAuthToken}`,
                 'X-CSRF-Token': csrfToken 
             },
             body: uploadFormData,

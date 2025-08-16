@@ -9,6 +9,7 @@ export default defineConfig({
         printshop: resolve(__dirname, 'printshop.html'),
         magiclogin: resolve(__dirname, 'magic-login.html'),
         orders: resolve(__dirname, 'orders.html'),
+        status: resolve(__dirname, 'status.html'),
       },
     },
   },
