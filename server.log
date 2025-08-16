@@ -1,0 +1,16 @@
+[KEY_MANAGER] Rotating keys...
+[KEY_MANAGER] Now managing 1 active keys.
+[dotenv@17.2.1] injecting env (14) from .env -- tip: 📡 version env with Radar: https://dotenvx.com/radar
+[dotenv@17.2.1] injecting env (0) from server/.env -- tip: ⚙️  suppress all logs with { quiet: true }
+[SERVER] Pricing configuration loaded.
+[TELEGRAM] Bot token not found. Bot is disabled.
+[SERVER] Multer configured for file uploads.
+[SERVER] Initializing Square client...
+[SERVER] Verifying connection to Square servers...
+✅ [SERVER] DNS resolution successful. Network connection appears to be working.
+[SERVER] Square client initialized.
+[SERVER] Performing sanity check on Square client...
+✅ [SERVER] Sanity check passed. Client has required API properties.
+[SERVER] Middleware (CORS, JSON, static file serving) enabled.
+[SERVER] Signed new session token with key ID: 12513855bebb5b9a
+[SERVER] Server listening at http://localhost:3000

@@ -5,6 +5,8 @@ import DOMPurify from 'dompurify';
 import { SvgNest } from './lib/svgnest.js';
 import { SVGParser } from './lib/svgparser.js';
 import * as jose from 'jose';
+import { jsPDF } from "jspdf";
+import SVGtoPDF from 'svg-to-pdfkit';
 
 // --- Global Variables ---
 const serverUrl = 'http://localhost:3000';
@@ -616,6 +618,36 @@ function handleDownloadCutFile() {
     URL.revokeObjectURL(url);
 }
 
+function handleExportPdf() {
+    if (!window.nestedSvg) {
+        showErrorToast('No nested SVG to export.');
+        return;
+    }
+
+    try {
+        const doc = new jsPDF({
+            unit: 'px',
+            format: 'a4'
+        });
+
+        const svgElement = new DOMParser().parseFromString(window.nestedSvg, "image/svg+xml").documentElement;
+
+        const width = parseFloat(svgElement.getAttribute('width'));
+        const height = parseFloat(svgElement.getAttribute('height'));
+
+        doc.deletePage(1);
+        doc.addPage([width, height]);
+
+        SVGtoPDF(doc, svgElement, 0, 0);
+
+        doc.save('nested-stickers.pdf');
+        showSuccessToast('PDF exported successfully.');
+    } catch (error) {
+        showErrorToast(`PDF Export Failed: ${error.message}`);
+        console.error(error);
+    }
+}
+
 
 // --- Initialization ---
 async function getServerSessionToken() {
@@ -683,7 +715,7 @@ async function init() {
     await getServerSessionToken();
 
     // Assign all DOM elements to the ui object
-    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text'];
+    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text'];
     ids.forEach(id => {
         // Convert kebab-case to camelCase for keys
         const key = id.replace(/-(\w)/g, (match, letter) => letter.toUpperCase());
@@ -699,6 +731,7 @@ async function init() {
     ui.closeSuccessToast?.addEventListener('click', hideSuccessToast);
     ui.nestStickersBtn?.addEventListener('click', handleNesting);
     ui.downloadCutFileBtn?.addEventListener('click', handleDownloadCutFile);
+    ui.exportPdfBtn?.addEventListener('click', handleExportPdf);
     ui.searchBtn?.addEventListener('click', handleSearch);
     ui.searchInput?.addEventListener('keyup', (e) => {
         if (e.key === 'Enter') handleSearch();
