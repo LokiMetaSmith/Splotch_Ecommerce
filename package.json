@@ -44,6 +44,7 @@
     "nodemailer": "^7.0.5",
     "square": "^43.0.1",
     "supertest": "^7.1.4",
+    "tiny-csrf": "^1.1.6",
     "vite": "^5.1.4"
   },
   "devDependencies": {
