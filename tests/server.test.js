@@ -34,7 +34,6 @@ describe('Server', () => {
     });
 
     afterAll(async () => {
-        timers.forEach(timer => clearInterval(timer));
         // Stop the bot from polling
         if (bot && bot.isPolling()) {
             await bot.stopPolling();

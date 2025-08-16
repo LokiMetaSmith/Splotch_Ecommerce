@@ -9,39 +9,38 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let app;
-let db;
-let serverInstance; // To hold the server instance
-let timers; // To hold the timer for clearing
-const testDbPath = path.join(__dirname, 'test-db.json');
-
-beforeAll(async () => {
-  db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
-  const mockSendEmail = jest.fn();
-  const server = await startServer(db, null, mockSendEmail, testDbPath);
-  app = server.app;
-  timers = server.timers;
-  serverInstance = app.listen();
-});
-
-beforeEach(async () => {
-  db.data = { orders: [], users: {}, credentials: {} };
-  await db.write();
-});
-
-afterAll(async () => {
-  timers.forEach(timer => clearInterval(timer));
-  await new Promise(resolve => serverInstance.close(resolve));
-    try {
-      await fs.unlink(testDbPath);
-    } catch (error) {
-      if (error.code !== 'ENOENT') {
-        throw error;
-      }
-    }
-});
-
 describe('Auth Endpoints', () => {
+  let app;
+  let db;
+  let serverInstance; // To hold the server instance
+  let timers; // To hold the timer for clearing
+  const testDbPath = path.join(__dirname, 'test-db.json');
+
+  beforeAll(async () => {
+    db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {} });
+    const mockSendEmail = jest.fn();
+    const server = await startServer(db, null, mockSendEmail, testDbPath);
+    app = server.app;
+    timers = server.timers;
+    serverInstance = app.listen();
+  });
+
+  beforeEach(async () => {
+    db.data = { orders: [], users: {}, credentials: {} };
+    await db.write();
+  });
+
+  afterAll(async () => {
+    await new Promise(resolve => serverInstance.close(resolve));
+      try {
+        await fs.unlink(testDbPath);
+      } catch (error) {
+        if (error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+  });
+
   it('should respond to ping', async () => {
     const res = await request(app).get('/api/ping');
     expect(res.statusCode).toEqual(200);
