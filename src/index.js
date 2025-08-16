@@ -462,7 +462,10 @@ async function handlePaymentFormSubmit(event) {
             throw new Error('Temporary authentication token was not received.');
         }
         console.log('[CLIENT] Temporary auth token received.');
-
+        await fetchCsrfToken(); 
+        if (!csrfToken) {
+            throw new Error('Could not retrieve a new security token for file upload.');
+        }
         // 1. Get image data from canvas as a Blob
         const designImageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         if (!designImageBlob) {
@@ -485,6 +488,7 @@ async function handlePaymentFormSubmit(event) {
             credentials: 'include',
             headers: {
                 'Authorization': `Bearer ${tempAuthToken}`
+                'X-CSRF-Token': csrfToken 
             },
             body: uploadFormData,
         });
