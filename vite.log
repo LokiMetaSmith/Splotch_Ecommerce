@@ -2,9 +2,9 @@
 > lokimetasmith.github.io@1.0.0 dev
 > vite
 
-[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
 
-  VITE v5.4.19  ready in 555 ms
+  VITE v5.4.19  ready in 674 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: http://192.168.0.2:5173/
+6:15:52 AM [vite] page reload playwright-report/index.html

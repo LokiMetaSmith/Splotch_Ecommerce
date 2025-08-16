@@ -49,42 +49,41 @@ describe('Auth Endpoints', () => {
   });
 
   it('should pre-register a new user and return registration options', async () => {
-    const csrfRes = await request(app).get('/api/csrf-token');
+    const agent = request.agent(app);
+    const csrfRes = await agent.get('/api/csrf-token');
     const csrfToken = csrfRes.body.csrfToken;
-    const cookie = csrfRes.headers['set-cookie'];
 
-    const res = await request(app)
+    const res = await agent
       .post('/api/auth/pre-register')
-      .set('Cookie', cookie)
-      .set('x-csrf-token', csrfToken)
+      .set('X-CSRF-Token', csrfToken)
       .send({ username: 'testuser' });
 
     expect(res.statusCode).toEqual(200);
     expect(res.body.challenge).toBeDefined();
 
-    //const db = await JSONFilePreset(testDbPath, {});
     await db.read();
     expect(db.data.users['testuser']).toBeDefined();
   });
 
   it('should login an existing user with correct credentials', async () => {
+    const agent = request.agent(app);
     // 1. Get CSRF token
-    const csrfRes = await request(app).get('/api/csrf-token');
-    const csrfToken = csrfRes.body.csrfToken;
-    const cookie = csrfRes.headers['set-cookie'];
+    let csrfRes = await agent.get('/api/csrf-token');
+    let csrfToken = csrfRes.body.csrfToken;
 
     // 2. Register user
-    await request(app)
+    await agent
       .post('/api/auth/register-user')
-      .set('Cookie', cookie)
-      .set('x-csrf-token', csrfToken)
+      .set('X-CSRF-Token', csrfToken)
       .send({ username: 'testuser', password: 'testpassword' });
 
     // 3. Login
-    const res = await request(app)
+    // It's good practice to get a fresh token before a new state-changing request
+    csrfRes = await agent.get('/api/csrf-token');
+    csrfToken = csrfRes.body.csrfToken;
+    const res = await agent
       .post('/api/auth/login')
-      .set('Cookie', cookie)
-      .set('x-csrf-token', csrfToken)
+      .set('X-CSRF-Token', csrfToken)
       .send({ username: 'testuser', password: 'testpassword' });
 
     expect(res.statusCode).toEqual(200);
@@ -92,23 +91,24 @@ describe('Auth Endpoints', () => {
   });
 
   it('should not login with a wrong password', async () => {
+    const agent = request.agent(app);
     // 1. Get CSRF token
-    const csrfRes = await request(app).get('/api/csrf-token');
-    const csrfToken = csrfRes.body.csrfToken;
-    const cookie = csrfRes.headers['set-cookie'];
+    let csrfRes = await agent.get('/api/csrf-token');
+    let csrfToken = csrfRes.body.csrfToken;
 
     // 2. Register user
-    await request(app)
+    await agent
       .post('/api/auth/register-user')
-      .set('Cookie', cookie)
-      .set('x-csrf-token', csrfToken)
+      .set('X-CSRF-Token', csrfToken)
       .send({ username: 'testuser', password: 'testpassword' });
 
     // 3. Attempt to login with wrong password
-    const res = await request(app)
+    // It's good practice to get a fresh token before a new state-changing request
+    csrfRes = await agent.get('/api/csrf-token');
+    csrfToken = csrfRes.body.csrfToken;
+    const res = await agent
       .post('/api/auth/login')
-      .set('Cookie', cookie)
-      .set('x-csrf-token', csrfToken)
+      .set('X-CSRF-Token', csrfToken)
       .send({ username: 'testuser', password: 'wrongpassword' });
 
     expect(res.statusCode).toEqual(400);

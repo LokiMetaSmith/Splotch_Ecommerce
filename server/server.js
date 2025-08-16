@@ -10,7 +10,8 @@ import { fileURLToPath } from 'url';
 import dns from 'dns';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import cookieParser from 'cookie-parser';
-import csrf from 'tiny-csrf';
+import lusca from 'lusca';
+import session from 'express-session';
 import { JSONFilePreset } from 'lowdb/node';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
@@ -218,17 +219,17 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
     const csrfSecret = process.env.CSRF_SECRET || '12345678901234567890123456789012';
     app.use(cookieParser(csrfSecret));
+    app.use(session({
+      secret: process.env.SESSION_SECRET || 'super-secret-session-key',
+      resave: false,
+      saveUninitialized: true,
+      cookie: { secure: process.env.NODE_ENV === 'production' }
+    }));
     app.use(express.json());
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-    // The csrfProtection middleware comes after the cookie/body parsers
-    const csrfProtection = csrf(
-        csrfSecret, // The secret
-        ["POST", "PUT", "DELETE"], // The methods to protect
-        ["/api/webhook"] // Optional: An array of routes to ignore
-    );
 
-    app.use(csrfProtection);
+    app.use(lusca.csrf());
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
@@ -271,7 +272,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       });
     });
     app.get('/api/csrf-token', (req, res) => {
-      res.json({ csrfToken: req.csrfToken });
+      res.json({ csrfToken: res.locals._csrf });
     });
 
     app.get('/api/pricing-info', (req, res) => {
