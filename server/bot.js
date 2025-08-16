@@ -26,6 +26,7 @@ function initializeBot(database) {
       { command: 'in_process_orders', description: 'Lists all ACCEPTED or PRINTING orders' },
       { command: 'shipped_orders', description: 'Lists all SHIPPED orders' },
       { command: 'canceled_orders', description: 'Lists all CANCELED orders' },
+      { command: 'delivered_orders', description: 'Lists all DELIVERED orders' },
     ];
     bot.setMyCommands(commands);
 
@@ -74,6 +75,10 @@ function initializeBot(database) {
 
     bot.onText(/\/canceled_orders/, (msg) => {
         listOrdersByStatus(msg.chat.id, ['CANCELED'], 'Canceled Orders');
+    });
+
+    bot.onText(/\/delivered_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['DELIVERED'], 'Delivered Orders');
     });
 
   } else {

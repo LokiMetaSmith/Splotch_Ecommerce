@@ -27,7 +27,6 @@
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "csurf": "^1.11.0",
     "dompurify": "^3.2.6",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
@@ -46,12 +45,15 @@
     "square": "^43.0.1",
     "supertest": "^7.1.4",
     "svg-to-pdfkit": "^0.1.8",
+    "tiny-csrf": "^1.1.6",
     "vite": "^5.1.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",
     "autoprefixer": "^10.4.21",
     "image-size": "^1.1.1",
+    "jest-environment-jsdom": "^30.0.5",
+
     "postcss": "^8.5.6",
     "serve": "^14.2.4",
     "svg-parser": "^2.0.4",
