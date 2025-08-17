@@ -288,14 +288,23 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         }
 
         const designImageFile = req.files.designImage[0];
-        const fileType = await fileTypeFromFile(designImageFile.path);
-
-        if (!fileType || fileType.ext !== 'svg') {
+        const designFileType = await fileTypeFromFile(designImageFile.path);
+		if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
             // It's good practice to remove the invalid file
             fs.unlink(designImageFile.path, (err) => {
                 if (err) console.error("Error deleting invalid file:", err);
             });
-            return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the design image.' });
+            return res.status(400).json({ error: 'Invalid file type. Only SVG, PNG, and JPEG are allowed.' });
+        }
+        const edgecutLineFile = req.files.cutLineFile[0];
+        const edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
+
+        if (!edgecutLineFileType || edgecutLineFileType.ext !== 'svg') {
+            // It's good practice to remove the invalid file
+            fs.unlink(edgecutLineFile.path, (err) => {
+                if (err) console.error("Error deleting invalid file:", err);
+            });
+            return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the edgecut line.' });
         }
 
         const designImagePath = `/uploads/${designImageFile.filename}`;
