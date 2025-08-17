@@ -1,4 +1,4 @@
-const serverUrl = '';
+const serverUrl = 'http://localhost:3000';
 let csrfToken;
 
 async function fetchCsrfToken() {

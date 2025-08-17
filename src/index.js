@@ -4,7 +4,7 @@ import { SVGParser } from './lib/svgparser.js';
 
 const appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
 const locationId = "LTS82DEX24XR0";
-const serverUrl = ''; // Define server URL once
+const serverUrl = 'http://localhost:3000'; // Define server URL once
 
 // Declare globals for SDK objects and key DOM elements
 let payments, card, csrfToken;
@@ -190,16 +190,6 @@ async function BootStrap() {
 
     updateEditingButtonsState(!originalImage);
     if (designMarginNote) designMarginNote.style.display = 'none';
-
-    // Check for reorder design parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const designUrl = urlParams.get('design');
-    if (designUrl) {
-        // The URL will be relative, e.g., /uploads/design.png
-        // Prepend the server URL to make it a full, fetchable URL.
-        const fullDesignUrl = `${serverUrl}${decodeURIComponent(designUrl)}`;
-        loadImageFromUrl(fullDesignUrl);
-    }
 }
 
 // --- Main execution ---
@@ -705,61 +695,6 @@ function loadFileAsImage(file) {
     } else {
         showPaymentStatus('Invalid file type. Please select an image or SVG file.', 'error');
     }
-}
-
-function loadImageFromUrl(imageUrl) {
-    if (!imageUrl) return;
-
-    // We need to fetch the image and convert it to a Blob,
-    // then we can use a FileReader like in the local file flow.
-    fetch(imageUrl)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error(`Failed to fetch image: ${res.statusText}`);
-            }
-            return res.blob();
-        })
-        .then(blob => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const img = new Image();
-                img.onload = () => {
-                    originalImage = img;
-                    updateEditingButtonsState(false);
-                    showPaymentStatus('Image loaded successfully.', 'success');
-                    const maxWidth = 500, maxHeight = 400;
-                    let newWidth = img.width, newHeight = img.height;
-                    if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
-                    if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
-                    if (canvas && ctx) {
-                        canvas.width = newWidth;
-                        canvas.height = newHeight;
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
-
-                        currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
-                        currentCutline = [[
-                            { x: 0, y: 0 },
-                            { x: newWidth, y: 0 },
-                            { x: newWidth, y: newHeight },
-                            { x: 0, y: newHeight }
-                        ]];
-                        currentPolygons = [];
-
-                        calculateAndUpdatePrice();
-                        drawBoundingBox(currentBounds);
-                    }
-                };
-                img.onerror = () => showPaymentStatus('Error loading image data from URL.', 'error');
-                img.src = reader.result;
-            };
-            reader.onerror = () => showPaymentStatus('Error reading fetched image blob.', 'error');
-            reader.readAsDataURL(blob);
-        })
-        .catch(error => {
-            showPaymentStatus(`Error: ${error.message}`, 'error');
-            console.error(error);
-        });
 }
 
 function redrawAll() {

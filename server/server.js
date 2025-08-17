@@ -521,25 +521,16 @@ Amount: $${(order.amount / 100).toFixed(2)}
 ${statusChecklist}
         `;
         try {
-            if (status === 'SHIPPED') {
-                await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
-                // After deleting, nullify the ID to prevent future errors
-                order.telegramMessageId = null;
-                console.log(`[TELEGRAM] Message for order ${order.orderId} deleted and ID cleared.`);
-            } else {
-                await bot.editMessageText(message, {
-                    chat_id: process.env.TELEGRAM_CHANNEL_ID,
-                    message_id: order.telegramMessageId,
-                });
-            }
+          if (status === 'SHIPPED') {
+            await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+          } else {
+            await bot.editMessageText(message, {
+              chat_id: process.env.TELEGRAM_CHANNEL_ID,
+              message_id: order.telegramMessageId,
+            });
+          }
         } catch (error) {
-            // If the message is already gone, don't treat it as a fatal error.
-            if (error.response && error.response.body && (error.response.body.description.includes('message to edit not found') || error.response.body.description.includes('message to delete not found'))) {
-                console.warn(`[TELEGRAM] Tried to update a message that was already deleted for order ${order.orderId}. Clearing ID.`);
-                order.telegramMessageId = null;
-            } else {
-                console.error('[TELEGRAM] Failed to edit or delete message:', error);
-            }
+          console.error('[TELEGRAM] Failed to edit or delete message:', error);
         }
       }
 
