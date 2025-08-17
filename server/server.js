@@ -296,7 +296,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
             fs.unlink(designImageFile.path, (err) => {
                 if (err) console.error("Error deleting invalid file:", err);
             });
-            return res.status(400).json({ error: 'Invalid file type. Only SVG, PNG, and JPEG are allowed.' });
+            return res.status(400).json({ error: `Invalid file type. Only ${allowedMimeTypes.join(', ')} are allowed.` });
         }
         // --- Validation for cutLineFile (optional) ---
         let cutLinePath = null;

@@ -148,38 +148,6 @@ To create a production-ready build of the application, follow these steps:
     ```
     The production build will be available at `http://localhost:3000` by default.
 
-## Testing
-
-This project includes both unit tests (using Jest) and end-to-end tests (using Playwright).
-
-### Running All Tests
-
-To run all tests, use the following command:
-
-```bash
-npm test
-```
-
-This will first run the unit tests, and then the end-to-end tests.
-
-### Running Unit Tests
-
-To run only the unit tests, use the following command:
-
-```bash
-npm run test:unit
-```
-
-### Running End-to-End Tests
-
-To run only the end-to-end tests, use the following command:
-
-```bash
-npm run test:e2e
-```
-
-**Note:** The end-to-end tests require the development server to be running. Make sure you have the dev server running in a separate terminal with `npm run dev` before running the e2e tests.
-
 ## Deployment
 
 For detailed deployment instructions, please see the [Deployment Guide](DEPLOY.md).
