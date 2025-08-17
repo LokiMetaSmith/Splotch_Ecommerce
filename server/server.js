@@ -24,6 +24,8 @@ import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
+
+const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
@@ -296,19 +298,23 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
             });
             return res.status(400).json({ error: 'Invalid file type. Only SVG, PNG, and JPEG are allowed.' });
         }
-        const edgecutLineFile = req.files.cutLineFile[0];
-        const edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
+        // --- Validation for cutLineFile (optional) ---
+        let cutLinePath = null;
+        if (req.files.cutLineFile && req.files.cutLineFile[0]) {
+            const edgecutLineFile = req.files.cutLineFile[0];
+            const edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
 
-        if (!edgecutLineFileType || edgecutLineFileType.ext !== 'svg') {
-            // It's good practice to remove the invalid file
-            fs.unlink(edgecutLineFile.path, (err) => {
-                if (err) console.error("Error deleting invalid file:", err);
-            });
-            return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the edgecut line.' });
+            if (!edgecutLineFileType || edgecutLineFileType.ext !== 'svg') {
+                // It's good practice to remove the invalid file
+                fs.unlink(edgecutLineFile.path, (err) => {
+                    if (err) console.error("Error deleting invalid file:", err);
+                });
+                return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the edgecut line.' });
+            }
+            cutLinePath = `/uploads/${edgecutLineFile.filename}`;
         }
 
         const designImagePath = `/uploads/${designImageFile.filename}`;
-        const cutLinePath = req.files.cutLineFile ? `/uploads/${req.files.cutLineFile[0].filename}` : null;
 
         res.json({
             success: true,
