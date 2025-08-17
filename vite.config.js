@@ -14,7 +14,16 @@ export default defineConfig({
     },
   },
   server: {
-    // Expose the server to the network, which can be useful for testing on other devices.
-    host: '0.0.0.0'
+    host: '0.0.0.0',
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      }
+    }
   }
 });
