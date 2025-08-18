@@ -685,6 +685,7 @@ function loadFileAsImage(file) {
                     // Update the price now that we have dimensions
                     calculateAndUpdatePrice();
                     drawBoundingBox(currentBounds); // Draw the initial bounding box
+                    drawSizeIndicator(currentBounds);
                 }
             };
             img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
@@ -730,34 +731,7 @@ function redrawAll() {
     drawPolygonsToCanvas(currentPolygons, 'black', drawOffset);
     drawPolygonsToCanvas(currentCutline, 'red', drawOffset, true);
     drawBoundingBox(currentBounds, drawOffset);
-
-    // Draw size indicators on the canvas
-    if (currentBounds && pricingConfig) {
-        const ppi = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96;
-        let width = (currentBounds.width / ppi);
-        let height = (currentBounds.height / ppi);
-        let unit = 'in';
-
-        if (isMetric) {
-            width *= 25.4;
-            height *= 25.4;
-            unit = 'mm';
-        }
-
-        ctx.fillStyle = "black";
-        ctx.font = "12px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
-        ctx.fillText(`${width.toFixed(1)} ${unit}`, drawOffset.x + currentBounds.width / 2, drawOffset.y - 5);
-
-        ctx.textAlign = "right";
-        ctx.textBaseline = "middle";
-        ctx.save();
-        ctx.translate(drawOffset.x - 5, drawOffset.y + currentBounds.height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillText(`${height.toFixed(1)} ${unit}`, 0, 0);
-        ctx.restore();
-    }
+    drawSizeIndicator(currentBounds, drawOffset);
 
     // After redrawing, the bounds may have changed, so update the price.
     calculateAndUpdatePrice();
@@ -863,21 +837,56 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
     if (!ctx || !bounds || !pricingConfig) return;
 
     // The user wanted a grey box with 1-inch dashes for pricing.
-    // Let's make it visible.
-    const ppi = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96;
-    const inchDash = ppi;
-    const inchGap = ppi / 4;
+    // The previous implementation calculated a dash length from PPI, which was often
+    // too large to be visible on smaller images. A fixed dash pattern is more reliable.
 
-    ctx.strokeStyle = 'rgba(0, 100, 255, 0.9)'; // A strong, visible blue
-    ctx.lineWidth = 3; // Make it thicker
-    ctx.setLineDash([8, 4]); // "Marching ants" style
+    // Set color to grey as requested.
+    ctx.strokeStyle = 'rgba(128, 128, 128, 0.9)'; // A strong, visible grey
+    ctx.lineWidth = 2; // A clean, visible line width
+
+    // Use a fixed dash pattern that is visible at most scales.
+    ctx.setLineDash([10, 5]);
+
     ctx.strokeRect(
         bounds.left + offset.x,
         bounds.top + offset.y,
-        bounds.right - bounds.left,
-        bounds.bottom - bounds.top
+        bounds.width,
+        bounds.height
     );
-    ctx.setLineDash([]); // Reset to solid line
+
+    // Reset line dash for subsequent drawing operations.
+    ctx.setLineDash([]);
+}
+
+function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
+    if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
+
+    const ppi = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96;
+    let width = (bounds.width / ppi);
+    let height = (bounds.height / ppi);
+    let unit = 'in';
+
+    if (isMetric) {
+        width *= 25.4;
+        height *= 25.4;
+        unit = 'mm';
+    }
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+    ctx.font = "14px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    // Position the text slightly above the top edge of the bounding box
+    ctx.fillText(`${width.toFixed(1)} ${unit}`, offset.x + bounds.width / 2, offset.y - 10);
+
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.save();
+    // Position the text slightly to the left of the left edge, rotated
+    ctx.translate(offset.x - 10, offset.y + bounds.height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(`${height.toFixed(1)} ${unit}`, 0, 0);
+    ctx.restore();
 }
 
 function handleAddText() {
@@ -960,6 +969,7 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         currentBounds = { left: 0, top: 0, right: newW, bottom: newH, width: newW, height: newH };
         calculateAndUpdatePrice();
         drawBoundingBox(currentBounds);
+        drawSizeIndicator(currentBounds);
     }
 }
 
@@ -989,6 +999,12 @@ function redrawOriginalImageWithFilters() {
             data[i + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
         }
         ctx.putImageData(imageData, 0, 0);
+    }
+
+    // Also redraw the bounding box and size indicator, which are cleared by the operation.
+    if (currentBounds) {
+        drawBoundingBox(currentBounds);
+        drawSizeIndicator(currentBounds);
     }
 }
 
@@ -1075,6 +1091,7 @@ function handleResize(percentage) {
             // Trigger the price update and redraw the bounding box
             calculateAndUpdatePrice();
             drawBoundingBox(currentBounds);
+            drawSizeIndicator(currentBounds);
         }
     }
 }
