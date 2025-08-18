@@ -383,7 +383,7 @@ New Order: ${newOrder.orderId}
 Customer: ${newOrder.billingContact.givenName} ${newOrder.billingContact.familyName}
 Email: ${newOrder.billingContact.email}
 Quantity: ${newOrder.orderDetails.quantity}
-Amount: $${(newOrder.amount / 100).toFixed(2)}
+Amount: $${(order.amount / 100).toFixed(2)}
           `;
           try {
             const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);

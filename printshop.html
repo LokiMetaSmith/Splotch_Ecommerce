@@ -133,21 +133,6 @@
                         <p class="text-xs text-gray-500 mb-2">Enter as JSON array of objects: [{"x":0, "y":0, "width":100, "height":100}]</p>
                         <textarea id="keepoutAreas" class="w-full p-1 border rounded-md" rows="4">[]</textarea>
                     </div>
-                    <div class="mt-4 border-t pt-4">
-                        <h3 class="text-lg font-bold mb-2">Export Options</h3>
-                        <div class="flex items-center justify-between">
-                            <label for="add-alignment-markers" class="flex items-center cursor-pointer">
-                                <input type="checkbox" id="add-alignment-markers" class="form-checkbox h-5 w-5 text-blue-600">
-                                <span class="ml-2 text-gray-700">Add Alignment Markers</span>
-                            </label>
-                        </div>
-                        <div class="flex items-center justify-between mt-2">
-                            <label for="add-job-markings" class="flex items-center cursor-pointer">
-                                <input type="checkbox" id="add-job-markings" class="form-checkbox h-5 w-5 text-blue-600">
-                                <span class="ml-2 text-gray-700">Add Job Markings</span>
-                            </label>
-                        </div>
-                    </div>
                     <button id="nestStickersBtn" class="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Nest Stickers</button>
                     <button id="downloadCutFileBtn" class="mt-4 w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600">Download Cut File</button>
                     <button id="exportPdfBtn" class="mt-4 w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Export as PDF</button>
@@ -207,20 +192,5 @@
         <button id="close-success-toast" class="ml-4 text-white font-bold">&times;</button>
     </div>
 
-    <!-- NEW: Cut File Editor Modal -->
-    <div id="cut-file-editor-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-        <div class="bg-white p-4 rounded-lg shadow-xl w-full max-w-4xl mx-4 sm:mx-0">
-            <div class="flex justify-between items-center mb-4 border-b pb-2">
-                <h2 class="text-2xl">Edit Cut File</h2>
-                <button id="close-editor-btn" class="text-3xl font-bold text-gray-500 hover:text-gray-800">&times;</button>
-            </div>
-            <div id="editor-canvas" class="relative w-full h-[60vh] bg-gray-200 overflow-auto">
-                <!-- The design image and SVG overlay will be injected here by JS -->
-            </div>
-            <div class="mt-4 text-right">
-                <button id="save-cut-file-btn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Save Changes</button>
-            </div>
-        </div>
-    </div>
 </body>
 </html>

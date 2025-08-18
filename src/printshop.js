@@ -429,21 +429,19 @@ function displayOrder(order) {
             <button class="action-btn" data-order-id="${order.orderId}" data-status="DELIVERED">Deliver</button>
             <button class="action-btn" data-order-id="${order.orderId}" data-status="COMPLETED">Complete</button>
             <button class="action-btn" data-order-id="${order.orderId}" data-status="CANCELED">Cancel</button>
-            <button class="edit-cut-file-btn bg-yellow-500 text-white px-3 py-1 rounded-md text-sm hover:bg-yellow-600">Edit Cut File</button>
         </div>`);
 
     ui.ordersList.prepend(card);
 
     card.querySelectorAll('.action-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+      //  btn.addEventListener('click', (e) => updateOrderStatus(e.target.dataset.orderId, e.target.dataset.status));
+		btn.addEventListener('click', (e) => {
             const orderId = e.target.dataset.orderId;
             const status = e.target.dataset.status;
+            // This function calls your server to update the status
             updateOrderStatus(orderId, status);
         });
     });
-
-    const editBtn = card.querySelector('.edit-cut-file-btn');
-    editBtn?.addEventListener('click', () => openCutFileEditor(order));
 }
 
 /**
@@ -491,67 +489,96 @@ async function handleSearch() {
 }
 
 async function handleNesting() {
-    // ... (existing handleNesting logic)
+    showLoadingIndicator();
+    ui.nestedSvgContainer.innerHTML = '<p>Nesting in progress...</p>';
 
-    // --- ENHANCEMENT: Add Markers ---
-    const addAlignmentMarkers = ui.addAlignmentMarkers.checked;
-    const addJobMarkings = ui.addJobMarkings.checked;
-
-    let finalSvgString = nest.start();
-
-    if (addAlignmentMarkers || addJobMarkings) {
-        const parser = new DOMParser();
-        const svgDoc = parser.parseFromString(finalSvgString, "image/svg+xml");
-        const svgRoot = svgDoc.documentElement;
-        const width = parseFloat(svgRoot.getAttribute('width'));
-        const height = parseFloat(svgRoot.getAttribute('height'));
-
-        if (addAlignmentMarkers) {
-            // Add simple crosshair markers in corners
-            const markerGroup = svgDoc.createElementNS("http://www.w3.org/2000/svg", 'g');
-            markerGroup.setAttribute('stroke', 'black');
-            markerGroup.setAttribute('stroke-width', '1');
-            const markerSize = 20;
-            const positions = [
-                { x: markerSize, y: markerSize },
-                { x: width - markerSize, y: markerSize },
-                { x: markerSize, y: height - markerSize },
-                { x: width - markerSize, y: height - markerSize }
-            ];
-            positions.forEach(pos => {
-                const vLine = svgDoc.createElementNS("http://www.w3.org/2000/svg", 'line');
-                vLine.setAttribute('x1', pos.x);
-                vLine.setAttribute('y1', pos.y - markerSize / 2);
-                vLine.setAttribute('x2', pos.x);
-                vLine.setAttribute('y2', pos.y + markerSize / 2);
-                const hLine = svgDoc.createElementNS("http://www.w3.org/2000/svg", 'line');
-                hLine.setAttribute('x1', pos.x - markerSize / 2);
-                hLine.setAttribute('y1', pos.y);
-                hLine.setAttribute('x2', pos.x + markerSize / 2);
-                hLine.setAttribute('y2', pos.y);
-                markerGroup.appendChild(vLine);
-                markerGroup.appendChild(hLine);
-            });
-            svgRoot.appendChild(markerGroup);
-        }
-
-        if (addJobMarkings) {
-            const textEl = svgDoc.createElementNS("http://www.w3.org/2000/svg", 'text');
-            textEl.setAttribute('x', '10');
-            textEl.setAttribute('y', height - 10);
-            textEl.setAttribute('font-size', '12px');
-            textEl.setAttribute('fill', 'black');
-            textEl.textContent = `Print Job: ${new Date().toISOString()} - ${allOrders.length} orders`;
-            svgRoot.appendChild(textEl);
-        }
-
-        finalSvgString = new XMLSerializer().serializeToString(svgDoc);
+    const svgElements = Array.from(ui.ordersList.querySelectorAll('.sticker-design'));
+    if (svgElements.length === 0) {
+        ui.nestedSvgContainer.innerHTML = '<p>No designs to nest.</p>';
+        hideLoadingIndicator();
+        return;
     }
 
-    state.nestedSvgResult = finalSvgString;
-    ui.nestedSvgContainer.innerHTML = finalSvgString;
-    showSuccessToast('Nesting complete.');
-    hideLoadingIndicator();
+    try {
+        // 1. Generate the complex bin polygon
+        const binWidth = 12 * 96; // 12 inches
+        const binHeight = 12 * 96; // 12 inches
+        const scale = 10000; // Use a high scale for precision
+
+        const cpr = new ClipperLib.Clipper();
+        const subj = [{ X: 0, Y: 0 }, { X: binWidth * scale, Y: 0 }, { X: binWidth * scale, Y: binHeight * scale }, { X: 0, Y: binHeight * scale }];
+        cpr.AddPath(subj, ClipperLib.PolyType.ptSubject, true);
+
+        const clip = [];
+        // Add edge margins
+        const marginTop = parseInt(document.getElementById('marginTop').value, 10) || 0;
+        const marginBottom = parseInt(document.getElementById('marginBottom').value, 10) || 0;
+        const marginLeft = parseInt(document.getElementById('marginLeft').value, 10) || 0;
+        const marginRight = parseInt(document.getElementById('marginRight').value, 10) || 0;
+
+        // Top margin as a keep-out
+        clip.push([{ X: -10, Y: -10 }, { X: (binWidth + 10) * scale, Y: -10 }, { X: (binWidth + 10) * scale, Y: marginTop * scale }, { X: -10, Y: marginTop * scale }]);
+        // Bottom margin
+        clip.push([{ X: -10, Y: (binHeight - marginBottom) * scale }, { X: (binWidth + 10) * scale, Y: (binHeight - marginBottom) * scale }, { X: (binWidth + 10) * scale, Y: (binHeight + 10) * scale }, { X: -10, Y: (binHeight + 10) * scale }]);
+        // Left margin
+        clip.push([{ X: -10, Y: -10 }, { X: marginLeft * scale, Y: -10 }, { X: marginLeft * scale, Y: (binHeight + 10) * scale }, { X: -10, Y: (binHeight + 10) * scale }]);
+        // Right margin
+        clip.push([{ X: (binWidth - marginRight) * scale, Y: -10 }, { X: (binWidth + 10) * scale, Y: -10 }, { X: (binWidth + 10) * scale, Y: (binHeight + 10) * scale }, { X: (binWidth - marginRight) * scale, Y: (binHeight + 10) * scale }]);
+
+        // Add internal keep-outs
+        const keepoutAreasText = document.getElementById('keepoutAreas').value;
+        const keepoutAreas = JSON.parse(keepoutAreasText);
+        keepoutAreas.forEach(area => {
+            clip.push([
+                { X: area.x * scale, Y: area.y * scale },
+                { X: (area.x + area.width) * scale, Y: area.y * scale },
+                { X: (area.x + area.width) * scale, Y: (area.y + area.height) * scale },
+                { X: area.x * scale, Y: (area.y + area.height) * scale }
+            ]);
+        });
+
+        cpr.AddPaths(clip, ClipperLib.PolyType.ptClip, true);
+
+        const solution = new ClipperLib.Paths();
+        cpr.Execute(ClipperLib.ClipType.ctDifference, solution, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
+
+        const complexBinPolygon = solution[0].map(p => ({ x: p.X / scale, y: p.Y / scale }));
+
+        // 2. Fetch and prepare the sticker SVGs
+        const svgPromises = svgElements.map(async (img) => {
+            const cutFilePath = img.dataset.cutFilePath;
+            if (cutFilePath) {
+                return (await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' })).text();
+            } else {
+                const svgString = await (await fetch(img.src, { credentials: 'include' })).text();
+                return generateCutFile(svgString);
+            }
+        });
+        const svgStrings = await Promise.all(svgPromises);
+
+        // 3. Set up and run SVGNest
+        const parser = new SVGParser();
+        const svgs = svgStrings.map(s => parser.load(s));
+
+        const spacing = parseInt(ui.spacingInput.value, 10) || 0;
+        const options = { spacing, rotations: 4 };
+
+        const nest = new SVGNest(null, svgs, options); // Pass null for binElement
+        nest.setBinPolygon(complexBinPolygon); // Use the new method
+
+        const resultSvg = nest.start();
+
+        // 4. Display result
+        ui.nestedSvgContainer.innerHTML = resultSvg;
+        window.nestedSvg = resultSvg;
+        showSuccessToast('Nesting complete.');
+
+    } catch (error) {
+        showErrorToast(`Nesting failed: ${error.message}`);
+        console.error(error);
+    } finally {
+        hideLoadingIndicator();
+    }
 }
 
 function generateCutFile(svgString) {
@@ -677,49 +704,6 @@ async function getCsrfToken() {
     }
 }
 
-function openCutFileEditor(order) {
-    ui.cutFileEditorModal.classList.remove('hidden');
-    const canvas = ui.editorCanvas;
-    canvas.innerHTML = ''; // Clear previous content
-
-    // 1. Display the design image as a background
-    const designImg = document.createElement('img');
-    designImg.src = `${serverUrl}${order.designImagePath}`;
-    designImg.style.position = 'absolute';
-    designImg.style.top = '0';
-    designImg.style.left = '0';
-    designImg.style.width = '100%';
-    designImg.style.height = '100%';
-    canvas.appendChild(designImg);
-
-    // 2. Fetch and overlay the SVG cut file
-    fetch(`${serverUrl}${order.cutLinePath}`)
-        .then(res => res.text())
-        .then(svgText => {
-            const svgContainer = document.createElement('div');
-            svgContainer.innerHTML = DOMPurify.sanitize(svgText);
-            const svgEl = svgContainer.firstChild;
-            svgEl.style.position = 'absolute';
-            svgEl.style.top = '0';
-            svgEl.style.left = '0';
-            svgEl.style.width = '100%';
-            svgEl.style.height = '100%';
-            canvas.appendChild(svgEl);
-
-            // Here you would attach logic to make the SVG editable
-            // (e.g., using libraries like Fabric.js or interact.js)
-            console.log('SVG loaded into editor. Ready for manipulation.');
-        });
-
-    // 3. Logic for the "Save" button
-    ui.saveCutFileBtn.onclick = () => {
-        const updatedSvg = canvas.querySelector('svg').outerHTML;
-        // ... send updatedSvg to the server to save it for this order ...
-        console.log('Saving updated SVG...');
-        ui.cutFileEditorModal.classList.add('hidden');
-    };
-}
-
 /**
  * Main application entry point.
  */
@@ -731,7 +715,7 @@ async function init() {
     await getServerSessionToken();
 
     // Assign all DOM elements to the ui object
-    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'keepoutAreas', 'add-alignment-markers', 'add-job-markings', 'cut-file-editor-modal', 'close-editor-btn', 'editor-canvas', 'save-cut-file-btn'];
+    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text'];
     ids.forEach(id => {
         // Convert kebab-case to camelCase for keys
         const key = id.replace(/-(\w)/g, (match, letter) => letter.toUpperCase());
@@ -752,7 +736,6 @@ async function init() {
     ui.searchInput?.addEventListener('keyup', (e) => {
         if (e.key === 'Enter') handleSearch();
     });
-    ui.closeEditorBtn?.addEventListener('click', () => ui.cutFileEditorModal.classList.add('hidden'));
 
     // Login Modal Listeners
     ui.closeModalBtn?.addEventListener('click', hideLoginModal);

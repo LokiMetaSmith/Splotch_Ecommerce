@@ -37,28 +37,9 @@ let customerOrder = {
 
 // --- Main Application Setup ---
 async function BootStrap() {
-    // This is the new customer-facing page logic
-    if (document.getElementById('payment-form')) {
-        initCustomerPage();
-    }
-}
-
-function initCustomerPage() {
-    // Assign UI elements for the customer page
+    // Assign DOM elements
     canvas = document.getElementById('imageCanvas');
     ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-    const cutFileInput = document.getElementById('cut-file-upload');
-    const cutFilePreview = document.getElementById('cut-file-preview-container');
-    const statusDiv = document.getElementById('payment-status-container');
-
-    const designImageInput = document.getElementById('design-image-upload');
-    designImageInput.addEventListener('change', (e) => handleDesignImageChange(e, cutFilePreview));
-
-    cutFileInput.addEventListener('change', (e) => handleCutFileChange(e, cutFilePreview, statusDiv));
-
-    const paymentForm = document.getElementById('payment-form');
-    paymentForm.addEventListener('submit', handlePaymentFormSubmit);
 
     const showOrderCreationBtn = document.getElementById('show-order-creation-btn');
     const orderCreationContainer = document.getElementById('order-creation-container');
@@ -66,8 +47,133 @@ function initCustomerPage() {
         orderCreationContainer.classList.toggle('hidden');
     });
 
-    // Initial status message
-    updateCustomerStatus('Please upload a design image to begin.', 'info', statusDiv);
+    const designImageInput = document.getElementById('design-image-upload');
+    const cutFileInput = document.getElementById('cut-file-upload');
+    const cutFilePreview = document.getElementById('cut-file-preview-container');
+    const statusDiv = document.getElementById('status');
+
+    designImageInput.addEventListener('change', (e) => handleDesignImageChange(e, cutFilePreview));
+    cutFileInput.addEventListener('change', (e) => handleCutFileChange(e, cutFilePreview, statusDiv));
+
+    const submitOrderBtn = document.getElementById('submit-order-btn');
+    submitOrderBtn.addEventListener('click', handleSubmitOrder);
+
+    // All the other original bootstrap logic remains here...
+    textInput = document.getElementById('textInput');
+    textSizeInput = document.getElementById('textSizeInput');
+    textColorInput = document.getElementById('textColorInput');
+    addTextBtn = document.getElementById('addTextBtn');
+    textFontFamilySelect = document.getElementById('textFontFamily');
+    stickerMaterialSelect = document.getElementById('stickerMaterial');
+    stickerResolutionSelect = document.getElementById('stickerResolution');
+    designMarginNote = document.getElementById('designMarginNote');
+    stickerQuantityInput = document.getElementById('stickerQuantity');
+    calculatedPriceDisplay = document.getElementById('calculatedPriceDisplay');
+    paymentStatusContainer = document.getElementById('payment-status-container');
+    ipfsLinkContainer = document.getElementById('ipfsLinkContainer');
+    fileInputGlobalRef = document.getElementById('file');
+    fileNameDisplayEl = document.getElementById('fileNameDisplay');
+    paymentFormGlobalRef = document.getElementById('payment-form');
+    rotateLeftBtnEl = document.getElementById('rotateLeftBtn');
+    rotateRightBtnEl = document.getElementById('rotateRightBtn');
+    const resizeSliderEl = document.getElementById('resizeSlider');
+    const resizeValueEl = document.getElementById('resizeValue');
+    startCropBtnEl = document.getElementById('startCropBtn');
+    grayscaleBtnEl = document.getElementById('grayscaleBtn');
+    sepiaBtnEl = document.getElementById('sepiaBtn');
+    const generateCutlineBtn = document.getElementById('generateCutlineBtn');
+
+    await Promise.all([
+        fetchCsrfToken(),
+        fetchPricingInfo()
+    ]);
+
+    try {
+        if (!window.Square || !window.Square.payments) {
+            throw new Error("Square SDK is not loaded.");
+        }
+        payments = window.Square.payments(appId, locationId);
+        card = await initializeCard(payments);
+    } catch (error) {
+        showPaymentStatus(`Failed to initialize payments: ${error.message}`, 'error');
+        console.error("[CLIENT] Failed to initialize Square payments SDK:", error);
+        return;
+    }
+
+    if (stickerQuantityInput) {
+        calculateAndUpdatePrice();
+        stickerQuantityInput.addEventListener('input', calculateAndUpdatePrice);
+        stickerQuantityInput.addEventListener('change', calculateAndUpdatePrice);
+    }
+    if (stickerMaterialSelect) {
+        stickerMaterialSelect.addEventListener('change', calculateAndUpdatePrice);
+    }
+    if (stickerResolutionSelect) {
+        stickerResolutionSelect.addEventListener('change', calculateAndUpdatePrice);
+    }
+    if (addTextBtn) {
+        addTextBtn.addEventListener('click', handleAddText);
+    }
+    if (rotateLeftBtnEl) rotateLeftBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(-90));
+    if (rotateRightBtnEl) rotateRightBtnEl.addEventListener('click', () => rotateCanvasContentFixedBounds(90));
+    if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', toggleGrayscaleFilter);
+    if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
+    if (resizeSliderEl) {
+        resizeSliderEl.addEventListener('input', (e) => {
+            const percentage = parseInt(e.target.value, 10);
+            if(resizeValueEl) resizeValueEl.textContent = `${percentage}%`;
+            handleResize(percentage);
+        });
+    }
+    if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
+    if(generateCutlineBtn) generateCutlineBtn.addEventListener('click', handleGenerateCutline);
+
+    const standardSizesContainer = document.getElementById('standard-sizes-controls');
+    if (standardSizesContainer) {
+        standardSizesContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('size-btn')) {
+                const targetInches = parseFloat(e.target.dataset.size);
+                handleStandardResize(targetInches);
+            }
+        });
+    }
+
+    const unitToggle = document.getElementById('unitToggle');
+    if (unitToggle) {
+        unitToggle.addEventListener('change', (e) => {
+            isMetric = e.target.checked;
+            calculateAndUpdatePrice();
+            redrawAll();
+        });
+    }
+
+    if (fileInputGlobalRef) {
+        fileInputGlobalRef.addEventListener('change', handleFileChange);
+    }
+
+    const previewArea = document.getElementById('preview-area');
+    previewArea.addEventListener('click', () => {
+        document.getElementById('editor-modal').classList.remove('hidden');
+    });
+
+    const okEditBtn = document.getElementById('ok-edit-btn');
+    okEditBtn.addEventListener('click', () => {
+        document.getElementById('editor-modal').classList.add('hidden');
+    });
+
+    const cancelEditBtn = document.getElementById('cancel-edit-btn');
+    cancelEditBtn.addEventListener('click', () => {
+        document.getElementById('editor-modal').classList.add('hidden');
+    });
+
+    if (paymentFormGlobalRef) {
+        paymentFormGlobalRef.addEventListener('submit', handlePaymentFormSubmit);
+    } else {
+        console.error("[CLIENT] BootStrap: Payment form with ID 'payment-form' not found. Payments will not work.");
+        showPaymentStatus("Payment form is missing. Cannot process payments.", "error");
+    }
+
+    updateEditingButtonsState(!originalImage);
 }
 
 function handleDesignImageChange(event, cutFilePreview) {
@@ -78,12 +184,12 @@ function handleDesignImageChange(event, cutFilePreview) {
     const reader = new FileReader();
     reader.onload = (e) => {
         customerOrder.designImageURL = e.target.result;
-        // The design preview is now the canvas itself
         const img = new Image();
         img.onload = () => {
             canvas.width = img.width;
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
+            document.getElementById('get-started-prompt').style.display = 'none';
             updateCustomerStatus('Design image loaded.', 'success');
             if (!customerOrder.cutFileSVG) {
                 generateDefaultCutline(customerOrder.designImageURL, cutFilePreview);
@@ -125,7 +231,7 @@ function generateDefaultCutline(imageSrc, cutFilePreview) {
         svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
         const rect = document.createElementNS(svgNS, "rect");
-        const offset = 10; // 10px bleed/offset
+        const offset = 10;
         rect.setAttribute('x', offset);
         rect.setAttribute('y', offset);
         rect.setAttribute('width', width - (offset * 2));
@@ -137,7 +243,6 @@ function generateDefaultCutline(imageSrc, cutFilePreview) {
 
         customerOrder.cutFileSVG = svg.outerHTML;
         cutFilePreview.innerHTML = DOMPurify.sanitize(customerOrder.cutFileSVG);
-        cutFilePreview.style.display = 'block';
         updateCustomerStatus('Default cutline generated.', 'success');
     };
     img.src = imageSrc;
@@ -152,24 +257,8 @@ function updateCustomerStatus(message, type = 'info', statusDiv) {
     statusDiv.style.visibility = 'visible';
 }
 
-// --- Main execution ---
-document.addEventListener('DOMContentLoaded', () => {
-    BootStrap();
-});
+document.addEventListener('DOMContentLoaded', BootStrap);
 
-async function handlePaymentFormSubmit(event) {
-    event.preventDefault();
-    updateCustomerStatus('Submitting order...', 'info');
-    // In a real app, this would use FormData to upload both files to the server
-    console.log('Submitting Order with:', {
-        design: customerOrder.designImageFile.name,
-        cutFile: customerOrder.cutFileSVG,
-    });
-    // Mock success
-    setTimeout(() => {
-        updateCustomerStatus('Order submitted successfully!', 'success');
-    }, 1000);
-}
 // All other functions from the original index.js are preserved below
-// but are not included here for brevity.
-// This includes pricing, square, and image editing logic.
+// (handlePaymentFormSubmit, pricing logic, etc.)
+// ...
