@@ -20,7 +20,7 @@
   - button "3\""
   - text: in
   - checkbox
-  - text: mm Could not load pricing information. Please refresh.
+  - text: mm A security token could not be loaded. Please refresh the page to continue.
   - heading "Add Text to Sticker" [level=3]
   - text: "Text:"
   - textbox "Text:"
