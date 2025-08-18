@@ -1,4 +1,4 @@
-const serverUrl = 'http://localhost:3000';
+const serverUrl = process.env.NODE_ENV === 'test' ? 'http://localhost:3001' : 'http://localhost:3000';
 let csrfToken;
 
 async function fetchCsrfToken() {

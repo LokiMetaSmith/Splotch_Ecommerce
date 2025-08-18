@@ -1,0 +1,81 @@
+# Page snapshot
+
+```yaml
+- main:
+  - heading "Custom Sticker Editor & Secure Pay" [level=1]
+  - link "View Order History":
+    - /url: /orders.html
+  - text: Your browser does not support the HTML5 canvas tag.
+  - button "Rotate Left"
+  - button "Rotate Right"
+  - text: "Scale: 100%"
+  - 'slider "Scale: 100%"': "100"
+  - button "Crop (Center 50%)"
+  - button "Grayscale"
+  - button "Sepia"
+  - button "Generate Smart Cutline"
+  - text: "Set max dimension to:"
+  - button "1\""
+  - button "2\""
+  - button "3\""
+  - text: in
+  - checkbox
+  - text: mm Could not load pricing information. Please refresh.
+  - heading "Add Text to Sticker" [level=3]
+  - text: "Text:"
+  - textbox "Text:"
+  - text: "Size (px):"
+  - spinbutton "Size (px):": "30"
+  - text: "Color:"
+  - textbox "Color:": "#2a284d"
+  - button "Add Text"
+  - text: "Font:"
+  - combobox "Font:":
+    - option "Arial" [selected]
+    - option "Verdana"
+    - option "Times New Roman"
+    - option "Courier New"
+    - option "Georgia"
+    - option "Modak (Display)"
+    - option "Baumans (Body)"
+    - option "Monofett (Display)"
+  - paragraph: "Note: Text is added to the center. Advanced text positioning may require other tools."
+  - heading "Order Your Custom Stickers & Pay" [level=2]
+  - heading "Sticker Options" [level=3]
+  - text: "Quantity:"
+  - spinbutton "Quantity:": "50"
+  - text: "Material:"
+  - combobox "Material:":
+    - option "Standard PP (Indoor)" [selected]
+    - option "Extra Durable PVC + Lamination (Outdoor 5-7 yrs)"
+  - paragraph: "Standard PP: Up to 1 yr outdoor. PVC: 5-7 yrs outdoor, laminated."
+  - text: "Resolution:"
+  - combobox "Resolution:"
+  - paragraph: Higher DPI (Dots Per Inch) results in a sharper, higher quality print.
+  - text: "Upload Cut Line for Custom Shape (Optional):"
+  - button "Upload Cut Line for Custom Shape (Optional):"
+  - paragraph: For custom shapes, please provide a vector cut line (.ai, .svg, .eps, .pdf). We can assist if needed (additional fee may apply).
+  - text: "Estimated Price: $0.00"
+  - heading "Billing Information" [level=3]
+  - text: First Name
+  - textbox "First Name"
+  - text: Last Name
+  - textbox "Last Name"
+  - text: Email
+  - textbox "Email"
+  - text: Phone
+  - textbox "Phone"
+  - text: Address
+  - textbox "Address"
+  - text: City
+  - textbox "City"
+  - text: State
+  - textbox "State"
+  - text: Postal Code
+  - textbox "Postal Code"
+  - text: "Upload Sticker Design Image:"
+  - button "Upload Sticker Design Image:"
+  - paragraph: This is the main image for your sticker design.
+  - iframe
+  - button "Pay & Process Order"
+```

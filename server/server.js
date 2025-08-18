@@ -296,9 +296,9 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
             fs.unlink(designImageFile.path, (err) => {
                 if (err) console.error("Error deleting invalid file:", err);
             });
-            return res.status(400).json({ error: 'Invalid file type. Only SVG, PNG, and JPEG are allowed.' });
+            return res.status(400).json({ error: `Invalid file type. Only ${allowedMimeTypes.join(', ')} are allowed.` });
         }
-        // --- Validation for cutLineFile (optional) ---
+
         let cutLinePath = null;
         if (req.files.cutLineFile && req.files.cutLineFile[0]) {
             const edgecutLineFile = req.files.cutLineFile[0];
@@ -383,7 +383,7 @@ New Order: ${newOrder.orderId}
 Customer: ${newOrder.billingContact.givenName} ${newOrder.billingContact.familyName}
 Email: ${newOrder.billingContact.email}
 Quantity: ${newOrder.orderDetails.quantity}
-Amount: $${(newOrder.amount / 100).toFixed(2)}
+Amount: $${(order.amount / 100).toFixed(2)}
           `;
           try {
             const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
