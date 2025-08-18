@@ -595,7 +595,6 @@ async function handlePaymentFormSubmit(event) {
 
 // --- UI Helper Functions ---
 function showPaymentStatus(message, type = 'info') {
-    console.log(`showPaymentStatus: ${message}, type: ${type}`);
     if (!paymentStatusContainer) {
         console.error("Payment status container not found. Message:", message);
         return;
@@ -631,7 +630,6 @@ function updateEditingButtonsState(disabled) {
 
 // --- Image Loading and Editing Functions ---
 function handleFileChange(event) {
-    console.log('handleFileChange called');
     const file = event.target.files[0];
     if (file) {
         loadFileAsImage(file);
