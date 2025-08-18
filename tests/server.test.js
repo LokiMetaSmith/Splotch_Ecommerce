@@ -38,6 +38,8 @@ describe('Server', () => {
         if (bot && bot.isPolling()) {
             await bot.stopPolling();
         }
+        // Clear timers
+        timers.forEach(timer => clearInterval(timer));
         // Close the server
         await new Promise(resolve => serverInstance.close(resolve));
         // Clean up the test database file

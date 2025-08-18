@@ -4,7 +4,7 @@ import { SVGParser } from './lib/svgparser.js';
 
 const appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
 const locationId = "LTS82DEX24XR0";
-const serverUrl = 'http://localhost:3000'; // Define server URL once
+const serverUrl = process.env.NODE_ENV === 'test' ? 'http://localhost:3001' : 'http://localhost:3000'; // Define server URL once
 
 // Declare globals for SDK objects and key DOM elements
 let payments, card, csrfToken;

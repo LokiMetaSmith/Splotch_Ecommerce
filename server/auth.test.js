@@ -31,6 +31,8 @@ describe('Auth Endpoints', () => {
   });
 
   afterAll(async () => {
+    // Clear timers
+    timers.forEach(timer => clearInterval(timer));
     await new Promise(resolve => serverInstance.close(resolve));
       try {
         await fs.unlink(testDbPath);
