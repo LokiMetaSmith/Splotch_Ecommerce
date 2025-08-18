@@ -2,10 +2,11 @@ import { test, expect } from './test-setup.js';
 
 test('allows a user to upload an image', async ({ page }) => {
   await page.goto('/');
+  await page.locator('#show-order-creation-btn').click();
 
   // Use the file chooser to upload the test image.
   const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.locator('label[for="file"]').click();
+  await page.locator('label[for="design-image-upload"]').click();
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles('verification/test.png');
 
