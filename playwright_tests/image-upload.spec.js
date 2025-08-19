@@ -7,10 +7,7 @@ test('allows a user to upload an image and enables editing', async ({ page }) =>
   await expect(page.locator('.rolodex-card[data-index="0"]')).toHaveClass(/active/);
 
   // Use the file chooser to upload the test image.
-  const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.locator('input#file').click();
-  const fileChooser = await fileChooserPromise;
-  await fileChooser.setFiles('verification/test.png');
+  await page.locator('input#file').setInputFiles('verification/test.png');
 
   // After upload, the edit buttons should be enabled.
   // We need to navigate to the second card to check this.

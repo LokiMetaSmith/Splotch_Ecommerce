@@ -4,10 +4,7 @@ test('allows a user to add text to an image', async ({ page }) => {
   await page.goto('/');
 
   // --- Step 1: Upload an image ---
-  const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.locator('input#file').click();
-  const fileChooser = await fileChooserPromise;
-  await fileChooser.setFiles('verification/test.png');
+  await page.locator('input#file').setInputFiles('verification/test.png');
 
   // --- Step 2: Navigate to the Customize card ---
   await page.locator('#rolodex-next').click();
