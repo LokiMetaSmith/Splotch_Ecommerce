@@ -64,7 +64,19 @@
 
         <!-- Payment Form -->
         <form id="payment-form" class="space-y-6 bg-gray-50 p-6 rounded-lg shadow-md">
-            <!-- All the payment form fields will remain here -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <input type="text" id="firstName" placeholder="First Name" class="p-2 border rounded-md">
+                <input type="text" id="lastName" placeholder="Last Name" class="p-2 border rounded-md">
+            </div>
+            <input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded-md">
+            <input type="text" id="address" placeholder="Address" class="w-full p-2 border rounded-md">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <input type="text" id="city" placeholder="City" class="p-2 border rounded-md">
+                <input type="text" id="state" placeholder="State" class="p-2 border rounded-md">
+                <input type="text" id="postalCode" placeholder="Postal Code" class="p-2 border rounded-md">
+            </div>
+            <div id="card-container"></div>
+            <button type="submit" class="w-full bg-blue-600 text-white p-3 rounded-md hover:bg-blue-700">Pay Now</button>
         </form>
     </main>
 
@@ -100,7 +112,20 @@
                 </div>
             </div>
             <div id="text-editing-controls" class="mt-4">
-                <!-- Text editing controls will be moved here -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input type="text" id="textInput" placeholder="Enter text" class="p-2 border rounded-md">
+                    <input type="number" id="textSizeInput" value="32" class="p-2 border rounded-md">
+                    <input type="color" id="textColorInput" value="#000000" class="p-2 border rounded-md">
+                </div>
+                <div class="flex items-center gap-2 mt-2">
+                    <select id="textFontFamily" class="p-2 border rounded-md">
+                        <option value="Arial">Arial</option>
+                        <option value="Modak">Modak</option>
+                        <option value="Monofett">Monofett</option>
+                        <option value="Baumans">Baumans</option>
+                    </select>
+                    <button id="addTextBtn" class="bg-blue-500 text-white p-2 rounded-md">Add Text</button>
+                </div>
             </div>
             <div class="mt-6 flex justify-end gap-4">
                 <button id="cancel-edit-btn" class="px-4 py-2 bg-gray-300 rounded-lg">Cancel</button>

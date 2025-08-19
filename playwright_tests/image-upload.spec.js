@@ -3,11 +3,18 @@ import { test, expect } from './test-setup.js';
 test('allows a user to upload an image', async ({ page }) => {
   await page.goto('/');
 
-  // Use the file chooser to upload the test image.
+  // --- Step 1: Open the editor and upload an image ---
+  await page.locator('#get-started-prompt').click();
+  await expect(page.locator('#editor-modal')).toBeVisible();
+
   const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.locator('label[for="file"]').click();
+  // The input is now inside the modal
+  await page.locator('input#design-image-upload').click();
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles('verification/test.png');
+
+  // Click OK to close the modal and apply changes
+  await page.locator('#ok-edit-btn').click();
 
   // WAIT for the image to be processed by waiting for the edit buttons to be enabled.
   // This is the most important verification step for this test. It proves the
