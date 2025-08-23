@@ -24,15 +24,16 @@
     "express-validator": "^7.2.1",
     "googleapis": "^140.0.1",
     "image-size": "^1.2.1",
-    "jose": "^6.0.12",
+    "jose": "^6.0.13",
     "jsonwebtoken": "^9.0.2",
     "lowdb": "^7.0.1",
+    "lusca": "^1.7.0",
     "multer": "^2.0.2",
     "node-telegram-bot-api": "^0.66.0",
-    "nodemailer": "^6.9.14",
-    "square": "^43.0.1",
+    "nodemailer": "^6.10.1",
+    "square": "^43.0.2",
     "svg-parser": "^2.0.4",
-    "tiny-csrf": "1.1.6"
+    "tiny-csrf": "^1.1.6"
   },
   "devDependencies": {
     "file-type": "^21.0.0",
