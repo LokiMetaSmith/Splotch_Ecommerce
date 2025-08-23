@@ -1,23 +1,41 @@
 import { test, expect } from './test-setup.js';
 
-test('allows a user to upload an image', async ({ page }) => {
-  await page.goto('/');
+test.describe('Image Upload', () => {
+  
+  test('Mobile: allows a user to upload an image and enables editing', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/');
+    await expect(page.locator('#mobile-layout')).toBeVisible({ timeout: 10000 });
+    
+    const canvas = page.locator('#mobile-imageCanvas');
+    
+    // Allow a moment for the initial blank canvas to render fully.
+    await page.waitForTimeout(500); 
+    const initialScreenshot = await canvas.screenshot();
 
-  // Use the file chooser to upload the test image.
-  const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.locator('label[for="file"]').click();
-  const fileChooser = await fileChooserPromise;
-  await fileChooser.setFiles('verification/test.png');
+    // Upload the file.
+    await page.locator('#mobile-file').setInputFiles('verification/test.png');
 
-  // WAIT for the image to be processed by waiting for the edit buttons to be enabled.
-  // This is the most important verification step for this test. It proves the
-  // async image loading and processing was successful enough to update the UI state.
-  await expect(page.locator('#rotateLeftBtn')).toBeEnabled({ timeout: 10000 });
+    // Wait for the canvas to change from its initial state. This confirms image load.
+    await expect(async () => {
+      expect(await canvas.screenshot()).not.toEqual(initialScreenshot);
+    }).toPass({ timeout: 10000 });
 
-  // The check for the success message has been removed as it was causing
-  // intractable failures in the test environment, even though the core
-  // functionality is working.
+    // Now that the image is loaded, navigate and verify buttons are enabled.
+    await page.locator('#rolodex-next').click();
+    await expect(page.locator('.rolodex-card[data-index="1"].active')).toBeVisible();
+    await expect(page.locator('#mobile-rotateLeftBtn')).toBeEnabled();
+  });
 
-  // Take a screenshot of the canvas to verify the image is displayed.
-  await page.locator('#imageCanvas').screenshot({ path: 'test-results/image-upload-canvas.png' });
+  test('Desktop: allows a user to upload an image and enables editing', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    await expect(page.locator('#desktop-layout')).toBeVisible({ timeout: 10000 });
+    await page.locator('#get-started-prompt').click();
+    await expect(page.locator('#editor-modal')).not.toHaveClass(/hidden/);
+    await page.locator('#design-image-upload').setInputFiles('verification/test.png');
+    await expect(page.locator('#rotateLeftBtn')).toBeEnabled({ timeout: 10000 });
+    await page.locator('#ok-edit-btn').click();
+    await expect(page.locator('#editor-modal')).toHaveClass(/hidden/);
+  });
 });
