@@ -15,7 +15,11 @@
     <link rel="stylesheet" href="./output.css" />
     <link rel="stylesheet" href="./splotch-theme.css" />
     <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
-
+    <script
+        type="text/javascript"
+        src="https://sandbox.web.squarecdn.com/v1/square.js"
+    ></script>
+    <script src="./src/lib/clipper.js"></script>
     <style>
         /* --- Responsive Layout Switching --- */
         /* Desktop is the default; mobile is hidden. */
@@ -36,17 +40,41 @@
             transition: background-color 0.2s;
             cursor: pointer;
         }
-        .size-btn:hover {
-            background-color: #e5e7eb;
+        .input {
+            @apply mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm;
+        }
+        /* Rolodex Styles */
+        #rolodex-container {
+            position: relative;
+            perspective: 1000px;
+            transition: height 0.6s ease; /* Smooth height transition */
+        }
+        .rolodex-card {
+            position: absolute;
+            width: 100%;
+            backface-visibility: hidden;
+            transition: transform 0.6s ease, opacity 0.6s ease;
+            opacity: 0;
+            transform: rotateY(180deg) scale(0.95);
+            pointer-events: none;
+        }
+        .rolodex-card.active {
+            opacity: 1;
+            transform: rotateY(0deg) scale(1);
+            pointer-events: auto;
+            z-index: 10;
+            position: relative; /* Change position to relative when active to define container height */
         }
         /* Toggle Switch CSS */
-        input:checked ~ .dot {
-            transform: translateX(100%);
-            background-color: #48bb78;
+        #unitToggle:checked ~ div .dot {
+            transform: translateX(1.5rem);
+        }
+        .dot {
+             transition: transform 0.3s ease;
         }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 font-sans">
 
     <div id="adblock-warning" style="display: none; padding: 1rem; background-color: #fffbe6; border: 1px solid #facc15; border-radius: 0.5rem; color: #713f12; margin: 1rem auto; max-width: 800px;">
         <p style="font-weight: bold;">Payment Form Blocked ???</p>
@@ -56,8 +84,8 @@
     <div id="desktop-layout">
         <main class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8">
             <div class="flex justify-between items-center mb-6">
-                <h1 class="text-3xl font-bold text-center text-gray-700">Custom Sticker Editor & Secure Pay</h1>
-                <a href="/orders.html" class="text-splotch-red hover:underline p-2 border-2 border-dashed border-pink-500 rounded-lg">View Order History</a>
+                <h1 class="text-3xl text-center text-gray-700" style="font-family: var(--font-modak);">Custom Sticker Editor & Secure Pay</h1>
+                <a href="/orders.html" class="text-splotch-red hover:underline p-2 border-2 border-dashed border-pink-500 rounded-lg" style="font-family: var(--font-baumans);">View Order History</a>
             </div>
 
             <div id="peerjs-status-container" class="mb-4 p-3 rounded-md text-sm text-white bg-gray-400" style="visibility: hidden; text-align: center;">
@@ -222,6 +250,7 @@
                 <a href="/orders.html" class="text-splotch-red hover:underline p-2 border-2 border-dashed border-pink-500 rounded-lg text-sm" style="font-family: var(--font-baumans);">Order History</a>
             </div>
 
+        <!-- Persistent Summary Header -->
             <div id="persistent-summary" class="sticky top-0 bg-white bg-opacity-80 backdrop-blur-sm z-20 p-4 mb-6 rounded-lg shadow-md border flex items-center justify-between space-x-6">
                 <div class="flex items-center space-x-4">
                     <canvas id="thumbnail-canvas" width="80" height="80" class="bg-gray-200 rounded-md border"></canvas>
@@ -237,20 +266,24 @@
             </div>
 
             <div id="rolodex-container">
-                <div class="rolodex-card" data-index="0">
-                    <h2 class="text-2xl text-center mb-4" style="font-family: var(--font-modak);">1. Upload & Preview</h2>
-                    <div class="bg-gray-50 p-4 rounded-lg shadow-inner mb-6 relative">
-                        <div class="relative w-full max-w-[500px] aspect-[5/4] mx-auto">
-                            <canvas id="mobile-imageCanvas" class="absolute top-0 left-0 w-full h-full border-2 border-dashed border-gray-300 rounded-md bg-white"></canvas>
-                            <div id="mobile-cut-file-preview-container" class="absolute top-0 left-0 w-full h-full pointer-events-none"></div>
-                        </div>
-                        <p id="mobile-designMarginNote" class="absolute bottom-2 right-2 text-xs text-splotch-red p-1 bg-white bg-opacity-75 rounded" style="font-family: var(--font-baumans); display: none;">Keep important elements 2-3mm from edge!</p>
-                    </div>
-                    <div class="max-w-2xl mx-auto grid grid-cols-1 gap-4">
-                        <div class="field"><label class="label text-sm font-medium text-gray-700" for="mobile-file">Upload Sticker Design Image:</label><div class="control"><input class="input mt-1 block w-full text-sm" id="mobile-file" name="file" type="file" accept="image/*"/><span id="mobile-fileNameDisplay" class="text-sm text-gray-600 ml-2"></span></div></div>
-                        <div class="field"><label class="label text-sm font-medium text-gray-700" for="mobile-cutLineFile">Upload Cut Line (Optional):</label><div class="control"><input class="input mt-1 block w-full text-sm" id="mobile-cutLineFile" name="cutLineFile" type="file" accept=".ai,.svg,.eps,.pdf"/></div></div>
-                    </div>
-                </div>
+<div class="rolodex-card" data-index="0">
+    <h2 class="text-2xl text-center mb-4" style="font-family: var(--font-modak);">1. Upload & Preview</h2>
+    <p class="text-center text-gray-600 -mt-2 mb-4" style="font-family: var(--font-baumans);">
+        Hover (or press and hold on touch) over the image to magnify.
+    </p>
+
+    <div id="magnify-preview-container" class="relative w-full max-w-[500px] aspect-[5/4] mx-auto border-2 border-dashed border-gray-300 rounded-md">
+        
+        <canvas id="mobile-imageCanvas-thumb" class="w-full h-full"></canvas>
+
+        <div id="magnify-loupe" class="hidden"></div>
+
+        <div id="magnify-label" class="hidden">Magnified Preview</div>
+    </div>
+
+    <div class="max-w-2xl mx-auto grid grid-cols-1 gap-4 mt-6">
+        </div>
+</div>
 
                 <div class="rolodex-card" data-index="1">
                     <h2 class="text-2xl text-center mb-4" style="font-family: var(--font-modak);">2. Customize Your Sticker</h2>

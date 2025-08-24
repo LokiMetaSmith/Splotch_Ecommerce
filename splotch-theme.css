@@ -71,6 +71,41 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
     border-radius: 15px !important;
 }
 
+/* Container must be relative for absolute positioning of children */
+#magnify-preview-container {
+    position: relative;
+    cursor: crosshair;
+    overflow: hidden; /* This keeps the loupe from spilling out */
+}
+
+/* The magnifying glass loupe element */
+#magnify-loupe {
+    position: absolute;
+    width: 175px;  /* Size of the magnifying glass */
+    height: 175px;
+    border-radius: 50%; /* Makes it a circle */
+    border: 4px solid #fefefe;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    background-repeat: no-repeat;
+    
+    /* This is crucial: it prevents the loupe from catching mouse events itself */
+    pointer-events: none; 
+}
+
+/* The label on the outer rim */
+#magnify-label {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-family: var(--font-baumans);
+    padding: 4px 12px;
+    border-radius: 0 0 8px 8px;
+    font-size: 0.8rem;
+    pointer-events: none;
+}
 /* --- Editing Controls --- */
 #editing-controls {
     background-color: rgba(0, 169, 157, 0.1) !important; /* Very light teal bg */
