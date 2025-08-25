@@ -22,7 +22,7 @@ import { google } from 'googleapis';
 import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
 import { initializeBot } from './bot.js';
-import { fileTypeFromFile } from 'file-type';
+const { fileTypeFromFile } = await import('file-type');
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 
 const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];

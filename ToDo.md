@@ -71,3 +71,7 @@ This document tracks the features and bug fixes that need to be implemented for 
 
 ## Security
 - [ ] Evaluate adding reCAPTCHA or other methods of securing the website.
+
+## Bugs
+- [ ] **`process is not defined` on Orders Page:** The `orders.html` page is throwing a `process is not defined` error, which breaks the magic link login flow.
+- [ ] **Magic Link Emails Not Sending:** The server is not sending emails for magic links.
