@@ -91,6 +91,9 @@ async function main() {
 
   // Check for stalled orders every hour
   setInterval(async () => {
+    // Force a re-read from the db.json file to get the latest order statuses
+    await db.read();
+
     const now = new Date();
     const finalStatuses = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
     const stalledOrders = db.data.orders.filter(order => {

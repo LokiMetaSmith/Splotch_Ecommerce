@@ -383,7 +383,7 @@ New Order: ${newOrder.orderId}
 Customer: ${newOrder.billingContact.givenName} ${newOrder.billingContact.familyName}
 Email: ${newOrder.billingContact.email}
 Quantity: ${newOrder.orderDetails.quantity}
-Amount: $${(order.amount / 100).toFixed(2)}
+Amount: $${(newOrder.amount / 100).toFixed(2)}
           `;
           try {
             const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
@@ -395,8 +395,15 @@ Amount: $${(order.amount / 100).toFixed(2)}
 
             // Send the design image
             if (newOrder.designImagePath) {
-              const imagePath = path.join(__dirname, newOrder.designImagePath);
-              await bot.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, imagePath);
+              const imagePath = path.join(__dirname, '..', newOrder.designImagePath);
+              const imageMessage = await bot.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, imagePath, {
+                caption: `Design for order: ${newOrder.orderId}`
+              });
+              const orderIndex = db.data.orders.findIndex(o => o.orderId === newOrder.orderId);
+              if (orderIndex !== -1) {
+                  db.data.orders[orderIndex].telegramImageMessageId = imageMessage.message_id;
+                  await db.write();
+              }
             }
 
             // Send the cut line file
@@ -503,6 +510,22 @@ Amount: $${(order.amount / 100).toFixed(2)}
       await db.write();
       console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
+      // If the order was stalled, delete the 'stalled' message
+      if (order.stalledMessageId) {
+        try {
+          await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.stalledMessageId);
+          order.stalledMessageId = null; // Clear the ID after deleting
+          await db.write();
+        } catch (error) {
+          // Ignore if the message is already deleted
+          if (error.response && error.response.body && error.response.body.description.includes('message to delete not found')) {
+            console.log(`[TELEGRAM] Stalled message for order ${orderId} was already deleted.`);
+          } else {
+            console.error('[TELEGRAM] Failed to delete stalled message:', error);
+          }
+        }
+      }
+
       // Update Telegram message
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
         const statusChecklist = `
@@ -521,8 +544,15 @@ Amount: $${(order.amount / 100).toFixed(2)}
 ${statusChecklist}
         `;
         try {
-          if (status === 'SHIPPED') {
-            await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+          if (status === 'SHIPPED' || status === 'COMPLETED' || status === 'CANCELED') {
+            // Delete the main order message
+            if (order.telegramMessageId) {
+                await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+            }
+            // Delete the image message
+            if (order.telegramImageMessageId) {
+                await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramImageMessageId);
+            }
           } else {
             await bot.editMessageText(message, {
               chat_id: process.env.TELEGRAM_CHANNEL_ID,
