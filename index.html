@@ -88,10 +88,6 @@
                 <a href="/orders.html" class="text-splotch-red hover:underline p-2 border-2 border-dashed border-pink-500 rounded-lg" style="font-family: var(--font-baumans);">View Order History</a>
             </div>
 
-            <div id="peerjs-status-container" class="mb-4 p-3 rounded-md text-sm text-white bg-gray-400" style="visibility: hidden; text-align: center;">
-                PeerJS Status: Initializing...
-            </div>
-
             <div class="bg-gray-50 p-4 rounded-lg shadow-inner mb-6 relative">
                 <canvas id="imageCanvas" width="500" height="400" class="block mx-auto border-2 border-dashed border-gray-300 rounded-md bg-white">
                     Your browser does not support the HTML5 canvas tag.
@@ -282,7 +278,13 @@
     </div>
 
     <div class="max-w-2xl mx-auto grid grid-cols-1 gap-4 mt-6">
+        <div class="field">
+            <label class="label text-sm font-medium text-gray-700" for="mobile-file">Upload Sticker Design Image:</label>
+            <div class="control">
+                <input class="input mt-1 block w-full text-sm" id="mobile-file" name="file" type="file" accept="image/*" />
+            </div>
         </div>
+    </div>
 </div>
 
                 <div class="rolodex-card" data-index="1">

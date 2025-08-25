@@ -10,6 +10,7 @@ const serverUrl = 'http://localhost:3000'; // Define server URL once
 let payments, card, csrfToken;
 let originalImage = null;
 let canvas, ctx;
+let fullResCanvas; // In-memory canvas for full-resolution image
 
 // Globals for SVG processing state
 let basePolygons = []; // The original, unscaled polygons from the SVG
@@ -178,6 +179,100 @@ document.addEventListener('DOMContentLoaded', () => {
             showAdBlockerWarning();
         }
     }, 2000);
+
+    // Rolodex functionality for mobile layout
+    const rolodexContainer = document.getElementById('rolodex-container');
+    if (rolodexContainer) {
+        const cards = document.querySelectorAll('.rolodex-card');
+        const nextBtn = document.getElementById('rolodex-next');
+        const prevBtn = document.getElementById('rolodex-prev');
+        const dotsContainer = document.getElementById('rolodex-dots');
+        let currentIndex = 0;
+
+        if (cards.length > 0 && nextBtn && prevBtn && dotsContainer) {
+            cards.forEach((_, i) => {
+                const dot = document.createElement('button');
+                dot.classList.add('w-3', 'h-3', 'rounded-full', 'bg-gray-300', 'transition');
+                dot.addEventListener('click', () => showCard(i));
+                dotsContainer.appendChild(dot);
+            });
+            const dots = dotsContainer.querySelectorAll('button');
+
+            function showCard(index) {
+                if (cards[index]) {
+                    rolodexContainer.style.height = cards[index].scrollHeight + 'px';
+                    cards.forEach((card, i) => {
+                        card.classList.toggle('active', i === index);
+                    });
+                    if (dots[index]) {
+                         dots.forEach((d, i) => d.classList.toggle('bg-splotch-navy', i === index));
+                    }
+                    currentIndex = index;
+                    prevBtn.disabled = currentIndex === 0;
+                    nextBtn.disabled = currentIndex === cards.length - 1;
+                }
+            }
+
+            nextBtn.addEventListener('click', () => {
+                if (currentIndex < cards.length - 1) showCard(currentIndex + 1);
+            });
+            prevBtn.addEventListener('click', () => {
+                if (currentIndex > 0) showCard(currentIndex - 1);
+            });
+
+            // Initial setup
+            showCard(0);
+        }
+    }
+
+    // Magnifying Glass Logic for mobile layout
+    const magnifyContainer = document.getElementById('magnify-preview-container');
+    if (magnifyContainer) {
+        const thumbCanvas = document.getElementById('mobile-imageCanvas-thumb');
+        const loupe = document.getElementById('magnify-loupe');
+        const label = document.getElementById('magnify-label');
+
+        if (thumbCanvas && loupe && label) {
+            const updateMagnifier = (e) => {
+                e.preventDefault();
+                const rect = thumbCanvas.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                loupe.style.left = `${x - loupe.offsetWidth / 2}px`;
+                loupe.style.top = `${y - loupe.offsetHeight / 2}px`;
+                if (!fullResCanvas || fullResCanvas.width === 0 || thumbCanvas.width === 0) return;
+                const ratioX = fullResCanvas.width / thumbCanvas.width;
+                const ratioY = fullResCanvas.height / thumbCanvas.height;
+                const bgX = -(x * ratioX - loupe.offsetWidth / 2);
+                const bgY = -(y * ratioY - loupe.offsetHeight / 2);
+                loupe.style.backgroundPosition = `${bgX}px ${bgY}px`;
+            };
+
+            const showMagnifier = () => {
+                if (fullResCanvas) {
+                    const dataURL = fullResCanvas.toDataURL();
+                    loupe.style.backgroundImage = `url(${dataURL})`;
+                    loupe.style.backgroundSize = `${fullResCanvas.width}px ${fullResCanvas.height}px`;
+                    loupe.classList.remove('hidden');
+                    label.classList.remove('hidden');
+                }
+            };
+
+            const hideMagnifier = () => {
+                loupe.classList.add('hidden');
+                label.classList.add('hidden');
+            };
+
+            magnifyContainer.addEventListener('mouseenter', showMagnifier);
+            magnifyContainer.addEventListener('mouseleave', hideMagnifier);
+            magnifyContainer.addEventListener('mousemove', updateMagnifier);
+            magnifyContainer.addEventListener('touchstart', (e) => { e.preventDefault(); showMagnifier(); }, { passive: false });
+            magnifyContainer.addEventListener('touchend', hideMagnifier);
+            magnifyContainer.addEventListener('touchmove', updateMagnifier, { passive: false });
+
+            hideMagnifier(); // Initially hide it
+        }
+    }
 });
 
 function showAdBlockerWarning() {
@@ -463,14 +558,38 @@ async function handlePaymentFormSubmit(event) {
 
 // --- UI Helper Functions ---
 function showPaymentStatus(message, type = 'info') {
-    // The old status container is gone. For now, we use alerts.
-    const prefix = type === 'error' ? 'Error: ' : (type === 'success' ? 'Success: ' : '');
-    alert(prefix + message);
-    if (type === 'error') {
-        console.error(message);
-    } else {
-        console.log(message);
+    const statusContainer = document.getElementById('payment-status-container');
+    if (!statusContainer) {
+        // Fallback for critical errors when the container might not be available
+        const prefix = type === 'error' ? 'Error: ' : (type === 'success' ? 'Success: ' : '');
+        alert(prefix + message);
+        console.log(`[Payment Status] ${type}: ${message}`);
+        return;
     }
+
+    statusContainer.textContent = message;
+    statusContainer.style.visibility = 'visible';
+
+    // Clear existing type classes
+    statusContainer.classList.remove('bg-green-500', 'bg-red-500', 'bg-blue-500', 'text-white');
+
+    // Apply new type class
+    switch (type) {
+        case 'success':
+            statusContainer.classList.add('bg-green-500', 'text-white');
+            break;
+        case 'error':
+            statusContainer.classList.add('bg-red-500', 'text-white');
+            break;
+        default: // 'info'
+            statusContainer.classList.add('bg-blue-500', 'text-white');
+            break;
+    }
+
+    // Hide the message after 5 seconds
+    setTimeout(() => {
+        statusContainer.style.visibility = 'hidden';
+    }, 5000);
 }
 
 function updateEditingButtonsState(disabled) {
@@ -523,6 +642,14 @@ function loadFileAsImage(file) {
             const img = new Image();
             img.onload = () => {
                 originalImage = img;
+
+                // Create an in-memory canvas for the full-resolution image
+                fullResCanvas = document.createElement('canvas');
+                fullResCanvas.width = img.width;
+                fullResCanvas.height = img.height;
+                const fullResCtx = fullResCanvas.getContext('2d');
+                fullResCtx.drawImage(img, 0, 0);
+
                 updateEditingButtonsState(false);
                 showPaymentStatus('Image loaded successfully.', 'success');
 
@@ -939,167 +1066,3 @@ function simplifyPolygon(points, epsilon = 1.0) {
     if (points.length < 3) return points;
     return rdp(points, epsilon);
 }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Rolodex functionality
-            const rolodexContainer = document.getElementById('rolodex-container');
-            const cards = document.querySelectorAll('.rolodex-card');
-            const nextBtn = document.getElementById('rolodex-next');
-            const prevBtn = document.getElementById('rolodex-prev');
-            const dotsContainer = document.getElementById('rolodex-dots');
-            let currentIndex = 0;
-
-            cards.forEach((_, i) => {
-                const dot = document.createElement('button');
-                dot.classList.add('w-3', 'h-3', 'rounded-full', 'bg-gray-300', 'transition');
-                dot.addEventListener('click', () => showCard(i));
-                dotsContainer.appendChild(dot);
-            });
-            const dots = dotsContainer.querySelectorAll('button');
-
-            function showCard(index) {
-                // Set container height before switching card for smooth transition
-                rolodexContainer.style.height = cards[index].scrollHeight + 'px';
-
-                cards.forEach((card, i) => {
-                    card.classList.toggle('active', i === index);
-                    dots[i].classList.toggle('bg-splotch-navy', i === index);
-                    dots[i].classList.toggle('bg-gray-300', i !== index);
-                });
-                currentIndex = index;
-                prevBtn.disabled = currentIndex === 0;
-                nextBtn.disabled = currentIndex === cards.length - 1;
-            }
-
-            nextBtn.addEventListener('click', () => {
-                if (currentIndex < cards.length - 1) showCard(currentIndex + 1);
-            });
-            prevBtn.addEventListener('click', () => {
-                if (currentIndex > 0) showCard(currentIndex - 1);
-            });
-
-            // Unit toggle and summary update functionality
-            const unitToggle = document.getElementById('unitToggle');
-            const maxDimensionInput = document.getElementById('maxDimensionInput');
-            const dimensionUnitLabel = document.getElementById('dimensionUnitLabel');
-            const summarySize = document.getElementById('summary-size');
-            const IN_TO_MM = 25.4;
-
-            function updateSummarySize() {
-                const isMm = unitToggle.checked;
-                const val = parseFloat(maxDimensionInput.value) || 0;
-                const unit = isMm ? 'mm' : 'in';
-                summarySize.textContent = `Size: ${val.toFixed(isMm ? 1 : 2)} ${unit}`;
-            }
-
-            unitToggle.addEventListener('change', () => {
-                const isMm = unitToggle.checked;
-                let currentValue = parseFloat(maxDimensionInput.value) || 0;
-                if (isMm) {
-                    dimensionUnitLabel.textContent = 'mm';
-                    maxDimensionInput.value = (currentValue * IN_TO_MM).toFixed(1);
-                } else {
-                    dimensionUnitLabel.textContent = 'in';
-                    maxDimensionInput.value = (currentValue / IN_TO_MM).toFixed(2);
-                }
-                updateSummarySize();
-            });
-
-            maxDimensionInput.addEventListener('input', updateSummarySize);
-
-            // Billing address toggle
-            const billingRadios = document.querySelectorAll('input[name="billingSameAsShipping"]');
-            const billingContainer = document.getElementById('billing-address-container');
-            const billingAddressInput = document.getElementById('billingAddress');
-            billingRadios.forEach(radio => {
-                radio.addEventListener('change', (event) => {
-                    if (event.target.value === 'no') {
-                        billingContainer.classList.remove('hidden');
-                        billingAddressInput.required = true;
-                    } else {
-                        billingContainer.classList.add('hidden');
-                        billingAddressInput.required = false;
-                    }
-                    // Recalculate container height when billing address is shown/hidden
-                    showCard(currentIndex);
-                });
-            });
-
-            // Initial setup
-            showCard(0);
-            updateSummarySize();
-        });
-// --- Magnifying Glass Logic ---
-
-// Get references to the new HTML elements
-const magnifyContainer = document.getElementById('magnify-preview-container');
-const thumbCanvas = document.getElementById('mobile-imageCanvas-thumb');
-const loupe = document.getElementById('magnify-loupe');
-const label = document.getElementById('magnify-label');
-
-// You will need a reference to your full-resolution canvas.
-// For this example, let's assume it's called 'fullResCanvas'.
-// This canvas might not be in the DOM, but held in memory.
-
-function updateMagnifier(e) {
-    e.preventDefault(); // Prevents unwanted scrolling on touch devices
-
-    const rect = thumbCanvas.getBoundingClientRect();
-
-    // Get cursor position relative to the thumbnail canvas
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-
-    // --- Position the Loupe Element ---
-    // Center the loupe on the cursor
-    loupe.style.left = `${x - loupe.offsetWidth / 2}px`;
-    loupe.style.top = `${y - loupe.offsetHeight / 2}px`;
-
-    // --- Calculate Background Position ---
-    // This is the magic: it moves the background image inside the loupe
-    // to show the correct magnified area.
-    
-    // Check for canvas dimensions to avoid division by zero
-    if (!fullResCanvas || fullResCanvas.width === 0 || thumbCanvas.width === 0) return;
-
-    const ratioX = fullResCanvas.width / thumbCanvas.width;
-    const ratioY = fullResCanvas.height / thumbCanvas.height;
-
-    const bgX = -(x * ratioX - loupe.offsetWidth / 2);
-    const bgY = -(y * ratioY - loupe.offsetHeight / 2);
-
-    loupe.style.backgroundPosition = `${bgX}px ${bgY}px`;
-}
-
-function showMagnifier() {
-    // This function runs when the user uploads an image.
-    // It sets the loupe's background to the full-resolution image data.
-    if (fullResCanvas) {
-        const dataURL = fullResCanvas.toDataURL();
-        loupe.style.backgroundImage = `url(${dataURL})`;
-        loupe.style.backgroundSize = `${fullResCanvas.width}px ${fullResCanvas.height}px`;
-
-        // Show the elements
-        loupe.classList.remove('hidden');
-        label.classList.remove('hidden');
-    }
-}
-
-function hideMagnifier() {
-    loupe.classList.add('hidden');
-    label.classList.add('hidden');
-}
-
-// Attach event listeners for both mouse and touch
-magnifyContainer.addEventListener('mouseenter', showMagnifier);
-magnifyContainer.addEventListener('mouseleave', hideMagnifier);
-magnifyContainer.addEventListener('mousemove', updateMagnifier);
-
-magnifyContainer.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    showMagnifier();
-}, { passive: false });
-magnifyContainer.addEventListener('touchend', hideMagnifier);
-magnifyContainer.addEventListener('touchmove', updateMagnifier, { passive: false });
-
-// You need to call `hideMagnifier()` initially and `showMagnifier()` whenever a new image is drawn.
