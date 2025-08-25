@@ -563,7 +563,7 @@ async function handleNesting() {
         const spacing = parseInt(ui.spacingInput.value, 10) || 0;
         const options = { spacing, rotations: 4 };
 
-        const nest = new SVGNest(null, svgs, options); // Pass null for binElement
+        const nest = new SvgNest(null, svgs, options); // Pass null for binElement
         nest.setBinPolygon(complexBinPolygon); // Use the new method
 
         const resultSvg = nest.start();
