@@ -21,6 +21,7 @@ This document tracks the features and bug fixes that need to be implemented for 
     - [x] List Shipped Orders
     - [x] List Canceled Orders
     - [ ] List Delivered Orders
+- [ ] **Bug:** Investigate and fix "message to delete not found" error.
 
 ## SVG, Pricing, and Customer Workflow
 
@@ -67,3 +68,6 @@ This document tracks the features and bug fixes that need to be implemented for 
 - [ ] **Staging Environment:**
     - [ ] Set up a staging environment that mirrors production.
     - [ ] Create a process for sanitizing and loading production data into the staging environment.
+
+## Security
+- [ ] Evaluate adding reCAPTCHA or other methods of securing the website.

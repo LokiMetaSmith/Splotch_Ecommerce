@@ -547,11 +547,27 @@ ${statusChecklist}
           if (status === 'SHIPPED' || status === 'COMPLETED' || status === 'CANCELED') {
             // Delete the main order message
             if (order.telegramMessageId) {
+              try {
                 await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+              } catch (error) {
+                if (error.response && error.response.body && error.response.body.description.includes('message to delete not found')) {
+                  console.log(`[TELEGRAM] Main message for order ${orderId} was already deleted.`);
+                } else {
+                  console.error('[TELEGRAM] Failed to delete main message:', error);
+                }
+              }
             }
             // Delete the image message
             if (order.telegramImageMessageId) {
+              try {
                 await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramImageMessageId);
+              } catch (error) {
+                if (error.response && error.response.body && error.response.body.description.includes('message to delete not found')) {
+                  console.log(`[TELEGRAM] Image message for order ${orderId} was already deleted.`);
+                } else {
+                  console.error('[TELEGRAM] Failed to delete image message:', error);
+                }
+              }
             }
           } else {
             await bot.editMessageText(message, {
