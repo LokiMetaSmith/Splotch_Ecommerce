@@ -99,4 +99,60 @@ function initializeBot(database) {
   return bot;
 }
 
-export { initializeBot, bot };
+async function handleOrderStatusUpdate(order, newStatus, db) {
+  // If the order was stalled, delete the 'stalled' message
+  if (order.stalledMessageId) {
+    try {
+      await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.stalledMessageId);
+      const orderInDb = db.data.orders.find(o => o.orderId === order.orderId);
+      if (orderInDb) {
+        orderInDb.stalledMessageId = null; // Clear the ID after deleting
+        await db.write();
+      }
+    } catch (error) {
+      if (error.response && error.response.body && error.response.body.description.includes('message to delete not found')) {
+        console.log(`[TELEGRAM] Stalled message for order ${order.orderId} was already deleted.`);
+      } else {
+        console.error('[TELEGRAM] Failed to delete stalled message:', error);
+      }
+    }
+  }
+
+  // Update Telegram message
+  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
+    const statusChecklist = `
+✅ New
+${newStatus === 'ACCEPTED' || newStatus === 'PRINTING' || newStatus === 'SHIPPED' ? '✅' : '⬜️'} Accepted
+${newStatus === 'PRINTING' || newStatus === 'SHIPPED' ? '✅' : '⬜️'} Printing
+${newStatus === 'SHIPPED' ? '✅' : '⬜️'} Shipped
+    `;
+    const message = `
+Order: ${order.orderId}
+Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
+Email: ${order.billingContact.email}
+Quantity: ${order.orderDetails.quantity}
+Amount: $${(order.amount / 100).toFixed(2)}
+
+${statusChecklist}
+    `;
+    try {
+      if (newStatus === 'SHIPPED' || newStatus === 'COMPLETED' || newStatus === 'CANCELED') {
+        if (order.telegramMessageId) {
+          await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+        }
+        if (order.telegramImageMessageId) {
+          await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramImageMessageId);
+        }
+      } else {
+        await bot.editMessageText(message, {
+          chat_id: process.env.TELEGRAM_CHANNEL_ID,
+          message_id: order.telegramMessageId,
+        });
+      }
+    } catch (error) {
+      console.error('[TELEGRAM] Failed to edit or delete message:', error);
+    }
+  }
+}
+
+export { initializeBot, bot, handleOrderStatusUpdate };

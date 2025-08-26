@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit tests/ server/",
+    "test:unit": "NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit tests/ server/",
     "test:e2e": "playwright test",
     "start-mock-server": "json-server --watch db.json --port 3001",
     "styles": "npx tailwindcss build styles.css -o output.css",
@@ -59,6 +59,7 @@
     "@playwright/test": "^1.45.0",
     "autoprefixer": "^10.4.21",
     "babel-jest": "^30.0.5",
+    "identity-obj-proxy": "^3.0.0",
     "image-size": "^1.1.1",
     "jest-environment-jsdom": "^30.0.5",
     "json-server": "^1.0.0-beta.3",
