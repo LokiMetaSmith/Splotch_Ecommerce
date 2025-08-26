@@ -21,7 +21,7 @@ import dotenv from 'dotenv';
 import { google } from 'googleapis';
 import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
-import { initializeBot } from './bot.js';
+import { initializeBot, handleOrderStatusUpdate } from './bot.js';
 const { fileTypeFromFile } = await import('file-type');
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 
@@ -62,9 +62,10 @@ let app;
 const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
 
 // Define an async function to contain all server logic
-async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
+async function startServer(db, bot, sendEmail, dbPath) {
   if (!db) {
-    db = await JSONFilePreset(dbPath, defaultData);
+    const finalDbPath = process.env.DB_PATH || dbPath || path.join(__dirname, 'db.json');
+    db = await JSONFilePreset(finalDbPath, defaultData);
   }
   // --- Google OAuth2 Client ---
   const oauth2Client = new google.auth.OAuth2(
@@ -510,75 +511,8 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
       await db.write();
       console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
-      // If the order was stalled, delete the 'stalled' message
-      if (order.stalledMessageId) {
-        try {
-          await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.stalledMessageId);
-          order.stalledMessageId = null; // Clear the ID after deleting
-          await db.write();
-        } catch (error) {
-          // Ignore if the message is already deleted
-          if (error.response && error.response.body && error.response.body.description.includes('message to delete not found')) {
-            console.log(`[TELEGRAM] Stalled message for order ${orderId} was already deleted.`);
-          } else {
-            console.error('[TELEGRAM] Failed to delete stalled message:', error);
-          }
-        }
-      }
-
-      // Update Telegram message
-      if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
-        const statusChecklist = `
-✅ New
-${status === 'ACCEPTED' || status === 'PRINTING' || status === 'SHIPPED' ? '✅' : '⬜️'} Accepted
-${status === 'PRINTING' || status === 'SHIPPED' ? '✅' : '⬜️'} Printing
-${status === 'SHIPPED' ? '✅' : '⬜️'} Shipped
-        `;
-        const message = `
-Order: ${order.orderId}
-Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
-Email: ${order.billingContact.email}
-Quantity: ${order.orderDetails.quantity}
-Amount: $${(order.amount / 100).toFixed(2)}
-
-${statusChecklist}
-        `;
-        try {
-          if (status === 'SHIPPED' || status === 'COMPLETED' || status === 'CANCELED') {
-            // Delete the main order message
-            if (order.telegramMessageId) {
-              try {
-                await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
-              } catch (error) {
-                if (error.response && error.response.body && error.response.body.description.includes('message to delete not found')) {
-                  console.log(`[TELEGRAM] Main message for order ${orderId} was already deleted.`);
-                } else {
-                  console.error('[TELEGRAM] Failed to delete main message:', error);
-                }
-              }
-            }
-            // Delete the image message
-            if (order.telegramImageMessageId) {
-              try {
-                await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramImageMessageId);
-              } catch (error) {
-                if (error.response && error.response.body && error.response.body.description.includes('message to delete not found')) {
-                  console.log(`[TELEGRAM] Image message for order ${orderId} was already deleted.`);
-                } else {
-                  console.error('[TELEGRAM] Failed to delete image message:', error);
-                }
-              }
-            }
-          } else {
-            await bot.editMessageText(message, {
-              chat_id: process.env.TELEGRAM_CHANNEL_ID,
-              message_id: order.telegramMessageId,
-            });
-          }
-        } catch (error) {
-          console.error('[TELEGRAM] Failed to edit or delete message:', error);
-        }
-      }
+      // Handle Telegram notifications
+      await handleOrderStatusUpdate(order, status, db);
 
       res.status(200).json({ success: true, order: order });
     });
@@ -946,10 +880,8 @@ ${statusChecklist}
     const sessionTokenTimer = setInterval(signInstanceToken, 30 * 60 * 1000);
     const keyRotationTimer = setInterval(rotateKeys, 60 * 60 * 1000);
 
-    if (process.env.NODE_ENV === 'test') {
-      sessionTokenTimer.unref();
-      keyRotationTimer.unref();
-    }
+    // The afterAll hook in the test file will clear these timers.
+    // .unref() is an optimization that is causing issues in this env.
     
     // Return the app and the timers so they can be managed by the caller
     return { app, timers: [sessionTokenTimer, keyRotationTimer] };
