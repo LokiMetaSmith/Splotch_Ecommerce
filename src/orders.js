@@ -1,3 +1,5 @@
+import '/styles.css';
+
 const serverUrl = process.env.NODE_ENV === 'test' ? 'http://localhost:3001' : 'http://localhost:3000';
 let csrfToken;
 

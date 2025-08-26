@@ -1,5 +1,5 @@
 // printshop.js
-import '/src/styles.css'; // Or your main CSS file
+import '/styles.css'; // Or your main CSS file
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import DOMPurify from 'dompurify';
 import { SvgNest } from './lib/svgnest.js';

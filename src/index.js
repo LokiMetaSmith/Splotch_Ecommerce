@@ -1,4 +1,5 @@
 import { SVGParser } from './lib/svgparser.js';
+import '/styles.css';
 
 // index.js
 

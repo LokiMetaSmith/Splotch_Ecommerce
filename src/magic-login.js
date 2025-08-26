@@ -1,3 +1,5 @@
+import '/styles.css';
+
 const serverUrl = 'http://localhost:3000';
 let csrfToken;
 

@@ -12,8 +12,14 @@
     <script type="text/javascript" src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
     <script src="./src/lib/clipper.js"></script>
 
-    <link rel="stylesheet" href="./output.css" />
-    <link rel="stylesheet" href="./splotch-theme.css" />
+    <script type="importmap">
+    {
+        "imports": {
+            "dompurify": "https://cdn.jsdelivr.net/npm/dompurify@3.0.11/dist/purify.es.mjs"
+        }
+    }
+    </script>
+
     <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
     <script
         type="text/javascript"
@@ -71,6 +77,10 @@
         }
         .dot {
              transition: transform 0.3s ease;
+        }
+        #imageCanvas {
+            max-width: 100%;
+            height: auto;
         }
     </style>
 </head>

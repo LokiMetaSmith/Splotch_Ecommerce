@@ -1,3 +1,289 @@
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
+
+@layer base {
+    body {
+        background-color: theme('colors.splotch-white');
+        font-family: theme('fontFamily.baumans');
+        color: theme('colors.splotch-navy');
+    }
+
+    main.container h1.text-3xl {
+        font-family: theme('fontFamily.modak');
+        color: theme('colors.splotch-navy');
+        font-size: clamp(2.5rem, 7vw, 3.75rem);
+        line-height: 1.15;
+        margin-bottom: 2.5rem;
+        padding-bottom: 1rem;
+    }
+
+    form h2.text-xl {
+        font-family: theme('fontFamily.modak');
+        color: theme('colors.splotch-navy');
+        font-size: clamp(1.8rem, 5vw, 2.5rem);
+        border-bottom: 3px solid theme('colors.splotch-teal');
+        padding-bottom: 0.75rem;
+        margin-bottom: 2rem;
+    }
+}
+
+@layer components {
+    main.container {
+        background-color: theme('colors.splotch-yellow');
+        color: theme('colors.splotch-navy');
+        border: 4px solid theme('colors.splotch-navy');
+        box-shadow: 0 8px 16px rgba(42, 40, 77, 0.3);
+        border-radius: 25px;
+        margin-top: 3rem;
+        margin-bottom: 3rem;
+    }
+
+    /* Canvas Area */
+    main.container > div:first-of-type {
+        background-color: theme('colors.splotch-white');
+        border: 3px solid theme('colors.splotch-teal');
+        border-radius: 20px;
+        padding: 1.5rem;
+        box-shadow: inset 0 0 10px rgba(0, 169, 157, 0.2);
+    }
+
+    #imageCanvas {
+        border: 3px dashed theme('colors.splotch-red');
+        background-color: rgba(255, 255, 255, 0.9);
+        border-radius: 15px;
+    }
+
+    #magnify-preview-container {
+        position: relative;
+        cursor: crosshair;
+        overflow: hidden;
+    }
+
+    #magnify-loupe {
+        position: absolute;
+        width: 175px;
+        height: 175px;
+        border-radius: 50%;
+        border: 4px solid #fefefe;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        background-repeat: no-repeat;
+        pointer-events: none;
+    }
+
+    #magnify-label {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        font-family: theme('fontFamily.baumans');
+        padding: 4px 12px;
+        border-radius: 0 0 8px 8px;
+        font-size: 0.8rem;
+        pointer-events: none;
+    }
+
+    /* Editing Controls */
+    #editing-controls {
+        background-color: rgba(0, 169, 157, 0.1);
+        border: 3px solid theme('colors.splotch-teal');
+        padding: 1.5rem;
+        border-radius: 20px;
+        gap: 0.85rem;
+    }
+
+    #editing-controls button,
+    #editing-controls input[type="text"] {
+        font-family: theme('fontFamily.baumans');
+        border-radius: 25px;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        padding: 0.7rem 0.9rem;
+        transition: all 0.2s ease-in-out;
+        border: none;
+        box-shadow: 0 3px 5px rgba(0,0,0,0.15);
+    }
+
+    #editing-controls button:hover {
+        filter: brightness(1.15);
+        transform: translateY(-2px) scale(1.03);
+        box-shadow: 0 5px 8px rgba(0,0,0,0.2);
+    }
+
+    #rotateLeftBtn, #rotateRightBtn {
+        background-color: theme('colors.splotch-red');
+        color: theme('colors.splotch-white');
+    }
+    #resizeBtn {
+        background-color: theme('colors.splotch-navy');
+        color: theme('colors.splotch-white');
+    }
+    #startCropBtn {
+        background-color: theme('colors.splotch-teal');
+        color: theme('colors.splotch-yellow');
+    }
+    #grayscaleBtn {
+        background-color: theme('colors.splotch-black');
+        color: theme('colors.splotch-white');
+    }
+    #sepiaBtn {
+        background: linear-gradient(145deg, theme('colors.splotch-red'), #E05A00);
+        color: theme('colors.splotch-white');
+    }
+
+    #editing-controls input#resizeInput {
+        background-color: theme('colors.splotch-white');
+        border: 2px solid theme('colors.splotch-navy');
+        color: theme('colors.splotch-navy');
+        text-transform: none;
+        font-weight: normal;
+        box-shadow: none;
+    }
+    #editing-controls input#resizeInput::placeholder {
+        color: theme('colors.splotch-navy');
+        opacity: 0.6;
+    }
+    #editing-controls input#resizeInput:focus {
+        border-color: theme('colors.splotch-red');
+        box-shadow: 0 0 0 3px rgba(255, 0, 58, 0.25);
+    }
+
+    /* Payment Form */
+    #payment-form {
+        background-color: rgba(255, 255, 255, 0.7);
+        border: 3px solid theme('colors.splotch-red');
+        padding: 2rem 2.5rem;
+        border-radius: 20px;
+        box-shadow: 0 5px 15px rgba(42, 40, 77, 0.15);
+    }
+
+    #payment-form .label {
+        font-family: theme('fontFamily.baumans');
+        color: theme('colors.splotch-navy');
+        font-size: 1.05rem;
+        font-weight: bold;
+        margin-bottom: 0.4rem;
+        display: block;
+    }
+
+    #payment-form .input {
+        font-family: theme('fontFamily.baumans');
+        background-color: theme('colors.splotch-white');
+        border: 2px solid theme('colors.splotch-navy');
+        color: theme('colors.splotch-navy');
+        border-radius: 12px;
+        padding: 0.8rem;
+        font-size: 1rem;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    #payment-form .input::placeholder {
+        color: theme('colors.splotch-navy');
+        opacity: 0.5;
+    }
+    #payment-form .input:focus {
+        border-color: theme('colors.splotch-red');
+        box-shadow: 0 0 0 3.5px rgba(255, 0, 58, 0.3);
+        outline: none;
+    }
+
+    #payment-form input[type="file"].input {
+        padding: 0.35rem;
+        border-style: dashed;
+        border-width: 2px;
+        line-height: 1.8;
+    }
+    #payment-form input[type="file"].input::-webkit-file-upload-button,
+    #payment-form input[type="file"].input::file-selector-button {
+        font-family: theme('fontFamily.baumans');
+        background-color: theme('colors.splotch-teal');
+        color: theme('colors.splotch-yellow');
+        border: none;
+        padding: 0.7rem 1.2rem;
+        border-radius: 20px;
+        margin-right: 1rem;
+        text-transform: uppercase;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    #payment-form input[type="file"].input::-webkit-file-upload-button:hover,
+    #payment-form input[type="file"].input::file-selector-button:hover {
+        background-color: theme('colors.splotch-navy');
+        color: theme('colors.splotch-yellow');
+    }
+
+    #card-container {
+        border: 2px solid theme('colors.splotch-teal');
+        padding: 1.25rem;
+        border-radius: 12px;
+        background-color: rgba(255, 255, 255, 0.9);
+        min-height: 50px;
+    }
+
+    #payment-form button[type="submit"] {
+        font-family: theme('fontFamily.baumans');
+        background: linear-gradient(145deg, theme('colors.splotch-red'), theme('colors.splotch-black'));
+        color: theme('colors.splotch-white');
+        font-size: 1.35rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        border-radius: 30px;
+        padding: 0.9rem 1rem;
+        border: none;
+        width: 100%;
+        transition: all 0.25s ease-in-out;
+        box-shadow: 0 5px 10px rgba(42, 40, 77, 0.25);
+    }
+    #payment-form button[type="submit"]:hover {
+        background: linear-gradient(145deg, theme('colors.splotch-black'), theme('colors.splotch-red'));
+        color: theme('colors.splotch-yellow');
+        transform: translateY(-4px) scale(1.02);
+        box-shadow: 0 7px 15px rgba(42, 40, 77, 0.35);
+    }
+
+    /* Status Messages & Other Containers */
+    #payment-status-container {
+        font-family: theme('fontFamily.baumans');
+        font-size: 1.05rem;
+        text-align: center;
+        border-radius: 15px;
+        padding: 1.2rem;
+        font-weight: bold;
+    }
+    .payment-success {
+        background-color: theme('colors.splotch-teal');
+        color: theme('colors.splotch-yellow');
+        border: 2px solid theme('colors.splotch-navy');
+    }
+    .payment-error {
+        background-color: theme('colors.splotch-red');
+        color: theme('colors.splotch-white');
+        border: 2px solid theme('colors.splotch-black');
+    }
+
+    #ipfsLinkContainer {
+        background-color: rgba(255, 255, 255, 0.7);
+        border: 2px dashed theme('colors.splotch-navy');
+        padding: 1.5rem;
+        border-radius: 15px;
+        margin-top: 2.5rem;
+        font-family: theme('fontFamily.baumans');
+        color: theme('colors.splotch-navy');
+        text-align: center;
+        font-size: 1rem;
+    }
+    #ipfsLinkContainer a {
+        color: theme('colors.splotch-red');
+        text-decoration: none;
+        font-weight: bold;
+        border-bottom: 2px dotted theme('colors.splotch-red');
+        padding-bottom: 2px;
+    }
+    #ipfsLinkContainer a:hover {
+        color: theme('colors.splotch-black');
+        border-bottom-color: theme('colors.splotch-black');
+    }
+}

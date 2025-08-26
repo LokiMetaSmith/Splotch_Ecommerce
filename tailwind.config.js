@@ -12,6 +12,8 @@ module.exports = {
         'splotch-yellow': '#FFD151',
         'splotch-teal': '#00A99D',
         'splotch-navy': '#2A284D',
+        'splotch-white': '#FFFFFF',
+        'splotch-black': '#000000',
       },
       fontFamily: {
         'modak': ['Modak', 'cursive'],
