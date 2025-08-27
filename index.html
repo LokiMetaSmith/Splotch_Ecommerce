@@ -47,12 +47,28 @@
     <main class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-center text-gray-700">Custom Sticker Editor & Secure Pay</h1>
-            <a href="/orders.html" class="text-splotch-red hover:underline p-2 border-2 border-dashed border-pink-500 rounded-lg">View Order History</a>
+            <a href="/orders.html" class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full">View Order History</a>
         </div>
 
         <!-- PeerJS Connection Status -->
         <div id="peerjs-status-container" class="mb-4 p-3 rounded-md text-sm text-white bg-gray-400" style="visibility: hidden; text-align: center;">
             PeerJS Status: Initializing...
+        </div>
+
+        <!-- UPLOAD STICKER FILE -->
+        <div class="field mb-6">
+            <label class="label text-sm font-medium text-gray-700">Upload Sticker Design Image:</label>
+            <div class="control">
+                <input
+                    class="input mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                    id="file"
+                    name="file"
+                    type="file"
+                    accept="image/*"
+                />
+                <span id="fileNameDisplay" class="text-sm text-gray-600 ml-2"></span>
+            </div>
+             <p class="text-xs text-gray-500 mt-1" style="font-family: var(--font-baumans);">This is the main image for your sticker design.</p>
         </div>
 
         <!-- Canvas for Image Editing -->
@@ -70,8 +86,8 @@
             <button id="rotateLeftBtn" title="Rotate Left 90°">Rotate Left</button>
             <button id="rotateRightBtn" title="Rotate Right 90°">Rotate Right</button>
             <div class="flex flex-col">
-                <label for="resizeSlider" class="text-sm text-center">Scale: <span id="resizeValue">100%</span></label>
-                <input type="range" id="resizeSlider" min="10" max="200" value="100" class="w-full">
+                <label for="resizeSlider" class="text-sm text-center">Size: <span id="resizeValue">3.0 in</span></label>
+                <input type="range" id="resizeSlider" min="1" max="8" value="3" step="0.1" class="w-full">
             </div>
             <button id="startCropBtn" title="Crop to Center 50%">Crop (Center 50%)</button>
             <button id="grayscaleBtn" title="Apply Grayscale Filter">Grayscale</button>
@@ -249,20 +265,6 @@
                         <input class="input mt-1 block w-full" id="postalCode" name="postalCode" type="text" placeholder="73101" required />
                     </div>
                 </div>
-            </div>
-            <div class="field">
-                <label class="label text-sm font-medium text-gray-700" for="file">Upload Sticker Design Image:</label>
-                <div class="control">
-                    <input
-                        class="input mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                        id="file"
-                        name="file"
-                        type="file"
-                        accept="image/*"
-                    />
-                    <span id="fileNameDisplay" class="text-sm text-gray-600 ml-2"></span>
-                </div>
-                 <p class="text-xs text-gray-500 mt-1" style="font-family: var(--font-baumans);">This is the main image for your sticker design.</p>
             </div>
             <!-- Square Card Payment Element -->
             <div id="card-container" class="p-3 border rounded-md bg-white shadow-sm min-h-[50px]"></div>
