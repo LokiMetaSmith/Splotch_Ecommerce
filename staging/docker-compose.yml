@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: nginx:alpine
+    container_name: staging-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./www:/usr/share/nginx/html
+    depends_on:
+      - backend
+    networks:
+      - staging-net
+
+  backend:
+    image: node:18
+    container_name: staging-backend
+    working_dir: /usr/src/app
+    volumes:
+      - ./server:/usr/src/app
+      - ../server/uploads:/usr/src/app/uploads # Mount uploads from the main server dir
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./server/.env
+    command: >
+      bash -c "npm install && node index.js"
+    networks:
+      - staging-net
+
+networks:
+  staging-net:
+    driver: bridge
