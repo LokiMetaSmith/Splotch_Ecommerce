@@ -16,10 +16,7 @@ describe.skip('Orders Page', () => {
   let document;
 
   function setupDOM(url = "http://localhost:3000/orders.html") {
-    dom = new JSDOM(html, {
-      runScripts: "outside-only",
-      url
-    });
+    dom = new JSDOM(html, { runScripts: "outside-only", resources: "usable", url });
     window = dom.window;
     document = window.document;
     global.window = window;
@@ -28,6 +25,8 @@ describe.skip('Orders Page', () => {
     global.localStorage = window.localStorage;
     global.URLSearchParams = window.URLSearchParams;
     global.URL = window.URL;
+
+    jest.spyOn(window.location, 'assign').mockImplementation(() => {});
 
     const scriptEl = document.createElement('script');
     scriptEl.textContent = scriptContent;
@@ -95,11 +94,7 @@ describe.skip('Orders Page', () => {
     expect(noOrdersMessage.textContent).not.toBe('');
   });
 
-  // TODO: This test is skipped because mocking window.location.assign is notoriously
-  // difficult in JSDOM. The test environment here is particularly strict and
-  // prevents all the common mocking strategies. This should be revisited when
-  // the test suite's Jest/JSDOM configuration is updated.
-  test.skip('reorder button should call window.location.assign', async () => {
+  test('reorder button should call window.location.assign', async () => {
     const token = 'test-auth-token';
     const designImage = '/path/to/reorder-image.png';
     setupDOM(`http://localhost:3000/orders.html?token=${token}`);
