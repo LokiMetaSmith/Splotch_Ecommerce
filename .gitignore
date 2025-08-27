@@ -6,3 +6,11 @@ db.json
 /server/uploads/designImage-*
 /server/uploads/cutLineFile-*
 *.bak
+
+server/error.log
+
+# Playwright
+test-results/
+playwright-report/
+verification/
+**/*-snapshots/
