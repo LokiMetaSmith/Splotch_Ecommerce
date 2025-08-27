@@ -110,11 +110,9 @@ async function BootStrap() {
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
     if (resizeSliderEl) {
         resizeSliderEl.addEventListener('input', (e) => {
-            const percentage = parseInt(e.target.value, 10);
-            if(resizeValueEl) resizeValueEl.textContent = `${percentage}%`;
-            // For raster images, we can apply this in real-time.
-            // For vector redraws, this could be slow, but we'll try it.
-            handleResize(percentage);
+            const inches = parseFloat(e.target.value);
+            if(resizeValueEl) resizeValueEl.textContent = `${inches.toFixed(1)} in`;
+            handleStandardResize(inches);
         });
     }
     if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
@@ -1051,21 +1049,6 @@ function handleStandardResize(targetInches) {
     if (currentMaxWidthPixels <= 0) return;
 
     const scale = targetPixels / currentMaxWidthPixels;
-    const percentage = scale * 100;
-
-    // Update the slider and call the main resize handler
-    const resizeSliderEl = document.getElementById('resizeSlider');
-    const resizeValueEl = document.getElementById('resizeValue');
-    if (resizeSliderEl) resizeSliderEl.value = percentage;
-    if (resizeValueEl) resizeValueEl.textContent = `${Math.round(percentage)}%`;
-
-    handleResize(percentage);
-}
-
-function handleResize(percentage) {
-    if (isNaN(percentage) || percentage <= 0) return;
-
-    const scale = percentage / 100;
 
     if (basePolygons.length > 0) {
         // SVG Vector Resizing - always scale from the original
