@@ -39,7 +39,6 @@ You will need API keys and credentials from three services:
     * Create **OAuth 2.0 Credentials** for a "Web application".
     * Add `http://localhost:3000/oauth2callback` as an **Authorized redirect URI**.
     * Copy your **Client ID** and **Client Secret**.
-* **SendGrid**: Create an account at [SendGrid](https://sendgrid.com) and generate an **API Key** for sending emails.
 
 #### 4. Generate Security Keys
 This application uses an RS256 key pair to sign server session tokens. Generate these keys in your terminal:
@@ -53,57 +52,7 @@ openssl rsa -in private.pem -pubout -out public.pem
 ```
 
 #### 5. Create Your Environment File
-Create a file named `.env` in the `server/` directory and add the following variables.
-
-```env
-# server/.env
-
-# --- Server Configuration ---
-# The port the backend server will run on.
-PORT=3000
-# The base URL of the frontend application, used for creating links in emails.
-BASE_URL="http://localhost:5173"
-
-
-# --- Square Credentials ---
-# Your Square Sandbox Access Token for processing payments.
-SQUARE_ACCESS_TOKEN="YOUR_SANDBOX_ACCESS_TOKEN"
-# Your Square Sandbox Location ID.
-SQUARE_LOCATION_ID="YOUR_SANDBOX_LOCATION_ID"
-
-
-# --- Google OAuth Credentials ---
-# The Client ID for your Google Cloud OAuth 2.0 application.
-GOOGLE_CLIENT_ID="YOUR_GOOGLE_CLIENT_ID"
-# The Client Secret for your Google Cloud OAuth 2.0 application.
-GOOGLE_CLIENT_SECRET="YOUR_GOOGLE_CLIENT_SECRET"
-
-
-# --- SendGrid API Key ---
-# API key for sending emails via SendGrid (if used as an alternative to Gmail).
-SENDGRID_API_KEY="YOUR_SENDGRID_API_KEY"
-
-
-# --- Admin Configuration ---
-# The email address where error logs and notifications will be sent.
-ADMIN_EMAIL="your-admin-email@example.com"
-
-
-# --- WebAuthn (Security Key) Configuration ---
-# The "Relying Party ID". For local development, this should be "localhost".
-# For production, it must be the domain where the application is hosted.
-RP_ID="localhost"
-# The full origin URL of the frontend application.
-EXPECTED_ORIGIN="http://localhost:5173"
-
-
-# --- JWT Asymmetric Keys ---
-# Copy the entire file content of your `private.pem`, including the header and footer,
-# and format it as a single line with `\n` for newlines.
-JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-# Copy the entire file content of your `public.pem`.
-JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
-```
+Create a file named `.env` in the `server/` directory. You can use `server/env.example` as a template. For a detailed explanation of each environment variable, please see the [Environment Variable Documentation](server/ENV_DOCUMENTATION.md).
 
 #### 6. Place Legacy Scripts
 The nesting feature relies on two older libraries. Place `clipper.js` and `parallel.js` inside the `public/lib/` directory at the root of your project.
