@@ -62,6 +62,7 @@
     "postcss": "^8.5.6",
     "serve": "^14.2.4",
     "svg-parser": "^2.0.4",
-    "tailwindcss": "^4.1.11"
+    "tailwindcss": "^4.1.11",
+    "@faker-js/faker": "^8.4.1"
   }
 }
