@@ -48,8 +48,6 @@ describe('Telegram Bot', () => {
         ],
       },
     };
-    // Set the environment variable for the bot token
-    process.env.TELEGRAM_BOT_TOKEN = 'test-token';
   });
 
   it('should initialize the bot and set commands', async () => {
@@ -110,8 +108,7 @@ describe('Telegram Bot', () => {
 
 describe('handleOrderStatusUpdate', () => {
   beforeEach(() => {
-    process.env.TELEGRAM_BOT_TOKEN = 'test-token';
-    process.env.TELEGRAM_CHANNEL_ID = 'test-channel';
+    // Environment variables are now set in tests/test-setup.js
   });
 
   it('should delete a stalled message when status changes', async () => {
