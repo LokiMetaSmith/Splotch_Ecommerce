@@ -28,6 +28,7 @@
     ></script>
     <script src="./src/lib/clipper.js"></script>
     <style>
+        @reference "./styles.css";
         /* --- Responsive Layout Switching --- */
         /* Desktop is the default; mobile is hidden. */
         #mobile-layout { display: none; }
@@ -47,9 +48,11 @@
             transition: background-color 0.2s;
             cursor: pointer;
         }
+
         .input {
             @reference mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm;
         }
+
         /* Rolodex Styles */
         #rolodex-container {
             position: relative;
