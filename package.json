@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit tests/ server/",
+    "test:unit": "cross-env TELEGRAM_BOT_TOKEN='test-token' TELEGRAM_CHANNEL_ID='test-channel' SQUARE_ACCESS_TOKEN='test-token' GOOGLE_CLIENT_ID='test-id' GOOGLE_CLIENT_SECRET='test-secret' GMAIL_REDIRECT_URI='http://localhost' JWT_SECRET='test-secret' ENCRYPT_CLIENT_JSON='false' PORT='3001' JWT_PRIVATE_KEY='test-key' JWT_PUBLIC_KEY='test-key' DB_PATH='/tmp/test-db.json' ADMIN_EMAIL='test@example.com' RP_ID='localhost' EXPECTED_ORIGIN='http://localhost:3001' CSRF_SECRET='test-secret' SESSION_SECRET='test-secret' SQUARE_LOCATION_ID='test-location' BASE_URL='http://localhost:3001' NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit tests/ server/",
     "test:e2e": "playwright test",
     "start-mock-server": "json-server --watch db.json --port 3001",
     "styles": "npx tailwindcss build styles.css -o output.css",

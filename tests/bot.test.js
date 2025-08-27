@@ -48,6 +48,7 @@ describe('Telegram Bot', () => {
         ],
       },
     };
+    // Environment variables are set in the package.json test script
   });
 
   it('should initialize the bot and set commands', async () => {
@@ -108,7 +109,7 @@ describe('Telegram Bot', () => {
 
 describe('handleOrderStatusUpdate', () => {
   beforeEach(() => {
-    // Environment variables are now set in tests/test-setup.js
+    // Environment variables are set in the package.json test script
   });
 
   it('should delete a stalled message when status changes', async () => {
