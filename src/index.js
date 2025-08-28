@@ -24,7 +24,7 @@ let isSepia = false;
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
 let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
-let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, startCropBtnEl, grayscaleBtnEl, sepiaBtnEl;
+let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
 
 let currentOrderAmountCents = 0;
 
@@ -65,7 +65,6 @@ async function BootStrap() {
     rotateRightBtnEl = document.getElementById('rotateRightBtn');
     const resizeSliderEl = document.getElementById('resizeSlider');
     const resizeValueEl = document.getElementById('resizeValue');
-    startCropBtnEl = document.getElementById('startCropBtn');
     grayscaleBtnEl = document.getElementById('grayscaleBtn');
     sepiaBtnEl = document.getElementById('sepiaBtn');
 
@@ -110,12 +109,16 @@ async function BootStrap() {
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
     if (resizeSliderEl) {
         resizeSliderEl.addEventListener('input', (e) => {
-            const inches = parseFloat(e.target.value);
-            if(resizeValueEl) resizeValueEl.textContent = `${inches.toFixed(1)} in`;
-            handleStandardResize(inches);
+            let value = parseFloat(e.target.value);
+            if (isMetric) {
+                if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} mm`;
+                handleStandardResize(value / 25.4);
+            } else {
+                if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} in`;
+                handleStandardResize(value);
+            }
         });
     }
-    if (startCropBtnEl) startCropBtnEl.addEventListener('click', handleCrop);
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
     if(generateCutlineBtn) generateCutlineBtn.addEventListener('click', handleGenerateCutline);
 
@@ -125,6 +128,19 @@ async function BootStrap() {
             if (e.target.classList.contains('size-btn')) {
                 const targetInches = parseFloat(e.target.dataset.size);
                 handleStandardResize(targetInches);
+
+                // Also update the slider
+                const resizeSliderEl = document.getElementById('resizeSlider');
+                const resizeValueEl = document.getElementById('resizeValue');
+                if (resizeSliderEl && resizeValueEl) {
+                    if (isMetric) {
+                        resizeSliderEl.value = targetInches * 25.4;
+                        resizeValueEl.textContent = `${(targetInches * 25.4).toFixed(1)} mm`;
+                    } else {
+                        resizeSliderEl.value = targetInches;
+                        resizeValueEl.textContent = `${targetInches.toFixed(1)} in`;
+                    }
+                }
             }
         });
     }
@@ -133,6 +149,7 @@ async function BootStrap() {
     if (unitToggle) {
         unitToggle.addEventListener('change', (e) => {
             isMetric = e.target.checked;
+            updateUnitUI(isMetric);
             calculateAndUpdatePrice(); // Re-calculate and re-render with new units
             redrawAll(); // Also redraw the on-canvas indicator
         });
@@ -609,9 +626,58 @@ function showPaymentStatus(message, type = 'info') {
     }
 }
 
+function updateUnitUI(isMetric) {
+    const inchesToMm = 25.4;
+    const sizeBtns = document.querySelectorAll('.size-btn');
+    const resizeSliderEl = document.getElementById('resizeSlider');
+    const resizeValueEl = document.getElementById('resizeValue');
+    const designMarginNoteEl = document.getElementById('designMarginNote');
+
+    sizeBtns.forEach(btn => {
+        const inches = parseFloat(btn.dataset.size);
+        if (isMetric) {
+            btn.textContent = `${(inches * inchesToMm).toFixed(0)}mm`;
+        } else {
+            btn.textContent = `${inches}"`;
+        }
+    });
+
+    if (resizeSliderEl && resizeValueEl) {
+        let currentValue = parseFloat(resizeSliderEl.value);
+        if (isMetric) {
+            if (!resizeSliderEl.dataset.originalMin) {
+                resizeSliderEl.dataset.originalMin = resizeSliderEl.min;
+                resizeSliderEl.dataset.originalMax = resizeSliderEl.max;
+                resizeSliderEl.dataset.originalStep = resizeSliderEl.step;
+            }
+            resizeSliderEl.min = resizeSliderEl.dataset.originalMin * inchesToMm;
+            resizeSliderEl.max = resizeSliderEl.dataset.originalMax * inchesToMm;
+            resizeSliderEl.step = resizeSliderEl.dataset.originalStep * inchesToMm / 10;
+            resizeSliderEl.value = currentValue * inchesToMm;
+            resizeValueEl.textContent = `${(currentValue * inchesToMm).toFixed(1)} mm`;
+        } else {
+            if (resizeSliderEl.dataset.originalMin) {
+                resizeSliderEl.min = resizeSliderEl.dataset.originalMin;
+                resizeSliderEl.max = resizeSliderEl.dataset.originalMax;
+                resizeSliderEl.step = resizeSliderEl.dataset.originalStep;
+                resizeSliderEl.value = currentValue / inchesToMm;
+                resizeValueEl.textContent = `${(currentValue / inchesToMm).toFixed(1)} in`;
+            }
+        }
+    }
+
+    if (designMarginNoteEl) {
+        if (isMetric) {
+            designMarginNoteEl.textContent = 'Keep important elements 2-3mm from edge!';
+        } else {
+            designMarginNoteEl.textContent = 'Keep important elements 0.08-0.12in from edge!';
+        }
+    }
+}
+
 function updateEditingButtonsState(disabled) {
     const elements = [
-        rotateLeftBtnEl, rotateRightBtnEl, startCropBtnEl, grayscaleBtnEl, sepiaBtnEl,
+        rotateLeftBtnEl, rotateRightBtnEl, grayscaleBtnEl, sepiaBtnEl,
         document.getElementById('resizeSlider'), document.getElementById('generateCutlineBtn'),
         textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect
     ];
@@ -730,6 +796,7 @@ function redrawAll() {
     drawPolygonsToCanvas(currentCutline, 'red', drawOffset, true);
     drawBoundingBox(currentBounds, drawOffset);
     drawSizeIndicator(currentBounds, drawOffset);
+    drawRuler(currentBounds, drawOffset);
 
     // After redrawing, the bounds may have changed, so update the price.
     calculateAndUpdatePrice();
@@ -884,6 +951,54 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
     ctx.translate(offset.x - 10, offset.y + bounds.height / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.fillText(`${height.toFixed(1)} ${unit}`, 0, 0);
+    ctx.restore();
+}
+
+function drawRuler(bounds, offset = { x: 0, y: 0 }) {
+    if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
+
+    const ppi = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96;
+    const majorMarkSpacing = isMetric ? 10 * ppi / 25.4 : ppi; // 10mm or 1in
+    const minorMarkSpacing = isMetric ? majorMarkSpacing / 10 : majorMarkSpacing / 8; // 1mm or 1/8in
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+    ctx.font = "10px Arial";
+    ctx.lineWidth = 1;
+
+    // Top ruler
+    for (let i = 0; i * minorMarkSpacing <= bounds.width; i++) {
+        const x = offset.x + i * minorMarkSpacing;
+        const y = offset.y - 10;
+        const isMajorMark = i % (isMetric ? 10 : 8) === 0;
+        const markHeight = isMajorMark ? 10 : 5;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y + markHeight);
+        ctx.stroke();
+        if (isMajorMark && i > 0) {
+            const label = isMetric ? (i / 10) : (i / 8);
+            ctx.fillText(label, x - 3, y - 2);
+        }
+    }
+
+    // Left ruler
+    for (let i = 0; i * minorMarkSpacing <= bounds.height; i++) {
+        const y = offset.y + i * minorMarkSpacing;
+        const x = offset.x - 10;
+        const isMajorMark = i % (isMetric ? 10 : 8) === 0;
+        const markWidth = isMajorMark ? 10 : 5;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + markWidth, y);
+        ctx.stroke();
+        if (isMajorMark && i > 0) {
+            const label = isMetric ? (i / 10) : (i / 8);
+            ctx.fillText(label, x - 12, y + 3);
+        }
+    }
+
     ctx.restore();
 }
 
@@ -1077,22 +1192,6 @@ function handleStandardResize(targetInches) {
             drawSizeIndicator(currentBounds);
         }
     }
-}
-
-function handleCrop() {
-    if (!canvas || !ctx || !originalImage) return;
-    const currentCanvasDataUrl = canvas.toDataURL();
-    const imgToCrop = new Image();
-    imgToCrop.onload = () => {
-        const cropWidth = imgToCrop.width / 2;
-        const cropHeight = imgToCrop.height / 2;
-        const cropX = imgToCrop.width / 4;
-        const cropY = imgToCrop.height / 4;
-        canvas.width = cropWidth; canvas.height = cropHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(imgToCrop, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
-    };
-    imgToCrop.src = currentCanvasDataUrl;
 }
 
 // --- Smart Cutline Generation ---
