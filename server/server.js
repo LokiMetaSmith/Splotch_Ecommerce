@@ -390,20 +390,21 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
             const orderIndex = db.data.orders.findIndex(o => o.orderId === newOrder.orderId);
             if (orderIndex !== -1) {
               db.data.orders[orderIndex].telegramMessageId = sentMessage.message_id;
+
+              // Send the design image
+              if (newOrder.designImagePath) {
+                const imagePath = path.join(__dirname, newOrder.designImagePath);
+                const sentPhoto = await bot.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, imagePath);
+                db.data.orders[orderIndex].telegramPhotoMessageId = sentPhoto.message_id;
+              }
+
+              // Send the cut line file
+              const cutLinePath = db.data.orders[orderIndex].cutLinePath;
+              if (cutLinePath) {
+                const docPath = path.join(__dirname, cutLinePath);
+                await bot.sendDocument(process.env.TELEGRAM_CHANNEL_ID, docPath);
+              }
               await db.write();
-            }
-
-            // Send the design image
-            if (newOrder.designImagePath) {
-              const imagePath = path.join(__dirname, newOrder.designImagePath);
-              await bot.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, imagePath);
-            }
-
-            // Send the cut line file
-            const cutLinePath = db.data.orders[orderIndex].cutLinePath;
-            if (cutLinePath) {
-              const docPath = path.join(__dirname, cutLinePath);
-              await bot.sendDocument(process.env.TELEGRAM_CHANNEL_ID, docPath);
             }
           } catch (error) {
             console.error('[TELEGRAM] Failed to send message or files:', error);
@@ -505,11 +506,19 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
 
       // Update Telegram message
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
+        const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+        const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+        const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
+        const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
+        const completedOrLater = ['COMPLETED'];
+
         const statusChecklist = `
 ✅ New
-${status === 'ACCEPTED' || status === 'PRINTING' || status === 'SHIPPED' ? '✅' : '⬜️'} Accepted
-${status === 'PRINTING' || status === 'SHIPPED' ? '✅' : '⬜️'} Printing
-${status === 'SHIPPED' ? '✅' : '⬜️'} Shipped
+${acceptedOrLater.includes(status) ? '✅' : '⬜️'} Accepted
+${printingOrLater.includes(status) ? '✅' : '⬜️'} Printing
+${shippedOrLater.includes(status) ? '✅' : '⬜️'} Shipped
+${deliveredOrLater.includes(status) ? '✅' : '⬜️'} Delivered
+${completedOrLater.includes(status) ? '✅' : '⬜️'} Completed
         `;
         const message = `
 Order: ${order.orderId}
@@ -521,13 +530,23 @@ Amount: $${(order.amount / 100).toFixed(2)}
 ${statusChecklist}
         `;
         try {
-          if (status === 'SHIPPED') {
+          if (status === 'COMPLETED') {
+            // Order is complete, delete the checklist message
             await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+            // also delete the photo if it exists and hasn't been deleted
+            if (order.telegramPhotoMessageId) {
+                await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+            }
           } else {
+            // For all other statuses, edit the message
             await bot.editMessageText(message, {
               chat_id: process.env.TELEGRAM_CHANNEL_ID,
               message_id: order.telegramMessageId,
             });
+            // If the status is SHIPPED, also delete the photo
+            if (status === 'SHIPPED' && order.telegramPhotoMessageId) {
+              await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+            }
           }
         } catch (error) {
           console.error('[TELEGRAM] Failed to edit or delete message:', error);
