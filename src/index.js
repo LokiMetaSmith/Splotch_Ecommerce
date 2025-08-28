@@ -150,8 +150,11 @@ async function BootStrap() {
         unitToggle.addEventListener('change', (e) => {
             isMetric = e.target.checked;
             updateUnitUI(isMetric);
-            calculateAndUpdatePrice(); // Re-calculate and re-render with new units
-            redrawAll(); // Also redraw the on-canvas indicator
+            // Only redraw if there's something to draw
+            if (originalImage || currentPolygons.length > 0) {
+                calculateAndUpdatePrice();
+                redrawAll();
+            }
         });
     }
 
