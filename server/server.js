@@ -70,7 +70,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    `http://localhost:3000/oauth2callback`
+    `${process.env.BASE_URL}/oauth2callback`
   );
 
   async function logAndEmailError(error, context = 'General Error') {
@@ -103,7 +103,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      `http://localhost:${port}/oauth2callback`
+      `${process.env.BASE_URL}/oauth2callback`
     );
 
     // --- Ensure upload directory exists ---
