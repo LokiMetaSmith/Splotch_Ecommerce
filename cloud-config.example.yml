@@ -1,0 +1,127 @@
+#cloud-config
+# This script configures a new Ubuntu 22.04 server to run the Print Shop application.
+# It creates a user, installs Docker, clones the repository, and starts the application using Docker Compose.
+
+# 1. Update packages on first boot
+package_update: true
+package_upgrade: true
+
+# 2. Create a non-root user to manage the application
+# IMPORTANT: Replace 'your_ssh_public_key' with your actual public SSH key.
+users:
+  - name: loki
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo, docker]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAA... your_ssh_public_key
+
+# 3. Install Docker and Docker Compose
+packages:
+  - docker.io
+  - docker-compose
+
+# 4. Define the files to be created on the server
+write_files:
+  # --- DOCKER COMPOSE CONFIGURATION ---
+  # This file defines the application and nginx services.
+  - path: /home/loki/lokimetasmith.github.io/docker-compose.yml
+    owner: loki:loki
+    permissions: '0664'
+    content: |
+      version: '3.8'
+      services:
+        app:
+          build:
+            context: ./server
+          restart: unless-stopped
+          env_file: .env
+          volumes:
+            - /home/loki/app-data/db.json:/app/db.json
+            - /home/loki/app-data/uploads:/app/server/uploads
+
+        nginx:
+          image: nginx:latest
+          restart: unless-stopped
+          ports:
+            - "80:80"
+          volumes:
+            - ./nginx.conf:/etc/nginx/conf.d/default.conf
+            - /home/loki/lokimetasmith.github.io/dist:/usr/share/nginx/html
+          depends_on:
+            - app
+
+  # --- NGINX REVERSE PROXY CONFIGURATION ---
+  # This file tells Nginx how to direct traffic.
+  - path: /home/loki/lokimetasmith.github.io/nginx.conf
+    owner: loki:loki
+    permissions: '0664'
+    content: |
+      server {
+          listen 80;
+          server_name _; # Listens for any domain
+
+          root /usr/share/nginx/html;
+          index index.html;
+
+          location / {
+              try_files $uri $uri/ =404;
+          }
+
+          location /api/ {
+              proxy_pass http://app:3000;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          }
+          # Add other backend paths here if needed
+          location /uploads/ {
+              proxy_pass http://app:3000/uploads/;
+          }
+          location /auth/ {
+               proxy_pass http://app:3000/auth/;
+          }
+          location /oauth2callback {
+               proxy_pass http://app:3000/oauth2callback;
+          }
+      }
+
+  # --- ENVIRONMENT VARIABLES ---
+  # IMPORTANT: Replace ALL placeholder values below with your real production secrets.
+  - path: /home/loki/lokimetasmith.github.io/.env
+    owner: loki:loki
+    permissions: '0600' # Make it readable only by the owner for security
+    content: |
+      PORT=3000
+      NODE_ENV=production
+      DB_PATH=/app/db.json
+      # --- REPLACE BELOW WITH YOUR REAL KEYS ---
+      BASE_URL=http://YOUR_DROPLET_IP
+      SQUARE_ACCESS_TOKEN=YOUR_PRODUCTION_SQUARE_TOKEN
+      SQUARE_LOCATION_ID=YOUR_PRODUCTION_SQUARE_LOCATION_ID
+      GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
+      GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
+      ADMIN_EMAIL=your_admin_email@example.com
+      RP_ID=YOUR_DOMAIN_OR_IP
+      EXPECTED_ORIGIN=http://YOUR_DOMAIN_OR_IP
+      JWT_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+      JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+      JWT_SECRET=A_VERY_LONG_AND_RANDOM_32_CHAR_SECRET
+      TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+      TELEGRAM_CHANNEL_ID=YOUR_TELEGRAM_CHANNEL_ID
+      CSRF_SECRET=ANOTHER_VERY_LONG_AND_RANDOM_SECRET
+      SESSION_SECRET=A_THIRD_VERY_LONG_AND_RANDOM_SECRET
+
+# 5. Run commands to set up and launch the application
+runcmd:
+  # Clone the repository
+  - git clone https://github.com/LokiMetaSmith/lokimetasmith.github.io.git /home/loki/lokimetasmith.github.io
+  # Create persistent data directories
+  - mkdir -p /home/loki/app-data/uploads
+  - touch /home/loki/app-data/db.json
+  # Set correct ownership for all files
+  - chown -R loki:loki /home/loki
+  # Build the frontend assets
+  - cd /home/loki/lokimetasmith.github.io && npm install && npm run build
+  # Launch the application using Docker Compose
+  - cd /home/loki/lokimetasmith.github.io && docker-compose up -d
