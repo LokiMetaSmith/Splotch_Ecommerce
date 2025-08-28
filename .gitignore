@@ -6,7 +6,7 @@ db.json
 /server/uploads/designImage-*
 /server/uploads/cutLineFile-*
 *.bak
-
+dist/
 server/error.log
 
 # Playwright
