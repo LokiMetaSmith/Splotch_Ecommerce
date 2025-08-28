@@ -16,10 +16,3 @@ This application follows a standard client-server architecture. It consists of t
 
 3.  **Print Shop Dashboard (`printshop.html`, `printshop.js`)**: This is an internal-facing dashboard for the print shop to view and manage incoming orders. This page **fetches all its data from the Node.js server** via API calls.
 
-## Deprecation of PeerJS
-
-**IMPORTANT:** The use of the **PeerJS library is deprecated and has been removed.**
-
-Previous versions of this application used PeerJS to create a direct peer-to-peer connection between the customer client and the print shop dashboard. This was done to send order data directly between the two clients.
-
-This architecture has been abandoned in favor of the more robust and scalable client-server model described above. Please **do not** re-introduce any PeerJS-related functionality. All data should flow through the central Node.js server.
