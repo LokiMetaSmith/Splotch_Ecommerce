@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: nginx:alpine
+    container_name: dev-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./dist:/usr/share/nginx/html
+    depends_on:
+      - backend
+    networks:
+      - dev-net
+
+  backend:
+    image: node:20
+    container_name: dev-backend
+    working_dir: /usr/src/app
+    volumes:
+      - ./server:/usr/src/app
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./server/.env
+    command: >
+      bash -c "npm install && node index.js"
+    networks:
+      - dev-net
+
+networks:
+  dev-net:
+    driver: bridge
