@@ -37,7 +37,7 @@ You will need to API keys and credentials from three services:
     * Create a new project.
     * Enable the **Gmail API**.
     * Create **OAuth 2.0 Credentials** for a "Web application".
-    * Add `http://localhost:3000/oauth2callback` as an **Authorized redirect URI**.
+    * Under **Authorized redirect URIs**, add the public URI for your server's callback endpoint. This URI should be your `BASE_URL` followed by `/oauth2callback`. For example: `https://your-print-shop.com/oauth2callback`. For local development, use `http://localhost:3000/oauth2callback`.
     * Copy your **Client ID** and **Client Secret**.
 
 #### 4. Generate Security Keys
@@ -66,6 +66,7 @@ Make sure your `server/.env` file is correctly configured with your Google API c
 
 -   `GOOGLE_CLIENT_ID`: Your Google API client ID.
 -   `GOOGLE_CLIENT_SECRET`: Your Google API client secret.
+-   `BASE_URL`: The public-facing URL of your server (e.g., `https://your-print-shop.com`). For local development, this should be `http://localhost:3000`.
 
 ### Step 2: Start Your Server
 Run your print shop server as you normally would:
