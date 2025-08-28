@@ -1,41 +1,39 @@
 #!/bin/bash
 
-# A script to back up application data to an AWS S3 bucket.
+# A script to back up application data to a remote storage provider using rclone.
 #
 # Usage:
-# ./scripts/backup.sh your-s3-bucket-name
+# ./scripts/backup.sh <rclone_remote_path>
+# Example: ./scripts/backup.sh b2-backups:my-print-shop-backups
 #
 # Prerequisites:
-# - aws-cli installed and configured with credentials that have
-#   write access to the target S3 bucket.
+# - rclone installed and configured with a remote (e.g., "b2-backups").
 # - Run this script from the root of the project directory.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
 # --- Configuration ---
-S3_BUCKET_NAME=$1
+RCLONE_REMOTE_PATH=$1
 SOURCE_DB="server/db.json"
 SOURCE_UPLOADS="server/uploads"
 BACKUP_FILENAME="backup-$(date +%Y-%m-%d-%H%M%S).tar.gz"
 
 # --- Validation ---
-if [ -z "$S3_BUCKET_NAME" ]; then
-  echo "❌ Error: S3 bucket name is required."
-  echo "Usage: $0 your-s3-bucket-name"
+if [ -z "$RCLONE_REMOTE_PATH" ]; then
+  echo "❌ Error: rclone remote path is required."
+  echo "Usage: $0 <rclone_remote_path>"
+  echo "Example: $0 b2-backups:my-print-shop-backups"
   exit 1
 fi
 
-if ! command -v aws &> /dev/null; then
-    echo "❌ Error: aws-cli is not installed. Please install it to continue."
+if ! command -v rclone &> /dev/null; then
+    echo "❌ Error: rclone is not installed. Please install and configure it to continue."
     exit 1
 fi
 
 if [ ! -f "$SOURCE_DB" ]; then
     echo "⚠️ Warning: Database file not found at $SOURCE_DB. Skipping."
-    # Decide if you want to exit or continue without the DB
-    # For this script, we'll continue, to back up uploads even if DB is missing.
-    # exit 1
 fi
 
 if [ ! -d "$SOURCE_UPLOADS" ]; then
@@ -46,16 +44,13 @@ echo "🚀 Starting backup process..."
 
 # --- Create Archive ---
 echo "📦 Creating archive: $BACKUP_FILENAME..."
-# The tar command will create the archive.
-# 'c' for create, 'z' for gzip, 'f' for file.
-# The files and directories to be archived are listed at the end.
 tar -czf "$BACKUP_FILENAME" "$SOURCE_DB" "$SOURCE_UPLOADS"
 
 echo "✅ Archive created successfully."
 
-# --- Upload to S3 ---
-echo "☁️  Uploading to S3 bucket: $S3_BUCKET_NAME..."
-aws s3 cp "$BACKUP_FILENAME" "s3://$S3_BUCKET_NAME/"
+# --- Upload to Remote Storage ---
+echo "☁️  Uploading to rclone remote: $RCLONE_REMOTE_PATH..."
+rclone copy "$BACKUP_FILENAME" "$RCLONE_REMOTE_PATH/"
 
 echo "✅ Upload complete."
 
