@@ -30,7 +30,7 @@ cd ..
 ```
 
 #### 3. Set Up Third-Party Services
-You will need API keys and credentials from three services:
+You will need to API keys and credentials from three services:
 
 * **Square**: Go to the [Square Developer Dashboard](https://developer.squareup.com/apps). Get your **Sandbox Access Token** and **Sandbox Location ID**.
 * **Google Cloud**: Go to the [Google Cloud Console](https://console.cloud.google.com/).
@@ -56,6 +56,83 @@ Create a file named `.env` in the `server/` directory. You can use `server/env.e
 
 #### 6. Place Legacy Scripts
 The nesting feature relies on two older libraries. Place `clipper.js` and `parallel.js` inside the `public/lib/` directory at the root of your project.
+
+## Generating a Gmail Refresh Token
+
+To allow the application to send emails (like magic login links) via Gmail, you need to provide it with a valid OAuth 2.0 Refresh Token. Follow this two-step process to generate one.
+
+### Prerequisites
+
+Before you begin, ensure your `.env` file in this `server/` directory contains the following values from your Google Cloud project:
+
+-   `GOOGLE_CLIENT_ID`
+-   `GOOGLE_CLIENT_SECRET`
+-   `GMAIL_REDIRECT_URI` (This must match one of the authorized redirect URIs in your Google Cloud project's credentials settings, e.g., `http://localhost:3000/oauth2callback`)
+
+### Step 1: Generate an Authorization URL
+
+First, you need to generate a unique URL that will allow you to grant the application permission to send emails on your behalf.
+
+1.  Open your terminal and run the following command from the root of the project:
+
+    ```bash
+    node server/getAuthUrl.js
+    ```
+
+2.  The script will print a URL to your console. Copy this entire URL.
+
+### Step 2: Get the Authorization Code and Refresh Token
+
+Now, you will use the URL to get an authorization code from Google, which you will then exchange for the refresh token.
+
+1.  Paste the URL from Step 1 into your web browser and navigate to it.
+
+2.  You will be prompted to sign in to your Google account and then asked to grant permission for the application to "Send email on your behalf". Click "Allow".
+
+3.  After you grant permission, your browser will be redirected to the `GMAIL_REDIRECT_URI` you specified in your `.env` file. The URL in your browser's address bar will look something like this:
+
+    ```
+    http://localhost:3000/oauth2callback?code=4/0A...Ag&scope=https://www.googleapis.com/auth/gmail.send
+    ```
+
+4.  Copy the `code` value from the URL. It's the long string of characters between `?code=` and `&scope`.
+
+5.  Open the `server/getRefreshToken.js` file in your code editor.
+
+6.  Paste the code you just copied into the `an_authorization_code` variable, replacing the placeholder text.
+
+    ```javascript
+    // server/getRefreshToken.js
+    // ...
+    const an_authorization_code = 'PASTE_THE_CODE_FROM_YOUR_BROWSER_URL_HERE';
+    // ...
+    ```
+
+7.  Save the `getRefreshToken.js` file.
+
+8.  Go back to your terminal and run the second script:
+
+    ```bash
+    node server/getRefreshToken.js
+    ```
+
+9.  The script will connect to Google and exchange the code for your tokens. It will print the refresh token to the console.
+
+### Step 3: Update Your `.env` File
+
+1.  Copy the refresh token that was printed to your console.
+
+2.  Open your `server/.env` file.
+
+3.  Paste the new token as the value for the `GMAIL_REFRESH_TOKEN` variable:
+
+    ```
+    GMAIL_REFRESH_TOKEN="1//...your-new-token...-Lg"
+    ```
+
+4.  Save the `.env` file.
+
+The server is now fully configured to send emails. You will need to restart the server for these changes to take effect.
 
 ## Running the Application
 
