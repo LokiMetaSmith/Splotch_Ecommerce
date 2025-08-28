@@ -378,12 +378,29 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
 
         // Send Telegram notification
         if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID) {
+          const status = 'NEW';
+          const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+          const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+          const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
+          const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
+          const completedOrLater = ['COMPLETED'];
+
+          const statusChecklist = `
+✅ New
+${acceptedOrLater.includes(status) ? '✅' : '⬜️'} Accepted
+${printingOrLater.includes(status) ? '✅' : '⬜️'} Printing
+${shippedOrLater.includes(status) ? '✅' : '⬜️'} Shipped
+${deliveredOrLater.includes(status) ? '✅' : '⬜️'} Delivered
+${completedOrLater.includes(status) ? '✅' : '⬜️'} Completed
+        `;
           const message = `
 New Order: ${newOrder.orderId}
 Customer: ${newOrder.billingContact.givenName} ${newOrder.billingContact.familyName}
 Email: ${newOrder.billingContact.email}
 Quantity: ${newOrder.orderDetails.quantity}
 Amount: $${(newOrder.amount / 100).toFixed(2)}
+
+${statusChecklist}
           `;
           try {
             const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
