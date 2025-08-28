@@ -64,6 +64,9 @@ This document tracks the features and bug fixes that need to be implemented for 
     - [ ] Install and configure Playwright for E2E testing.
     - [ ] Create an initial test case to verify the homepage loads correctly.
     - [ ] Add a `test:e2e` script to `package.json` to run the E2E tests.
-- [ ] **Staging Environment:**
-    - [ ] Set up a staging environment that mirrors production.
-    - [ ] Create a process for sanitizing and loading production data into the staging environment.
+- [x] **Staging Environment:**
+    - [x] Set up a staging environment that mirrors production.
+    - [x] Create a process for sanitizing and loading production data into the staging environment.
+- [x] **Automated Backups:**
+    - [x] Implement a script to back up the database and user uploads to cloud storage.
+    - [x] Document the backup and restore process.
