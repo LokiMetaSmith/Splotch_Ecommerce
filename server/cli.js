@@ -4,11 +4,15 @@ import { Command } from 'commander';
 import { JSONFilePreset } from 'lowdb/node';
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const program = new Command();
 
 const defaultData = { orders: [], users: {}, credentials: {} };
-const db = await JSONFilePreset('db.json', defaultData);
+const db = await JSONFilePreset(path.join(__dirname, 'db.json'), defaultData);
 
 program
     .name('printshop-cli')
