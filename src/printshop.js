@@ -689,18 +689,20 @@ function handleExportPdf() {
     }
 
     try {
-        const doc = new jsPDF({
-            unit: 'px',
-            format: 'a4'
-        });
-
         const svgElement = new DOMParser().parseFromString(window.nestedSvg, "image/svg+xml").documentElement;
-
         const width = parseFloat(svgElement.getAttribute('width'));
         const height = parseFloat(svgElement.getAttribute('height'));
 
-        doc.deletePage(1);
-        doc.addPage([width, height]);
+        if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+            showErrorToast('Invalid SVG dimensions for PDF export.');
+            return;
+        }
+
+        // Create the PDF with the correct dimensions from the start.
+        const doc = new jsPDF({
+            unit: 'px',
+            format: [width, height]
+        });
 
         SVGtoPDF(doc, svgElement, 0, 0);
 
