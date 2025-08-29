@@ -45,6 +45,12 @@ async function BootStrap() {
     }
     ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+    // Set initial canvas size with DPR scaling
+    // We read the width/height attributes from the HTML, which are our logical dimensions.
+    const initialWidth = canvas.width;
+    const initialHeight = canvas.height;
+    setCanvasSize(initialWidth, initialHeight);
+
     textInput = document.getElementById('textInput');
     textSizeInput = document.getElementById('textSizeInput');
     textColorInput = document.getElementById('textColorInput');
@@ -695,6 +701,23 @@ function updateEditingButtonsState(disabled) {
     if (designMarginNote) designMarginNote.style.display = disabled ? 'none' : 'block';
 }
 
+function setCanvasSize(logicalWidth, logicalHeight) {
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+
+    // Set the "actual" size of the canvas in device pixels
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+
+    // Set the "display" size of the canvas in CSS pixels
+    canvas.style.width = `${logicalWidth}px`;
+    canvas.style.height = `${logicalHeight}px`;
+
+    // Scale the context to account for the higher resolution.
+    // Using setTransform ensures this is not cumulative.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
 // --- Image Loading and Editing Functions ---
 function handleFileChange(event) {
     const file = event.target.files[0];
@@ -734,10 +757,9 @@ function loadFileAsImage(file) {
                 if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
                 if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
                 if (canvas && ctx) {
-                    canvas.width = newWidth;
-                    canvas.height = newHeight;
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+                    setCanvasSize(newWidth, newHeight);
+                    ctx.clearRect(0, 0, newWidth, newHeight);
+                    ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
 
                     // For raster images, the bounds and cutline are the canvas itself.
                     currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
@@ -787,9 +809,10 @@ function redrawAll() {
     }
 
     // Set canvas size based on the final cutline bounds
-    canvas.width = currentBounds.right - currentBounds.left + 40; // Add padding
-    canvas.height = currentBounds.bottom - currentBounds.top + 40;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const logicalWidth = currentBounds.right - currentBounds.left + 40; // Add padding
+    const logicalHeight = currentBounds.bottom - currentBounds.top + 40;
+    setCanvasSize(logicalWidth, logicalHeight);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     // Create an offset for drawing, so the shape isn't at the very edge
     const drawOffset = { x: -currentBounds.left + 20, y: -currentBounds.top + 20 };
@@ -1076,8 +1099,7 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         tempCtx.drawImage(canvas, -w / 2, -h / 2);
 
         // Now, update the main canvas with the rotated image
-        canvas.width = newW;
-        canvas.height = newH;
+        setCanvasSize(newW, newH);
         ctx.clearRect(0, 0, newW, newH);
         ctx.drawImage(tempCanvas, 0, 0);
 
@@ -1180,9 +1202,8 @@ function handleStandardResize(targetInches) {
         const newHeight = originalImage.height * scale;
 
         if (newWidth > 0 && newHeight > 0) {
-            canvas.width = newWidth;
-            canvas.height = newHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            setCanvasSize(newWidth, newHeight);
+            ctx.clearRect(0, 0, newWidth, newHeight);
             ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
 
             // Update the bounds and cutline for the new raster size
