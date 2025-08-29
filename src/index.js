@@ -902,18 +902,24 @@ function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke =
 }
 
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
-    if (!ctx || !bounds || !pricingConfig) return;
+    if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
 
     // The user wanted a grey box with 1-inch dashes for pricing.
     // The previous implementation calculated a dash length from PPI, which was often
     // too large to be visible on smaller images. A fixed dash pattern is more reliable.
+
+    // Let's try to implement the desired logic, but with a smaller dash size.
+    const selectedResolution = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value);
+    const ppi = selectedResolution ? selectedResolution.ppi : 96;
+    const dashLength = ppi / 8; // 1/8 inch dash
+    const gapLength = ppi / 16; // 1/16 inch gap
 
     // Set color to grey as requested.
     ctx.strokeStyle = 'rgba(128, 128, 128, 0.9)'; // A strong, visible grey
     ctx.lineWidth = 2; // A clean, visible line width
 
     // Use a fixed dash pattern that is visible at most scales.
-    ctx.setLineDash([10, 5]);
+    ctx.setLineDash([dashLength, gapLength]);
 
     ctx.strokeRect(
         bounds.left + offset.x,
