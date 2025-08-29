@@ -119,3 +119,28 @@ This document tracks the features and bug fixes that need to be implemented for 
 - [x] **Automated Backups:**
     - [x] Implement a script to back up the database and user uploads to cloud storage.
     - [x] Document the backup and restore process.
+
+---
+<br>
+
+# Security Backlog
+
+This section tracks security vulnerabilities and hardening tasks that need to be addressed.
+
+## High-Priority
+
+-   **[ ] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
+-   **[ ] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
+-   **[ ] Fix Vulnerable Dependencies:** Run `npm audit fix --force` to patch the 6 known vulnerabilities in the server's dependencies. Plan a migration away from the deprecated `request` package to a modern alternative like `axios`.
+-   **[ ] Implement Role-Based Access Control (RBAC):** Add a `role` field to the user model and protect administrative endpoints (e.g., `/api/orders`) to ensure only authorized users can access them.
+
+## Medium-Priority
+
+-   **[ ] Remove Fallback Session Secret:** Remove the hardcoded fallback session secret from `server/server.js` to ensure the application fails securely if the secret is not provided.
+-   **[ ] Harden Docker Image:** Modify `server/Dockerfile` to create and use a non-root user to run the application, reducing the risk of container-based attacks.
+-   **[ ] Improve Input Validation:** Perform a full audit of all API endpoints and apply consistent, strict input validation to all user-supplied data (including URL parameters, query strings, and request bodies).
+
+## Low-Priority
+
+-   **[ ] Improve Example Secrets:** Update `server/env.example` to remove weak example secrets and replace them with clear instructions for generating strong, random values.
+-   **[ ] Use Environment Variables for Test Passwords:** Refactor tests to pull sensitive data like passwords from environment variables instead of hardcoding them, especially for CI/CD environments.
