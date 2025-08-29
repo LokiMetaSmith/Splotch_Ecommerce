@@ -566,15 +566,9 @@ async function handleNesting() {
         const nest = new SVGNest(null, svgs, options); // Pass null for binElement
         nest.setBinPolygon(complexBinPolygon); // Use the new method
 
-        let resultSvg = nest.start();
+        const resultSvg = nest.start();
 
-        // 4. Add printing marks if requested
-        const addPrintingMarksCheckbox = document.getElementById('addPrintingMarks');
-        if (addPrintingMarksCheckbox && addPrintingMarksCheckbox.checked) {
-            resultSvg = addPrintingMarksToSVG(resultSvg);
-        }
-
-        // 5. Display result
+        // 4. Display result
         ui.nestedSvgContainer.innerHTML = resultSvg;
         window.nestedSvg = resultSvg;
         showSuccessToast('Nesting complete.');
@@ -622,64 +616,6 @@ function handleDownloadCutFile() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-}
-
-function addPrintingMarksToSVG(svgString) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, "image/svg+xml");
-    const svg = doc.documentElement;
-
-    const width = parseFloat(svg.getAttribute('width'));
-    const height = parseFloat(svg.getAttribute('height'));
-    const markLength = 20; // Length of the crop mark lines
-    const markOffset = 10; // Distance from the edge
-
-    const marksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    marksGroup.setAttribute('stroke', '#000000');
-    marksGroup.setAttribute('stroke-width', '1');
-
-    // Top-left
-    let line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', 0); line.setAttribute('y1', -markOffset);
-    line.setAttribute('x2', 0); line.setAttribute('y2', markLength);
-    marksGroup.appendChild(line);
-    line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', -markOffset); line.setAttribute('y1', 0);
-    line.setAttribute('x2', markLength); line.setAttribute('y2', 0);
-    marksGroup.appendChild(line);
-
-    // Top-right
-    line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', width); line.setAttribute('y1', -markOffset);
-    line.setAttribute('x2', width); line.setAttribute('y2', markLength);
-    marksGroup.appendChild(line);
-    line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', width - markLength); line.setAttribute('y1', 0);
-    line.setAttribute('x2', width + markOffset); line.setAttribute('y2', 0);
-    marksGroup.appendChild(line);
-
-    // Bottom-left
-    line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', 0); line.setAttribute('y1', height - markLength);
-    line.setAttribute('x2', 0); line.setAttribute('y2', height + markOffset);
-    marksGroup.appendChild(line);
-    line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', -markOffset); line.setAttribute('y1', height);
-    line.setAttribute('x2', markLength); line.setAttribute('y2', height);
-    marksGroup.appendChild(line);
-
-    // Bottom-right
-    line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', width); line.setAttribute('y1', height - markLength);
-    line.setAttribute('x2', width); line.setAttribute('y2', height + markOffset);
-    marksGroup.appendChild(line);
-    line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', width - markLength); line.setAttribute('y1', height);
-    line.setAttribute('x2', width + markOffset); line.setAttribute('y2', height);
-    marksGroup.appendChild(line);
-
-    svg.appendChild(marksGroup);
-    return new XMLSerializer().serializeToString(doc);
 }
 
 function handleExportPdf() {

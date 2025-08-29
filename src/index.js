@@ -22,7 +22,7 @@ let isGrayscale = false;
 let isSepia = false;
 
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
-let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay, dedicatedSizeDisplay;
+let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
 
@@ -45,10 +45,10 @@ async function BootStrap() {
     }
     ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    // Set initial canvas size with DPR scaling
-    // We read the width/height attributes from the HTML, which are our logical dimensions.
     const initialWidth = canvas.width;
     const initialHeight = canvas.height;
+    canvas.style.width = `${initialWidth}px`;
+    canvas.style.height = `${initialHeight}px`;
     setCanvasSize(initialWidth, initialHeight);
 
     textInput = document.getElementById('textInput');
@@ -61,7 +61,6 @@ async function BootStrap() {
     designMarginNote = document.getElementById('designMarginNote');
     stickerQuantityInput = document.getElementById('stickerQuantity');
     calculatedPriceDisplay = document.getElementById('calculatedPriceDisplay');
-    dedicatedSizeDisplay = document.getElementById('dedicatedSizeDisplay');
     paymentStatusContainer = document.getElementById('payment-status-container');
     ipfsLinkContainer = document.getElementById('ipfsLinkContainer'); // This might be deprecated if IPFS is handled server-side
     fileInputGlobalRef = document.getElementById('file');
@@ -116,9 +115,14 @@ async function BootStrap() {
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
     if (resizeSliderEl) {
         resizeSliderEl.addEventListener('input', (e) => {
-            const inches = isMetric ? parseFloat(e.target.value) / 25.4 : parseFloat(e.target.value);
-            handleStandardResize(inches);
-            updateSizeDisplays(inches);
+            let value = parseFloat(e.target.value);
+            if (isMetric) {
+                if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} mm`;
+                handleStandardResize(value / 25.4);
+            } else {
+                if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} in`;
+                handleStandardResize(value);
+            }
         });
     }
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
@@ -130,7 +134,19 @@ async function BootStrap() {
             if (e.target.classList.contains('size-btn')) {
                 const targetInches = parseFloat(e.target.dataset.size);
                 handleStandardResize(targetInches);
-                updateSizeDisplays(targetInches);
+
+                // Also update the slider
+                const resizeSliderEl = document.getElementById('resizeSlider');
+                const resizeValueEl = document.getElementById('resizeValue');
+                if (resizeSliderEl && resizeValueEl) {
+                    if (isMetric) {
+                        resizeSliderEl.value = targetInches * 25.4;
+                        resizeValueEl.textContent = `${(targetInches * 25.4).toFixed(1)} mm`;
+                    } else {
+                        resizeSliderEl.value = targetInches;
+                        resizeValueEl.textContent = `${targetInches.toFixed(1)} in`;
+                    }
+                }
             }
         });
     }
@@ -331,44 +347,13 @@ function calculateAndUpdatePrice() {
 
     calculatedPriceDisplay.innerHTML = `
         <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
+        <span class="text-sm text-gray-600 block">
+            Size: ${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}
+        </span>
         <span class="text-xs text-gray-500 block">
             Complexity Modifier: x${priceResult.complexityMultiplier}
         </span>
     `;
-
-    // Also update the dedicated size display area
-    if (dedicatedSizeDisplay) {
-        let width = (bounds.width / ppi);
-        let height = (bounds.height / ppi);
-        let unit = 'in';
-
-        if (isMetric) {
-            width *= 25.4;
-            height *= 25.4;
-            unit = 'mm';
-        }
-        dedicatedSizeDisplay.textContent = `${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}`;
-    }
-}
-
-function updateSizeDisplays(inches) {
-    const resizeSliderEl = document.getElementById('resizeSlider');
-    const resizeValueEl = document.getElementById('resizeValue');
-
-    if (isMetric) {
-        if (resizeSliderEl) resizeSliderEl.value = inches * 25.4;
-        if (resizeValueEl) resizeValueEl.textContent = `${(inches * 25.4).toFixed(1)} mm`;
-        if (dedicatedSizeDisplay) dedicatedSizeDisplay.textContent = `${(inches * 25.4).toFixed(1)} mm`;
-    } else {
-        if (resizeSliderEl) resizeSliderEl.value = inches;
-        if (resizeValueEl) resizeValueEl.textContent = `${inches.toFixed(1)} in`;
-        if (dedicatedSizeDisplay) dedicatedSizeDisplay.textContent = `${inches.toFixed(1)} in`;
-    }
-
-    // This will redraw the on-canvas size indicator
-    if (currentBounds) {
-        drawSizeIndicator(currentBounds);
-    }
 }
 
 function formatPrice(amountInCents) {
@@ -724,10 +709,6 @@ function setCanvasSize(logicalWidth, logicalHeight) {
     canvas.width = logicalWidth * dpr;
     canvas.height = logicalHeight * dpr;
 
-    // Set the "display" size of the canvas in CSS pixels
-    canvas.style.width = `${logicalWidth}px`;
-    canvas.style.height = `${logicalHeight}px`;
-
     // Scale the context to account for the higher resolution.
     // Using setTransform ensures this is not cumulative.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -790,10 +771,6 @@ function loadFileAsImage(file) {
                     calculateAndUpdatePrice();
                     drawBoundingBox(currentBounds); // Draw the initial bounding box
                     drawSizeIndicator(currentBounds);
-
-                    // Set initial size displays
-                    const initialInches = Math.max(currentBounds.width, currentBounds.height) / (pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96);
-                    updateSizeDisplays(initialInches);
                 }
             };
             img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
@@ -944,24 +921,18 @@ function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke =
 }
 
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
-    if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
+    if (!ctx || !bounds || !pricingConfig) return;
 
     // The user wanted a grey box with 1-inch dashes for pricing.
     // The previous implementation calculated a dash length from PPI, which was often
     // too large to be visible on smaller images. A fixed dash pattern is more reliable.
-
-    // Let's try to implement the desired logic, but with a smaller dash size.
-    const selectedResolution = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value);
-    const ppi = selectedResolution ? selectedResolution.ppi : 96;
-    const dashLength = ppi / 8; // 1/8 inch dash
-    const gapLength = ppi / 16; // 1/16 inch gap
 
     // Set color to grey as requested.
     ctx.strokeStyle = 'rgba(128, 128, 128, 0.9)'; // A strong, visible grey
     ctx.lineWidth = 2; // A clean, visible line width
 
     // Use a fixed dash pattern that is visible at most scales.
-    ctx.setLineDash([dashLength, gapLength]);
+    ctx.setLineDash([10, 5]);
 
     ctx.strokeRect(
         bounds.left + offset.x,
