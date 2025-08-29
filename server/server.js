@@ -547,8 +547,8 @@ Amount: $${(order.amount / 100).toFixed(2)}
 ${statusChecklist}
         `;
         try {
-          if (status === 'COMPLETED' || status === 'CANCELED') {
-            // Order is complete or canceled, delete the checklist message
+          if (status === 'COMPLETED') {
+            // Order is complete, delete the checklist message
             await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
             // also delete the photo if it exists and hasn't been deleted
             if (order.telegramPhotoMessageId) {
