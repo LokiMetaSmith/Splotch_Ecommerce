@@ -22,6 +22,7 @@ import { google } from 'googleapis';
 import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
 import { initializeBot } from './bot.js';
+import { initializeTracker } from './tracker.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 
@@ -573,6 +574,27 @@ ${statusChecklist}
       res.status(200).json({ success: true, order: order });
     });
 
+    app.post('/api/orders/:orderId/tracking', authenticateToken, [
+        body('trackingNumber').notEmpty().withMessage('trackingNumber is required'),
+        body('courier').notEmpty().withMessage('courier is required'),
+    ], async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+        const { orderId } = req.params;
+        const { trackingNumber, courier } = req.body;
+        const order = db.data.orders.find(o => o.orderId === orderId);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found.' });
+        }
+        order.trackingNumber = trackingNumber;
+        order.courier = courier;
+        await db.write();
+        console.log(`[SERVER] Tracking info added to order ID ${orderId}.`);
+        res.status(200).json({ success: true, order: order });
+    });
+
     // --- Auth Endpoints ---
     app.post('/api/auth/register-user', [
       body('username').notEmpty().withMessage('username is required'),
@@ -930,6 +952,9 @@ ${statusChecklist}
         res.status(400).json({ error: error.message });
       }
     });
+
+    // Initialize the shipment tracker
+    initializeTracker(db);
 
     // Sign the initial token and re-sign periodically
     signInstanceToken();

@@ -230,6 +230,30 @@ async function handleWebAuthnLogin() {
     }
 }
 
+async function handleAddTracking(orderId) {
+    const trackingNumber = document.getElementById(`tracking-number-${orderId}`).value;
+    const courier = document.getElementById(`courier-${orderId}`).value;
+
+    if (!trackingNumber) {
+        showErrorToast('Please enter a tracking number.');
+        return;
+    }
+
+    showLoadingIndicator();
+    try {
+        await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/tracking`, {
+            method: 'POST',
+            body: JSON.stringify({ trackingNumber, courier }),
+        });
+        showSuccessToast('Tracking information added successfully.');
+    } catch (error) {
+        showErrorToast(`Failed to add tracking info: ${error.message}`);
+        console.error(error);
+    } finally {
+        hideLoadingIndicator();
+    }
+}
+
 /**
  * Handles the password login flow.
  */
@@ -429,7 +453,17 @@ function displayOrder(order) {
             <button class="action-btn" data-order-id="${order.orderId}" data-status="DELIVERED">Deliver</button>
             <button class="action-btn" data-order-id="${order.orderId}" data-status="COMPLETED">Complete</button>
             <button class="action-btn" data-order-id="${order.orderId}" data-status="CANCELED">Cancel</button>
-        </div>`);
+        </div>
+        <div id="tracking-info-${order.orderId}" class="mt-4" style="display: ${order.status === 'SHIPPED' ? 'block' : 'none'};">
+            <input type="text" id="tracking-number-${order.orderId}" placeholder="Enter Tracking Number" class="border rounded-md p-2">
+            <select id="courier-${order.orderId}" class="border rounded-md p-2">
+                <option value="usps">USPS</option>
+                <option value="ups">UPS</option>
+                <option value="fedex">FedEx</option>
+            </select>
+            <button class="add-tracking-btn" data-order-id="${order.orderId}">Add Tracking</button>
+        </div>
+    `);
 
     ui.ordersList.prepend(card);
 
@@ -441,6 +475,11 @@ function displayOrder(order) {
             // This function calls your server to update the status
             updateOrderStatus(orderId, status);
         });
+    });
+
+    card.querySelector('.add-tracking-btn')?.addEventListener('click', (e) => {
+        const orderId = e.target.dataset.orderId;
+        handleAddTracking(orderId);
     });
 }
 
