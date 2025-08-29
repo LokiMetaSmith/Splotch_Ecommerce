@@ -22,7 +22,7 @@ let isGrayscale = false;
 let isSepia = false;
 
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
-let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
+let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay, dedicatedSizeDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
 
@@ -55,6 +55,7 @@ async function BootStrap() {
     designMarginNote = document.getElementById('designMarginNote');
     stickerQuantityInput = document.getElementById('stickerQuantity');
     calculatedPriceDisplay = document.getElementById('calculatedPriceDisplay');
+    dedicatedSizeDisplay = document.getElementById('dedicatedSizeDisplay');
     paymentStatusContainer = document.getElementById('payment-status-container');
     ipfsLinkContainer = document.getElementById('ipfsLinkContainer'); // This might be deprecated if IPFS is handled server-side
     fileInputGlobalRef = document.getElementById('file');
@@ -109,14 +110,9 @@ async function BootStrap() {
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
     if (resizeSliderEl) {
         resizeSliderEl.addEventListener('input', (e) => {
-            let value = parseFloat(e.target.value);
-            if (isMetric) {
-                if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} mm`;
-                handleStandardResize(value / 25.4);
-            } else {
-                if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} in`;
-                handleStandardResize(value);
-            }
+            const inches = isMetric ? parseFloat(e.target.value) / 25.4 : parseFloat(e.target.value);
+            handleStandardResize(inches);
+            updateSizeDisplays(inches);
         });
     }
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
@@ -128,19 +124,7 @@ async function BootStrap() {
             if (e.target.classList.contains('size-btn')) {
                 const targetInches = parseFloat(e.target.dataset.size);
                 handleStandardResize(targetInches);
-
-                // Also update the slider
-                const resizeSliderEl = document.getElementById('resizeSlider');
-                const resizeValueEl = document.getElementById('resizeValue');
-                if (resizeSliderEl && resizeValueEl) {
-                    if (isMetric) {
-                        resizeSliderEl.value = targetInches * 25.4;
-                        resizeValueEl.textContent = `${(targetInches * 25.4).toFixed(1)} mm`;
-                    } else {
-                        resizeSliderEl.value = targetInches;
-                        resizeValueEl.textContent = `${targetInches.toFixed(1)} in`;
-                    }
-                }
+                updateSizeDisplays(targetInches);
             }
         });
     }
@@ -341,13 +325,44 @@ function calculateAndUpdatePrice() {
 
     calculatedPriceDisplay.innerHTML = `
         <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
-        <span class="text-sm text-gray-600 block">
-            Size: ${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}
-        </span>
         <span class="text-xs text-gray-500 block">
             Complexity Modifier: x${priceResult.complexityMultiplier}
         </span>
     `;
+
+    // Also update the dedicated size display area
+    if (dedicatedSizeDisplay) {
+        let width = (bounds.width / ppi);
+        let height = (bounds.height / ppi);
+        let unit = 'in';
+
+        if (isMetric) {
+            width *= 25.4;
+            height *= 25.4;
+            unit = 'mm';
+        }
+        dedicatedSizeDisplay.textContent = `${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}`;
+    }
+}
+
+function updateSizeDisplays(inches) {
+    const resizeSliderEl = document.getElementById('resizeSlider');
+    const resizeValueEl = document.getElementById('resizeValue');
+
+    if (isMetric) {
+        if (resizeSliderEl) resizeSliderEl.value = inches * 25.4;
+        if (resizeValueEl) resizeValueEl.textContent = `${(inches * 25.4).toFixed(1)} mm`;
+        if (dedicatedSizeDisplay) dedicatedSizeDisplay.textContent = `${(inches * 25.4).toFixed(1)} mm`;
+    } else {
+        if (resizeSliderEl) resizeSliderEl.value = inches;
+        if (resizeValueEl) resizeValueEl.textContent = `${inches.toFixed(1)} in`;
+        if (dedicatedSizeDisplay) dedicatedSizeDisplay.textContent = `${inches.toFixed(1)} in`;
+    }
+
+    // This will redraw the on-canvas size indicator
+    if (currentBounds) {
+        drawSizeIndicator(currentBounds);
+    }
 }
 
 function formatPrice(amountInCents) {
@@ -753,6 +768,10 @@ function loadFileAsImage(file) {
                     calculateAndUpdatePrice();
                     drawBoundingBox(currentBounds); // Draw the initial bounding box
                     drawSizeIndicator(currentBounds);
+
+                    // Set initial size displays
+                    const initialInches = Math.max(currentBounds.width, currentBounds.height) / (pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96);
+                    updateSizeDisplays(initialInches);
                 }
             };
             img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
