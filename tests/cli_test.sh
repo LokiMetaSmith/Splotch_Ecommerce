@@ -7,7 +7,7 @@ set -e
 
 # --- Test Setup ---
 CLI_PATH="server/cli.js"
-DB_PATH="server/test-db.json"
+export DB_PATH="server/test-db.json"
 TEST_USER="clitestuser"
 TEST_PASS="password123"
 
@@ -17,18 +17,11 @@ if [ ! -f "$CLI_PATH" ]; then
     exit 1
 fi
 
-# Point the CLI to our test database by temporarily renaming it.
-# This is a simple way to isolate the test environment.
-mv server/db.json "$DB_PATH" 2>/dev/null || true # Ignore error if it doesn't exist
-
-echo "--- Running CLI Tests ---"
-
 # --- Helper Functions ---
 cleanup() {
     echo "--- Cleaning up ---"
-    # Restore the original database and remove the test one.
-    rm "$DB_PATH"
-    mv "$DB_PATH" server/db.json 2>/dev/null || true
+    # Remove the test database, leaving the production db untouched.
+    rm -f "$DB_PATH"
 }
 
 # Register the cleanup function to be called on script exit.
