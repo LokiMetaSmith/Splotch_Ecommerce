@@ -56,5 +56,6 @@ This document outlines security best practices for this project, covering the we
     *   Regenerate session IDs after login.
     *   Implement secure session termination (logout).
 *   **Dependency Management:**
-    *   Use a tool to scan for vulnerabilities in third-party libraries and frameworks.
+    *   Use a tool like `npm audit` or `snyk` to regularly scan for vulnerabilities in third-party libraries and frameworks.
     *   Keep all dependencies up to date.
+    *   **Action Item:** The `node-telegram-bot-api` package has known vulnerabilities that cannot be automatically fixed. This is because it depends on the deprecated `request` package. A dedicated task should be created to replace `node-telegram-bot-api` with a modern alternative that does not have these underlying vulnerabilities.
