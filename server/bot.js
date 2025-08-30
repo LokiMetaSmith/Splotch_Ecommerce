@@ -81,6 +81,44 @@ function initializeBot(database) {
         listOrdersByStatus(msg.chat.id, ['DELIVERED'], 'Delivered Orders');
     });
 
+    // Listen for replies to add notes to orders
+    bot.on('message', async (msg) => {
+        // We only care about replies
+        if (!msg.reply_to_message) {
+            return;
+        }
+
+        // Ignore commands
+        if (msg.text && msg.text.startsWith('/')) {
+            return;
+        }
+
+        const originalMessageId = msg.reply_to_message.message_id;
+
+        // Find the order that this message is a reply to
+        const order = db.data.orders.find(o => o.telegramMessageId === originalMessageId || o.telegramPhotoMessageId === originalMessageId);
+
+        if (order) {
+            if (!order.notes) {
+                order.notes = [];
+            }
+
+            const note = {
+                text: msg.text,
+                from: msg.from.username || `${msg.from.first_name} ${msg.from.last_name || ''}`.trim(),
+                date: new Date(msg.date * 1000).toISOString(),
+            };
+
+            order.notes.push(note);
+            await db.write();
+
+            // Confirm that the note was added
+            bot.sendMessage(msg.chat.id, "Note added successfully!", {
+                reply_to_message_id: msg.message_id
+            }).catch(err => console.error('[TELEGRAM] Error sending confirmation message:', err));
+        }
+    });
+
   } else {
     console.warn('[TELEGRAM] Bot token not found. Bot is disabled.');
     // Create a mock bot to avoid errors when the token is not set

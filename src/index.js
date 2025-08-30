@@ -22,7 +22,7 @@ let isGrayscale = false;
 let isSepia = false;
 
 let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
-let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay, dedicatedSizeDisplay;
+let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
 
@@ -45,6 +45,12 @@ async function BootStrap() {
     }
     ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+    const initialWidth = canvas.width;
+    const initialHeight = canvas.height;
+    canvas.style.width = `${initialWidth}px`;
+    canvas.style.height = `${initialHeight}px`;
+    setCanvasSize(initialWidth, initialHeight);
+
     textInput = document.getElementById('textInput');
     textSizeInput = document.getElementById('textSizeInput');
     textColorInput = document.getElementById('textColorInput');
@@ -55,7 +61,6 @@ async function BootStrap() {
     designMarginNote = document.getElementById('designMarginNote');
     stickerQuantityInput = document.getElementById('stickerQuantity');
     calculatedPriceDisplay = document.getElementById('calculatedPriceDisplay');
-    dedicatedSizeDisplay = document.getElementById('dedicatedSizeDisplay');
     paymentStatusContainer = document.getElementById('payment-status-container');
     ipfsLinkContainer = document.getElementById('ipfsLinkContainer'); // This might be deprecated if IPFS is handled server-side
     fileInputGlobalRef = document.getElementById('file');
@@ -110,9 +115,14 @@ async function BootStrap() {
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
     if (resizeSliderEl) {
         resizeSliderEl.addEventListener('input', (e) => {
-            const inches = isMetric ? parseFloat(e.target.value) / 25.4 : parseFloat(e.target.value);
-            handleStandardResize(inches);
-            updateSizeDisplays(inches);
+            let value = parseFloat(e.target.value);
+            if (isMetric) {
+                if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} mm`;
+                handleStandardResize(value / 25.4);
+            } else {
+                if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} in`;
+                handleStandardResize(value);
+            }
         });
     }
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
@@ -124,7 +134,19 @@ async function BootStrap() {
             if (e.target.classList.contains('size-btn')) {
                 const targetInches = parseFloat(e.target.dataset.size);
                 handleStandardResize(targetInches);
-                updateSizeDisplays(targetInches);
+
+                // Also update the slider
+                const resizeSliderEl = document.getElementById('resizeSlider');
+                const resizeValueEl = document.getElementById('resizeValue');
+                if (resizeSliderEl && resizeValueEl) {
+                    if (isMetric) {
+                        resizeSliderEl.value = targetInches * 25.4;
+                        resizeValueEl.textContent = `${(targetInches * 25.4).toFixed(1)} mm`;
+                    } else {
+                        resizeSliderEl.value = targetInches;
+                        resizeValueEl.textContent = `${targetInches.toFixed(1)} in`;
+                    }
+                }
             }
         });
     }
@@ -325,44 +347,13 @@ function calculateAndUpdatePrice() {
 
     calculatedPriceDisplay.innerHTML = `
         <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
+        <span class="text-sm text-gray-600 block">
+            Size: ${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}
+        </span>
         <span class="text-xs text-gray-500 block">
             Complexity Modifier: x${priceResult.complexityMultiplier}
         </span>
     `;
-
-    // Also update the dedicated size display area
-    if (dedicatedSizeDisplay) {
-        let width = (bounds.width / ppi);
-        let height = (bounds.height / ppi);
-        let unit = 'in';
-
-        if (isMetric) {
-            width *= 25.4;
-            height *= 25.4;
-            unit = 'mm';
-        }
-        dedicatedSizeDisplay.textContent = `${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}`;
-    }
-}
-
-function updateSizeDisplays(inches) {
-    const resizeSliderEl = document.getElementById('resizeSlider');
-    const resizeValueEl = document.getElementById('resizeValue');
-
-    if (isMetric) {
-        if (resizeSliderEl) resizeSliderEl.value = inches * 25.4;
-        if (resizeValueEl) resizeValueEl.textContent = `${(inches * 25.4).toFixed(1)} mm`;
-        if (dedicatedSizeDisplay) dedicatedSizeDisplay.textContent = `${(inches * 25.4).toFixed(1)} mm`;
-    } else {
-        if (resizeSliderEl) resizeSliderEl.value = inches;
-        if (resizeValueEl) resizeValueEl.textContent = `${inches.toFixed(1)} in`;
-        if (dedicatedSizeDisplay) dedicatedSizeDisplay.textContent = `${inches.toFixed(1)} in`;
-    }
-
-    // This will redraw the on-canvas size indicator
-    if (currentBounds) {
-        drawSizeIndicator(currentBounds);
-    }
 }
 
 function formatPrice(amountInCents) {
@@ -710,6 +701,19 @@ function updateEditingButtonsState(disabled) {
     if (designMarginNote) designMarginNote.style.display = disabled ? 'none' : 'block';
 }
 
+function setCanvasSize(logicalWidth, logicalHeight) {
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+
+    // Set the "actual" size of the canvas in device pixels
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+
+    // Scale the context to account for the higher resolution.
+    // Using setTransform ensures this is not cumulative.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
 // --- Image Loading and Editing Functions ---
 function handleFileChange(event) {
     const file = event.target.files[0];
@@ -749,10 +753,9 @@ function loadFileAsImage(file) {
                 if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
                 if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
                 if (canvas && ctx) {
-                    canvas.width = newWidth;
-                    canvas.height = newHeight;
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+                    setCanvasSize(newWidth, newHeight);
+                    ctx.clearRect(0, 0, newWidth, newHeight);
+                    ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
 
                     // For raster images, the bounds and cutline are the canvas itself.
                     currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
@@ -766,12 +769,7 @@ function loadFileAsImage(file) {
 
                     // Update the price now that we have dimensions
                     calculateAndUpdatePrice();
-                    drawBoundingBox(currentBounds); // Draw the initial bounding box
-                    drawSizeIndicator(currentBounds);
-
-                    // Set initial size displays
-                    const initialInches = Math.max(currentBounds.width, currentBounds.height) / (pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96);
-                    updateSizeDisplays(initialInches);
+                    drawCanvasDecorations(currentBounds); // Draw the initial bounding box, size indicator, and rulers
                 }
             };
             img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
@@ -806,9 +804,10 @@ function redrawAll() {
     }
 
     // Set canvas size based on the final cutline bounds
-    canvas.width = currentBounds.right - currentBounds.left + 40; // Add padding
-    canvas.height = currentBounds.bottom - currentBounds.top + 40;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const logicalWidth = currentBounds.right - currentBounds.left + 40; // Add padding
+    const logicalHeight = currentBounds.bottom - currentBounds.top + 40;
+    setCanvasSize(logicalWidth, logicalHeight);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     // Create an offset for drawing, so the shape isn't at the very edge
     const drawOffset = { x: -currentBounds.left + 20, y: -currentBounds.top + 20 };
@@ -816,9 +815,7 @@ function redrawAll() {
     // Draw everything
     drawPolygonsToCanvas(currentPolygons, 'black', drawOffset);
     drawPolygonsToCanvas(currentCutline, 'red', drawOffset, true);
-    drawBoundingBox(currentBounds, drawOffset);
-    drawSizeIndicator(currentBounds, drawOffset);
-    drawRuler(currentBounds, drawOffset);
+    drawCanvasDecorations(currentBounds, drawOffset);
 
     // After redrawing, the bounds may have changed, so update the price.
     calculateAndUpdatePrice();
@@ -920,25 +917,26 @@ function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke =
     });
 }
 
+function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
+    if (!bounds) return;
+    drawBoundingBox(bounds, offset);
+    drawSizeIndicator(bounds, offset);
+    drawRuler(bounds, offset);
+}
+
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
-    if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
+    if (!ctx || !bounds || !pricingConfig) return;
 
     // The user wanted a grey box with 1-inch dashes for pricing.
     // The previous implementation calculated a dash length from PPI, which was often
     // too large to be visible on smaller images. A fixed dash pattern is more reliable.
-
-    // Let's try to implement the desired logic, but with a smaller dash size.
-    const selectedResolution = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value);
-    const ppi = selectedResolution ? selectedResolution.ppi : 96;
-    const dashLength = ppi / 8; // 1/8 inch dash
-    const gapLength = ppi / 16; // 1/16 inch gap
 
     // Set color to grey as requested.
     ctx.strokeStyle = 'rgba(128, 128, 128, 0.9)'; // A strong, visible grey
     ctx.lineWidth = 2; // A clean, visible line width
 
     // Use a fixed dash pattern that is visible at most scales.
-    ctx.setLineDash([dashLength, gapLength]);
+    ctx.setLineDash([10, 5]);
 
     ctx.strokeRect(
         bounds.left + offset.x,
@@ -1101,16 +1099,14 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         tempCtx.drawImage(canvas, -w / 2, -h / 2);
 
         // Now, update the main canvas with the rotated image
-        canvas.width = newW;
-        canvas.height = newH;
+        setCanvasSize(newW, newH);
         ctx.clearRect(0, 0, newW, newH);
         ctx.drawImage(tempCanvas, 0, 0);
 
         // Update bounds and price, and redraw the bounding box
         currentBounds = { left: 0, top: 0, right: newW, bottom: newH, width: newW, height: newH };
         calculateAndUpdatePrice();
-        drawBoundingBox(currentBounds);
-        drawSizeIndicator(currentBounds);
+        drawCanvasDecorations(currentBounds);
     }
 }
 
@@ -1144,8 +1140,7 @@ function redrawOriginalImageWithFilters() {
 
     // Also redraw the bounding box and size indicator, which are cleared by the operation.
     if (currentBounds) {
-        drawBoundingBox(currentBounds);
-        drawSizeIndicator(currentBounds);
+        drawCanvasDecorations(currentBounds);
     }
 }
 
@@ -1205,9 +1200,8 @@ function handleStandardResize(targetInches) {
         const newHeight = originalImage.height * scale;
 
         if (newWidth > 0 && newHeight > 0) {
-            canvas.width = newWidth;
-            canvas.height = newHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            setCanvasSize(newWidth, newHeight);
+            ctx.clearRect(0, 0, newWidth, newHeight);
             ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
 
             // Update the bounds and cutline for the new raster size
@@ -1216,8 +1210,7 @@ function handleStandardResize(targetInches) {
 
             // Trigger the price update and redraw the bounding box
             calculateAndUpdatePrice();
-            drawBoundingBox(currentBounds);
-            drawSizeIndicator(currentBounds);
+            drawCanvasDecorations(currentBounds);
         }
     }
 }
