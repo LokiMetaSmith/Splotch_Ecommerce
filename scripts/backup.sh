@@ -1,97 +1,36 @@
 #!/bin/bash
 
-# A script to back up application data to a remote storage provider.
-# Supports 'rclone' (recommended) and 'aws-cli' as upload methods.
-#
-# Usage:
-#   ./scripts/backup.sh --method rclone <rclone_remote_path>
-#   ./scripts/backup.sh --method aws <s3_bucket_name>
-#
-# Examples:
-#   ./scripts/backup.sh --method rclone b2-backups:my-bucket
-#   ./scripts/backup.sh --method aws my-s3-bucket
-#
-# Prerequisites:
-# - The chosen upload tool (rclone or aws-cli) must be installed and configured.
-# - Run this script from the root of the project directory.
-
-# Exit immediately if a command exits with a non-zero status.
-set -e
-
-# --- Argument Parsing ---
-if [ "$1" != "--method" ]; then
-  echo "❌ Error: First argument must be --method."
-  echo "Usage: $0 --method [rclone|aws] <destination>"
-  exit 1
-fi
-
-METHOD=$2
-DESTINATION=$3
-
-# --- Configuration ---
+# Set the source and destination directories
 SOURCE_DB="server/db.json"
 SOURCE_UPLOADS="server/uploads"
-BACKUP_FILENAME="backup-$(date +%Y-%m-%d-%H%M%S).tar.gz"
+BACKUP_DIR="backups"
+TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+BACKUP_FILE="$BACKUP_DIR/backup-$TIMESTAMP.tar.gz"
 
-# --- Validation ---
-if [ -z "$METHOD" ] || [ -z "$DESTINATION" ]; then
-  echo "❌ Error: Invalid arguments. Method and destination are required."
-  echo "Usage: $0 --method [rclone|aws] <destination>"
-  exit 1
-fi
+# Create backup directory if it doesn't exist
+mkdir -p $BACKUP_DIR
 
-if [ "$METHOD" == "rclone" ]; then
-  if ! command -v rclone &> /dev/null; then
-    echo "❌ Error: rclone is not installed. Please install and configure it to continue."
-    exit 1
-  fi
-elif [ "$METHOD" == "aws" ]; then
-  if ! command -v aws &> /dev/null; then
-    echo "❌ Error: aws-cli is not installed. Please install it to continue."
-    exit 1
-  fi
+# Create the archive
+echo "Creating backup archive..."
+tar -czf $BACKUP_FILE $SOURCE_DB $SOURCE_UPLOADS
+
+if [ $? -eq 0 ]; then
+    echo "Backup archive created successfully: $BACKUP_FILE"
 else
-  echo "❌ Error: Invalid method '$METHOD'. Must be 'rclone' or 'aws'."
-  exit 1
-fi
-
-if [ ! -f "$SOURCE_DB" ] && [ ! -d "$SOURCE_UPLOADS" ]; then
-    echo "❌ Error: Neither source database ($SOURCE_DB) nor uploads directory ($SOURCE_UPLOADS) found. Nothing to back up."
+    echo "Error creating backup archive."
     exit 1
 fi
 
-echo "🚀 Starting backup process using method: $METHOD..."
+# Upload the archive
+echo "Uploading backup to transfer.whalebone.io..."
+UPLOAD_URL=$(curl -v --upload-file $BACKUP_FILE https://transfer.whalebone.io/backup.tar.gz)
 
-# --- Create Archive ---
-# Build the list of files to archive. This handles cases where one is missing.
-FILES_TO_BACKUP=""
-if [ -f "$SOURCE_DB" ]; then
-    FILES_TO_BACKUP="$FILES_TO_BACKUP $SOURCE_DB"
+if [ $? -eq 0 ]; then
+    echo "Backup uploaded successfully."
+    echo "Download URL: $UPLOAD_URL"
+    # Clean up the local backup file
+    rm $BACKUP_FILE
 else
-    echo "⚠️ Warning: Database file not found at $SOURCE_DB. Skipping."
+    echo "Error uploading backup."
+    exit 1
 fi
-
-if [ -d "$SOURCE_UPLOADS" ]; then
-    FILES_TO_BACKUP="$FILES_TO_BACKUP $SOURCE_UPLOADS"
-else
-    echo "⚠️ Warning: Uploads directory not found at $SOURCE_UPLOADS. Skipping."
-fi
-
-echo "📦 Creating archive: $BACKUP_FILENAME..."
-tar -czf "$BACKUP_FILENAME" $FILES_TO_BACKUP
-echo "✅ Archive created successfully."
-
-# --- Upload to Remote Storage ---
-echo "☁️  Uploading to $DESTINATION..."
-if [ "$METHOD" == "rclone" ]; then
-  rclone copy "$BACKUP_FILENAME" "$DESTINATION/"
-elif [ "$METHOD" == "aws" ]; then
-  aws s3 cp "$BACKUP_FILENAME" "s3://$DESTINATION/"
-fi
-echo "✅ Upload complete."
-
-# --- Cleanup ---
-echo "🧹 Cleaning up local archive file..."
-rm "$BACKUP_FILENAME"
-
-echo "🎉 Backup process finished successfully!"
