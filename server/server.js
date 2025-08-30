@@ -232,7 +232,13 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     app.use(express.static(path.join(__dirname, '..')));
     app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-    app.use(lusca.csrf());
+    app.use(lusca({
+        csrf: true,
+        xframe: 'SAMEORIGIN',
+        hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},
+        xssProtection: true,
+        nosniff: true
+    }));
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
