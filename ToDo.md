@@ -131,7 +131,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 
 -   **[ ] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[ ] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
--   **[ ] Fix Vulnerable Dependencies:** Run `npm audit fix --force` to patch the 6 known vulnerabilities in the server's dependencies. Plan a migration away from the deprecated `request` package to a modern alternative like `axios`.
+-   **[ ] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./docs/TELEGRAM_BOT_MIGRATION.md) for a step-by-step guide.
 -   **[ ] Implement Role-Based Access Control (RBAC):** Add a `role` field to the user model and protect administrative endpoints (e.g., `/api/orders`) to ensure only authorized users can access them.
 
 ## Medium-Priority
