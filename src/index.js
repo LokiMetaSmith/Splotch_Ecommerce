@@ -769,8 +769,7 @@ function loadFileAsImage(file) {
 
                     // Update the price now that we have dimensions
                     calculateAndUpdatePrice();
-                    drawBoundingBox(currentBounds); // Draw the initial bounding box
-                    drawSizeIndicator(currentBounds);
+                    drawCanvasDecorations(currentBounds); // Draw the initial bounding box, size indicator, and rulers
                 }
             };
             img.onerror = () => showPaymentStatus('Error loading image data.', 'error');
@@ -816,9 +815,7 @@ function redrawAll() {
     // Draw everything
     drawPolygonsToCanvas(currentPolygons, 'black', drawOffset);
     drawPolygonsToCanvas(currentCutline, 'red', drawOffset, true);
-    drawBoundingBox(currentBounds, drawOffset);
-    drawSizeIndicator(currentBounds, drawOffset);
-    drawRuler(currentBounds, drawOffset);
+    drawCanvasDecorations(currentBounds, drawOffset);
 
     // After redrawing, the bounds may have changed, so update the price.
     calculateAndUpdatePrice();
@@ -918,6 +915,13 @@ function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke =
             ctx.fill();
         }
     });
+}
+
+function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
+    if (!bounds) return;
+    drawBoundingBox(bounds, offset);
+    drawSizeIndicator(bounds, offset);
+    drawRuler(bounds, offset);
 }
 
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
@@ -1102,8 +1106,7 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         // Update bounds and price, and redraw the bounding box
         currentBounds = { left: 0, top: 0, right: newW, bottom: newH, width: newW, height: newH };
         calculateAndUpdatePrice();
-        drawBoundingBox(currentBounds);
-        drawSizeIndicator(currentBounds);
+        drawCanvasDecorations(currentBounds);
     }
 }
 
@@ -1137,8 +1140,7 @@ function redrawOriginalImageWithFilters() {
 
     // Also redraw the bounding box and size indicator, which are cleared by the operation.
     if (currentBounds) {
-        drawBoundingBox(currentBounds);
-        drawSizeIndicator(currentBounds);
+        drawCanvasDecorations(currentBounds);
     }
 }
 
@@ -1208,8 +1210,7 @@ function handleStandardResize(targetInches) {
 
             // Trigger the price update and redraw the bounding box
             calculateAndUpdatePrice();
-            drawBoundingBox(currentBounds);
-            drawSizeIndicator(currentBounds);
+            drawCanvasDecorations(currentBounds);
         }
     }
 }
