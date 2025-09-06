@@ -1,6 +1,6 @@
-# Home Lab Deployment with Proxmox and Docker
+# Home Lab Deployment with Proxmox and Containers
 
-This guide provides comprehensive instructions for deploying the Print Shop application on a home server managed by Proxmox. We will use Docker to containerize the application and Nginx Proxy Manager to handle secure, external access.
+This guide provides comprehensive instructions for deploying the Print Shop application on a home server managed by Proxmox. We will use a container engine (like Docker or Podman) to run the application and Nginx Proxy Manager to handle secure, external access.
 
 ## Architecture Overview
 
@@ -57,6 +57,8 @@ Once the LXC is running, open its console from the Proxmox UI.
     ```bash
     apt install docker-compose -y
     ```
+
+    > **Note on Podman:** As a more secure, daemonless alternative to Docker, you can install `podman` and `podman-compose` instead. The commands used in this guide are interchangeable.
 
 **Step 3: Create and Run the Nginx Proxy Manager Container**
 
@@ -145,6 +147,8 @@ Open the console for your new app container.
     # Install other tools
     apt install docker-compose git nodejs npm -y
     ```
+
+    > **Note on Podman:** You can use `podman` and `podman-compose` here as well. The rest of the steps remain the same.
 
 **Step 3: Prepare the Application**
 

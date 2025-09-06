@@ -1,0 +1,176 @@
+#cloud-config
+# This script configures a new Ubuntu 22.04 server to run the Print Shop application.
+# It creates a user, installs Podman, clones the repository, and starts the application
+# as a proper systemd service for maximum stability.
+
+# 1. Update packages on first boot
+package_update: true
+package_upgrade: true
+
+# 2. Create a non-root user to manage the application
+# IMPORTANT: Replace 'your_ssh_public_key' with your actual public SSH key.
+users:
+  - name: loki
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAA... your_ssh_public_key
+
+# 3. Install Podman
+packages:
+  - podman
+
+# 4. Define the files to be created on the server
+write_files:
+  # --- PODMAN KUBE YAML CONFIGURATION ---
+  # This file defines the application pod, containing the app and nginx services.
+  # It is designed to be used with `podman play kube`.
+  - path: /home/loki/lokimetasmith.github.io/pod.yml
+    owner: loki:loki
+    permissions: '0664'
+    content: |
+      # Kubernetes YAML for the Print Shop Application Pod
+      # Generated from a docker-compose file and adapted for Podman.
+      # Use `podman play kube pod.yml` to launch.
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: print-shop-pod
+        labels:
+          app: print-shop
+      spec:
+        containers:
+        - name: app
+          # This will use the image built locally by the runcmd steps.
+          image: localhost/print-shop-app:latest
+          envFrom:
+          - secretRef:
+              name: app-secrets
+          ports:
+          - containerPort: 3000
+            hostPort: 3000
+          volumeMounts:
+          - mountPath: /app/db.json
+            name: db-data
+          - mountPath: /app/server/uploads
+            name: uploads-data
+
+        - name: nginx
+          image: docker.io/library/nginx:latest
+          ports:
+          - containerPort: 80
+            hostPort: 80
+          volumeMounts:
+          - mountPath: /etc/nginx/conf.d/default.conf
+            name: nginx-conf
+            readOnly: true
+          - mountPath: /usr/share/nginx/html
+            name: frontend-dist
+            readOnly: true
+
+        volumes:
+        - name: db-data
+          hostPath:
+            path: /home/loki/app-data/db.json
+            type: File
+        - name: uploads-data
+          hostPath:
+            path: /home/loki/app-data/uploads
+            type: Directory
+        - name: nginx-conf
+          hostPath:
+            path: /home/loki/lokimetasmith.github.io/nginx.conf
+            type: File
+        - name: frontend-dist
+          hostPath:
+            path: /home/loki/lokimetasmith.github.io/dist
+            type: Directory
+
+  # --- NGINX REVERSE PROXY CONFIGURATION ---
+  # This file tells Nginx how to direct traffic.
+  - path: /home/loki/lokimetasmith.github.io/nginx.conf
+    owner: loki:loki
+    permissions: '0664'
+    content: |
+      server {
+          listen 80;
+          server_name _;
+
+          root /usr/share/nginx/html;
+          index index.html;
+
+          location / {
+              try_files $uri $uri/ =404;
+          }
+
+          location ~ ^/(api|uploads|auth|oauth2callback) {
+              proxy_pass http://localhost:3000;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          }
+      }
+
+  # --- ENVIRONMENT VARIABLES (as a Kubernetes Secret) ---
+  # IMPORTANT: Replace ALL placeholder values below with your real production secrets.
+  - path: /home/loki/lokimetasmith.github.io/secrets.yml
+    owner: loki:loki
+    permissions: '0600'
+    content: |
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: app-secrets
+      stringData:
+        PORT: "3000"
+        NODE_ENV: "production"
+        DB_PATH: "/app/db.json"
+        # --- REPLACE BELOW WITH YOUR REAL KEYS ---
+        BASE_URL: "http://YOUR_DROPLET_IP"
+        SQUARE_ACCESS_TOKEN: "YOUR_PRODUCTION_SQUARE_TOKEN"
+        SQUARE_LOCATION_ID: "YOUR_PRODUCTION_SQUARE_LOCATION_ID"
+        GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"
+        GOOGLE_CLIENT_SECRET: "YOUR_GOOGLE_CLIENT_SECRET"
+        ADMIN_EMAIL: "your_admin_email@example.com"
+        RP_ID: "YOUR_DOMAIN_OR_IP"
+        EXPECTED_ORIGIN: "http://YOUR_DOMAIN_OR_IP"
+        JWT_PRIVATE_KEY: |
+          -----BEGIN RSA PRIVATE KEY-----
+          ...
+          -----END RSA PRIVATE KEY-----
+        JWT_PUBLIC_KEY: |
+          -----BEGIN PUBLIC KEY-----
+          ...
+          -----END PUBLIC KEY-----
+        JWT_SECRET: "A_VERY_LONG_AND_RANDOM_32_CHAR_SECRET"
+        TELEGRAM_BOT_TOKEN: "YOUR_TELEGRAM_BOT_TOKEN"
+        TELEGRAM_CHANNEL_ID: "YOUR_TELEGRAM_CHANNEL_ID"
+        CSRF_SECRET: "ANOTHER_VERY_LONG_AND_RANDOM_SECRET"
+        SESSION_SECRET: "A_THIRD_VERY_LONG_AND_RANDOM_SECRET"
+
+# 5. Run commands to set up and launch the application
+runcmd:
+  # --- Basic Setup ---
+  - git clone https://github.com/LokiMetaSmith/lokimetasmith.github.io.git /home/loki/lokimetasmith.github.io
+  - mkdir -p /home/loki/app-data/uploads
+  - touch /home/loki/app-data/db.json
+  - chown -R loki:loki /home/loki
+
+  # --- Build Frontend and Container Image ---
+  # Run as the 'loki' user
+  - su - loki -c "cd /home/loki/lokimetasmith.github.io && npm install && npm run build"
+  - su - loki -c "cd /home/loki/lokimetasmith.github.io && podman build -t print-shop-app:latest ./server"
+
+  # --- Create and Enable Systemd Service ---
+  # The following commands are run as the 'loki' user to set up a rootless systemd service.
+  - su - loki -c "cd /home/loki/lokimetasmith.github.io && podman play kube pod.yml"
+  - su - loki -c "cd /home/loki/lokimetasmith.github.io && podman generate systemd --files --name print-shop-pod"
+  - su - loki -c "mkdir -p /home/loki/.config/systemd/user"
+  - su - loki -c "mv /home/loki/lokimetasmith.github.io/pod-print-shop-pod.service /home/loki/.config/systemd/user/"
+  - su - loki -c "systemctl --user daemon-reload"
+  - su - loki -c "systemctl --user enable --now pod-print-shop-pod.service"
+
+  # --- Enable Lingering ---
+  # This is crucial for allowing the user's services to run even when they are not logged in.
+  - loginctl enable-linger loki

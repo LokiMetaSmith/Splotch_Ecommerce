@@ -8,6 +8,15 @@ The `docker-compose.yaml` file in the root of this project defines two services:
 -   `backend`: The Node.js application server.
 -   `frontend`: An Nginx server to serve the static frontend files.
 
+### A Note on Podman
+
+[Podman](https://podman.io/) is a daemonless container engine that can be used as a drop-in replacement for Docker. It is generally considered more secure as it does not require a persistent root-privileged daemon.
+
+All commands in this guide that use `docker` and `docker-compose` can be replaced with `podman` and `podman-compose` respectively. For example, `docker-compose up` becomes `podman-compose up`. You may need to install `podman-compose` separately (`pip install podman-compose`).
+
+On many Linux systems, you can even set a permanent alias to make the transition seamless:
+`alias docker=podman`
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
