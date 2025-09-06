@@ -10,6 +10,7 @@
     "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit",
     "test:server": "cd server && npm test",
     "test:e2e": "playwright test",
+    "test:gatekeeper": "node gatekeeper/gatekeeper.mjs",
     "start-mock-server": "json-server --watch db.json --port 3001",
     "styles": "npx tailwindcss build styles.css -o output.css",
     "build": "vite build --base=./",
@@ -26,6 +27,7 @@
   },
   "homepage": "https://github.com/LokiMetaSmith/lokimetasmith.github.io#readme",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@simplewebauthn/browser": "^13.1.2",
     "@simplewebauthn/server": "^13.1.2",
     "bcrypt": "^6.0.0",
@@ -55,6 +57,7 @@
     "vite": "^5.1.4"
   },
   "devDependencies": {
+    "@faker-js/faker": "^8.4.1",
     "@playwright/test": "^1.45.0",
     "autoprefixer": "^10.4.21",
     "image-size": "^1.1.1",
@@ -63,7 +66,6 @@
     "postcss": "^8.5.6",
     "serve": "^14.2.4",
     "svg-parser": "^2.0.4",
-    "tailwindcss": "^4.1.11",
-    "@faker-js/faker": "^8.4.1"
+    "tailwindcss": "^4.1.11"
   }
 }

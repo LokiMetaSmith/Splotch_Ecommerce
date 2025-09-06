@@ -12,7 +12,13 @@ DEV_SERVER_PID=$!
 sleep 5
 
 # Run the tests
-npm run test:e2e
+# If arguments are passed to the script, run only those tests.
+# Otherwise, run all E2E tests.
+if [ "$#" -gt 0 ]; then
+  npm run test:e2e -- "$@"
+else
+  npm run test:e2e
+fi
 TEST_EXIT_CODE=$?
 
 # Stop the servers
