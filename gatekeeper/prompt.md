@@ -7,8 +7,8 @@ Analyze the provided "Branch Git Diff" and match it against the "Available E2E T
 1.  **Analyze Carefully:** Do not just look at file names. A change in a shared component might require running many tests. A change in API behavior could affect any test that calls that endpoint.
 2.  **Be Conservative:** If there is a reasonable chance a change could affect a test, include it. It is better to run an unnecessary test than to miss a critical bug.
 3.  **Output Format:** Your response MUST be a single JSON object, enclosed in a ```json markdown block. The JSON object must contain two keys:
-    -   `"explanation"`: A brief, concise markdown-formatted explanation of why you chose the tests.
-    -   `"tests"`: An array of strings, where each string is the full path to a test file that should be run.
+    - `"explanation"`: A brief, concise markdown-formatted explanation of why you chose the tests.
+    - `"tests"`: An array of strings, where each string is the full path to a test file that should be run.
 
 **Example Output:**
 

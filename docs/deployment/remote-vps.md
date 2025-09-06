@@ -3,6 +3,7 @@
 This guide covers deploying the Print Shop application to a production environment on a remote Virtual Private Server (VPS) from a cloud provider like DigitalOcean, Vultr, Linode, or AWS.
 
 We present two methods:
+
 1.  **Automated Deployment with Cloud-Init (Recommended):** This method uses a script to automate the entire server setup process. It's fast, repeatable, and based on Docker.
 2.  **Manual Deployment (Legacy):** This is a traditional, non-containerized guide for setting up the application step-by-step.
 
@@ -18,13 +19,13 @@ This approach is the most secure and robust. It uses Podman to run the container
 
 1.  **Use the `cloud-config-podman.example.yml` file.** This file is designed for this modern workflow.
 2.  **Customize the Configuration:**
-    -   Make a copy of the file named `my-cloud-config.yml`.
-    -   Add your public SSH key.
-    -   Fill in all the placeholder secrets in the `secrets.yml` section.
-    -   If you have a private container registry, update the image name in the `pod.yml` section.
+    - Make a copy of the file named `my-cloud-config.yml`.
+    - Add your public SSH key.
+    - Fill in all the placeholder secrets in the `secrets.yml` section.
+    - If you have a private container registry, update the image name in the `pod.yml` section.
 3.  **Launch Your Server:**
-    -   Follow the "Launch the Server" steps below, using the content of your customized `my-cloud-config.yml` file as the User Data.
-    -   The script will automatically build the application, create the pod, and enable a systemd service to manage it.
+    - Follow the "Launch the Server" steps below, using the content of your customized `my-cloud-config.yml` file as the User Data.
+    - The script will automatically build the application, create the pod, and enable a systemd service to manage it.
 
 ### Method 1b: Docker (Legacy)
 
@@ -32,11 +33,11 @@ This approach uses the original Docker-based cloud-init script.
 
 1.  **Use the `cloud-config.example.yml` file.**
 2.  **Customize the Configuration:**
-    -   Make a copy of the file named `my-cloud-config.yml`.
-    -   Add your public SSH key.
-    -   Fill in all the placeholder secrets in the `.env` section.
+    - Make a copy of the file named `my-cloud-config.yml`.
+    - Add your public SSH key.
+    - Fill in all the placeholder secrets in the `.env` section.
 3.  **Launch Your Server:**
-    -   Follow the "Launch the Server" steps below, using the content of your customized `my-cloud-config.yml` file as the User Data.
+    - Follow the "Launch the Server" steps below, using the content of your customized `my-cloud-config.yml` file as the User Data.
 
 ---
 
@@ -48,7 +49,7 @@ This approach uses the original Docker-based cloud-init script.
 4.  **Choose a plan:** A basic shared CPU droplet is a good starting point.
 5.  **Authentication:** Ensure your SSH key (the same one you added to your config file) is selected.
 6.  **Select additional options:** Check the box for **User Data**.
-7.  **Provide User Data:** A text box will appear. Copy the *entire contents* of your customized `my-cloud-config.yml` file and paste it into this box.
+7.  **Provide User Data:** A text box will appear. Copy the _entire contents_ of your customized `my-cloud-config.yml` file and paste it into this box.
 8.  Finalize the droplet details (hostname, etc.) and click **Create Droplet**.
 
 DigitalOcean will now create the server. On its first boot, it will automatically execute your script. This may take 3-5 minutes.
@@ -59,8 +60,8 @@ DigitalOcean will now create the server. On its first boot, it will automaticall
 
 2.  **Setting up HTTPS (Manual Step):**
     The cloud-init script sets up an Nginx server on port 80 (HTTP). To enable HTTPS, you need to configure it manually.
-    -   SSH into your new server: `ssh loki@YOUR_DROPLET_IP`
-    -   You can use a tool like Certbot to obtain and install a free SSL certificate from Let's Encrypt for your Nginx container. Detailed guides for this are widely available online.
+    - SSH into your new server: `ssh loki@YOUR_DROPLET_IP`
+    - You can use a tool like Certbot to obtain and install a free SSL certificate from Let's Encrypt for your Nginx container. Detailed guides for this are widely available online.
 
 After these steps, your application will be live and running in a containerized environment.
 
@@ -75,6 +76,7 @@ This method walks you through setting up the application manually on a fresh ser
 Before deploying, ensure your server (e.g., a Linux VM) has the necessary software.
 
 **Prerequisites:**
+
 - **Node.js** (v18 or later)
 - **npm** (comes with Node.js)
 - **Nginx** (or another web server) to act as a reverse proxy.
@@ -107,6 +109,7 @@ Before deploying, ensure your server (e.g., a Linux VM) has the necessary softwa
 
 1.  Create a new Nginx config file (e.g., `/etc/nginx/sites-available/printshop`).
 2.  Add a server block. **You must customize this for your setup.**
+
     ```nginx
     server {
         listen 80;
@@ -129,6 +132,7 @@ Before deploying, ensure your server (e.g., a Linux VM) has the necessary softwa
         }
     }
     ```
+
 3.  Enable the site: `sudo ln -s /etc/nginx/sites-available/printshop /etc/nginx/sites-enabled/` and restart Nginx.
 4.  **Crucially, set up HTTPS using Let's Encrypt / Certbot.**
 
@@ -139,6 +143,7 @@ In production, do not use a `.env` file. Set environment variables using your se
 #### Data Persistence
 
 You **must** ensure these locations are backed up and persist across deployments:
+
 - **Database:** The file specified by `DB_PATH`. Store it outside the project folder (e.g., `/var/data/db.json`).
 - **File Uploads:** The `server/uploads/` directory.
 
