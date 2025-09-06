@@ -204,3 +204,50 @@ The final step is to tell your reverse proxy how to find your application and ma
     -   Click `Save`.
 
 Nginx Proxy Manager will now obtain an SSL certificate for your domain and automatically configure the proxy. After a minute or two, you should be able to access your application securely at `https://print-shop.yourdomain.com`.
+
+---
+
+## Part 4: Advanced Security & Performance with Cloudflare
+
+The setup above provides a solid, working deployment. However, for a production environment that is exposed to the public internet, you can significantly improve security and performance by using [Cloudflare](https://www.cloudflare.com/).
+
+This section outlines best practices for protecting your home server by routing your traffic through Cloudflare's network. This provides several key benefits:
+-   **Hides your Home IP Address:** Visitors connect to Cloudflare's servers, not directly to your home network.
+-   **DDOS Protection:** Cloudflare automatically absorbs malicious denial-of-service attacks.
+-   **CDN & Caching:** Your site's static assets are cached on Cloudflare's global network, making it load faster for users worldwide.
+
+### Step 1: Move DNS to Cloudflare
+
+1.  **Create a Cloudflare Account:** Sign up for a free account on the Cloudflare website.
+2.  **Add Your Domain:** Follow the prompts to add your domain name. Cloudflare will automatically scan for your existing DNS records.
+3.  **Update Nameservers:** Cloudflare will provide you with two new nameserver addresses. You must log in to your domain registrar (where you bought the domain) and replace your existing nameservers with the ones provided by Cloudflare. This change can take a few hours to propagate.
+4.  **Enable the Proxy:** In your Cloudflare DNS settings, ensure the record pointing to your home IP address has the **Proxy status** set to **"Proxied"** (it should show an orange cloud icon). This is the magic step that routes traffic through Cloudflare.
+
+### Step 2: Lock Down Your Network
+
+Once your traffic is proxied through Cloudflare, you should prevent attackers from bypassing it and accessing your server directly.
+
+1.  **Restrict Traffic to Cloudflare IPs:**
+    -   The most important step is to configure your home firewall (usually in your router settings) to **only allow incoming traffic on port 443 from Cloudflare's IP addresses**.
+    -   Block all other incoming traffic on this port. This ensures that no one can access your server by its direct IP address.
+    -   Cloudflare publishes its IP ranges here: [https://www.cloudflare.com/ips/](https://www.cloudflare.com/ips/).
+
+2.  **Enforce HTTPS:**
+    -   In your router, you can now safely **remove the port forwarding rule for port 80**. Only forward port 443 to your Nginx Proxy Manager container.
+    -   In the Cloudflare dashboard for your domain, go to **SSL/TLS -> Overview**. Set the encryption mode to **Full (Strict)**. This ensures traffic is encrypted all the way from the user's browser to your server.
+    -   In **SSL/TLS -> Edge Certificates**, enable **"Always Use HTTPS"**.
+
+### Step 3: Harden Your Server's SSH Access
+
+Your web traffic is now secure, but you should also harden access to the server itself.
+
+1.  **Use SSH Keys:** Ensure you are only logging in with SSH keys and have disabled password authentication.
+2.  **Disable Root Login:** In your server's SSH configuration file (`/etc/ssh/sshd_config`), ensure you have the line `PermitRootLogin no`.
+3.  **Restrict SSH Access (Optional):** For maximum security, you can configure your firewall to only allow SSH connections (port 22) from specific, trusted IP addresses.
+
+### Step 4: Explore Advanced Features
+
+With this setup, you can now explore other powerful Cloudflare features:
+-   **Dynamic DNS:** If your home IP address changes, you can use a script with the Cloudflare API to automatically update your DNS record, avoiding the need for a separate dynamic DNS service.
+-   **Firewall Rules:** Create custom rules in the Cloudflare dashboard to block traffic from specific countries, IP ranges, or known malicious actors.
+-   **Cloudflare Access:** Protect specific URLs or your entire site with an additional login layer (e.g., Google, GitHub, or one-time passcodes).
