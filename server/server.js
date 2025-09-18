@@ -25,11 +25,43 @@ import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
+import sanitizeSVG from '@mattkrick/sanitize-svg';
+import { JSDOM } from 'jsdom';
 
 const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+// JSDOM window is needed for server-side SVG sanitization
+const { window } = new JSDOM('');
+
+async function sanitizeSVGFile(filePath) {
+    try {
+        const fileBuffer = fs.readFileSync(filePath);
+        // Using 'await' since sanitizeSVG can be async with certain configs, though it's sync here.
+        const sanitized = await sanitizeSVG(fileBuffer, window);
+        if (!sanitized) {
+            // The sanitizer returns null if it finds malicious content.
+            // We'll replace the file with an empty string, effectively rejecting it.
+            fs.writeFileSync(filePath, '');
+            console.warn(`[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`);
+            return false;
+        }
+        fs.writeFileSync(filePath, sanitized);
+        console.log(`[SECURITY] SVG file sanitized successfully: ${filePath}`);
+        return true;
+    } catch (error) {
+        console.error(`[ERROR] Could not sanitize SVG file: ${filePath}`, error);
+        // In case of an error, we should not keep the potentially harmful file.
+        try {
+            fs.unlinkSync(filePath);
+        } catch (unlinkError) {
+            console.error(`[ERROR] Failed to delete file after sanitization error: ${filePath}`, unlinkError);
+        }
+        return false;
+    }
+}
 
 // Load pricing configuration
 let pricingConfig = {};
@@ -75,16 +107,18 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
   );
 
   async function logAndEmailError(error, context = 'General Error') {
-    const errorMessage = `[${new Date().toISOString()}] [${context}] ${error.stack}\n`;
-    fs.appendFileSync(path.join(__dirname, 'error.log'), errorMessage);
+    // Sanitize error logging to avoid leaking sensitive information in logs/emails.
+    const sanitizedErrorMessage = `[${new Date().toISOString()}] [${context}] ${error.message}\n`;
+    fs.appendFileSync(path.join(__dirname, 'error.log'), sanitizedErrorMessage);
+    // The full error (including stack) is still logged to the console for debugging.
     console.error(`[${context}]`, error);
     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
       try {
         await sendEmail({
           to: process.env.ADMIN_EMAIL,
           subject: `Print Shop Server Error: ${context}`,
-          text: `An error occurred in the Print Shop server.\n\nContext: ${context}\n\nError: ${error.stack}`,
-          html: `<p>An error occurred in the Print Shop server.</p><p><b>Context:</b> ${context}</p><pre>${error.stack}</pre>`,
+          text: `An error occurred in the Print Shop server.\n\nContext: ${context}\n\nError: ${error.message}`,
+          html: `<p>An error occurred in the Print Shop server.</p><p><b>Context:</b> ${context}</p><pre>${error.message}</pre>`,
           oauth2Client,
         });
       } catch (emailError) {
@@ -219,8 +253,35 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     
    // app.use(limiter);
     app.use(cors(corsOptions));
+
+    // If running behind a reverse proxy, trust the first hop.
+    // This is required for rate limiting and other security features to work correctly.
+    if (process.env.TRUST_PROXY === 'true') {
+        app.set('trust proxy', 1);
+        console.log('[SERVER] Trusting reverse proxy headers.');
+    }
+
+    // --- CSRF Secret Management ---
+    const weakDefaultCsrfSecret = '12345678901234567890123456789012';
+    let csrfSecret = process.env.CSRF_SECRET;
+
+    if (!csrfSecret || csrfSecret === weakDefaultCsrfSecret) {
+        if (process.env.NODE_ENV === 'production') {
+            console.error('❌ [FATAL] CSRF_SECRET is not set or is set to the weak default in a production environment.');
+            console.error('   Please set a strong, unique CSRF_SECRET environment variable.');
+            process.exit(1);
+        } else {
+            // In non-production environments, we can fall back to the weak secret for convenience,
+            // but we should log a clear warning.
+            csrfSecret = weakDefaultCsrfSecret;
+            console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+            console.warn('   Do not use this configuration in production.');
+        }
+    } else {
+        console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+    }
+
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
-    const csrfSecret = process.env.CSRF_SECRET || '12345678901234567890123456789012';
     app.use(cookieParser(csrfSecret));
     app.use(session({
       secret: process.env.SESSION_SECRET || 'super-secret-session-key',
@@ -261,6 +322,12 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       });
     }
 
+    const isAdmin = (user) => {
+      if (!user || !user.email) return false;
+      // Check if the user's email matches the admin email from environment variables
+      return user.email === process.env.ADMIN_EMAIL;
+    };
+
     // --- API Endpoints ---
     app.use('/api', apiLimiter);
     app.get('/.well-known/jwks.json', async (req, res) => {
@@ -298,12 +365,20 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
 
         const designImageFile = req.files.designImage[0];
         const designFileType = await fileTypeFromFile(designImageFile.path);
-		if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
+        if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
             // It's good practice to remove the invalid file
             fs.unlink(designImageFile.path, (err) => {
                 if (err) console.error("Error deleting invalid file:", err);
             });
             return res.status(400).json({ error: `Invalid file type. Only ${allowedMimeTypes.join(', ')} are allowed.` });
+        }
+
+        // --- SVG Sanitization for designImage ---
+        if (designFileType.mime === 'image/svg+xml') {
+            const isSafe = await sanitizeSVGFile(designImageFile.path);
+            if (!isSafe) {
+                return res.status(400).json({ error: 'The uploaded SVG file contains potentially malicious content and was rejected.' });
+            }
         }
 
         let cutLinePath = null;
@@ -317,6 +392,14 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
                     if (err) console.error("Error deleting invalid file:", err);
                 });
                 return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the edgecut line.' });
+            }
+
+            // --- SVG Sanitization for cutLineFile ---
+            const isSafe = await sanitizeSVGFile(edgecutLineFile.path);
+            if (!isSafe) {
+                // Also delete the already processed design image to avoid orphaned files
+                fs.unlink(designImageFile.path, (err) => { if (err) console.error("Error deleting orphaned design file:", err); });
+                return res.status(400).json({ error: 'The uploaded cut line file contains potentially malicious content and was rejected.' });
             }
             cutLinePath = `/uploads/${edgecutLineFile.filename}`;
         }
@@ -410,7 +493,7 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
 ${statusChecklist}
           `;
           try {
-            const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
+            const sentMessage = await bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
             const orderIndex = db.data.orders.findIndex(o => o.orderId === newOrder.orderId);
             if (orderIndex !== -1) {
               db.data.orders[orderIndex].telegramMessageId = sentMessage.message_id;
@@ -418,7 +501,7 @@ ${statusChecklist}
               // Send the design image
               if (newOrder.designImagePath) {
                 const imagePath = path.join(__dirname, newOrder.designImagePath);
-                const sentPhoto = await bot.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, imagePath);
+                const sentPhoto = await bot.telegram.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, { source: imagePath });
                 db.data.orders[orderIndex].telegramPhotoMessageId = sentPhoto.message_id;
               }
 
@@ -426,7 +509,7 @@ ${statusChecklist}
               const cutLinePath = db.data.orders[orderIndex].cutLinePath;
               if (cutLinePath) {
                 const docPath = path.join(__dirname, cutLinePath);
-                await bot.sendDocument(process.env.TELEGRAM_CHANNEL_ID, docPath);
+                await bot.telegram.sendDocument(process.env.TELEGRAM_CHANNEL_ID, { source: docPath });
               }
               await db.write();
             }
@@ -467,13 +550,10 @@ ${statusChecklist}
   });
     });
     app.get('/api/orders', authenticateToken, (req, res) => {
-//      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
-//      if (!user) {
-//        return res.status(401).json({ error: 'User not found' });
-//      }
-      // This endpoint is for the print shop dashboard, which needs to see all orders.
-      // The `authenticateToken` middleware already ensures the user is logged in and authorized.
-      // The previous implementation incorrectly filtered orders by the logged-in user's email.
+      // This endpoint is for the print shop dashboard and should only be accessible by admins.
+      if (!isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
+      }
       const allOrders = db.data.orders;
       res.status(200).json(allOrders.slice().reverse());
     });
@@ -504,10 +584,18 @@ ${statusChecklist}
     app.get('/api/orders/:orderId', authenticateToken, (req, res) => {
       const { orderId } = req.params;
       const order = db.data.orders.find(o => o.orderId === orderId);
+
       if (!order) {
         return res.status(404).json({ error: 'Order not found' });
       }
-      res.json(order);
+
+      // Check if the user is an admin or the owner of the order.
+      if (isAdmin(req.user) || (req.user.email && req.user.email === order.billingContact.email)) {
+        return res.json(order);
+      }
+
+      // To avoid leaking information, return 404 even if the order exists but the user is not authorized.
+      return res.status(404).json({ error: 'Order not found' });
     });
 
     app.post('/api/orders/:orderId/status', authenticateToken, [
@@ -556,20 +644,22 @@ ${statusChecklist}
         try {
           if (status === 'COMPLETED' || status === 'CANCELED') {
             // Order is complete or canceled, delete the checklist message
-            await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+            await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
             // also delete the photo if it exists and hasn't been deleted
             if (order.telegramPhotoMessageId) {
-                await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+                await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
             }
           } else {
             // For all other statuses, edit the message
-            await bot.editMessageText(message, {
-              chat_id: process.env.TELEGRAM_CHANNEL_ID,
-              message_id: order.telegramMessageId,
-            });
+            await bot.telegram.editMessageText(
+                process.env.TELEGRAM_CHANNEL_ID,
+                order.telegramMessageId,
+                undefined,
+                message
+            );
             // If the status is SHIPPED, also delete the photo
             if (status === 'SHIPPED' && order.telegramPhotoMessageId) {
-              await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+              await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
             }
           }
         } catch (error) {
@@ -686,7 +776,8 @@ ${statusChecklist}
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
         const magicLink = `${process.env.BASE_URL}/magic-login.html?token=${token}`;
 
-        console.log('Magic Link (for testing):', magicLink);
+        // The magic link is sensitive and should not be logged.
+        // console.log('Magic Link (for testing):', magicLink);
 
         console.log('[magic-login] Checking OAuth2 client state before sending email:');
         console.log(oauth2Client.credentials);
@@ -973,7 +1064,7 @@ ${statusChecklist}
     }
     
     // Return the app and the timers so they can be managed by the caller
-    return { app, timers: [sessionTokenTimer, keyRotationTimer] };
+    return { app, timers: [sessionTokenTimer, keyRotationTimer], bot };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');
