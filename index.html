@@ -38,6 +38,7 @@
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
     <script type="module" src="./src/index.js" defer></script>
+    <link rel="manifest" href="/manifest.json">
 </head>
 <body class="bg-gray-100">
     <div id="adblock-warning" style="display: none; padding: 1rem; background-color: #fffbe6; border: 1px solid #facc15; border-radius: 0.5rem; color: #713f12; margin: 1rem auto; max-width: 800px;">
@@ -282,5 +283,16 @@
             <div id="ipfsLinkContainer" class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow"></div>
         </form>
     </main>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
 </body>
 </html>

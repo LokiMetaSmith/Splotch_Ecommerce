@@ -55,7 +55,8 @@
     "square": "^43.0.1",
     "supertest": "^7.1.4",
     "svg-to-pdfkit": "^0.1.8",
-    "vite": "^5.1.4"
+    "vite": "^5.1.4",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
