@@ -14,6 +14,7 @@ describe('Auth Endpoints', () => {
   let db;
   let serverInstance; // To hold the server instance
   let timers; // To hold the timer for clearing
+  let bot; // To hold the bot instance for cleanup
   const testDbPath = path.join(__dirname, 'test-db.json');
 
   beforeAll(async () => {
@@ -22,6 +23,7 @@ describe('Auth Endpoints', () => {
     const server = await startServer(db, null, mockSendEmail, testDbPath);
     app = server.app;
     timers = server.timers;
+    bot = server.bot;
     serverInstance = app.listen();
   });
 
@@ -31,6 +33,9 @@ describe('Auth Endpoints', () => {
   });
 
   afterAll(async () => {
+    if (bot) {
+      await bot.stop('test');
+    }
     // Clear timers
     timers.forEach(timer => clearInterval(timer));
     await new Promise(resolve => serverInstance.close(resolve));
