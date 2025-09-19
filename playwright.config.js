@@ -1,8 +1,15 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
+  webServer: {
+    command: 'node server/index.js',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    // Set a higher timeout for the server to start
+    timeout: 120 * 1000,
+  },
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:3000',
     headless: true,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
