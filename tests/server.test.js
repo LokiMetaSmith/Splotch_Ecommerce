@@ -34,8 +34,8 @@ describe('Server', () => {
     });
 
     afterAll(async () => {
-        // Stop the bot from polling
-        if (bot && bot.isPolling()) {
+        // Stop the bot from polling, if it's running
+        if (bot && typeof bot.isPolling === 'function' && bot.isPolling()) {
             await bot.stopPolling();
         }
         // Clear timers
@@ -43,9 +43,9 @@ describe('Server', () => {
         // Close the server
         await new Promise(resolve => serverInstance.close(resolve));
         // Clean up the test database file
-            if (fs.existsSync(testDbPath)) {
-                fs.unlinkSync(testDbPath);
-            }
+        if (fs.existsSync(testDbPath)) {
+            fs.unlinkSync(testDbPath);
+        }
     });
 
     it('should respond to ping', async () => {
