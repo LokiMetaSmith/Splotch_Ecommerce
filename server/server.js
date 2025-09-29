@@ -25,7 +25,7 @@ import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
-import sanitizeSVG from '@mattkrick/sanitize-svg';
+import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 
 const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
@@ -35,19 +35,21 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // JSDOM window is needed for server-side SVG sanitization
 const { window } = new JSDOM('');
+const purify = DOMPurify(window);
 
 async function sanitizeSVGFile(filePath) {
     try {
-        const fileBuffer = fs.readFileSync(filePath);
-        // Using 'await' since sanitizeSVG can be async with certain configs, though it's sync here.
-        const sanitized = await sanitizeSVG(fileBuffer, window);
-        if (!sanitized) {
-            // The sanitizer returns null if it finds malicious content.
-            // We'll replace the file with an empty string, effectively rejecting it.
-            fs.writeFileSync(filePath, '');
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const sanitized = purify.sanitize(fileContent, { USE_PROFILES: { svg: true } });
+
+        // DOMPurify returns an empty string if it finds malicious content.
+        // We also check if the original content was not empty to avoid false positives.
+        if (!sanitized && fileContent.trim() !== '') {
+            fs.writeFileSync(filePath, ''); // Overwrite with empty string to reject.
             console.warn(`[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`);
             return false;
         }
+
         fs.writeFileSync(filePath, sanitized);
         console.log(`[SECURITY] SVG file sanitized successfully: ${filePath}`);
         return true;
