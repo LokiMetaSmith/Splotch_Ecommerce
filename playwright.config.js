@@ -7,6 +7,10 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     // Set a higher timeout for the server to start
     timeout: 120 * 1000,
+    env: {
+      SQUARE_ACCESS_TOKEN: 'dummy-token-for-testing',
+      NODE_ENV: 'test',
+    },
   },
   use: {
     baseURL: 'http://localhost:3000',
