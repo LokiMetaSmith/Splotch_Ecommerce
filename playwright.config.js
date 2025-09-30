@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   webServer: {
-    command: 'node server/index.js',
+    command: 'SQUARE_ACCESS_TOKEN=dummy_token node server/index.js',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     // Set a higher timeout for the server to start

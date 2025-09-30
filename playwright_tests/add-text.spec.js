@@ -10,14 +10,13 @@ test('allows a user to add text to an image', async ({ page }) => {
   await fileChooser.setFiles('verification/test.png');
 
   // --- Step 2: Verify the image loaded successfully ---
-  // Wait for the text input to be enabled as a sign that processing is done.
-  await page.waitForFunction(() => {
-    const textInput = document.getElementById('textInput');
-    return textInput && !textInput.disabled;
-  });
+  // Wait for the text input to be enabled before trying to fill it.
+  await expect(page.locator('#textInput')).toBeEnabled({ timeout: 10000 });
 
   // --- Step 3: Add text ---
   await page.locator('#textInput').fill('Hello, World!');
+  // Also explicitly wait for the button to be enabled before clicking.
+  await expect(page.locator('#addTextBtn')).toBeEnabled({ timeout: 5000 });
   await page.locator('#addTextBtn').click();
 
   // --- Step 4: Verify the text was added ---

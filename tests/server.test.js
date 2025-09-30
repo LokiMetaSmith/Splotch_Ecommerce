@@ -6,6 +6,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import request from 'supertest';
 import fs from 'fs';
+import jwt from 'jsonwebtoken';
+import { getCurrentSigningKey } from '../server/keyManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,5 +54,60 @@ describe('Server', () => {
         const res = await request(app).get('/api/ping');
         expect(res.statusCode).toEqual(200);
         expect(res.body.status).toEqual('ok');
+    });
+
+    describe('/api/orders/search', () => {
+        let userAuthToken;
+        const userEmail = 'test@example.com';
+
+        beforeEach(async () => {
+            // Setup a user and their token
+            const user = { id: 'user-1', email: userEmail, credentials: [] };
+            db.data.users[user.id] = user;
+
+            // Setup orders for the user
+            db.data.orders.push(
+                { orderId: 'abc-123', billingContact: { email: userEmail } },
+                { orderId: 'def-456', billingContact: { email: userEmail } },
+                { orderId: 'ghi-789', billingContact: { email: 'another@example.com' } }
+            );
+            await db.write();
+
+            // Generate a token for the user
+            const { privateKey, kid } = getCurrentSigningKey();
+            userAuthToken = jwt.sign({ email: userEmail }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
+        });
+
+        it('should return all user orders when no query is provided', async () => {
+            const res = await request(app)
+                .get('/api/orders/search')
+                .set('Authorization', `Bearer ${userAuthToken}`);
+
+            expect(res.statusCode).toEqual(200);
+            expect(res.body).toBeInstanceOf(Array);
+            expect(res.body.length).toEqual(2);
+            expect(res.body.some(order => order.orderId === 'abc-123')).toBe(true);
+            expect(res.body.some(order => order.orderId === 'def-456')).toBe(true);
+        });
+
+        it('should return filtered user orders when a query is provided', async () => {
+            const res = await request(app)
+                .get('/api/orders/search?q=abc')
+                .set('Authorization', `Bearer ${userAuthToken}`);
+
+            expect(res.statusCode).toEqual(200);
+            expect(res.body).toBeInstanceOf(Array);
+            expect(res.body.length).toEqual(1);
+            expect(res.body[0].orderId).toEqual('abc-123');
+        });
+
+        it('should return a 200 with an empty array if search query matches no orders', async () => {
+            const res = await request(app)
+                .get('/api/orders/search?q=xyz')
+                .set('Authorization', `Bearer ${userAuthToken}`);
+
+            expect(res.statusCode).toEqual(200);
+            expect(res.body).toEqual([]);
+        });
     });
 });

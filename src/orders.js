@@ -1,4 +1,6 @@
-const serverUrl = process.env.NODE_ENV === 'test' ? 'http://localhost:3001' : 'http://localhost:3000';
+// Use a relative URL to ensure requests are sent to the same origin
+// the page is served from, which is http://localhost:3000 in the test environment.
+const serverUrl = '';
 let csrfToken;
 
 async function fetchCsrfToken() {

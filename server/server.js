@@ -562,15 +562,20 @@ ${statusChecklist}
 
     app.get('/api/orders/search', authenticateToken, (req, res) => {
       const { q } = req.query;
-      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
-      if (!user) {
-        return res.status(401).json({ error: 'User not found' });
+      const userEmail = req.user.email;
+
+      if (!userEmail) {
+        return res.status(401).json({ error: 'Authentication token must contain an email.' });
       }
-      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
-      const filteredOrders = userOrders.filter(order => order.orderId.includes(q));
-      if (filteredOrders.length === 0) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
+
+      const userOrders = db.data.orders.filter(order => order.billingContact.email === userEmail);
+
+      // If q is undefined or null, treat it as an empty string to return all orders for the user.
+      const searchQuery = q || '';
+      const filteredOrders = userOrders.filter(order => order.orderId.includes(searchQuery));
+
+      // Return orders, or an empty array if no matches are found.
+      // The previous logic returned a 404, which is less RESTful for a search/filter operation.
       res.status(200).json(filteredOrders.slice().reverse());
     });
 
