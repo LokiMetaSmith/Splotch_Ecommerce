@@ -1,9 +1,8 @@
-const serverUrl = process.env.NODE_ENV === 'test' ? 'http://localhost:3001' : 'http://localhost:3000';
 let csrfToken;
 
 async function fetchCsrfToken() {
     try {
-        const response = await fetch(`${serverUrl}/api/csrf-token`, { credentials: 'include' });
+        const response = await fetch('/api/csrf-token', { credentials: 'include' });
         if (!response.ok) {
             throw new Error(`Server responded with ${response.status}`);
         }
@@ -53,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!csrfToken) {
                 throw new Error('CSRF token is not available. Please refresh the page.');
             }
-            const response = await fetch(`${serverUrl}/api/auth/magic-login`, {
+            const response = await fetch('/api/auth/magic-login', {
                 method: 'POST',
                 credentials: 'include',
                 headers: {
@@ -82,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         orderHistorySection.classList.remove('hidden');
 
         try {
-            const response = await fetch(`${serverUrl}/api/orders/my-orders`, {
+            const response = await fetch('/api/orders/my-orders', {
                 credentials: 'include',
                 headers: {
                     'Authorization': `Bearer ${authToken}`
@@ -126,7 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <p class="text-sm text-gray-600">Status: <span class="font-semibold">${order.status}</span></p>
                     </div>
                     <div class="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">
-                        <img src="${serverUrl}${order.designImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
+                        <img src="${order.designImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
                     </div>
                 </div>
                 <div class="mt-4">

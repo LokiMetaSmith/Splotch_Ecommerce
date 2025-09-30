@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import tailwindcss from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
 
 export default defineConfig({
   build: {
@@ -13,8 +15,22 @@ export default defineConfig({
       },
     },
   },
+  css: {
+    postcss: {
+      plugins: [
+        tailwindcss,
+        autoprefixer,
+      ],
+    },
+  },
   server: {
-    // Expose the server to the network, which can be useful for testing on other devices.
-    host: '0.0.0.0'
-  }
+    host: '0.0.0.0',
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 });
