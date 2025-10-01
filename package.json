@@ -28,9 +28,11 @@
   },
   "homepage": "https://github.com/LokiMetaSmith/lokimetasmith.github.io#readme",
   "dependencies": {
+    "@easypost/api": "^8.2.0",
     "@google/generative-ai": "^0.24.1",
     "@simplewebauthn/browser": "^13.1.2",
     "@simplewebauthn/server": "^13.1.2",
+    "@tailwindcss/postcss": "^4.1.14",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -55,6 +57,7 @@
     "square": "^43.0.1",
     "supertest": "^7.1.4",
     "svg-to-pdfkit": "^0.1.8",
+    "telegraf": "^4.16.3",
     "vite": "^5.1.4",
     "web-push": "^3.6.7"
   },

@@ -4,17 +4,12 @@ test('allows a user to add text to an image', async ({ page }) => {
   await page.goto('/');
 
   // --- Step 1: Upload an image ---
-  const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.locator('label[for="file"]').click();
-  const fileChooser = await fileChooserPromise;
-  await fileChooser.setFiles('verification/test.png');
+  // Use setInputFiles for a more direct and reliable file upload simulation.
+  await page.locator('input#file').setInputFiles('verification/test.png');
 
   // --- Step 2: Verify the image loaded successfully ---
   // Wait for the text input to be enabled as a sign that processing is done.
-  await page.waitForFunction(() => {
-    const textInput = document.getElementById('textInput');
-    return textInput && !textInput.disabled;
-  });
+  await expect(page.locator('#textInput')).toBeEnabled({ timeout: 20000 });
 
   // --- Step 3: Add text ---
   await page.locator('#textInput').fill('Hello, World!');
