@@ -1,0 +1,10 @@
+
+> lokimetasmith.github.io@1.0.0 dev
+> vite
+
+Port 5173 is in use, trying another one...
+
+  VITE v5.4.19  ready in 975 ms
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: http://192.168.0.2:5174/
