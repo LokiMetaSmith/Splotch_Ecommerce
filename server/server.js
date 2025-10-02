@@ -752,7 +752,11 @@ ${statusChecklist}
         return res.status(400).json({ error: 'Invalid username or password' });
       }
       const { privateKey, kid } = getCurrentSigningKey();
-      const token = jwt.sign({ username: user.username }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
+      const payload = { username: user.username };
+      if (user.email) {
+          payload.email = user.email;
+      }
+      const token = jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
       res.json({ token });
     });
     
@@ -1054,6 +1058,9 @@ ${statusChecklist}
 
     // Initialize the shipment tracker
     initializeTracker(db);
+
+    // Ensure keys are loaded/created before signing the first token
+    await rotateKeys();
 
     // Sign the initial token and re-sign periodically
     signInstanceToken();
