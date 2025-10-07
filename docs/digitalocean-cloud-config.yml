@@ -1,0 +1,159 @@
+#cloud-config
+# This configuration script is designed for provisioning a new Ubuntu 22.04 Droplet on DigitalOcean.
+# It fully automates the setup of the Print Shop application environment.
+#
+# To use this file:
+# 1. Replace all placeholder values (e.g., "your_ssh_public_key", "YOUR_DROPLET_IP", "YOUR_PRODUCTION_SQUARE_TOKEN").
+# 2. When creating a new Droplet, paste the entire contents of this file into the "User Data" field in the
+#    "Advanced Options" section of the creation screen.
+
+# 1. System updates
+# Ensures all packages are up-to-date on the first boot.
+package_update: true
+package_upgrade: true
+
+# 2. User setup
+# Creates a dedicated non-root user to manage the application, enhancing security.
+# IMPORTANT: Replace 'your_ssh_public_key' with your actual public SSH key.
+# You can find your public key typically at ~/.ssh/id_rsa.pub.
+users:
+  - name: loki
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo, docker]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAA... your_ssh_public_key
+
+# 3. Software installation
+# Installs Docker and Docker Compose, which are required to run the containerized application.
+packages:
+  - docker.io
+  - docker-compose
+
+# 4. File creation
+# Defines the necessary configuration files that will be created on the Droplet.
+write_files:
+  # --- DOCKER COMPOSE CONFIGURATION ---
+  # Defines the application and nginx services for production.
+  - path: /home/loki/lokimetasmith.github.io/docker-compose.yml
+    owner: loki:loki
+    permissions: '0664'
+    content: |
+      version: '3.8'
+      services:
+        app:
+          build:
+            context: ./server
+          restart: unless-stopped
+          env_file: .env
+          volumes:
+            - /home/loki/app-data/db.json:/app/db.json
+            - /home/loki/app-data/uploads:/app/server/uploads
+          networks:
+            - app-net
+
+        nginx:
+          image: nginx:latest
+          restart: unless-stopped
+          ports:
+            - "80:80"
+          volumes:
+            - ./nginx.conf:/etc/nginx/conf.d/default.conf
+            - /home/loki/lokimetasmith.github.io/dist:/usr/share/nginx/html
+          depends_on:
+            - app
+          networks:
+            - app-net
+
+      networks:
+        app-net:
+          driver: bridge
+
+  # --- NGINX REVERSE PROXY CONFIGURATION ---
+  # Configures Nginx to act as a reverse proxy, directing traffic to the Node.js application.
+  - path: /home/loki/lokimetasmith.github.io/nginx.conf
+    owner: loki:loki
+    permissions: '0664'
+    content: |
+      server {
+          listen 80;
+          server_name YOUR_DOMAIN_OR_IP; # Replace with your domain or Droplet IP
+
+          root /usr/share/nginx/html;
+          index index.html;
+
+          location / {
+              try_files $uri $uri/ =404;
+          }
+
+          location /api/ {
+              proxy_pass http://app:3000;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          }
+          location /uploads/ {
+              proxy_pass http://app:3000/uploads/;
+          }
+          location /auth/ {
+               proxy_pass http://app:3000/auth/;
+          }
+          location /oauth2callback {
+               proxy_pass http://app:3000/oauth2callback;
+          }
+      }
+
+  # --- ENVIRONMENT VARIABLES ---
+  # IMPORTANT: Replace ALL placeholder values below with your real production secrets.
+  # These are critical for the application to function correctly.
+  - path: /home/loki/lokimetasmith.github.io/.env
+    owner: loki:loki
+    permissions: '0600' # Secure permissions: only readable by the 'loki' user
+    content: |
+      # Server Configuration
+      PORT=3000
+      NODE_ENV=production
+      DB_PATH=/app/db.json
+      BASE_URL=http://YOUR_DROPLET_IP # Replace with your Droplet's public IP
+
+      # Square API Credentials (Production)
+      SQUARE_ACCESS_TOKEN=YOUR_PRODUCTION_SQUARE_TOKEN
+      SQUARE_LOCATION_ID=YOUR_PRODUCTION_SQUARE_LOCATION_ID
+
+      # Google OAuth Credentials
+      GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
+      GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
+
+      # Application Admin
+      ADMIN_EMAIL=your_admin_email@example.com
+
+      # WebAuthn Configuration
+      RP_ID=YOUR_DOMAIN_OR_IP # Replace with your domain or Droplet IP
+      EXPECTED_ORIGIN=http://YOUR_DOMAIN_OR_IP # Replace with your domain or Droplet IP
+
+      # Security & JWT
+      # Generate secure, random strings for the secrets below.
+      JWT_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nPASTE_YOUR_PRIVATE_KEY_HERE\n-----END RSA PRIVATE KEY-----"
+      JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nPASTE_YOUR_PUBLIC_KEY_HERE\n-----END PUBLIC KEY-----"
+      JWT_SECRET=REPLACE_WITH_A_32_CHAR_RANDOM_SECRET
+      CSRF_SECRET=REPLACE_WITH_ANOTHER_32_CHAR_RANDOM_SECRET
+      SESSION_SECRET=REPLACE_WITH_A_THIRD_32_CHAR_RANDOM_SECRET
+
+      # Optional: Telegram Bot for Notifications
+      TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+      TELEGRAM_CHANNEL_ID=YOUR_TELEGRAM_CHANNEL_ID
+
+# 5. Post-setup commands
+# These commands are executed after the server is provisioned.
+runcmd:
+  # 1. Clone the application repository from GitHub
+  - git clone https://github.com/LokiMetaSmith/lokimetasmith.github.io.git /home/loki/lokimetasmith.github.io
+  # 2. Create directories for persistent data
+  - mkdir -p /home/loki/app-data/uploads
+  - touch /home/loki/app-data/db.json
+  # 3. Set correct ownership for all application files
+  - chown -R loki:loki /home/loki
+  # 4. Build the frontend assets
+  - cd /home/loki/lokimetasmith.github.io && npm install && npm run build
+  # 5. Launch the application using Docker Compose in detached mode
+  - cd /home/loki/lokimetasmith.github.io && docker-compose up -d
