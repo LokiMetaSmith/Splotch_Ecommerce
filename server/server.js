@@ -25,6 +25,8 @@ import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
+import { Markup } from 'telegraf';
+import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 
@@ -479,11 +481,11 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
 
           const statusChecklist = `
 ✅ New
-${acceptedOrLater.includes(status) ? '✅' : '⬜️'} Accepted
-${printingOrLater.includes(status) ? '✅' : '⬜️'} Printing
-${shippedOrLater.includes(status) ? '✅' : '⬜️'} Shipped
-${deliveredOrLater.includes(status) ? '✅' : '⬜️'} Delivered
-${completedOrLater.includes(status) ? '✅' : '⬜️'} Completed
+${['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Accepted
+${['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Printing
+${['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Shipped
+${['DELIVERED', 'COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Delivered
+${['COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Completed
         `;
           const message = `
 New Order: ${newOrder.orderId}
@@ -495,7 +497,8 @@ Amount: $${(newOrder.amount / 100).toFixed(2)}
 ${statusChecklist}
           `;
           try {
-            const sentMessage = await bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
+            const keyboard = getOrderStatusKeyboard(newOrder);
+            const sentMessage = await bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, { reply_markup: keyboard });
             const orderIndex = db.data.orders.findIndex(o => o.orderId === newOrder.orderId);
             if (orderIndex !== -1) {
               db.data.orders[orderIndex].telegramMessageId = sentMessage.message_id;
@@ -653,11 +656,13 @@ ${statusChecklist}
             }
           } else {
             // For all other statuses, edit the message
+            const keyboard = getOrderStatusKeyboard(order);
             await bot.telegram.editMessageText(
                 process.env.TELEGRAM_CHANNEL_ID,
                 order.telegramMessageId,
                 undefined,
-                message
+                message,
+                { reply_markup: keyboard }
             );
             // If the status is SHIPPED, also delete the photo
             if (status === 'SHIPPED' && order.telegramPhotoMessageId) {

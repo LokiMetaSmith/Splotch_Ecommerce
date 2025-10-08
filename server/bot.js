@@ -1,9 +1,7 @@
 import { Telegraf, Markup } from 'telegraf';
 import { message } from 'telegraf/filters';
 import dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
+import { getOrderStatusKeyboard } from './telegramHelpers.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -83,6 +81,68 @@ function initializeBot(database) {
             }).catch(err => console.error('[TELEGRAM] Error sending confirmation message:', err));
           }
         }
+      });
+
+      bot.on('callback_query', async (ctx) => {
+        const [action, orderId] = ctx.callbackQuery.data.split('_');
+        const order = db.data.orders.find(o => o.orderId === orderId);
+
+        if (order) {
+          let newStatus;
+          switch (action) {
+            case 'accept':
+              newStatus = 'ACCEPTED';
+              break;
+            case 'print':
+              newStatus = 'PRINTING';
+              break;
+            case 'ship':
+              newStatus = 'SHIPPED';
+              break;
+            case 'deliver':
+              newStatus = 'DELIVERED';
+              break;
+            case 'complete':
+                newStatus = 'COMPLETED';
+                break;
+            case 'cancel':
+              newStatus = 'CANCELED';
+              break;
+          }
+
+          if (newStatus) {
+            order.status = newStatus;
+            await db.write();
+
+            const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
+            const completedOrLater = ['COMPLETED'];
+
+            const statusChecklist = `
+✅ New
+${acceptedOrLater.includes(newStatus) ? '✅' : '⬜️'} Accepted
+${printingOrLater.includes(newStatus) ? '✅' : '⬜️'} Printing
+${shippedOrLater.includes(newStatus) ? '✅' : '⬜️'} Shipped
+${deliveredOrLater.includes(newStatus) ? '✅' : '⬜️'} Delivered
+${completedOrLater.includes(newStatus) ? '✅' : '⬜️'} Completed
+            `;
+
+            const message = `
+Order: ${order.orderId}
+Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
+Email: ${order.billingContact.email}
+Quantity: ${order.orderDetails.quantity}
+Amount: $${(order.amount / 100).toFixed(2)}
+
+${statusChecklist}
+            `;
+            const keyboard = getOrderStatusKeyboard(order);
+            ctx.editMessageText(message, { reply_markup: keyboard });
+          }
+        }
+        ctx.answerCbQuery();
       });
 
       bot.launch();
