@@ -1,9 +1,10 @@
 # Deployment Guide
 
-This guide provides instructions for deploying the Print Shop application. We'll cover two primary methods:
+This guide provides instructions for deploying the Print Shop application. We'll cover three primary methods:
 
-1.  **Automated Production Deployment to DigitalOcean**: The recommended method for a live, production environment.
-2.  **Local Development with Docker**: For setting up a local, containerized environment that mirrors production.
+1.  **Automated Production Deployment to DigitalOcean**: For deploying to a cloud-based Droplet.
+2.  **Automated Production Deployment to Proxmox**: For deploying to a self-hosted Proxmox VE instance.
+3.  **Local Development with Docker**: For setting up a local, containerized environment that mirrors production.
 
 ---
 
@@ -103,7 +104,69 @@ Your application is now deployed and live!
 
 ---
 
-## 2. Local Development with Docker
+## 2. Automated Production Deployment to Proxmox
+
+This method uses a shell script to automate the creation of a new Virtual Machine (VM) on a Proxmox VE host. It works by cloning a pre-existing cloud-init enabled template, provisioning it with the application, and starting it.
+
+### Prerequisites
+
+This method is for advanced users and requires setup on the Proxmox host itself.
+
+1.  **Proxmox VE Host**: You must have a working Proxmox VE installation.
+2.  **Cloud-Init VM Template**: A VM template with cloud-init installed is required. This is the base image that will be cloned. For instructions on creating one, see the official Proxmox documentation or community guides on creating Ubuntu/Debian cloud-init templates.
+3.  **Project Repository**: This project's repository must be cloned onto your Proxmox host, as the script needs access to the `proxmox-cloud-config.yml` file.
+4.  **Root Access**: You must run the deployment script as the `root` user on the Proxmox host.
+
+### Step 1: Prepare the Cloud-Config File
+
+Before running the deployment script, you must fill in the placeholder values in the Proxmox cloud-config file.
+
+1.  On your Proxmox host, open the file: `docs/proxmox-cloud-config.yml`.
+2.  Replace all placeholder values like `your_ssh_public_key`, `YOUR_VM_IP`, `YOUR_PRODUCTION_SQUARE_TOKEN`, etc., with your actual production credentials and secrets. This step is critical for the application to function correctly.
+
+### Step 2: Configure the Deployment Script
+
+You need to edit a few variables inside the `deploy-proxmox.sh` script to match your Proxmox environment.
+
+1.  Open the script file: `scripts/deploy-proxmox.sh`.
+2.  Adjust the following configuration variables at the top of the file:
+    *   `TEMPLATE_VMID`: Set this to the ID of your cloud-init VM template (e.g., `9000`).
+    *   `STORAGE_POOL`: The name of the storage where the new VM disk will be created (e.g., `local-lvm`).
+    *   `BRIDGE`: The network bridge the VM should use (e.g., `vmbr0`).
+
+### Step 3: Run the Deployment Script
+
+1.  Ensure the script is executable:
+    ```bash
+    chmod +x scripts/deploy-proxmox.sh
+    ```
+2.  Run the script as root. You can optionally provide a new VMID and VM name.
+    ```bash
+    # With a custom VMID and name
+    sudo ./scripts/deploy-proxmox.sh 9001 print-shop-prod
+
+    # Or with default values
+    sudo ./scripts/deploy-proxmox.sh
+    ```
+3.  The script will prompt you for the new VM's static IP address (in CIDR format) and its gateway.
+4.  After you confirm, the script will clone the template, apply the configurations, and start the new VM.
+
+### Step 4: Post-Deployment Verification
+
+The script will output the IP address you configured.
+
+1.  Wait a few minutes for the cloud-init process to complete on the new VM.
+2.  SSH into the VM using the user and SSH key you specified in the `proxmox-cloud-config.yml` file:
+    ```bash
+    ssh loki@YOUR_VM_IP
+    ```
+3.  Verify that the application is running by checking the Docker containers: `docker ps`.
+
+Your application is now deployed on Proxmox!
+
+---
+
+## 3. Local Development with Docker
 
 You can run a containerized version of this application on your local machine using the provided `docker-compose.yaml` file. This is useful for testing in an environment that closely resembles production.
 
