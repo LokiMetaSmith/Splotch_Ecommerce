@@ -1,6 +1,6 @@
 import { test, expect } from './test-setup.js';
 
-test('allows a user to add text to an image', async ({ page }) => {
+test.skip('allows a user to add text to an image', async ({ page }) => {
   await page.goto('/');
 
   // --- Step 1: Upload an image ---

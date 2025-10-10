@@ -97,16 +97,17 @@ let app;
 const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
 
 // Define an async function to contain all server logic
+const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    `${process.env.BASE_URL}/oauth2callback`
+  );
 async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
   }
   // --- Google OAuth2 Client ---
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    `${process.env.BASE_URL}/oauth2callback`
-  );
+
 
   async function logAndEmailError(error, context = 'General Error') {
     // Sanitize error logging to avoid leaking sensitive information in logs/emails.
@@ -690,6 +691,69 @@ ${statusChecklist}
         order.courier = courier;
         await db.write();
         console.log(`[SERVER] Tracking info added to order ID ${orderId}.`);
+
+        // Send shipment notification email
+        if (order.billingContact && order.billingContact.email) {
+            try {
+                const customerName = order.billingContact.givenName || 'Valued Customer';
+                const shippingAddress = order.shippingContact;
+                const orderDate = new Date(order.receivedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                const addressHtml = `
+                    <address>
+                        ${shippingAddress.givenName} ${shippingAddress.familyName}<br>
+                        ${shippingAddress.addressLines.join('<br>')}<br>
+                        ${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}<br>
+                        ${shippingAddress.country}<br>
+                        ${shippingAddress.phoneNumber || ''}
+                    </address>
+                `;
+                // NOTE: The product name is hardcoded as "Stickers" because the current
+                // order creation process only supports a single product type. This can be
+                // expanded in the future if more products are added.
+                const productDetailsHtml = `
+                    <tr>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">Stickers</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails.quantity}</td>
+                    </tr>
+                `;
+
+                await sendEmail({
+                    to: order.billingContact.email,
+                    subject: `Your Splotch order #${order.orderId} has shipped!`,
+                    text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails.quantity}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join('\n')}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
+                    html: `
+                        <p>Hey ${customerName},</p>
+                        <p>Heads up—your order has been sent out!</p>
+                        <p><b>Ordered:</b> ${orderDate}</p>
+                        <p>Here’s the tracking number:</p>
+                        <p><b>${trackingNumber}</b><br>${courier}</p>
+                        <p><i>Tracking information can take up to 48 hours to be updated after the order is shipped.</i></p>
+                        <h3>Here’s what’s in your Shipment:</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left; padding: 10px; border-bottom: 2px solid #ddd;">Product</th>
+                                    <th style="text-align: left; padding: 10px; border-bottom: 2px solid #ddd;">Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${productDetailsHtml}
+                            </tbody>
+                        </table>
+                        <h3>Shipping address:</h3>
+                        ${addressHtml}
+                        <p>Stay in touch!</p>
+                        <p><b>Splotch</b></p>
+                    `,
+                    oauth2Client,
+                });
+                console.log(`[SERVER] Shipment notification email sent for order ID ${orderId}.`);
+            } catch (emailError) {
+                // Log the error, but don't block the API response since the tracking info was saved.
+                await logAndEmailError(emailError, `Failed to send shipment notification for order ${orderId}`);
+            }
+        }
+
         res.status(200).json({ success: true, order: order });
     });
 
