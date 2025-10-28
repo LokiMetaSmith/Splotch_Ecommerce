@@ -9,7 +9,7 @@ import { jsPDF } from "jspdf";
 import SVGtoPDF from 'svg-to-pdfkit';
 
 // --- Global Variables ---
-const serverUrl = 'http://localhost:3000';
+const serverUrl = ''; // Use relative paths for API calls
 let authToken = localStorage.getItem('authToken');
 let csrfToken;
 let allOrders = []; // To store a complete list of orders for filtering
@@ -170,7 +170,10 @@ function logout() {
     ui.loginBtn.removeEventListener('click', logout);
     ui.loginBtn.addEventListener('click', showLoginModal);
 
-    ui.ordersList.innerHTML = '';
+    // Clear existing order cards without destroying the message element
+    const orderCards = ui.ordersList.querySelectorAll('.order-card');
+    orderCards.forEach(card => card.remove());
+
     ui.noOrdersMessage.textContent = 'Please log in to view orders.';
     ui.noOrdersMessage.style.display = 'block';
 }
@@ -409,7 +412,7 @@ function filterAndDisplayOrders(status) {
 }
 
 /**
- * Renders a single order card into the DOM.
+ * Renders a single order card into the DOM using safe DOM creation methods.
  * @param {object} order - The order object from the server.
  */
 function displayOrder(order) {
@@ -420,59 +423,92 @@ function displayOrder(order) {
     const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
     const receivedDate = new Date(order.receivedAt).toLocaleString();
 
-    card.innerHTML = DOMPurify.sanitize(`
-        <div class="flex justify-between items-start">
-            <div>
-                <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
-                <p class="text-sm text-gray-600">Received: ${receivedDate}</p>
-            </div>
-            <div id="status-badge-${order.orderId}" class="status-${order.status.toLowerCase()} font-bold py-1 px-3 rounded-full text-sm">${order.status}</div>
-        </div>
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
-            <div>
-                <dt>Billing Name:</dt> <dd>${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}</dd>
-                <dt>Billing Email:</dt> <dd>${order.billingContact?.email || 'N/A'}</dd>
-            </div>
-            <div>
-                <dt>Shipping Name:</dt> <dd>${order.shippingContact?.givenName || ''} ${order.shippingContact?.familyName || ''}</dd>
-                <dt>Shipping Email:</dt> <dd>${order.shippingContact?.email || 'N/A'}</dd>
-            </div>
-            <div>
-                <dt>Quantity:</dt> <dd>${order.orderDetails?.quantity || 'N/A'}</dd>
-                <dt>Amount:</dt> <dd>${formattedAmount}</dd>
-            </div>
-        </div>
-        <div class="mt-4">
-            <dt>Sticker Design:</dt>
-            <a href="${serverUrl}${order.designImagePath}" target="_blank"><img src="${serverUrl}${order.designImagePath}" alt="Sticker Design" class="sticker-design" data-cut-file-path="${order.cutLinePath || ''}"></a>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-2">
-            <button class="action-btn" data-order-id="${order.orderId}" data-status="ACCEPTED">Accept</button>
-            <button class="action-btn" data-order-id="${order.orderId}" data-status="PRINTING">Print</button>
-            <button class="action-btn" data-order-id="${order.orderId}" data-status="SHIPPED">Ship</button>
-            <button class="action-btn" data-order-id="${order.orderId}" data-status="DELIVERED">Deliver</button>
-            <button class="action-btn" data-order-id="${order.orderId}" data-status="COMPLETED">Complete</button>
-            <button class="action-btn" data-order-id="${order.orderId}" data-status="CANCELED">Cancel</button>
-        </div>
-        <div id="tracking-info-${order.orderId}" class="mt-4" style="display: ${order.status === 'SHIPPED' ? 'block' : 'none'};">
-            <input type="text" id="tracking-number-${order.orderId}" placeholder="Enter Tracking Number" class="border rounded-md p-2">
-            <select id="courier-${order.orderId}" class="border rounded-md p-2">
-                <option value="usps">USPS</option>
-                <option value="ups">UPS</option>
-                <option value="fedex">FedEx</option>
-            </select>
-            <button class="add-tracking-btn" data-order-id="${order.orderId}">Add Tracking</button>
-        </div>
-    `);
+    // --- Helper to create elements ---
+    const createEl = (tag, classes = [], attributes = {}, text) => {
+        const el = document.createElement(tag);
+        el.classList.add(...classes);
+        for (const [key, value] of Object.entries(attributes)) {
+            el.setAttribute(key, value);
+        }
+        if (text) el.textContent = text;
+        return el;
+    };
 
+    // --- Header ---
+    const header = createEl('div', ['flex', 'justify-between', 'items-start']);
+    const headerTextDiv = createEl('div');
+    const orderIdH3 = createEl('h3', ['text-xl', 'text-splotch-red'], {}, 'Order ID: ');
+    orderIdH3.appendChild(createEl('span', ['font-mono', 'text-sm'], {}, `${order.orderId.substring(0, 8)}...`));
+    const receivedP = createEl('p', ['text-sm', 'text-gray-600'], {}, `Received: ${receivedDate}`);
+    headerTextDiv.append(orderIdH3, receivedP);
+    const statusBadge = createEl('div', [`status-${order.status.toLowerCase()}`, 'font-bold', 'py-1', 'px-3', 'rounded-full', 'text-sm'], { id: `status-badge-${order.orderId}` }, order.status);
+    header.append(headerTextDiv, statusBadge);
+
+    // --- Details Grid ---
+    const detailsGrid = createEl('div', ['mt-4', 'grid', 'grid-cols-1', 'md:grid-cols-2', 'gap-4', 'order-details']);
+
+    const createDtDd = (dtText, ddText) => {
+        const dt = createEl('dt', [], {}, dtText);
+        const dd = createEl('dd', [], {}, ddText);
+        return [dt, dd];
+    };
+
+    const billingDiv = createEl('div');
+    billingDiv.append(...createDtDd('Billing Name:', `${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}`));
+    billingDiv.append(...createDtDd('Billing Email:', order.billingContact?.email || 'N/A'));
+
+    const shippingDiv = createEl('div');
+    shippingDiv.append(...createDtDd('Shipping Name:', `${order.shippingContact?.givenName || ''} ${order.shippingContact?.familyName || ''}`));
+    shippingDiv.append(...createDtDd('Shipping Email:', order.shippingContact?.email || 'N/A'));
+
+    const orderInfoDiv = createEl('div');
+    orderInfoDiv.append(...createDtDd('Quantity:', order.orderDetails?.quantity || 'N/A'));
+    orderInfoDiv.append(...createDtDd('Amount:', formattedAmount));
+
+    detailsGrid.append(billingDiv, shippingDiv, orderInfoDiv);
+
+    // --- Sticker Design ---
+    const imageDiv = createEl('div', ['mt-4']);
+    imageDiv.appendChild(createEl('dt', [], {}, 'Sticker Design:'));
+    const imageLink = createEl('a', [], { href: `${serverUrl}${order.designImagePath}`, target: '_blank' });
+    const image = createEl('img', ['sticker-design'], {
+        src: `${serverUrl}${order.designImagePath}`,
+        alt: 'Sticker Design',
+        'data-cut-file-path': order.cutLinePath || ''
+    });
+    imageLink.appendChild(image);
+    imageDiv.appendChild(imageLink);
+
+    // --- Action Buttons ---
+    const buttonsDiv = createEl('div', ['mt-4', 'flex', 'flex-wrap', 'gap-2']);
+    const statuses = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELED'];
+    statuses.forEach(status => {
+        buttonsDiv.appendChild(createEl('button', ['action-btn'], {
+            'data-order-id': order.orderId,
+            'data-status': status
+        }, status.charAt(0) + status.slice(1).toLowerCase()));
+    });
+
+    // --- Tracking Info ---
+    const trackingDiv = createEl('div', ['mt-4'], { id: `tracking-info-${order.orderId}` });
+    trackingDiv.style.display = order.status === 'SHIPPED' ? 'block' : 'none';
+    trackingDiv.appendChild(createEl('input', ['border', 'rounded-md', 'p-2'], { type: 'text', id: `tracking-number-${order.orderId}`, placeholder: 'Enter Tracking Number' }));
+    const courierSelect = createEl('select', ['border', 'rounded-md', 'p-2'], { id: `courier-${order.orderId}` });
+    ['usps', 'ups', 'fedex'].forEach(courier => {
+        courierSelect.appendChild(createEl('option', [], { value: courier }, courier.toUpperCase()));
+    });
+    trackingDiv.appendChild(courierSelect);
+    trackingDiv.appendChild(createEl('button', ['add-tracking-btn'], { 'data-order-id': order.orderId }, 'Add Tracking'));
+
+    // --- Assemble and Render Card ---
+    card.append(header, detailsGrid, imageDiv, buttonsDiv, trackingDiv);
     ui.ordersList.prepend(card);
 
+    // --- Attach Event Listeners ---
     card.querySelectorAll('.action-btn').forEach(btn => {
-      //  btn.addEventListener('click', (e) => updateOrderStatus(e.target.dataset.orderId, e.target.dataset.status));
-		btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', (e) => {
             const orderId = e.target.dataset.orderId;
             const status = e.target.dataset.status;
-            // This function calls your server to update the status
             updateOrderStatus(orderId, status);
         });
     });
