@@ -23,6 +23,7 @@ import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
+import { validateUsername } from './validators.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 import { Markup } from 'telegraf';
@@ -804,7 +805,7 @@ ${statusChecklist}
     });
 
     app.post('/api/auth/login', [
-      body('username').notEmpty().withMessage('username is required'),
+      ...validateUsername,
       body('password').notEmpty().withMessage('password is required'),
     ], async (req, res) => {
       const errors = validationResult(req);
@@ -1014,14 +1015,11 @@ ${statusChecklist}
 
 
     // --- WebAuthn (Passkey) Endpoints ---
-    app.post('/api/auth/pre-register', [
-      body('username').notEmpty().withMessage('username is required'),
-    ], async (req, res) => {
+    app.post('/api/auth/pre-register', validateUsername, async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
-
       const { username } = req.body;
       let user = db.data.users[username];
 
@@ -1053,7 +1051,7 @@ ${statusChecklist}
       res.json(options);
     });
 
-    app.post('/api/auth/register-verify', async (req, res) => {
+    app.post('/api/auth/register-verify', validateUsername, async (req, res) => {
       const { body } = req;
       const { username } = req.query;
       const user = db.data.users[username];
@@ -1077,7 +1075,7 @@ ${statusChecklist}
       }
     });
 
-    app.get('/api/auth/login-options', async (req, res) => {
+    app.get('/api/auth/login-options', validateUsername, async (req, res) => {
       const { username } = req.query;
       const user = db.data.users[username];
       if (!user) {
@@ -1095,7 +1093,7 @@ ${statusChecklist}
       res.json(options);
     });
 
-    app.post('/api/auth/login-verify', async (req, res) => {
+    app.post('/api/auth/login-verify', validateUsername, async (req, res) => {
       const { body } = req;
       const { username } = req.query;
       const user = db.data.users[username];
