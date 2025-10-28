@@ -773,7 +773,11 @@ ${statusChecklist}
         return res.status(400).json({ errors: errors.array() });
       }
       const { username, password } = req.body;
-      if (db.data.users[username]) {
+      // Prevent prototype pollution
+      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
+        return res.status(400).json({ error: 'Invalid username.' });
+      }
+      if (Object.prototype.hasOwnProperty.call(db.data.users, username)) {
         return res.status(400).json({ error: 'User already exists' });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -813,7 +817,11 @@ ${statusChecklist}
         return res.status(400).json({ errors: errors.array() });
       }
       const { username, password } = req.body;
-      const user = db.data.users[username];
+      // Prevent prototype pollution
+      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
+        return res.status(400).json({ error: 'Invalid username or password' });
+      }
+      const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
       if (!user || !user.password) {
         return res.status(400).json({ error: 'Invalid username or password' });
       }
@@ -1021,7 +1029,11 @@ ${statusChecklist}
         return res.status(400).json({ errors: errors.array() });
       }
       const { username } = req.body;
-      let user = db.data.users[username];
+      // Prevent prototype pollution
+      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
+        return res.status(400).json({ error: 'Invalid username.' });
+      }
+      let user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
 
       if (!user) {
         // Create a new user if they don't exist
@@ -1054,7 +1066,11 @@ ${statusChecklist}
     app.post('/api/auth/register-verify', validateUsername, async (req, res) => {
       const { body } = req;
       const { username } = req.query;
-      const user = db.data.users[username];
+      // Prevent prototype pollution
+      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
+        return res.status(400).json({ error: 'Invalid username.' });
+      }
+      const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
       try {
         const verification = await verifyRegistrationResponse({
           response: body,
@@ -1077,7 +1093,11 @@ ${statusChecklist}
 
     app.get('/api/auth/login-options', validateUsername, async (req, res) => {
       const { username } = req.query;
-      const user = db.data.users[username];
+      // Prevent prototype pollution
+      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
+        return res.status(400).json({ error: 'User not found' });
+      }
+      const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
       if (!user) {
         return res.status(400).json({ error: 'User not found' });
       }
@@ -1096,7 +1116,11 @@ ${statusChecklist}
     app.post('/api/auth/login-verify', validateUsername, async (req, res) => {
       const { body } = req;
       const { username } = req.query;
-      const user = db.data.users[username];
+      // Prevent prototype pollution
+      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
+        return res.status(400).json({ error: 'Invalid username.' });
+      }
+      const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
       const credential = db.data.credentials[body.id];
       if (!credential) {
         return res.status(400).json({ error: 'Credential not found.' });
