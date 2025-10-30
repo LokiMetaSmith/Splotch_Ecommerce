@@ -51,7 +51,7 @@
     "lucas": "^1.0.4",
     "lusca": "^1.7.0",
     "multer": "^2.0.1",
-    "node-telegram-bot-api": "^0.66.0",
+    "node-telegram-bot-api": "^0.63.0",
     "nodemailer": "^7.0.5",
     "square": "^43.0.1",
     "svg-to-pdfkit": "^0.1.8",
