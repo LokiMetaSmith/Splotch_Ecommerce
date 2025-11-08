@@ -40,6 +40,26 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const { window } = new JSDOM('');
 const purify = DOMPurify(window);
 
+// Helper function to sanitize contact objects to prevent Stored XSS.
+const sanitizeContactObject = (contact) => {
+    if (!contact) return null;
+    const sanitized = {};
+    for (const key in contact) {
+        if (Object.prototype.hasOwnProperty.call(contact, key)) {
+            const value = contact[key];
+            if (typeof value === 'string') {
+                sanitized[key] = purify.sanitize(value);
+            } else if (Array.isArray(value)) {
+                // Assuming array of strings like addressLines
+                sanitized[key] = value.map(item => (typeof item === 'string' ? purify.sanitize(item) : item));
+            } else {
+                sanitized[key] = value;
+            }
+        }
+    }
+    return sanitized;
+};
+
 async function sanitizeSVGFile(filePath) {
     try {
         const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -466,8 +486,8 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           currency: currency || 'USD',
           status: 'NEW',
           orderDetails: orderDetails.orderDetails,
-          billingContact: orderDetails.billingContact,
-          shippingContact: shippingContact,
+          billingContact: sanitizeContactObject(orderDetails.billingContact),
+          shippingContact: sanitizeContactObject(shippingContact),
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
         };
