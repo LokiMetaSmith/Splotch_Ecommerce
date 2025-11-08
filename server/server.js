@@ -105,7 +105,7 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_SECRET,
     `${process.env.BASE_URL}/oauth2callback`
   );
-async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
+async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json'), squareClient) {
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
   }
@@ -181,45 +181,46 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     console.log('[SERVER] Multer configured for file uploads.');
     
     // --- Square Client Initialization ---
-    console.log('[SERVER] Initializing Square client...');
-    if (!process.env.SQUARE_ACCESS_TOKEN) {
-      console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
-      // In a test environment, we don't want to kill the test runner.
-      if (process.env.NODE_ENV !== 'test') {
-        process.exit(1);
-      }
-    }
-    const squareClient = new SquareClient({
-      version: '2025-07-16',
-      token: process.env.SQUARE_ACCESS_TOKEN,
-      environment: SquareEnvironment.Sandbox,
-    });
-    console.log('[SERVER] Verifying connection to Square servers...');
-    if (process.env.NODE_ENV !== 'test') {
-        try {
-            await new Promise((resolve, reject) => {
-                dns.lookup('connect.squareup.com', (err) => {
-                    if (err) return reject(err);
-                    resolve();
-                });
+    if (!squareClient) {
+        if (process.env.NODE_ENV !== 'test') {
+            console.log('[SERVER] Initializing Square client...');
+            if (!process.env.SQUARE_ACCESS_TOKEN) {
+                console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+                process.exit(1);
+            }
+            squareClient = new SquareClient({
+                version: '2025-07-16',
+                token: process.env.SQUARE_ACCESS_TOKEN,
+                environment: SquareEnvironment.Sandbox,
             });
-            console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
-        } catch (error) {
-            console.error('❌ [FATAL] Could not resolve Square API domain.');
-            console.error('   This is likely a network, DNS, or firewall issue on the server.');
-            console.error('   Full Error:', error.message);
-            process.exit(1);
+            console.log('[SERVER] Verifying connection to Square servers...');
+            try {
+                await new Promise((resolve, reject) => {
+                    dns.lookup('connect.squareup.com', (err) => {
+                        if (err) return reject(err);
+                        resolve();
+                    });
+                });
+                console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
+            } catch (error) {
+                console.error('❌ [FATAL] Could not resolve Square API domain.');
+                console.error('   This is likely a network, DNS, or firewall issue on the server.');
+                console.error('   Full Error:', error.message);
+                process.exit(1);
+            }
+            console.log('[SERVER] Square client initialized.');
+            console.log('[SERVER] Performing sanity check on Square client...');
+            if (!squareClient.locations || !squareClient.payments) {
+                console.error('❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).');
+                console.error('   This may indicate an issue with the installed Square SDK package.');
+                process.exit(1);
+            }
+            console.log('✅ [SERVER] Sanity check passed. Client has required API properties.');
+        } else {
+            // In test environment, if no client is passed, use a mock.
+            squareClient = new SquareClient();
         }
     }
-    console.log('[SERVER] Square client initialized.');
-  // --- NEW: Local Sanity Check for API properties ---
-    console.log('[SERVER] Performing sanity check on Square client...');
-    if (!squareClient.locations || !squareClient.payments) {
-        console.error('❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).');
-        console.error('   This may indicate an issue with the installed Square SDK package.');
-        process.exit(1);
-    }
-    console.log('✅ [SERVER] Sanity check passed. Client has required API properties.');
 
    
 
@@ -435,12 +436,44 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       }
       try {
         const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetails } = req.body;
+
+        // --- SERVER-SIDE PRICE CALCULATION (Vulnerability Fix BLF-001) ---
+        const designFilePath = path.join(__dirname, designImagePath);
+        if (!fs.existsSync(designFilePath)) {
+            return res.status(400).json({ error: 'Design file not found on server.' });
+        }
+        const { bounds, cutline } = await getDesignDimensions(designFilePath);
+
+        const resolutionNameFromClient = req.body.orderDetails?.resolution;
+        if (!resolutionNameFromClient) {
+            return res.status(400).json({ error: 'Resolution must be provided in orderDetails.'});
+        }
+        const resolutionObj = pricingConfig.resolutions.find(r => r.name === resolutionNameFromClient);
+        if (!resolutionObj) {
+            return res.status(400).json({ error: `Invalid resolution name provided: ${resolutionNameFromClient}` });
+        }
+
+        const serverPrice = calculateStickerPrice(
+            req.body.orderDetails.quantity,
+            req.body.orderDetails.material,
+            bounds,
+            cutline,
+            resolutionObj,
+            pricingConfig
+        );
+        const serverCalculatedAmountCents = serverPrice.total;
+
+        if (amountCents !== serverCalculatedAmountCents) {
+            console.warn(`[SECURITY] Client-sent price (${amountCents}) does not match server-calculated price (${serverCalculatedAmountCents}). Using server price.`);
+        }
+        // --- END OF FIX ---
+
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
           locationId: process.env.SQUARE_LOCATION_ID,
           amountMoney: {
-            amount: BigInt(amountCents),
+            amount: BigInt(serverCalculatedAmountCents), // USE SERVER-CALCULATED PRICE
             currency: currency || 'USD',
           },
          appFeeMoney: {
@@ -462,7 +495,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           orderId: randomUUID(),
           paymentId: paymentResult.payment.id,
           squareOrderId: paymentResult.payment.orderId,
-          amount: Number(amountCents),
+          amount: Number(serverCalculatedAmountCents), // USE SERVER-CALCULATED PRICE
           currency: currency || 'USD',
           status: 'NEW',
           orderDetails: orderDetails.orderDetails,
