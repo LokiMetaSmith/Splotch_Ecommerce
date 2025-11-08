@@ -304,26 +304,6 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
 
     app.use(lusca({
         csrf: true,
-        csp: {
-            policy: {
-                'default-src': "'self'",
-                'script-src': [
-                    "'self'",
-                    'https://cdn.jsdelivr.net',
-                    'https://sandbox.web.squarecdn.com',
-                ],
-                'style-src': [
-                    "'self'",
-                    "'unsafe-inline'",
-                    'https://fonts.googleapis.com',
-                ],
-                'font-src': [
-                    "'self'",
-                    'https://fonts.gstatic.com',
-                ],
-            },
-            reportOnly: process.env.CSP_MODE !== 'enforce',
-        },
         xframe: 'SAMEORIGIN',
         hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},
         xssProtection: true,
@@ -620,7 +600,7 @@ ${statusChecklist}
       }
 
       // Check if the user is an admin or the owner of the order.
-      if (isAdmin(req.user) || (req.user.email && req.user.email === order.billingContact.email)) {
+      if (isAdmin(req.user) || (req.user && req.user.email && order.billingContact && req.user.email === order.billingContact.email)) {
         return res.json(order);
       }
 

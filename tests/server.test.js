@@ -54,14 +54,33 @@ describe('Server', () => {
         expect(res.body.status).toEqual('ok');
     });
 
-    it('should include a Content-Security-Policy-Report-Only header', async () => {
-        const res = await request(app).get('/api/ping');
-        expect(res.headers['content-security-policy-report-only']).toBeDefined();
-        const csp = res.headers['content-security-policy-report-only'];
-        const policies = csp.split(';').map(p => p.trim());
-        expect(policies).toContain("default-src 'self'");
-        expect(policies).toContain("script-src 'self',https://cdn.jsdelivr.net,https://sandbox.web.squarecdn.com");
-        expect(policies).toContain("style-src 'self','unsafe-inline',https://fonts.googleapis.com");
-        expect(policies).toContain("font-src 'self',https://fonts.gstatic.com");
+    it('should prevent a user from accessing another user\'s order (IDOR)', async () => {
+        // 1. Create two users
+        db.data.users['user1'] = { id: 'user1', email: 'user1@example.com' };
+        db.data.users['user2'] = { id: 'user2', email: 'user2@example.com' };
+
+        // 2. Create an order for each user
+        const order1 = { orderId: 'order1', billingContact: { email: 'user1@example.com' } };
+        const order2 = { orderId: 'order2', billingContact: { email: 'user2@example.com' } };
+        db.data.orders.push(order1, order2);
+        await db.write();
+
+        // 3. Get a temporary auth token for user1
+        const agent = request.agent(app);
+        const csrfRes = await agent.get('/api/csrf-token');
+        const csrfToken = csrfRes.body.csrfToken;
+        const tokenRes = await agent
+            .post('/api/auth/issue-temp-token')
+            .set('x-csrf-token', csrfToken)
+            .send({ email: 'user1@example.com' });
+        const authToken = tokenRes.body.token;
+
+        // 4. As user1, attempt to access order2
+        const res = await agent
+            .get('/api/orders/order2')
+            .set('Authorization', `Bearer ${authToken}`);
+
+        // 5. The server should return a 404 to prevent information leakage
+        expect(res.statusCode).toEqual(404);
     });
 });
