@@ -40,26 +40,6 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const { window } = new JSDOM('');
 const purify = DOMPurify(window);
 
-// Helper function to sanitize contact objects to prevent Stored XSS.
-const sanitizeContactObject = (contact) => {
-    if (!contact) return null;
-    const sanitized = {};
-    for (const key in contact) {
-        if (Object.prototype.hasOwnProperty.call(contact, key)) {
-            const value = contact[key];
-            if (typeof value === 'string') {
-                sanitized[key] = purify.sanitize(value);
-            } else if (Array.isArray(value)) {
-                // Assuming array of strings like addressLines
-                sanitized[key] = value.map(item => (typeof item === 'string' ? purify.sanitize(item) : item));
-            } else {
-                sanitized[key] = value;
-            }
-        }
-    }
-    return sanitized;
-};
-
 async function sanitizeSVGFile(filePath) {
     try {
         const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -448,6 +428,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
       body('designImagePath').notEmpty().withMessage('designImagePath is required'),
+      body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Order quantity must be a positive integer'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -486,8 +467,8 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           currency: currency || 'USD',
           status: 'NEW',
           orderDetails: orderDetails.orderDetails,
-          billingContact: sanitizeContactObject(orderDetails.billingContact),
-          shippingContact: sanitizeContactObject(shippingContact),
+          billingContact: orderDetails.billingContact,
+          shippingContact: shippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
         };
@@ -620,7 +601,7 @@ ${statusChecklist}
       }
 
       // Check if the user is an admin or the owner of the order.
-      if (isAdmin(req.user) || (req.user && req.user.email && order.billingContact && req.user.email === order.billingContact.email)) {
+      if (isAdmin(req.user) || (req.user.email && req.user.email === order.billingContact.email)) {
         return res.json(order);
       }
 

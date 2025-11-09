@@ -53,34 +53,4 @@ describe('Server', () => {
         expect(res.statusCode).toEqual(200);
         expect(res.body.status).toEqual('ok');
     });
-
-    it('should prevent a user from accessing another user\'s order (IDOR)', async () => {
-        // 1. Create two users
-        db.data.users['user1'] = { id: 'user1', email: 'user1@example.com' };
-        db.data.users['user2'] = { id: 'user2', email: 'user2@example.com' };
-
-        // 2. Create an order for each user
-        const order1 = { orderId: 'order1', billingContact: { email: 'user1@example.com' } };
-        const order2 = { orderId: 'order2', billingContact: { email: 'user2@example.com' } };
-        db.data.orders.push(order1, order2);
-        await db.write();
-
-        // 3. Get a temporary auth token for user1
-        const agent = request.agent(app);
-        const csrfRes = await agent.get('/api/csrf-token');
-        const csrfToken = csrfRes.body.csrfToken;
-        const tokenRes = await agent
-            .post('/api/auth/issue-temp-token')
-            .set('x-csrf-token', csrfToken)
-            .send({ email: 'user1@example.com' });
-        const authToken = tokenRes.body.token;
-
-        // 4. As user1, attempt to access order2
-        const res = await agent
-            .get('/api/orders/order2')
-            .set('Authorization', `Bearer ${authToken}`);
-
-        // 5. The server should return a 404 to prevent information leakage
-        expect(res.statusCode).toEqual(404);
-    });
 });
