@@ -192,7 +192,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     const squareClient = new SquareClient({
       version: '2025-07-16',
       token: process.env.SQUARE_ACCESS_TOKEN,
-      environment: SquareEnvironment.Sandbox,
+      environment: process.env.NODE_ENV === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
     });
     console.log('[SERVER] Verifying connection to Square servers...');
     if (process.env.NODE_ENV !== 'test') {
@@ -439,6 +439,11 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         // Prevent currency confusion attacks by enforcing USD
         if (currency && currency !== 'USD') {
             return res.status(400).json({ error: 'Invalid currency. Only USD is accepted.' });
+        }
+
+        // Block test card nonces in production
+        if (process.env.NODE_ENV === 'production' && sourceId.startsWith('cnon:card-nonce-ok')) {
+            return res.status(400).json({ error: 'Test cards cannot be used in production.' });
         }
 
         const paymentPayload = {
