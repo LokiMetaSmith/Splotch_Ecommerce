@@ -428,7 +428,6 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
       body('designImagePath').notEmpty().withMessage('designImagePath is required'),
-      body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Order quantity must be a positive integer'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -436,6 +435,12 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       }
       try {
         const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetails } = req.body;
+
+        // Prevent currency confusion attacks by enforcing USD
+        if (currency && currency !== 'USD') {
+            return res.status(400).json({ error: 'Invalid currency. Only USD is accepted.' });
+        }
+
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
