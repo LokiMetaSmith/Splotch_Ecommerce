@@ -1,0 +1,59 @@
+#cloud-config
+# ==============================================================================
+# Tunnel Droplet Cloud-Config
+# ==============================================================================
+#
+# Description:
+# This configuration provisions a DigitalOcean Droplet to act as a secure
+# endpoint for a reverse SSH tunnel.
+#
+# Before using, you must replace the following placeholder:
+#  - "your_home_server_ssh_public_key"
+#
+# ==============================================================================
+
+package_update: true
+package_upgrade: true
+
+# 1. User setup
+# Creates a dedicated non-root user for the tunnel connection.
+# IMPORTANT: Replace with the public SSH key from your HOME server.
+users:
+  - name: tunneluser
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAA... your_home_server_ssh_public_key
+
+# 2. Software installation
+packages:
+  - nginx
+
+# 3. Nginx Configuration
+# Configures Nginx to reverse proxy traffic to the tunnel's local port.
+write_files:
+  - path: /etc/nginx/sites-available/default
+    permissions: '0644'
+    content: |
+      server {
+          listen 80;
+          server_name _;
+
+          location / {
+              proxy_pass http://127.0.0.1:8080;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+          }
+      }
+
+# 4. SSH Server Configuration
+# Allows the tunnel user to forward ports.
+runcmd:
+  # Configure sshd to allow port forwarding and restart the service
+  - echo "GatewayPorts yes" >> /etc/ssh/sshd_config
+  - echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config
+  - systemctl restart sshd
+
+  # Restart nginx to apply the new configuration
+  - systemctl restart nginx
