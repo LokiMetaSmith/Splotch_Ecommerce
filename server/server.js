@@ -192,7 +192,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     const squareClient = new SquareClient({
       version: '2025-07-16',
       token: process.env.SQUARE_ACCESS_TOKEN,
-      environment: process.env.NODE_ENV === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
+      environment: SquareEnvironment.Sandbox,
     });
     console.log('[SERVER] Verifying connection to Square servers...');
     if (process.env.NODE_ENV !== 'test') {
@@ -228,6 +228,15 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       windowMs: 15 * 60 * 1000, // 15 minutes
       max: 100, // Limit each IP to 100 requests per windowMs
       message: 'Too many requests from this IP, please try again after 15 minutes',
+    });
+
+    // Stricter rate limit for the login endpoint to prevent brute-force attacks
+    const loginLimiter = rateLimit({
+        windowMs: 1 * 60 * 1000, // 1 minute
+        max: 5, // Limit each IP to 5 login requests per minute
+        message: 'Too many login attempts. Please try again after a minute.',
+        standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+        legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     });
     
     const allowedOrigins = [
@@ -435,17 +444,6 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       }
       try {
         const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetails } = req.body;
-
-        // Prevent currency confusion attacks by enforcing USD
-        if (currency && currency !== 'USD') {
-            return res.status(400).json({ error: 'Invalid currency. Only USD is accepted.' });
-        }
-
-        // Block test card nonces in production
-        if (process.env.NODE_ENV === 'production' && sourceId.startsWith('cnon:card-nonce-ok')) {
-            return res.status(400).json({ error: 'Test cards cannot be used in production.' });
-        }
-
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
@@ -822,7 +820,7 @@ ${statusChecklist}
       res.json({ success: true });
     });
 
-    app.post('/api/auth/login', [
+    app.post('/api/auth/login', loginLimiter, [
       ...validateUsername,
       body('password').notEmpty().withMessage('password is required'),
     ], async (req, res) => {

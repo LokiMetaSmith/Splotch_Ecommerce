@@ -3,7 +3,7 @@ import request from 'supertest';
 import { startServer } from './server.js';
 import { JSONFilePreset } from 'lowdb/node';
 import path from 'path';
-import fs from 'fs/promises';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,18 +34,16 @@ describe('Auth Endpoints', () => {
 
   afterAll(async () => {
     if (bot) {
-      await bot.stop('test');
+      // Correctly stop the bot
+      await bot.stop();
     }
     // Clear timers
     timers.forEach(timer => clearInterval(timer));
     await new Promise(resolve => serverInstance.close(resolve));
-      try {
-        await fs.unlink(testDbPath);
-      } catch (error) {
-        if (error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
+    // Use synchronous unlink to prevent race conditions on cleanup
+    if (fs.existsSync(testDbPath)) {
+        fs.unlinkSync(testDbPath);
+    }
   });
 
   it('should respond to ping', async () => {
