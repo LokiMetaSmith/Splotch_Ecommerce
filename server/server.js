@@ -30,6 +30,8 @@ import { Markup } from 'telegraf';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
+import speakeasy from 'speakeasy';
+import qrcode from 'qrcode';
 
 const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
 const __filename = fileURLToPath(import.meta.url);
@@ -841,6 +843,12 @@ ${statusChecklist}
       if (!validPassword) {
         return res.status(400).json({ error: 'Invalid username or password' });
       }
+
+      // --- MFA Check ---
+      if (user.mfa_enabled) {
+        return res.status(202).json({ mfaRequired: true, message: 'Please provide your MFA token.' });
+      }
+
       const { privateKey, kid } = getCurrentSigningKey();
       const payload = { username: user.username };
       if (user.email) {
@@ -1101,6 +1109,76 @@ ${statusChecklist}
         await logAndEmailError(error, 'Error in /api/auth/register-verify');
         res.status(400).json({ error: error.message });
       }
+    });
+
+    // --- MFA (TOTP) Endpoints ---
+    app.post('/api/auth/mfa/setup', authenticateToken, async (req, res) => {
+        // This endpoint should only be accessible by admins.
+        if (!isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
+        }
+
+        const user = Object.values(db.data.users).find(u => u.email === req.user.email);
+        if (!user) {
+            return res.status(404).json({ error: 'Admin user not found.' });
+        }
+
+        // Generate a new TOTP secret
+        const secret = speakeasy.generateSecret({
+            name: `Splotch Admin (${user.email})`,
+        });
+
+        // Store the secret with the user in the database
+        user.mfa_secret = secret.base32;
+        user.mfa_enabled = false; // Enable only after verification
+        await db.write();
+
+        // Generate a QR code for the user to scan
+        qrcode.toDataURL(secret.otpauth_url, (err, data_url) => {
+            if (err) {
+                logAndEmailError(err, 'Failed to generate QR code');
+                return res.status(500).json({ error: 'Could not generate QR code.' });
+            }
+            res.json({
+                secret: secret.base32,
+                qrCodeUrl: data_url,
+                message: 'Scan this QR code with your authenticator app and verify to enable MFA.',
+            });
+        });
+    });
+
+    app.post('/api/auth/mfa/login', [
+        ...validateUsername,
+        body('token').notEmpty().withMessage('MFA token is required'),
+    ], async (req, res) => {
+        const { username, token } = req.body;
+        // Prevent prototype pollution
+        if (['__proto__', 'constructor', 'prototype'].includes(username)) {
+            return res.status(400).json({ error: 'Invalid username' });
+        }
+        const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
+
+        if (!user || !user.mfa_enabled || !user.mfa_secret) {
+            return res.status(401).json({ error: 'MFA not enabled for this user.' });
+        }
+
+        const verified = speakeasy.totp.verify({
+            secret: user.mfa_secret,
+            encoding: 'base32',
+            token,
+        });
+
+        if (verified) {
+            const { privateKey, kid } = getCurrentSigningKey();
+            const payload = { username: user.username };
+            if (user.email) {
+                payload.email = user.email;
+            }
+            const jwtToken = jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
+            res.json({ token: jwtToken });
+        } else {
+            res.status(401).json({ error: 'Invalid MFA token.' });
+        }
     });
 
     app.get('/api/auth/login-options', validateUsername, async (req, res) => {

@@ -53,6 +53,8 @@
     "multer": "^2.0.1",
     "node-telegram-bot-api": "^0.63.0",
     "nodemailer": "^7.0.5",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0",
     "square": "^43.0.1",
     "svg-to-pdfkit": "^0.1.8",
     "telegraf": "^4.16.3",
