@@ -105,7 +105,7 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_SECRET,
     `${process.env.BASE_URL}/oauth2callback`
   );
-async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json')) {
+async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json'), injectedSquareClient = null) {
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
   }
@@ -182,19 +182,25 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     
     // --- Square Client Initialization ---
     console.log('[SERVER] Initializing Square client...');
-    if (!process.env.SQUARE_ACCESS_TOKEN) {
-      console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
-      // In a test environment, we don't want to kill the test runner.
-      if (process.env.NODE_ENV !== 'test') {
-        process.exit(1);
+    let squareClient = injectedSquareClient;
+
+    if (!squareClient) {
+      if (!process.env.SQUARE_ACCESS_TOKEN) {
+        console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+        // In a test environment, we don't want to kill the test runner.
+        if (process.env.NODE_ENV !== 'test') {
+          process.exit(1);
+        }
       }
+      squareClient = new SquareClient({
+        version: '2025-07-16',
+        token: process.env.SQUARE_ACCESS_TOKEN,
+        environment: SquareEnvironment.Sandbox,
+      });
+      console.log('[SERVER] Verifying connection to Square servers...');
+    } else {
+      console.log('[SERVER] Using injected Square client.');
     }
-    const squareClient = new SquareClient({
-      version: '2025-07-16',
-      token: process.env.SQUARE_ACCESS_TOKEN,
-      environment: SquareEnvironment.Sandbox,
-    });
-    console.log('[SERVER] Verifying connection to Square servers...');
     if (process.env.NODE_ENV !== 'test') {
         try {
             await new Promise((resolve, reject) => {
