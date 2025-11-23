@@ -1,0 +1,140 @@
+#cloud-config
+# ==============================================================================
+# NAT Gateway Cloud Configuration
+# ==============================================================================
+# This configuration turns a standard Ubuntu Cloud image into a hardened
+# NAT Gateway and Firewall.
+#
+# Features:
+# - Automated IP Forwarding
+# - strict iptables firewall with NAT Masquerading
+# - Fail2Ban for SSH protection
+# - Dual-homed network setup auto-detection
+#
+# User: loki (The Trickster God needs a gatekeeper)
+# ==============================================================================
+
+package_update: true
+package_upgrade: true
+
+# Add necessary packages for routing and security
+packages:
+  - iptables
+  - iptables-persistent
+  - fail2ban
+  - curl
+  - net-tools
+
+# Enable IP Forwarding in the kernel
+write_files:
+  - path: /etc/sysctl.d/99-nat-gateway.conf
+    content: |
+      net.ipv4.ip_forward=1
+      net.ipv6.conf.all.forwarding=1
+
+  # The Firewall Setup Script
+  # This script auto-detects which interface is WAN (has default route)
+  # and which is LAN, then applies robust iptables rules.
+  - path: /usr/local/bin/setup-firewall.sh
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -e
+
+      echo "[*] Identifying network interfaces..."
+
+      # Find the interface with the default route (WAN)
+      WAN_IFACE=$(ip route | grep default | awk '{print $5}' | head -n1)
+
+      if [ -z "$WAN_IFACE" ]; then
+          echo "Error: No default route found. Cannot determine WAN interface."
+          exit 1
+      fi
+
+      # Find the other interface (LAN)
+      # Assuming only 2 main interfaces exist. If more, this logic might need tuning.
+      # We exclude lo and the WAN interface.
+      LAN_IFACE=$(ip link show | grep -v "lo:" | grep -v "$WAN_IFACE:" | awk -F': ' '/^[0-9]+: / {print $2}' | head -n1)
+
+      if [ -z "$LAN_IFACE" ]; then
+          echo "Warning: No second interface found. Operating in single-arm mode?"
+          # Fallback or exit? For a NAT gateway script, we expect 2.
+          # But let's not crash, maybe they act as a VPN exit node.
+      fi
+
+      echo "    WAN Interface: $WAN_IFACE"
+      echo "    LAN Interface: ${LAN_IFACE:-None}"
+
+      echo "[*] Applying iptables rules..."
+
+      # 1. Clear existing rules
+      iptables -F
+      iptables -t nat -F
+      iptables -X
+
+      # 2. Set Default Policies (DROP everything by default)
+      iptables -P INPUT DROP
+      iptables -P FORWARD DROP
+      iptables -P OUTPUT ACCEPT
+
+      # 3. Allow Loopback
+      iptables -A INPUT -i lo -j ACCEPT
+
+      # 4. Allow Established and Related connections
+      iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+      iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+      # 5. Allow SSH (Port 22) - Critical for management
+      # (Fail2Ban will protect this)
+      iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
+      # 6. LAN / NAT Rules (if LAN interface exists)
+      if [ -n "$LAN_IFACE" ]; then
+          # Allow all traffic from LAN
+          iptables -A INPUT -i $LAN_IFACE -j ACCEPT
+
+          # Allow forwarding from LAN to WAN
+          iptables -A FORWARD -i $LAN_IFACE -o $WAN_IFACE -j ACCEPT
+
+          # Enable NAT (Masquerading) for traffic going out of WAN
+          iptables -t nat -A POSTROUTING -o $WAN_IFACE -j MASQUERADE
+
+          echo "    NAT enabled: $LAN_IFACE -> $WAN_IFACE"
+      fi
+
+      # 7. ICMP (Ping) - Rate limited
+      iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s -j ACCEPT
+
+      echo "[*] Saving rules..."
+      netfilter-persistent save
+
+      echo "[*] Firewall configuration complete."
+
+  # Fail2Ban Configuration for SSH
+  - path: /etc/fail2ban/jail.local
+    content: |
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      bantime = 3600
+
+users:
+  - name: loki
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAA... your_ssh_public_key
+
+runcmd:
+  # Apply sysctl settings immediately
+  - sysctl -p /etc/sysctl.d/99-nat-gateway.conf
+  # Run the firewall setup
+  - /usr/local/bin/setup-firewall.sh
+  # Ensure fail2ban is running
+  - systemctl enable fail2ban
+  - systemctl start fail2ban
