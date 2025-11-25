@@ -175,17 +175,21 @@ mkdir -p "$SNIPPET_DIR"
 # Read template and replace SSH key
 # We use sed to replace the placeholder.
 # NOTE: We must escape the SSH key for sed, or use a different delimiter.
-# Using python/perl for replacement is safer, but let's try a simple approach first.
-# We will create the file content dynamically using cat.
 
-# Read the template content excluding the placeholder line
-# Actually, let's just create a new file based on the logic, referencing the template is hard if we want to replace cleanly.
-# Better: Read the template file, and replace the placeholder string.
-
-# Escape forward slashes in SSH key for sed
-ESCAPED_SSH_KEY=$(echo "$SSH_KEY" | sed 's/\//\\\//g')
+# Escape forward slashes, backslashes, and ampersands in SSH key for sed
+ESCAPED_SSH_KEY=$(echo "$SSH_KEY" | sed -e 's/\\/\\\\/g' -e 's/\//\\\//g' -e 's/&/\\\&/g')
 
 sed "s/ssh-rsa AAAA... your_ssh_public_key/$ESCAPED_SSH_KEY/" "$CLOUD_CONFIG_TEMPLATE" > "$SNIPPET_PATH"
+
+# Verify replacement success
+if grep -q "ssh-rsa AAAA... your_ssh_public_key" "$SNIPPET_PATH"; then
+    echo "Error: SSH Key replacement failed. The placeholder 'ssh-rsa AAAA... your_ssh_public_key' was not found or replaced in $SNIPPET_PATH."
+    echo "Please check the template file: $CLOUD_CONFIG_TEMPLATE"
+    # Clean up and exit
+    rm "$SNIPPET_PATH"
+    qm destroy "$NEW_VMID"
+    exit 1
+fi
 
 echo "    Snippet created at: $SNIPPET_PATH"
 
