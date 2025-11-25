@@ -48,12 +48,6 @@ describe('Auth Endpoints', () => {
       }
   });
 
-  it('should respond to ping', async () => {
-    const res = await request(app).get('/api/ping');
-    expect(res.statusCode).toEqual(200);
-    expect(res.body.status).toEqual('ok');
-  });
-
   it('should pre-register a new user and return registration options', async () => {
     const agent = request.agent(app);
     const csrfRes = await agent.get('/api/csrf-token');

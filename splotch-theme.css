@@ -299,3 +299,67 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
   background-position: top left;
   background-size: contain or cover;
 */
+
+/* --- Mascot Styling --- */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+#mascot-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    width: 120px;
+    height: auto;
+    transition: transform 0.3s ease-in-out;
+    cursor: pointer;
+    animation: bounce 2s infinite ease-in-out;
+}
+
+#mascot-container:hover {
+    transform: scale(1.1) rotate(-5deg);
+    animation-play-state: paused;
+}
+
+#mascot-img {
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+}
+
+/* Speech bubble */
+.speech-bubble {
+	position: absolute;
+	background: #ffffff;
+    border: 2px solid var(--splotch-navy);
+	border-radius: .4em;
+    padding: 10px;
+    bottom: 110%;
+    right: 0;
+    width: 150px;
+    font-family: var(--font-baumans);
+    font-size: 0.9rem;
+    color: var(--splotch-navy);
+    display: none; /* Hidden by default */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+#mascot-container:hover .speech-bubble {
+    display: block;
+}
+
+.speech-bubble:after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	right: 40px;
+	width: 0;
+	height: 0;
+	border: 10px solid transparent;
+	border-top-color: var(--splotch-navy);
+	border-bottom: 0;
+	margin-bottom: -10px;
+}
