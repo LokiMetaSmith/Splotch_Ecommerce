@@ -283,16 +283,11 @@
             <div id="ipfsLinkContainer" class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow"></div>
         </form>
     </main>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(registration => {
-                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                }, err => {
-                    console.log('ServiceWorker registration failed: ', err);
-                });
-            });
-        }
-    </script>
+    <div id="mascot-container" title="Hi! I'm the Splotch Mascot!">
+        <div class="speech-bubble" id="mascot-text">Create something awesome today!</div>
+        <img id="mascot-img" src="/mascot.png" alt="Splotch Mascot">
+    </div>
+
+    <script src="./src/app-init.js"></script>
 </body>
 </html>

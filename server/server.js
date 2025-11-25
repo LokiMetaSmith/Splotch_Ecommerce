@@ -305,16 +305,30 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       cookie: { secure: process.env.NODE_ENV === 'production' }
     }));
     app.use(express.json());
-    app.use(express.static(path.join(__dirname, '..')));
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
     app.use(lusca({
         csrf: true,
         xframe: 'SAMEORIGIN',
         hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},
         xssProtection: true,
-        nosniff: true
+        nosniff: true,
+        csp: {
+            policy: {
+                'default-src': "'self'",
+                'script-src': "'self' https://cdn.jsdelivr.net https://sandbox.web.squarecdn.com https://web.squarecdn.com 'unsafe-inline' 'unsafe-eval'",
+                'style-src': "'self' https://fonts.googleapis.com 'unsafe-inline'",
+                'font-src': "'self' https://fonts.gstatic.com",
+                'connect-src': "'self' http://localhost:3000 https://connect.squareup.com https://sandbox.web.squarecdn.com",
+                'img-src': "'self' data: blob:",
+                'frame-src': "'self' https://sandbox.web.squarecdn.com https://web.squarecdn.com",
+                'object-src': "'none'",
+                'base-uri': "'self'"
+            }
+        }
     }));
+
+    app.use(express.static(path.join(__dirname, '../public')));
+    app.use(express.static(path.join(__dirname, '..')));
+    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {

@@ -39,10 +39,10 @@ These items address fundamental problems with the test setup and major gaps in f
 
 These are smaller tasks for improving test quality and covering minor edge cases.
 
--   **[ ] Remove Placeholder Test:** The file `tests/simple.test.js` contains a useless test (`expect(true).toBe(true)`) and should be deleted.
+-   **[x] Remove Placeholder Test:** The file `tests/simple.test.js` contains a useless test (`expect(true).toBe(true)`) and should be deleted.
 -   **[ ] Expand Incomplete Server Tests:** The main backend integration test (`tests/server.test.js`) only covers the `/api/ping` endpoint. It should be expanded to cover all other non-auth, non-order-related endpoints.
 -   **[ ] Add Test for CLI `remove-key` Command:** The command-line interface test (`tests/cli_test.sh`) is missing coverage for the `remove-key` command.
--   **[ ] Consolidate Redundant Tests:** The `/api/ping` endpoint is tested in two different files. The duplicate test should be removed.
+-   **[x] Consolidate Redundant Tests:** The `/api/ping` endpoint is tested in two different files. The duplicate test should be removed.
 
 ---
 <br>
@@ -57,7 +57,7 @@ This document tracks the features and bug fixes that need to be implemented for 
 - [x] **Add "Delivered" Category:** Add a new "Delivered" status category for orders.
 - [x] **Add "Completed" Category:** Add a new "Completed" status category for orders.
 - [ ] **Printing Marks:** Include functionality to add printing marks for borders on the print sheet.
-- [ ] **Media Margins:** Add the ability to define keepout areas or margins on the interior and edges of media rolls.
+- [x] **Media Margins:** Add the ability to define keepout areas or margins on the interior and edges of media rolls.
 - [ ] **Nesting Improvements:** Improve nesting of items on the print sheet, aided by the bounding box implementation.
 
 ## Telegram Bot
@@ -86,13 +86,13 @@ This document tracks the features and bug fixes that need to be implemented for 
     - [ ] **Bug:** Size display does not update on resize.
     - [ ] Display the sticker's dimensions directly on the canvas preview.
     - [ ] Show the current width and height in a dedicated text area.
-- [ ] **Standard Size Buttons:**
-    - [ ] Add buttons for one-click resizing to 1", 2", and 3" sizes.
-- [ ] **Unit Selection:**
-    - [ ] Add a control to switch between inches and millimeters for display.
+- [x] **Standard Size Buttons:**
+    - [x] Add buttons for one-click resizing to 1", 2", and 3" sizes.
+- [x] **Unit Selection:**
+    - [x] Add a control to switch between inches and millimeters for display.
 
 ## Print Shop Page
-- [ ] **PDF Export:** Add a button to export the nested print sheet as a PDF.
+- [x] **PDF Export:** Add a button to export the nested print sheet as a PDF.
 
 ## Authentication
 
@@ -129,6 +129,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 
 ## High-Priority
 
+-   **[x] Implement Content Security Policy (CSP):** Configure the server to send a strict `Content-Security-Policy` header to mitigate XSS attacks.
 -   **[ ] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[ ] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
 -   **[ ] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./docs/TELEGRAM_BOT_MIGRATION.md) for a step-by-step guide.
