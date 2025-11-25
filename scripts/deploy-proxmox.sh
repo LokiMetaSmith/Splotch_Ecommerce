@@ -46,7 +46,7 @@ BRIDGE="vmbr0"
 
 # Path to the cloud-config user data file.
 # Assumes the script is run from the project root directory.
-CLOUD_CONFIG_PATH="docs/proxmox-cloud-config.yml"
+CLOUD_CONFIG_TEMPLATE="docs/proxmox-cloud-config.yml"
 
 # --- Dynamic Configuration (from script arguments) ---
 
@@ -79,8 +79,8 @@ if ! command -v qm &> /dev/null; then
     exit 1
 fi
 
-if [ ! -f "$CLOUD_CONFIG_PATH" ]; then
-    echo "Error: Cloud-config file not found at '$CLOUD_CONFIG_PATH'."
+if [ ! -f "$CLOUD_CONFIG_TEMPLATE" ]; then
+    echo "Error: Cloud-config template not found at '$CLOUD_CONFIG_TEMPLATE'."
     echo "Please ensure the file exists and the script is run from the project root."
     exit 1
 fi
@@ -101,7 +101,7 @@ echo "  - New VM ID:      $NEW_VMID"
 echo "  - New VM Name:    $NEW_VM_NAME"
 echo "  - Storage Pool:   $STORAGE_POOL"
 echo "  - Network Bridge: $BRIDGE"
-echo "  - User Data File: $CLOUD_CONFIG_PATH"
+echo "  - User Data File: $CLOUD_CONFIG_TEMPLATE"
 echo
 
 # 2. Get Network Configuration from User
@@ -115,6 +115,37 @@ if [ -z "$IP_CONFIG" ] || [ -z "$GATEWAY" ]; then
 fi
 
 echo
+
+# --- SSH Key Handling ---
+SSH_KEY=""
+# Try to detect root's SSH key or user's key if sudo
+POSSIBLE_KEYS=(
+  "/root/.ssh/id_rsa.pub"
+  "/root/.ssh/id_ed25519.pub"
+  "${HOME}/.ssh/id_rsa.pub"
+  "${HOME}/.ssh/id_ed25519.pub"
+)
+
+for key in "${POSSIBLE_KEYS[@]}"; do
+    if [ -f "$key" ]; then
+        SSH_KEY=$(cat "$key")
+        echo "Found SSH Key: $key"
+        break
+    fi
+done
+
+if [ -z "$SSH_KEY" ]; then
+    echo "No local SSH key found."
+    read -p "Paste your public SSH key (starts with 'ssh-rsa' or similar): " SSH_KEY_INPUT
+    if [ -z "$SSH_KEY_INPUT" ]; then
+        echo "Error: SSH Key is required to access the VM."
+        exit 1
+    fi
+    SSH_KEY="$SSH_KEY_INPUT"
+fi
+
+echo
+
 # 3. Confirm with the user before proceeding
 read -p "Do you want to create this VM? (y/N) " -n 1 -r
 echo
@@ -134,8 +165,30 @@ echo "⚙️  Configuring VM $NEW_VMID..."
 # We will create a temporary snippet for this deployment.
 SNIPPET_STORAGE="local" # 'local' is the default storage for snippets
 SNIPPET_NAME="user-data-${NEW_VMID}.yml"
-SNIPPET_PATH="/var/lib/vz/snippets/$SNIPPET_NAME"
-cp "$CLOUD_CONFIG_PATH" "$SNIPPET_PATH"
+SNIPPET_DIR="/var/lib/vz/snippets"
+SNIPPET_PATH="$SNIPPET_DIR/$SNIPPET_NAME"
+
+# Ensure snippet directory exists
+mkdir -p "$SNIPPET_DIR"
+
+echo "📜 Generating Cloud-Init User Data..."
+
+# Escape forward slashes and ampersands in SSH key for sed
+ESCAPED_SSH_KEY=$(echo "$SSH_KEY" | sed -e 's/\\/\\\\/g' -e 's/\//\\\//g' -e 's/&/\\\&/g')
+
+sed "s/ssh-rsa AAAA... your_ssh_public_key/$ESCAPED_SSH_KEY/" "$CLOUD_CONFIG_TEMPLATE" > "$SNIPPET_PATH"
+
+# Verify replacement success
+if grep -q "ssh-rsa AAAA... your_ssh_public_key" "$SNIPPET_PATH"; then
+    echo "Error: SSH Key replacement failed. The placeholder 'ssh-rsa AAAA... your_ssh_public_key' was not found or replaced in $SNIPPET_PATH."
+    echo "Please check the template file: $CLOUD_CONFIG_TEMPLATE"
+    # Clean up and exit
+    rm "$SNIPPET_PATH"
+    qm destroy "$NEW_VMID"
+    exit 1
+fi
+
+echo "    Snippet created at: $SNIPPET_PATH"
 
 # Configure the VM to use the cloud-init user data from the snippet
 qm set "$NEW_VMID" --cicustom "user=${SNIPPET_STORAGE}:snippets/${SNIPPET_NAME}"
@@ -149,12 +202,9 @@ qm set "$NEW_VMID" --ipconfig0 "ip=${IP_CONFIG},gw=${GATEWAY}"
 echo "⚡️ Starting VM $NEW_VMID..."
 qm start "$NEW_VMID"
 
-# Clean up the temporary snippet file
-echo "🧹 Cleaning up temporary files..."
-rm "$SNIPPET_PATH"
-
 echo
 echo "✅ VM '$NEW_VM_NAME' (ID: $NEW_VMID) has been created and started."
+echo "   NOTE: The Cloud-Init snippet file ($SNIPPET_PATH) must persist for Proxmox configuration."
 echo
 
 echo "-------------------------------------"
@@ -167,7 +217,7 @@ echo "  - IP Address: ${IP_CONFIG%/*}" # Extracts the IP from the CIDR format
 echo
 echo "Next Steps:"
 echo "1. Wait a few minutes for the cloud-init setup to complete."
-echo "2. SSH into the VM using the user ('loki') and SSH key you defined in the cloud-config:"
+echo "2. SSH into the VM using the user ('loki') and the SSH key you provided:"
 echo
 echo "   ssh loki@${IP_CONFIG%/*}"
 echo

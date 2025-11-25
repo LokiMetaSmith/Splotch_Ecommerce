@@ -78,9 +78,37 @@ if [ ! -f "$CLOUD_CONFIG_PATH" ]; then
     exit 1
 fi
 
+# SSH Key Selection Logic
 if [ "$SSH_KEY_FINGERPRINT" == "YOUR_SSH_KEY_FINGERPRINT" ]; then
-    echo "Error: Please update the SSH_KEY_FINGERPRINT variable in this script."
-    exit 1
+    echo "SSH_KEY_FINGERPRINT is not configured in the script."
+    echo "Fetching available SSH keys from DigitalOcean..."
+    echo
+
+    # Check if any keys exist
+    KEY_LIST=$(doctl compute ssh-key list --format ID,Name,Fingerprint --no-header)
+
+    if [ -z "$KEY_LIST" ]; then
+        echo "Error: No SSH keys found in your DigitalOcean account."
+        echo "Please add an SSH key to your DigitalOcean account first."
+        echo "See: https://docs.digitalocean.com/products/droplets/how-to/add-ssh-keys/"
+        exit 1
+    fi
+
+    # Display keys
+    doctl compute ssh-key list
+    echo
+
+    # Prompt user to select a key
+    read -p "Enter the Fingerprint of the SSH key to use: " USER_FINGERPRINT
+
+    if [ -z "$USER_FINGERPRINT" ]; then
+        echo "Error: Fingerprint cannot be empty."
+        exit 1
+    fi
+
+    SSH_KEY_FINGERPRINT="$USER_FINGERPRINT"
+    echo "Using SSH Key Fingerprint: $SSH_KEY_FINGERPRINT"
+    echo
 fi
 
 echo "Configuration:"
