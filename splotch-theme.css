@@ -299,3 +299,78 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
   background-position: top left;
   background-size: contain or cover;
 */
+
+/* --- Mascot Styling --- */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+#mascot-container {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 9999;
+    width: 130px;
+    height: auto;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+    animation: bounce 3s infinite ease-in-out;
+    transform: rotate(-10deg); /* Initial peeled angle */
+}
+
+#mascot-container:hover {
+    transform: scale(1.15) rotate(0deg); /* Straighten up on hover */
+    animation-play-state: paused;
+}
+
+#mascot-img {
+    width: 100%;
+    height: auto;
+    /* Create a thick white sticker border and shadow */
+    filter: drop-shadow(0 2px 0 #fff)
+            drop-shadow(0 -2px 0 #fff)
+            drop-shadow(2px 0 0 #fff)
+            drop-shadow(-2px 0 0 #fff)
+            drop-shadow(2px 2px 0 #fff)
+            drop-shadow(-2px 2px 0 #fff)
+            drop-shadow(2px -2px 0 #fff)
+            drop-shadow(-2px -2px 0 #fff)
+            drop-shadow(3px 5px 5px rgba(0,0,0,0.4));
+    will-change: filter;
+}
+
+/* Speech bubble */
+.speech-bubble {
+	position: absolute;
+	background: #ffffff;
+    border: 2px solid var(--splotch-navy);
+	border-radius: .4em;
+    padding: 10px;
+    bottom: 110%;
+    right: 0;
+    width: 150px;
+    font-family: var(--font-baumans);
+    font-size: 0.9rem;
+    color: var(--splotch-navy);
+    display: none; /* Hidden by default */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+#mascot-container:hover .speech-bubble {
+    display: block;
+}
+
+.speech-bubble:after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	right: 40px;
+	width: 0;
+	height: 0;
+	border: 10px solid transparent;
+	border-top-color: var(--splotch-navy);
+	border-bottom: 0;
+	margin-bottom: -10px;
+}

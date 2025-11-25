@@ -283,6 +283,11 @@
             <div id="ipfsLinkContainer" class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow"></div>
         </form>
     </main>
+    <div id="mascot-container" title="Hi! I'm the Splotch Mascot!">
+        <div class="speech-bubble" id="mascot-text">Create something awesome today!</div>
+        <img id="mascot-img" src="/mascot.png" alt="Splotch Mascot">
+    </div>
+
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -293,6 +298,23 @@
                 });
             });
         }
+
+        // Mascot Interaction
+        const mascotContainer = document.getElementById('mascot-container');
+        const mascotText = document.getElementById('mascot-text');
+        const messages = [
+            "Create something awesome today!",
+            "Need some stickers?",
+            "I love your design!",
+            "Print your imagination!",
+            "Splotch is the best!",
+            "Don't forget to save!"
+        ];
+
+        mascotContainer.addEventListener('mouseenter', () => {
+            const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+            mascotText.textContent = randomMessage;
+        });
     </script>
 </body>
 </html>
