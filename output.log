@@ -1,0 +1,53 @@
+
+Running 1 test using 1 worker
+
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/csrf-token
+  ✘  1 playwright_tests/bounding-box.spec.js:3:1 › bounding box is visible when scaling image (30.5s)
+
+
+  1) playwright_tests/bounding-box.spec.js:3:1 › bounding box is visible when scaling image ────────
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.fill: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('#resizeSlider')[22m
+    [2m    - locator resolved to <input min="1" max="8" disabled value="3" step="0.1" type="range" id="resizeSlider" class="w-full opacity-50 cursor-not-allowed"/>[22m
+    [2m    - fill("3")[22m
+    [2m  - attempting fill action[22m
+    [2m    2 × waiting for element to be visible, enabled and editable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying fill action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and editable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying fill action[22m
+    [2m      - waiting 100ms[22m
+    [2m    56 × waiting for element to be visible, enabled and editable[22m
+    [2m       - element is not enabled[22m
+    [2m     - retrying fill action[22m
+    [2m       - waiting 500ms[22m
+
+
+      19 |   // Use the slider to resize
+      20 |   const slider = page.locator('#resizeSlider');
+    > 21 |   await slider.fill('3'); // Resize to 3 inches (or whatever unit)
+         |                ^
+      22 |   // Trigger input event
+      23 |   await slider.dispatchEvent('input');
+      24 |
+        at /app/playwright_tests/bounding-box.spec.js:21:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/bounding-box-bounding-box-is-visible-when-scaling-image/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/bounding-box-bounding-box-is-visible-when-scaling-image/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/bounding-box-bounding-box-is-visible-when-scaling-image/error-context.md
+
+  1 failed
+    playwright_tests/bounding-box.spec.js:3:1 › bounding box is visible when scaling image ─────────
