@@ -310,4 +310,116 @@ describe('Order API Endpoints', () => {
              expect(mockSendEmail).toHaveBeenCalled();
         });
     });
+
+    describe('GET /api/orders (Admin List)', () => {
+        it('should allow admin to view all orders', async () => {
+            db.data.orders.push(
+                { orderId: 'o1', receivedAt: '2023-01-01' },
+                { orderId: 'o2', receivedAt: '2023-01-02' }
+            );
+            await db.write();
+
+            const token = getAuthToken('admin', 'admin@example.com');
+            const res = await request(app)
+                .get('/api/orders')
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body).toHaveLength(2);
+            // It reverses the order
+            expect(res.body[0].orderId).toBe('o2');
+        });
+
+        it('should deny non-admin users', async () => {
+            const token = getAuthToken('user', 'user@example.com');
+            const res = await request(app)
+                .get('/api/orders')
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(res.statusCode).toBe(403);
+        });
+    });
+
+    describe('GET /api/orders/my-orders', () => {
+        it('should return orders for the authenticated user', async () => {
+            const email = 'my@example.com';
+            db.data.orders.push(
+                { orderId: 'my1', billingContact: { email }, receivedAt: '2023-01-01' },
+                { orderId: 'other1', billingContact: { email: 'other@example.com' }, receivedAt: '2023-01-02' }
+            );
+            await db.write();
+
+            const token = getAuthToken('myuser', email);
+            const res = await request(app)
+                .get('/api/orders/my-orders')
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0].orderId).toBe('my1');
+        });
+
+        it('should return empty list if user has no orders', async () => {
+            const token = getAuthToken('newuser', 'new@example.com');
+            const res = await request(app)
+                .get('/api/orders/my-orders')
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body).toHaveLength(0);
+        });
+    });
+
+    describe('GET /api/orders/search', () => {
+        it('should allow user to search their orders', async () => {
+            const email = 'search@example.com';
+            // User must exist for search endpoint
+            db.data.users['searchuser'] = { email, username: 'searchuser' };
+            db.data.orders.push(
+                { orderId: 'search123', billingContact: { email }, receivedAt: '2023-01-01' },
+                { orderId: 'search456', billingContact: { email }, receivedAt: '2023-01-02' }
+            );
+            await db.write();
+
+            const token = getAuthToken('searchuser', email);
+            const res = await request(app)
+                .get('/api/orders/search?q=123')
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0].orderId).toBe('search123');
+        });
+
+        it('should not find other users orders even if ID matches query', async () => {
+             const email = 'user1@example.com';
+             db.data.users['user1'] = { email, username: 'user1' };
+             db.data.orders.push(
+                { orderId: 'secret123', billingContact: { email: 'admin@example.com' } }
+             );
+             await db.write();
+
+             const token = getAuthToken('user1', email);
+             const res = await request(app)
+                .get('/api/orders/search?q=123')
+                .set('Authorization', `Bearer ${token}`);
+
+             // The search filters by user email first, then by query.
+             // If filteredOrders is empty, it returns 404.
+             expect(res.statusCode).toBe(404);
+        });
+
+        it('should return 404 if no order matches', async () => {
+            const email = 'search@example.com';
+            db.data.users['searchuser'] = { email, username: 'searchuser' };
+            await db.write();
+
+            const token = getAuthToken('searchuser', email);
+            const res = await request(app)
+                .get('/api/orders/search?q=nonexistent')
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(res.statusCode).toBe(404);
+        });
+    });
 });
