@@ -925,7 +925,11 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
 }
 
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
-    if (!ctx || !bounds || !pricingConfig) return;
+    console.log('[DEBUG] drawBoundingBox called with:', { bounds, offset, hasCtx: !!ctx, hasPricing: !!pricingConfig });
+    if (!ctx || !bounds || !pricingConfig) {
+        console.log('[DEBUG] drawBoundingBox aborting due to missing dependencies');
+        return;
+    }
 
     // The user wanted a grey box with 1-inch dashes for pricing.
     // The previous implementation calculated a dash length from PPI, which was often
@@ -938,12 +942,17 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
     // Use a fixed dash pattern that is visible at most scales.
     ctx.setLineDash([10, 5]);
 
-    ctx.strokeRect(
-        bounds.left + offset.x,
-        bounds.top + offset.y,
-        bounds.width,
-        bounds.height
-    );
+    // Stroke is centered on the path, so we offset by half the line width to keep it inside/visible
+    // especially when bounds are at (0,0) of the canvas.
+    const halfLineWidth = ctx.lineWidth / 2;
+    const x = bounds.left + offset.x + halfLineWidth;
+    const y = bounds.top + offset.y + halfLineWidth;
+    const w = bounds.width - ctx.lineWidth;
+    const h = bounds.height - ctx.lineWidth;
+
+    console.log('[DEBUG] strokeRect args:', { x, y, w, h, lineWidth: ctx.lineWidth, strokeStyle: ctx.strokeStyle });
+
+    ctx.strokeRect(x, y, w, h);
 
     // Reset line dash for subsequent drawing operations.
     ctx.setLineDash([]);
