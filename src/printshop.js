@@ -470,7 +470,7 @@ function displayOrder(order) {
     // --- Sticker Design ---
     const imageDiv = createEl('div', ['mt-4']);
     imageDiv.appendChild(createEl('dt', [], {}, 'Sticker Design:'));
-    const imageLink = createEl('a', [], { href: `${serverUrl}${order.designImagePath}`, target: '_blank' });
+    const imageLink = createEl('a', ['sticker-peel-container'], { href: `${serverUrl}${order.designImagePath}`, target: '_blank' });
     const image = createEl('img', ['sticker-design'], {
         src: `${serverUrl}${order.designImagePath}`,
         alt: 'Sticker Design',
@@ -786,7 +786,7 @@ async function getCsrfToken() {
  */
 async function init() {
     // This creates a verifier that automatically fetches and caches keys from your JWKS endpoint
-    JWKS = jose.createRemoteJWKSet(new URL(`${serverUrl}/.well-known/jwks.json`));
+    JWKS = jose.createRemoteJWKSet(new URL(`${serverUrl}/.well-known/jwks.json`, window.location.origin));
     console.log('[CLIENT] Remote JWKS verifier created.');
 
     await getServerSessionToken();

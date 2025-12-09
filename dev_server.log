@@ -1,0 +1,10 @@
+
+> lokimetasmith.github.io@1.0.0 dev
+> vite --port 5173
+
+
+  VITE v7.1.12  ready in 696 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.2:5173/
+9:06:30 AM [vite] (client) page reload src/printshop.js
