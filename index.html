@@ -301,7 +301,23 @@
 
         // Mascot Interaction
         const mascotContainer = document.getElementById('mascot-container');
+        const mascotImg = document.getElementById('mascot-img');
         const mascotText = document.getElementById('mascot-text');
+
+        // Random Mascot Selection
+        const mascotImages = [
+            '/mascot.png',
+            '/mascot-1.png',
+            '/mascot-2.png',
+            '/mascot-3.png',
+            '/mascot-4.png',
+            '/mascot-5.png',
+            '/mascot-6.png',
+            '/mascot-7.png'
+        ];
+        const randomMascot = mascotImages[Math.floor(Math.random() * mascotImages.length)];
+        mascotImg.src = randomMascot;
+
         const messages = [
             "Create something awesome today!",
             "Need some stickers?",
@@ -314,6 +330,25 @@
         mascotContainer.addEventListener('mouseenter', () => {
             const randomMessage = messages[Math.floor(Math.random() * messages.length)];
             mascotText.textContent = randomMessage;
+        });
+
+        // Wiggle on Proximity
+        document.addEventListener('mousemove', (e) => {
+            const rect = mascotContainer.getBoundingClientRect();
+            const mascotCenterX = rect.left + rect.width / 2;
+            const mascotCenterY = rect.top + rect.height / 2;
+
+            const distance = Math.sqrt(
+                Math.pow(e.clientX - mascotCenterX, 2) +
+                Math.pow(e.clientY - mascotCenterY, 2)
+            );
+
+            // Threshold for "near" (e.g., 300 pixels)
+            if (distance < 300) {
+                mascotContainer.classList.add('wiggle');
+            } else {
+                mascotContainer.classList.remove('wiggle');
+            }
         });
     </script>
 </body>
