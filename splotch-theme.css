@@ -301,9 +301,17 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
 */
 
 /* --- Mascot Styling --- */
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+@keyframes peel {
+  0%, 100% { transform: rotate(-10deg) translateY(0) scale(1); }
+  50% { transform: rotate(-14deg) translateY(-10px) scale(1.02); }
+}
+
+@keyframes wiggle {
+  0% { transform: rotate(-10deg) scale(1.1); }
+  25% { transform: rotate(-18deg) scale(1.15); }
+  50% { transform: rotate(-4deg) scale(1.15); }
+  75% { transform: rotate(-14deg) scale(1.15); }
+  100% { transform: rotate(-10deg) scale(1.1); }
 }
 
 #mascot-container {
@@ -315,13 +323,18 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
     height: auto;
     transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     cursor: pointer;
-    animation: bounce 3s infinite ease-in-out;
+    animation: peel 4s infinite ease-in-out;
     transform: rotate(-10deg); /* Initial peeled angle */
+    transform-origin: bottom right;
+}
+
+#mascot-container.wiggle {
+    animation: wiggle 0.5s infinite ease-in-out;
 }
 
 #mascot-container:hover {
+    animation: none;
     transform: scale(1.15) rotate(0deg); /* Straighten up on hover */
-    animation-play-state: paused;
 }
 
 #mascot-img {
