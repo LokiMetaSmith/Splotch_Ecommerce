@@ -2,7 +2,6 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   webServer: {
-    // FIX: Use the Vite dev server for frontend tests, not the Node backend.
     command: 'npm run dev',
     url: 'http://localhost:5173', // Vite's default port
     reuseExistingServer: !process.env.CI, // Reuse server in local dev for speed
