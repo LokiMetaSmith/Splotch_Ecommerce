@@ -25,6 +25,7 @@ let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
 let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
+let widthDisplayEl, heightDisplayEl;
 
 let currentOrderAmountCents = 0;
 
@@ -66,6 +67,9 @@ async function BootStrap() {
     fileInputGlobalRef = document.getElementById('file');
     fileNameDisplayEl = document.getElementById('fileNameDisplay');
     paymentFormGlobalRef = document.getElementById('payment-form');
+
+    widthDisplayEl = document.getElementById('widthDisplay');
+    heightDisplayEl = document.getElementById('heightDisplay');
 
     rotateLeftBtnEl = document.getElementById('rotateLeftBtn');
     rotateRightBtnEl = document.getElementById('rotateRightBtn');
@@ -328,6 +332,8 @@ function calculateAndUpdatePrice() {
     if (!bounds || !cutline || !selectedResolution) {
         currentOrderAmountCents = 0;
         calculatedPriceDisplay.innerHTML = `Price: <span class="text-gray-500">---</span>`;
+        if (widthDisplayEl) widthDisplayEl.value = '---';
+        if (heightDisplayEl) heightDisplayEl.value = '---';
         return;
     }
 
@@ -344,6 +350,9 @@ function calculateAndUpdatePrice() {
         height *= 25.4;
         unit = 'mm';
     }
+
+    if (widthDisplayEl) widthDisplayEl.value = width.toFixed(2);
+    if (heightDisplayEl) heightDisplayEl.value = height.toFixed(2);
 
     calculatedPriceDisplay.innerHTML = `
         <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>

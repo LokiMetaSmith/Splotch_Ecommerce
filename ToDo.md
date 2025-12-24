@@ -83,9 +83,9 @@ This document tracks the features and bug fixes that need to be implemented for 
     - [x] Allow the customer to see the calculated bounding box when they are scaling their uploaded image.
     - [ ] **Bug:** Bounding box is not visible.
 - [ ] **Size Indicators:**
-    - [ ] **Bug:** Size display does not update on resize.
-    - [ ] Display the sticker's dimensions directly on the canvas preview.
-    - [ ] Show the current width and height in a dedicated text area.
+    - [x] **Bug:** Size display does not update on resize.
+    - [x] Display the sticker's dimensions directly on the canvas preview.
+    - [x] Show the current width and height in a dedicated text area.
 - [ ] **Standard Size Buttons:**
     - [ ] Add buttons for one-click resizing to 1", 2", and 3" sizes.
 - [ ] **Unit Selection:**
