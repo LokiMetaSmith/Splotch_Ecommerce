@@ -79,17 +79,17 @@ This document tracks the features and bug fixes that need to be implemented for 
 - [x] **Square Inch Pricing:**
     - [x] Move the pricing model to be based on the square inch bounding box of the sticker.
     - [x] Adjust the price based on the complexity or length of the generated/provided cut path.
-- [ ] **Visual Bounding Box:**
+- [x] **Visual Bounding Box:**
     - [x] Allow the customer to see the calculated bounding box when they are scaling their uploaded image.
-    - [ ] **Bug:** Bounding box is not visible.
-- [ ] **Size Indicators:**
+    - [x] **Bug:** Bounding box is not visible.
+- [x] **Size Indicators:**
     - [x] **Bug:** Size display does not update on resize.
     - [x] Display the sticker's dimensions directly on the canvas preview.
     - [x] Show the current width and height in a dedicated text area.
-- [ ] **Standard Size Buttons:**
-    - [ ] Add buttons for one-click resizing to 1", 2", and 3" sizes.
-- [ ] **Unit Selection:**
-    - [ ] Add a control to switch between inches and millimeters for display.
+- [x] **Standard Size Buttons:**
+    - [x] Add buttons for one-click resizing to 1", 2", and 3" sizes.
+- [x] **Unit Selection:**
+    - [x] Add a control to switch between inches and millimeters for display.
 
 ## Print Shop Page
 - [ ] **PDF Export:** Add a button to export the nested print sheet as a PDF.
