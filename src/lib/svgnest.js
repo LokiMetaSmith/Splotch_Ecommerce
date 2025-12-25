@@ -43,7 +43,8 @@ class GeneticAlgorithm {
 
         for (const angle of angleList) {
             const rotatedPart = GeometryUtil.rotatePolygon(part, angle);
-            if (rotatedPart.width < this.binBounds.width && rotatedPart.height < this.binBounds.height) {
+            const rotatedBounds = GeometryUtil.getPolygonBounds(rotatedPart);
+            if (rotatedBounds.width < this.binBounds.width && rotatedBounds.height < this.binBounds.height) {
                 return angle;
             }
         }
@@ -238,44 +239,63 @@ export class SvgNest {
         });
         
         // --- Add Printing Marks ---
-        // First, enrich the placement data with width and height from the original tree
-        const enrichedPlacements = placedGroup.map(p => {
-            const originalPart = this.tree.find(part => part.id === p.id);
-            const partBounds = GeometryUtil.getPolygonBounds(originalPart);
-            return { ...p, width: partBounds.width, height: partBounds.height };
-        });
+        if (this.config.addPrintingMarks) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-        const bounds = {
-            left: Math.min(...enrichedPlacements.map(p => p.x)),
-            top: Math.min(...enrichedPlacements.map(p => p.y)),
-            right: Math.max(...enrichedPlacements.map(p => p.x + p.width)),
-            bottom: Math.max(...enrichedPlacements.map(p => p.y + p.height)),
-        };
+            placedGroup.forEach(p => {
+                const originalPart = this.tree.find(part => part.id === p.id);
+                // We need to rotate the polygon to get accurate bounds
+                const rotatedPart = GeometryUtil.rotatePolygon(originalPart, p.rotation);
+                const partBounds = GeometryUtil.getPolygonBounds(rotatedPart);
 
-        const markLength = 20; // Length of the crop mark lines
-        const markOffset = 10; // Distance from the bounding box
+                // Placement x, y corresponds to the origin (0,0) of the part's coordinate system.
+                // We need to add the rotated part's bounds offset (which might be negative) to get the visual edges.
+                const absMinX = p.x + partBounds.x;
+                const absMinY = p.y + partBounds.y;
+                const absMaxX = p.x + partBounds.x + partBounds.width;
+                const absMaxY = p.y + partBounds.y + partBounds.height;
 
-        const createMark = (d) => {
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute('d', d);
-            path.setAttribute('stroke', 'black');
-            path.setAttribute('stroke-width', '1');
-            path.setAttribute('fill', 'none');
-            return path;
-        };
+                if (absMinX < minX) minX = absMinX;
+                if (absMinY < minY) minY = absMinY;
+                if (absMaxX > maxX) maxX = absMaxX;
+                if (absMaxY > maxY) maxY = absMaxY;
+            });
 
-        // Top-left
-        newSvg.appendChild(createMark(`M ${bounds.left - markOffset} ${bounds.top - markOffset - markLength} L ${bounds.left - markOffset} ${bounds.top - markOffset}`));
-        newSvg.appendChild(createMark(`M ${bounds.left - markOffset - markLength} ${bounds.top - markOffset} L ${bounds.left - markOffset} ${bounds.top - markOffset}`));
-        // Top-right
-        newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.top - markOffset - markLength} L ${bounds.right + markOffset} ${bounds.top - markOffset}`));
-        newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.top - markOffset} L ${bounds.right + markOffset} ${bounds.top - markOffset}`));
-        // Bottom-left
-        newSvg.appendChild(createMark(`M ${bounds.left - markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.left - markOffset} ${bounds.bottom + markOffset}`));
-        newSvg.appendChild(createMark(`M ${bounds.left - markOffset - markLength} ${bounds.bottom + markOffset} L ${bounds.left - markOffset} ${bounds.bottom + markOffset}`));
-        // Bottom-right
-        newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
-        newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.bottom + markOffset} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
+            // If no parts placed, skip marks
+            if (minX !== Infinity) {
+                const bounds = {
+                    left: minX,
+                    top: minY,
+                    right: maxX,
+                    bottom: maxY,
+                };
+
+                const markLength = 20; // Length of the crop mark lines
+                const markOffset = 10; // Distance from the bounding box
+
+                const createMark = (d) => {
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    path.setAttribute('d', d);
+                    path.setAttribute('stroke', 'black');
+                    path.setAttribute('stroke-width', '1');
+                    path.setAttribute('fill', 'none');
+                    return path;
+                };
+
+                // Top-left
+                newSvg.appendChild(createMark(`M ${bounds.left - markOffset} ${bounds.top - markOffset - markLength} L ${bounds.left - markOffset} ${bounds.top - markOffset}`));
+                newSvg.appendChild(createMark(`M ${bounds.left - markOffset - markLength} ${bounds.top - markOffset} L ${bounds.left - markOffset} ${bounds.top - markOffset}`));
+                // Top-right
+                newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.top - markOffset - markLength} L ${bounds.right + markOffset} ${bounds.top - markOffset}`));
+                newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.top - markOffset} L ${bounds.right + markOffset} ${bounds.top - markOffset}`));
+                // Bottom-left
+                newSvg.appendChild(createMark(`M ${bounds.left - markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.left - markOffset} ${bounds.bottom + markOffset}`));
+                newSvg.appendChild(createMark(`M ${bounds.left - markOffset - markLength} ${bounds.bottom + markOffset} L ${bounds.left - markOffset} ${bounds.bottom + markOffset}`));
+                // Bottom-right
+                newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
+                newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.bottom + markOffset} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
+            }
+        }
 
 
         const serializer = new XMLSerializer();
