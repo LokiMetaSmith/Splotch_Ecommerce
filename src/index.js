@@ -940,6 +940,8 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
         return;
     }
 
+    ctx.save();
+
     // The user wanted a grey box with 1-inch dashes for pricing.
     // The previous implementation calculated a dash length from PPI, which was often
     // too large to be visible on smaller images. A fixed dash pattern is more reliable.
@@ -961,10 +963,11 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
 
     console.log('[DEBUG] strokeRect args:', { x, y, w, h, lineWidth: ctx.lineWidth, strokeStyle: ctx.strokeStyle });
 
-    ctx.strokeRect(x, y, w, h);
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.stroke();
 
-    // Reset line dash for subsequent drawing operations.
-    ctx.setLineDash([]);
+    ctx.restore();
 }
 
 function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
@@ -1134,6 +1137,11 @@ function redrawOriginalImageWithFilters() {
     // Start with the fresh, original image
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+
+    // Explicitly restore stroke style before drawing decorations
+    // as drawImage might reset some context state or previous operations might have polluted it.
+    ctx.strokeStyle = 'rgba(128, 128, 128, 0.9)';
+    ctx.lineWidth = 2;
 
     // Apply filters based on state
     if (isGrayscale) {

@@ -34,6 +34,19 @@ const pricingConfig = {
 export const test = base.extend({
   // 'auto' automatically runs this fixture for every test that uses it.
   autoMock: [async ({ page }, use) => {
+    // Mock the Square Web Payments SDK
+    await page.addInitScript(() => {
+      window.Square = {
+        payments: () => ({
+          card: async () => ({
+            attach: async () => {},
+            tokenize: async () => ({ status: 'OK', token: 'mock-sq-token' }),
+            destroy: async () => {},
+          })
+        })
+      };
+    });
+
     // Set up the mock before the test runs
     await page.route('**/api/**', (route) => {
       const url = new URL(route.request().url());
