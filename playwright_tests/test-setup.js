@@ -47,82 +47,96 @@ export const test = base.extend({
       };
     });
 
-    // Set up the mock before the test runs
-    await page.route('**/api/**', (route) => {
-      const url = new URL(route.request().url());
-      const pathname = url.pathname;
-      console.log(`[MOCK] Intercepted API request for: ${pathname}`);
+    // Intercept requests
+    await page.route('**/*', async (route) => {
+        const url = new URL(route.request().url());
+        const pathname = url.pathname;
 
-      // --- API Mock Router ---
+        // Block external Square SDK to prevent it from overwriting our mock
+        if (url.hostname.includes('squarecdn') || pathname.endsWith('square.js')) {
+            console.log(`[MOCK] Blocking external script: ${url.href}`);
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/javascript',
+                body: 'console.log("Square SDK blocked by test");'
+            });
+        }
 
-      if (pathname.endsWith('/api/csrf-token')) {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ csrfToken: 'mock-csrf-token-12345' }),
-        });
-      }
+        // Handle API requests
+        if (pathname.startsWith('/api/') || pathname.includes('/api/')) {
+            console.log(`[MOCK] Intercepted API request for: ${pathname}`);
 
-      if (pathname.endsWith('/api/pricing-info')) {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(pricingConfig),
-        });
-      }
+            if (pathname.endsWith('/api/csrf-token')) {
+                return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ csrfToken: 'mock-csrf-token-12345' }),
+                });
+            }
 
-      if (pathname.endsWith('/api/auth/magic-login')) {
-         return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ success: true, message: "Magic link sent!" }),
-        });
-      }
+            if (pathname.endsWith('/api/pricing-info')) {
+                return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(pricingConfig),
+                });
+            }
 
-      if (pathname.endsWith('/api/upload-design')) {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            message: 'Upload successful',
-            designImagePath: '/uploads/mocked-design.png',
-            cutLinePath: null
-          }),
-        });
-      }
+            if (pathname.endsWith('/api/auth/magic-login')) {
+                return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ success: true, message: "Magic link sent!" }),
+                });
+            }
 
-      if (pathname.endsWith('/api/auth/issue-temp-token')) {
-        return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ token: 'mock-temp-auth-token-xyz' })
-        });
-      }
+            if (pathname.endsWith('/api/upload-design')) {
+                return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    message: 'Upload successful',
+                    designImagePath: '/uploads/mocked-design.png',
+                    cutLinePath: null
+                }),
+                });
+            }
 
-      if (pathname.endsWith('/api/create-order')) {
-          return route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({ success: true, orderId: 'mock-order-id-67890' })
-          });
-      }
+            if (pathname.endsWith('/api/auth/issue-temp-token')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ token: 'mock-temp-auth-token-xyz' })
+                });
+            }
 
-      if (pathname.endsWith('/api/server-info')) {
-        return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ version: '1.0.0-mock', environment: 'test' })
-        });
-      }
+            if (pathname.endsWith('/api/create-order')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ success: true, orderId: 'mock-order-id-67890' })
+                });
+            }
 
+            if (pathname.endsWith('/api/server-info')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ version: '1.0.0-mock', environment: 'test' })
+                });
+            }
 
-      // --- Fallback for unhandled routes ---
-      console.warn(`[MOCK] Unhandled API route: ${pathname}`);
-      return route.fulfill({
-        status: 404,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: `Mock not found for ${pathname}` }),
-      });
+            // Fallback for unhandled API routes
+            console.warn(`[MOCK] Unhandled API route: ${pathname}`);
+            return route.fulfill({
+                status: 404,
+                contentType: 'application/json',
+                body: JSON.stringify({ error: `Mock not found for ${pathname}` }),
+            });
+        }
+
+        // Continue regular requests (CSS, JS, etc.)
+        return route.continue();
     });
 
     // Run the actual test
