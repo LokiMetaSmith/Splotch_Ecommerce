@@ -21,7 +21,7 @@ let pricingConfig = null;
 let isGrayscale = false;
 let isSepia = false;
 
-let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect;
+let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect, textEditingControlsContainer;
 let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
@@ -57,6 +57,7 @@ async function BootStrap() {
     textColorInput = document.getElementById('textColorInput');
     addTextBtn = document.getElementById('addTextBtn');
     textFontFamilySelect = document.getElementById('textFontFamily');
+    textEditingControlsContainer = document.getElementById('text-editing-controls');
     stickerMaterialSelect = document.getElementById('stickerMaterial');
     stickerResolutionSelect = document.getElementById('stickerResolution');
     designMarginNote = document.getElementById('designMarginNote');
@@ -708,6 +709,7 @@ function updateEditingButtonsState(disabled) {
         }
     });
     if (designMarginNote) designMarginNote.style.display = disabled ? 'none' : 'block';
+    if (textEditingControlsContainer) textEditingControlsContainer.hidden = disabled;
 }
 
 function setCanvasSize(logicalWidth, logicalHeight) {
@@ -934,9 +936,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
 }
 
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
-    console.log('[DEBUG] drawBoundingBox called with:', { bounds, offset, hasCtx: !!ctx, hasPricing: !!pricingConfig });
     if (!ctx || !bounds || !pricingConfig) {
-        console.log('[DEBUG] drawBoundingBox aborting due to missing dependencies');
         return;
     }
 
@@ -960,8 +960,6 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
     const y = bounds.top + offset.y + halfLineWidth;
     const w = bounds.width - ctx.lineWidth;
     const h = bounds.height - ctx.lineWidth;
-
-    console.log('[DEBUG] strokeRect args:', { x, y, w, h, lineWidth: ctx.lineWidth, strokeStyle: ctx.strokeStyle });
 
     ctx.beginPath();
     ctx.rect(x, y, w, h);
