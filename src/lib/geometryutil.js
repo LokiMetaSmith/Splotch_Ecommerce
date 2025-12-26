@@ -326,6 +326,23 @@ export const GeometryUtil = {
         }
         return 0.5 * area;
     },
+
+    rotatePolygon: function(polygon, angle) {
+        if (!polygon || polygon.length === 0) return [];
+        const angleRad = _degreesToRadians(angle);
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+        const rotated = [];
+        for (let i = 0; i < polygon.length; i++) {
+            rotated.push({
+                x: polygon[i].x * cos - polygon[i].y * sin,
+                y: polygon[i].x * sin + polygon[i].y * cos
+            });
+        }
+        if (polygon.id !== undefined) rotated.id = polygon.id;
+        if (polygon.source) rotated.source = polygon.source;
+        return rotated;
+    },
     
     // ... other methods from original file can be added here ...
 };

@@ -56,7 +56,7 @@ This document tracks the features and bug fixes that need to be implemented for 
 - [x] **Filter by Category:** Implement a filter button to allow viewing different categories of print jobs (e.g., New, In Progress, Shipped, Canceled, Delivered, Completed).
 - [x] **Add "Delivered" Category:** Add a new "Delivered" status category for orders.
 - [x] **Add "Completed" Category:** Add a new "Completed" status category for orders.
-- [ ] **Printing Marks:** Include functionality to add printing marks for borders on the print sheet.
+- [x] **Printing Marks:** Include functionality to add printing marks for borders on the print sheet.
 - [ ] **Media Margins:** Add the ability to define keepout areas or margins on the interior and edges of media rolls.
 - [ ] **Nesting Improvements:** Improve nesting of items on the print sheet, aided by the bounding box implementation.
 
