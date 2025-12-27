@@ -17,6 +17,7 @@ test('allows a user to upload an image', async ({ page }) => {
   // The check for the success message has been removed as it was causing
   // intractable failures in the test environment, even though the core
   // functionality is working.
+  await expect(page.locator('#payment-status-container')).toContainText('Image loaded successfully.', { timeout: 10000 });
 
   // Take a screenshot of the canvas to verify the image is displayed.
   await page.locator('#imageCanvas').screenshot({ path: 'test-results/image-upload-canvas.png' });

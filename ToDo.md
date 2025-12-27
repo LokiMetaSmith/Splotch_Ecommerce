@@ -12,9 +12,9 @@ These issues represent the most severe risks to the application's functionality 
 -   **[x] Test the Payment & Order API Endpoints:** The backend API endpoints for creating orders and processing payments (`/api/create-order`) and managing orders (`/api/orders`, `/api/orders/:orderId`, etc.) have **zero test coverage**. These are the most critical, revenue-generating parts of the application and must have robust integration tests.
 -   **[x] Test the Frontend Payment Submission Flow:** The entire frontend user flow for submitting a payment is untested. The existing Playwright test (`payment-form.spec.js`) only checks for the visibility of form fields. A new test is needed to simulate a user filling out the form, submitting it, and verifying the entire process.
 -   **[x] Fix Ineffective Pricing Logic Test:** The unit test for the pricing logic (`tests/pricing.test.js`) tests a **local copy of the code**, not the actual implementation from `src/index.js`. This provides a false sense of security. The test must be refactored to import and test the real `calculateStickerPrice` function.
--   **[ ] Fix Broken Playwright Tests:** Two Playwright tests have their core verification steps commented out due to "intractable failures". They must be fixed to perform proper automated validation instead of relying on manual screenshot checks.
+-   **[x] Fix Broken Playwright Tests:** Two Playwright tests have their core verification steps commented out due to "intractable failures". They must be fixed to perform proper automated validation instead of relying on manual screenshot checks.
     -   [x] `playwright_tests/add-text.spec.js`
-    -   `playwright_tests/image-upload.spec.js`
+    -   [x] `playwright_tests/image-upload.spec.js`
 
 ---
 
