@@ -12,9 +12,9 @@ These issues represent the most severe risks to the application's functionality 
 -   **[x] Test the Payment & Order API Endpoints:** The backend API endpoints for creating orders and processing payments (`/api/create-order`) and managing orders (`/api/orders`, `/api/orders/:orderId`, etc.) have **zero test coverage**. These are the most critical, revenue-generating parts of the application and must have robust integration tests.
 -   **[x] Test the Frontend Payment Submission Flow:** The entire frontend user flow for submitting a payment is untested. The existing Playwright test (`payment-form.spec.js`) only checks for the visibility of form fields. A new test is needed to simulate a user filling out the form, submitting it, and verifying the entire process.
 -   **[x] Fix Ineffective Pricing Logic Test:** The unit test for the pricing logic (`tests/pricing.test.js`) tests a **local copy of the code**, not the actual implementation from `src/index.js`. This provides a false sense of security. The test must be refactored to import and test the real `calculateStickerPrice` function.
--   **[ ] Fix Broken Playwright Tests:** Two Playwright tests have their core verification steps commented out due to "intractable failures". They must be fixed to perform proper automated validation instead of relying on manual screenshot checks.
+-   **[x] Fix Broken Playwright Tests:** Two Playwright tests have their core verification steps commented out due to "intractable failures". They must be fixed to perform proper automated validation instead of relying on manual screenshot checks.
     -   [x] `playwright_tests/add-text.spec.js`
-    -   `playwright_tests/image-upload.spec.js`
+    -   [x] `playwright_tests/image-upload.spec.js`
 
 ---
 
@@ -40,7 +40,7 @@ These items address fundamental problems with the test setup and major gaps in f
 These are smaller tasks for improving test quality and covering minor edge cases.
 
 -   **[x] Remove Placeholder Test:** The file `tests/simple.test.js` contains a useless test (`expect(true).toBe(true)`) and should be deleted.
--   **[ ] Expand Incomplete Server Tests:** The main backend integration test (`tests/server.test.js`) only covers the `/api/ping` endpoint. It should be expanded to cover all other non-auth, non-order-related endpoints.
+-   **[x] Expand Incomplete Server Tests:** The main backend integration test (`tests/server.test.js`) only covers the `/api/ping` endpoint. It should be expanded to cover all other non-auth, non-order-related endpoints.
 -   **[ ] Add Test for CLI `remove-key` Command:** The command-line interface test (`tests/cli_test.sh`) is missing coverage for the `remove-key` command.
 -   **[x] Consolidate Redundant Tests:** The `/api/ping` endpoint is tested in two different files. The duplicate test should be removed.
 
