@@ -69,7 +69,8 @@ This document tracks the features and bug fixes that need to be implemented for 
     - [x] List In-Process Orders
     - [x] List Shipped Orders
     - [x] List Canceled Orders
-    - [ ] List Delivered Orders
+    - [x] List Delivered Orders
+    - [x] List Completed Orders
 
 ## SVG, Pricing, and Customer Workflow
 

@@ -22,6 +22,7 @@ function initializeBot(database) {
         { command: 'shipped_orders', description: 'Lists all SHIPPED orders' },
         { command: 'canceled_orders', description: 'Lists all CANCELED orders' },
         { command: 'delivered_orders', description: 'Lists all DELIVERED orders' },
+        { command: 'completed_orders', description: 'Lists all COMPLETED orders' },
       ];
       bot.telegram.setMyCommands(commands);
 
@@ -57,6 +58,7 @@ function initializeBot(database) {
       bot.command('shipped_orders', (ctx) => listOrdersByStatus(ctx, ['SHIPPED'], 'Shipped Orders'));
       bot.command('canceled_orders', (ctx) => listOrdersByStatus(ctx, ['CANCELED'], 'Canceled Orders'));
       bot.command('delivered_orders', (ctx) => listOrdersByStatus(ctx, ['DELIVERED'], 'Delivered Orders'));
+      bot.command('completed_orders', (ctx) => listOrdersByStatus(ctx, ['COMPLETED'], 'Completed Orders'));
 
       // Listen for replies to add notes to orders
       bot.on(message('text'), async (ctx) => {
