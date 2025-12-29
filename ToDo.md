@@ -24,10 +24,10 @@ These items address fundamental problems with the test setup and major gaps in f
 
 -   **[ ] Unify Test Environment Setup:** The Jest environment is not configured correctly to handle ES module imports from the `/src` directory, forcing bad practices like code duplication in tests. This needs to be fixed to allow for standard `import` statements in all unit tests.
 -   **[ ] Remove API Mocking in E2E Tests:** The entire Playwright suite runs against a mocked backend. While this is useful for isolating the frontend, it is not a true end-to-end test. A separate E2E test suite or configuration should be created that runs against the **real backend** to validate full-stack integration.
--   **[ ] Add Tests for All Authentication Flows:** Backend integration tests are missing for all non-password authentication methods. Test suites need to be created for:
-    -   WebAuthn (Passkey) registration and login (`/api/auth/register-verify`, `/api/auth/login-verify`, etc.).
-    -   Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).
-    -   Google OAuth flow (`/auth/google`, `/oauth2callback`).
+-   **[x] Add Tests for All Authentication Flows:** Backend integration tests are missing for all non-password authentication methods. Test suites need to be created for:
+    -   [x] WebAuthn (Passkey) registration and login (`/api/auth/register-verify`, `/api/auth/login-verify`, etc.).
+    -   [x] Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).
+    -   [x] Google OAuth flow (`/auth/google`, `/oauth2callback`).
 -   **[ ] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
     -   Adding text to the canvas.
     -   Image rotation, resizing, and filters (grayscale, sepia).
@@ -81,7 +81,7 @@ This document tracks the features and bug fixes that need to be implemented for 
     - [x] Move the pricing model to be based on the square inch bounding box of the sticker.
     - [x] Adjust the price based on the complexity or length of the generated/provided cut path.
 - [x] **Visual Bounding Box:**
-    - [x] Allow the customer to see the calculated bounding box when they are scaling their uploaded image.
+    - [x] Allow the customer to see the calculated bounding box when they scale their uploaded image.
     - [x] **Bug:** Bounding box is not visible.
 - [x] **Size Indicators:**
     - [x] **Bug:** Size display does not update on resize.
