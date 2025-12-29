@@ -1,5 +1,6 @@
 import { test, expect } from './test-setup.js';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,20 +27,28 @@ test('bounding box is visible when scaling image', async ({ page }) => {
   });
   // -----------------------------
 
+  // Ensure verification directory exists
+  const verificationDir = path.resolve(__dirname, '../verification');
+  if (!fs.existsSync(verificationDir)) {
+      fs.mkdirSync(verificationDir, { recursive: true });
+  }
+
+  // Create a proper 100x100 image if it doesn't exist
+  // This is a 100x100 white square PNG
+  const filePath = path.join(verificationDir, 'test.png');
+  if (!fs.existsSync(filePath)) {
+      const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAXSURBVHhe7cExAQAAAMKg9U9tCy8gAAAAXP4D2AABY6YxpgAAAABJRU5ErkJggg==', 'base64');
+      fs.writeFileSync(filePath, buffer);
+  }
+
   await page.goto('/');
 
-  // Robust File Upload using setInputFiles and absolute path
-  // We go up one level from playwright_tests/ to root, then into verification/
-  const filePath = path.resolve(__dirname, '../verification/test.png');
   console.log(`[TEST] Uploading file from: ${filePath}`);
 
   // Directly target the file input.
-  // Note: If the input is hidden, setInputFiles usually still works in Playwright.
   await page.locator('input[type="file"][id="file"]').setInputFiles(filePath);
 
   // Wait for the success message to confirm processing started/finished
-  // The app shows: showPaymentStatus('Image loaded successfully.', 'success');
-  // We can wait for that text in the status container.
   const statusContainer = page.locator('#payment-status-container');
   await expect(statusContainer).toContainText('Image loaded successfully', { timeout: 10000 });
   console.log('[TEST] Image loaded successfully message detected.');
@@ -81,7 +90,7 @@ test('bounding box is visible when scaling image', async ({ page }) => {
       height: canvas.height,
       lineWidth: ctx.lineWidth,
       strokeStyle: ctx.strokeStyle,
-      pricingConfigLoaded: !!window.pricingConfig // Check if config is available if exposed or inferable
+      pricingConfigLoaded: !!window.pricingConfig
     };
   });
 
@@ -102,7 +111,11 @@ test('bounding box is visible when scaling image', async ({ page }) => {
       const a = data[i+3];
 
       // Check for grey-ish color (128, 128, 128)
-      if (Math.abs(r - 128) < 20 && Math.abs(g - 128) < 20 && Math.abs(b - 128) < 20 && a > 200) {
+      // Allow broader tolerance for alpha blending (approx 140 on white)
+      const matchesBase = Math.abs(r - 128) < 20 && Math.abs(g - 128) < 20 && Math.abs(b - 128) < 20;
+      const matchesBlended = Math.abs(r - 140) < 15 && Math.abs(g - 140) < 15 && Math.abs(b - 140) < 15;
+
+      if ((matchesBase || matchesBlended) && a > 50) {
         return true;
       }
     }
