@@ -115,7 +115,11 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
   async function logAndEmailError(error, context = 'General Error') {
     // Sanitize error logging to avoid leaking sensitive information in logs/emails.
     const sanitizedErrorMessage = `[${new Date().toISOString()}] [${context}] ${error.message}\n`;
-    fs.appendFileSync(path.join(__dirname, 'error.log'), sanitizedErrorMessage);
+    try {
+      await fs.promises.appendFile(path.join(__dirname, 'error.log'), sanitizedErrorMessage);
+    } catch (logError) {
+      console.error('CRITICAL: Failed to write to error log:', logError);
+    }
     // The full error (including stack) is still logged to the console for debugging.
     console.error(`[${context}]`, error);
     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
