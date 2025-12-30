@@ -10,7 +10,7 @@ import SVGtoPDF from 'svg-to-pdfkit';
 
 // --- Global Variables ---
 const serverUrl = ''; // Use relative paths for API calls
-let authToken = localStorage.getItem('authToken');
+let authToken;
 let csrfToken;
 let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
@@ -786,6 +786,8 @@ async function getCsrfToken() {
  * Main application entry point.
  */
 async function init() {
+    authToken = localStorage.getItem('authToken');
+
     // This creates a verifier that automatically fetches and caches keys from your JWKS endpoint
     JWKS = jose.createRemoteJWKSet(new URL(`${serverUrl}/.well-known/jwks.json`, window.location.origin));
     console.log('[CLIENT] Remote JWKS verifier created.');
