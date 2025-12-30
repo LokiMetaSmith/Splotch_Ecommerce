@@ -40,6 +40,8 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const { window } = new JSDOM('');
 const purify = DOMPurify(window);
 
+export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+
 async function sanitizeSVGFile(filePath) {
     try {
         const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -109,6 +111,13 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
   }
+
+  // Initialize activeOrders cache if not present
+  if (!db.activeOrders) {
+    db.activeOrders = db.data.orders.filter(order => !FINAL_STATUSES.includes(order.status));
+    console.log(`[SERVER] Initialized active orders cache with ${db.activeOrders.length} orders.`);
+  }
+
   // --- Google OAuth2 Client ---
 
 
@@ -478,6 +487,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           receivedAt: new Date().toISOString(),
         };
         db.data.orders.push(newOrder);
+        db.activeOrders.push(newOrder);
         await db.write();
         console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
 
@@ -629,6 +639,21 @@ ${statusChecklist}
       }
       order.status = status;
       order.lastUpdatedAt = new Date().toISOString();
+
+      // Update active orders cache
+      const isFinal = FINAL_STATUSES.includes(status);
+      const activeIndex = db.activeOrders.findIndex(o => o.orderId === orderId);
+
+      if (isFinal) {
+        if (activeIndex !== -1) {
+          db.activeOrders.splice(activeIndex, 1);
+        }
+      } else {
+        if (activeIndex === -1) {
+          db.activeOrders.push(order);
+        }
+      }
+
       await db.write();
       console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
