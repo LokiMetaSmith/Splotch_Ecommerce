@@ -92,7 +92,7 @@ async function getDesignDimensions(filePath) {
     const fileExtension = filePath.split('.').pop().toLowerCase();
 
     if (fileExtension === 'svg') {
-        const svgText = fs.readFileSync(filePath, 'utf8');
+        const svgText = await fs.promises.readFile(filePath, 'utf8');
         const parsed = parse(svgText);
         const svgNode = parsed.children[0];
         const width = parseFloat(svgNode.properties.width);
