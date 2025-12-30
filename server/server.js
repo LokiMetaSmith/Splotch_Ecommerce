@@ -97,7 +97,7 @@ const signInstanceToken = () => {
 let db;
 let app;
 
-const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
+const defaultData = { orders: {}, users: {}, credentials: {}, config: {} };
 
 // Define an async function to contain all server logic
 const oauth2Client = new google.auth.OAuth2(
@@ -108,6 +108,23 @@ const oauth2Client = new google.auth.OAuth2(
 async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json'), injectedSquareClient = null) {
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
+  }
+
+  // --- MIGRATION LOGIC: Convert orders array to object if necessary ---
+  if (Array.isArray(db.data.orders)) {
+    console.log('[SERVER] Migrating orders from Array to Object...');
+    const ordersArray = db.data.orders;
+    const ordersObject = {};
+    ordersArray.forEach(order => {
+      if (order.orderId) {
+        ordersObject[order.orderId] = order;
+      } else {
+        console.warn('[SERVER] Found order without orderId during migration, skipping:', order);
+      }
+    });
+    db.data.orders = ordersObject;
+    await db.write();
+    console.log('[SERVER] Migration complete.');
   }
   // --- Google OAuth2 Client ---
 
@@ -481,7 +498,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
         };
-        db.data.orders.push(newOrder);
+        db.data.orders[newOrder.orderId] = newOrder;
         await db.write();
         console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
 
@@ -574,7 +591,7 @@ ${statusChecklist}
       if (!isAdmin(req.user)) {
         return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
       }
-      const allOrders = db.data.orders;
+      const allOrders = Object.values(db.data.orders);
       res.status(200).json(allOrders.slice().reverse());
     });
 
@@ -584,7 +601,7 @@ ${statusChecklist}
       if (!user) {
         return res.status(401).json({ error: 'User not found' });
       }
-      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
+      const userOrders = Object.values(db.data.orders).filter(order => order.billingContact.email === user.email);
       const filteredOrders = userOrders.filter(order => order.orderId.includes(q));
       if (filteredOrders.length === 0) {
         return res.status(404).json({ error: 'Order not found' });
@@ -597,13 +614,13 @@ ${statusChecklist}
         return res.status(401).json({ error: 'Authentication token is invalid or missing email.' });
       }
       const userEmail = req.user.email;
-      const userOrders = db.data.orders.filter(order => order.billingContact.email === userEmail);
+      const userOrders = Object.values(db.data.orders).filter(order => order.billingContact.email === userEmail);
       res.status(200).json(userOrders.slice().reverse());
     });
 
     app.get('/api/orders/:orderId', authenticateToken, (req, res) => {
       const { orderId } = req.params;
-      const order = db.data.orders.find(o => o.orderId === orderId);
+      const order = db.data.orders[orderId];
 
       if (!order) {
         return res.status(404).json({ error: 'Order not found' });
@@ -627,7 +644,7 @@ ${statusChecklist}
       }
       const { orderId } = req.params;
       const { status } = req.body;
-      const order = db.data.orders.find(o => o.orderId === orderId);
+      const order = db.data.orders[orderId];
       if (!order) {
         return res.status(404).json({ error: 'Order not found.' });
       }
@@ -702,7 +719,7 @@ ${statusChecklist}
         }
         const { orderId } = req.params;
         const { trackingNumber, courier } = req.body;
-        const order = db.data.orders.find(o => o.orderId === orderId);
+        const order = db.data.orders[orderId];
         if (!order) {
             return res.status(404).json({ error: 'Order not found.' });
         }

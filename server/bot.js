@@ -28,7 +28,7 @@ function initializeBot(database) {
 
       const listOrdersByStatus = (ctx, statuses, title) => {
         try {
-          const orders = db.data.orders.filter(o => statuses.includes(o.status));
+          const orders = Object.values(db.data.orders).filter(o => statuses.includes(o.status));
 
           if (orders.length === 0) {
             ctx.reply(`No orders with status: ${statuses.join(', ')}`)
@@ -64,7 +64,7 @@ function initializeBot(database) {
       bot.on(message('text'), async (ctx) => {
         if (ctx.message.reply_to_message) {
           const originalMessageId = ctx.message.reply_to_message.message_id;
-          const order = db.data.orders.find(o => o.telegramMessageId === originalMessageId || o.telegramPhotoMessageId === originalMessageId);
+          const order = Object.values(db.data.orders).find(o => o.telegramMessageId === originalMessageId || o.telegramPhotoMessageId === originalMessageId);
 
           if (order) {
             if (!order.notes) {
@@ -87,7 +87,7 @@ function initializeBot(database) {
 
       bot.on('callback_query', async (ctx) => {
         const [action, orderId] = ctx.callbackQuery.data.split('_');
-        const order = db.data.orders.find(o => o.orderId === orderId);
+        const order = db.data.orders[orderId];
 
         if (order) {
           let newStatus;
