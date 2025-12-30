@@ -57,7 +57,7 @@ async function main() {
         }
     }
 
-    db = await JSONFilePreset(dbPath, { orders: [], users: {}, credentials: {}, config: {} });
+    db = await JSONFilePreset(dbPath, { orders: {}, users: {}, credentials: {}, config: {} });
 
     if (process.env.ENCRYPT_CLIENT_JSON === 'true') {
         const originalWrite = db.write;
@@ -93,7 +93,7 @@ async function main() {
   setInterval(async () => {
     const now = new Date();
     const finalStatuses = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
-    const stalledOrders = db.data.orders.filter(order => {
+    const stalledOrders = Object.values(db.data.orders).filter(order => {
       if (finalStatuses.includes(order.status)) {
         return false;
       }
@@ -113,7 +113,7 @@ async function main() {
           reply_to_message_id: order.telegramMessageId,
         });
         // Store the message ID so we can delete it later
-        const orderInDb = db.data.orders.find(o => o.orderId === order.orderId);
+        const orderInDb = db.data.orders[order.orderId];
         if (orderInDb) {
             orderInDb.stalledMessageId = sentMessage.message_id;
             await db.write();

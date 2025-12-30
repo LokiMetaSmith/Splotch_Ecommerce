@@ -30,7 +30,7 @@ describe('Order API Endpoints', () => {
         }
 
         // Setup mock DB
-        db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
+        db = await JSONFilePreset(testDbPath, { orders: {}, users: {}, credentials: {}, config: {} });
 
         // Mock Bot
         bot = {
@@ -84,7 +84,7 @@ describe('Order API Endpoints', () => {
 
     beforeEach(async () => {
         // Reset DB data (in memory object linked to file)
-        db.data.orders = [];
+        db.data.orders = {};
         db.data.users = {};
         await db.write();
         // Clear mock calls
@@ -145,7 +145,7 @@ describe('Order API Endpoints', () => {
             expect(res.body.success).toBe(true);
             expect(res.body.order.status).toBe('NEW');
             expect(mockSquareClient.payments.create).toHaveBeenCalled();
-            expect(db.data.orders).toHaveLength(1);
+            expect(Object.keys(db.data.orders)).toHaveLength(1);
             expect(bot.telegram.sendMessage).toHaveBeenCalled();
         });
 
@@ -198,7 +198,7 @@ describe('Order API Endpoints', () => {
                  billingContact: { email: 'user@example.com' },
                  amount: 1000
              };
-             db.data.orders.push(order);
+             db.data.orders[order.orderId] = order;
              await db.write();
 
              const adminToken = getAuthToken('admin', 'admin@example.com');
@@ -217,7 +217,7 @@ describe('Order API Endpoints', () => {
                  billingContact: { email: 'owner@example.com' },
                  amount: 1000
              };
-             db.data.orders.push(order);
+             db.data.orders[order.orderId] = order;
              await db.write();
 
              const ownerToken = getAuthToken('owner', 'owner@example.com');
@@ -235,7 +235,7 @@ describe('Order API Endpoints', () => {
                  billingContact: { email: 'owner@example.com' },
                  amount: 1000
              };
-             db.data.orders.push(order);
+             db.data.orders[order.orderId] = order;
              await db.write();
 
              const otherToken = getAuthToken('other', 'other@example.com');
@@ -258,7 +258,7 @@ describe('Order API Endpoints', () => {
                  status: 'NEW',
                  telegramMessageId: 999
              };
-             db.data.orders.push(order);
+             db.data.orders[order.orderId] = order;
              await db.write();
 
              const agent = request.agent(app);
@@ -273,7 +273,7 @@ describe('Order API Endpoints', () => {
                 .send({ status: 'PRINTING' });
 
              expect(res.statusCode).toEqual(200);
-             expect(db.data.orders[0].status).toEqual('PRINTING');
+             expect(db.data.orders[order.orderId].status).toEqual('PRINTING');
              expect(bot.telegram.editMessageText).toHaveBeenCalled();
         });
     });
@@ -291,7 +291,7 @@ describe('Order API Endpoints', () => {
                  amount: 500,
                  status: 'PRINTING'
              };
-             db.data.orders.push(order);
+             db.data.orders[order.orderId] = order;
              await db.write();
 
              const agent = request.agent(app);
@@ -306,17 +306,15 @@ describe('Order API Endpoints', () => {
                 .send({ trackingNumber: 'TRACK123', courier: 'UPS' });
 
              expect(res.statusCode).toEqual(200);
-             expect(db.data.orders[0].trackingNumber).toEqual('TRACK123');
+             expect(db.data.orders[order.orderId].trackingNumber).toEqual('TRACK123');
              expect(mockSendEmail).toHaveBeenCalled();
         });
     });
 
     describe('GET /api/orders (Admin List)', () => {
         it('should allow admin to view all orders', async () => {
-            db.data.orders.push(
-                { orderId: 'o1', receivedAt: '2023-01-01' },
-                { orderId: 'o2', receivedAt: '2023-01-02' }
-            );
+            db.data.orders['o1'] = { orderId: 'o1', receivedAt: '2023-01-01' };
+            db.data.orders['o2'] = { orderId: 'o2', receivedAt: '2023-01-02' };
             await db.write();
 
             const token = getAuthToken('admin', 'admin@example.com');
@@ -343,10 +341,8 @@ describe('Order API Endpoints', () => {
     describe('GET /api/orders/my-orders', () => {
         it('should return orders for the authenticated user', async () => {
             const email = 'my@example.com';
-            db.data.orders.push(
-                { orderId: 'my1', billingContact: { email }, receivedAt: '2023-01-01' },
-                { orderId: 'other1', billingContact: { email: 'other@example.com' }, receivedAt: '2023-01-02' }
-            );
+            db.data.orders['my1'] = { orderId: 'my1', billingContact: { email }, receivedAt: '2023-01-01' };
+            db.data.orders['other1'] = { orderId: 'other1', billingContact: { email: 'other@example.com' }, receivedAt: '2023-01-02' };
             await db.write();
 
             const token = getAuthToken('myuser', email);
@@ -375,10 +371,8 @@ describe('Order API Endpoints', () => {
             const email = 'search@example.com';
             // User must exist for search endpoint
             db.data.users['searchuser'] = { email, username: 'searchuser' };
-            db.data.orders.push(
-                { orderId: 'search123', billingContact: { email }, receivedAt: '2023-01-01' },
-                { orderId: 'search456', billingContact: { email }, receivedAt: '2023-01-02' }
-            );
+            db.data.orders['search123'] = { orderId: 'search123', billingContact: { email }, receivedAt: '2023-01-01' };
+            db.data.orders['search456'] = { orderId: 'search456', billingContact: { email }, receivedAt: '2023-01-02' };
             await db.write();
 
             const token = getAuthToken('searchuser', email);
@@ -394,9 +388,7 @@ describe('Order API Endpoints', () => {
         it('should not find other users orders even if ID matches query', async () => {
              const email = 'user1@example.com';
              db.data.users['user1'] = { email, username: 'user1' };
-             db.data.orders.push(
-                { orderId: 'secret123', billingContact: { email: 'admin@example.com' } }
-             );
+             db.data.orders['secret123'] = { orderId: 'secret123', billingContact: { email: 'admin@example.com' } };
              await db.write();
 
              const token = getAuthToken('user1', email);
