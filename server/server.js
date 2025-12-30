@@ -42,25 +42,25 @@ const purify = DOMPurify(window);
 
 async function sanitizeSVGFile(filePath) {
     try {
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const fileContent = await fs.promises.readFile(filePath, 'utf-8');
         const sanitized = purify.sanitize(fileContent, { USE_PROFILES: { svg: true } });
 
         // DOMPurify returns an empty string if it finds malicious content.
         // We also check if the original content was not empty to avoid false positives.
         if (!sanitized && fileContent.trim() !== '') {
-            fs.writeFileSync(filePath, ''); // Overwrite with empty string to reject.
+            await fs.promises.writeFile(filePath, ''); // Overwrite with empty string to reject.
             console.warn(`[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`);
             return false;
         }
 
-        fs.writeFileSync(filePath, sanitized);
+        await fs.promises.writeFile(filePath, sanitized);
         console.log(`[SECURITY] SVG file sanitized successfully: ${filePath}`);
         return true;
     } catch (error) {
         console.error(`[ERROR] Could not sanitize SVG file: ${filePath}`, error);
         // In case of an error, we should not keep the potentially harmful file.
         try {
-            fs.unlinkSync(filePath);
+            await fs.promises.unlink(filePath);
         } catch (unlinkError) {
             console.error(`[ERROR] Failed to delete file after sanitization error: ${filePath}`, unlinkError);
         }
