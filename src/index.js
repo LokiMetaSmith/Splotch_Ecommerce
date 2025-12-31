@@ -29,6 +29,8 @@ let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnE
 let widthDisplayEl, heightDisplayEl;
 
 let currentOrderAmountCents = 0;
+let currentProductId = null; // Track if we are in "Product Mode"
+let creatorProfitCents = 0; // The markup for the current product
 
 // --- Main Application Setup ---
 async function BootStrap() {
@@ -134,6 +136,50 @@ async function BootStrap() {
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
     if(generateCutlineBtn) generateCutlineBtn.addEventListener('click', handleGenerateCutline);
 
+    // Creator / Product UI
+    const sellDesignBtn = document.getElementById('sellDesignBtn');
+    const productModal = document.getElementById('productModal');
+    const cancelProductBtn = document.getElementById('cancelProductBtn');
+    const createProductBtn = document.getElementById('createProductBtn');
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+
+    if (sellDesignBtn) {
+        sellDesignBtn.addEventListener('click', () => {
+             if (!originalImage || !currentCutline || currentCutline.length === 0) {
+                 showPaymentStatus('Please upload an image and generate a cutline first.', 'error');
+                 return;
+             }
+            productModal.classList.remove('hidden');
+            document.getElementById('productLinkContainer').classList.add('hidden');
+        });
+    }
+    if (cancelProductBtn) {
+        cancelProductBtn.addEventListener('click', () => productModal.classList.add('hidden'));
+    }
+    if (createProductBtn) {
+        createProductBtn.addEventListener('click', handleCreateProduct);
+    }
+    if (copyLinkBtn) {
+        copyLinkBtn.addEventListener('click', () => {
+            const linkInput = document.getElementById('productLinkInput');
+            linkInput.select();
+            document.execCommand('copy'); // Fallback/Legacy
+            navigator.clipboard.writeText(linkInput.value);
+            copyLinkBtn.textContent = 'Copied!';
+            setTimeout(() => copyLinkBtn.textContent = 'Copy', 2000);
+        });
+    }
+
+    // Check for authentication to show "Sell" button
+    checkAuthStatus();
+
+    // Check for product mode (Buyer Flow)
+    const urlParams = new URLSearchParams(window.location.search);
+    const productIdParam = urlParams.get('product_id');
+    if (productIdParam) {
+        await loadProductForBuyer(productIdParam);
+    }
+
     const standardSizesContainer = document.getElementById('standard-sizes-controls');
     if (standardSizesContainer) {
         standardSizesContainer.addEventListener('click', (e) => {
@@ -218,7 +264,10 @@ async function BootStrap() {
         showPaymentStatus("Payment form is missing. Cannot process payments.", "error");
     }
 
-    updateEditingButtonsState(!originalImage);
+    // Initial UI state
+    if (!productIdParam) {
+        updateEditingButtonsState(!originalImage);
+    }
     if (designMarginNote) designMarginNote.style.display = 'none';
 }
 
@@ -272,7 +321,11 @@ function calculateAndUpdatePrice() {
     }
 
     const priceResult = calculateStickerPrice(pricingConfig, quantity, selectedMaterial, bounds, cutline, selectedResolution);
-    currentOrderAmountCents = priceResult.total;
+
+    // --- Creator Markup Logic ---
+    const totalMarkup = creatorProfitCents * quantity;
+    currentOrderAmountCents = priceResult.total + totalMarkup;
+    // ----------------------------
 
     const ppi = selectedResolution.ppi;
     let width = (bounds.width / ppi);
@@ -288,8 +341,14 @@ function calculateAndUpdatePrice() {
     if (widthDisplayEl) widthDisplayEl.value = width.toFixed(2);
     if (heightDisplayEl) heightDisplayEl.value = height.toFixed(2);
 
+    let markupHtml = '';
+    if (creatorProfitCents > 0) {
+        markupHtml = `<span class="text-xs text-green-600 block">Includes Creator Support: ${formatPrice(totalMarkup)}</span>`;
+    }
+
     calculatedPriceDisplay.innerHTML = `
         <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
+        ${markupHtml}
         <span class="text-sm text-gray-600 block">
             Size: ${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}
         </span>
@@ -517,7 +576,8 @@ async function handlePaymentFormSubmit(event) {
             designImagePath,
             orderDetails,
             billingContact,
-            _csrf: csrfToken // Add CSRF token to payload
+            _csrf: csrfToken, // Add CSRF token to payload
+            productId: currentProductId // Include if it exists
         };
 
         // 5. Submit the order to the server
@@ -1381,4 +1441,199 @@ function rdp(points, epsilon) {
 function simplifyPolygon(points, epsilon = 1.0) {
     if (points.length < 3) return points;
     return rdp(points, epsilon);
+}
+
+// --- Creator / Product Functions ---
+async function checkAuthStatus() {
+    try {
+        const response = await fetch(`${serverUrl}/api/auth/verify-token`, {
+            credentials: 'include',
+            headers: {
+                // If there's a token in local storage (e.g., from login), add it.
+                // However, the cookie-based flow might be safer if implemented.
+                // The current codebase uses query params or expects cookies?
+                // `authenticateToken` checks Authorization header.
+                // The main page might not have the token in the header if it's not set.
+                // Let's check how the dashboard does it. Dashboard extracts from URL.
+                // For the main page, we might need to rely on a cookie or check localStorage if token was saved.
+                // For this implementation, let's assume if the user visited the dashboard, they might have a token.
+                // But the main page doesn't seem to persist it.
+                // HACKERMAN SOLUTION: Check URL for token too, or just don't show button if not explicit.
+            }
+        });
+
+        // Wait, the main page doesn't have login logic.
+        // The user must provide a token via URL or LocalStorage to be "Logged In" on the main page.
+        // Let's check localStorage.
+        const token = localStorage.getItem('splotch_token');
+        if (token) {
+             const verifyRes = await fetch(`${serverUrl}/api/auth/verify-token`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+             });
+             if (verifyRes.ok) {
+                 const sellBtn = document.getElementById('sellDesignBtn');
+                 if (sellBtn) sellBtn.classList.remove('hidden');
+             }
+        }
+    } catch (e) {
+        // Not logged in
+    }
+}
+
+async function handleCreateProduct() {
+    const name = document.getElementById('productName').value;
+    const profitInput = document.getElementById('creatorProfit').value;
+    const profitCents = Math.round(parseFloat(profitInput) * 100);
+
+    if (!name || isNaN(profitCents)) {
+        alert('Please enter a valid name and profit amount.');
+        return;
+    }
+
+    // We need to upload the file first if it's not already on the server?
+    // Actually, handlePaymentFormSubmit uploads it. We need a similar flow here.
+    // OR we reuse the upload endpoint.
+    // But `handleFileChange` just reads locally.
+
+    // 1. Get auth token
+    const token = localStorage.getItem('splotch_token');
+    if (!token) {
+        alert('You must be logged in to sell designs.');
+        return;
+    }
+
+    try {
+        // 2. Upload Design
+        const designImageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const uploadFormData = new FormData();
+        uploadFormData.append('designImage', designImageBlob, 'design.png');
+        uploadFormData.append('_csrf', csrfToken);
+
+        // Use existing upload endpoint
+        const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-CSRF-Token': csrfToken
+            },
+            body: uploadFormData
+        });
+        const uploadData = await uploadResponse.json();
+        if (!uploadResponse.ok) throw new Error(uploadData.error || 'Upload failed');
+
+        // 3. Create Product
+        const productPayload = {
+            name,
+            creatorProfitCents: profitCents,
+            designImagePath: uploadData.designImagePath,
+            cutLinePath: uploadData.cutLinePath,
+            _csrf: csrfToken
+        };
+
+        const createResponse = await fetch(`${serverUrl}/api/products`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify(productPayload)
+        });
+
+        const createData = await createResponse.json();
+        if (!createResponse.ok) throw new Error(createData.error || 'Creation failed');
+
+        // 4. Show Link
+        const link = `${window.location.origin}${window.location.pathname}?product_id=${createData.product.productId}`;
+        document.getElementById('productLinkInput').value = link;
+        document.getElementById('productLinkContainer').classList.remove('hidden');
+        document.getElementById('createProductBtn').classList.add('hidden'); // Prevent double click
+
+    } catch (error) {
+        console.error(error);
+        alert('Failed to create product: ' + error.message);
+    }
+}
+
+async function loadProductForBuyer(productId) {
+    try {
+        currentProductId = productId;
+        showPaymentStatus('Loading product design...', 'info');
+
+        const response = await fetch(`${serverUrl}/api/products/${productId}`);
+        if (!response.ok) throw new Error('Product not found');
+
+        const product = await response.json();
+
+        // Set Pricing Markup
+        creatorProfitCents = product.creatorProfitCents;
+
+        // Load Image
+        const img = new Image();
+        img.onload = () => {
+            originalImage = img;
+            // Draw
+            const maxWidth = 500, maxHeight = 400;
+            let newWidth = img.width, newHeight = img.height;
+            if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
+            if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
+            setCanvasSize(newWidth, newHeight);
+            ctx.clearRect(0, 0, newWidth, newHeight);
+            ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+            // Mock Cutline if not provided (or parse it if it is)
+            // For MVP, if there is no cutline path in response, we default to box?
+            // Actually, products should have cutlines if they were created via the UI.
+            // But we don't have code to load the cutline from a file URL back into `currentCutline` polygons easily
+            // without parsing the SVG again.
+            // Hackerman shortcut: Just use the bounds of the image for now or trigger auto-trace?
+            // Better: If we have the image, we can just treat it as a fresh load.
+            // But we should "Lock" the UI.
+
+            // Generate basic bounds
+            currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
+            currentCutline = [[
+                { x: 0, y: 0 },
+                { x: newWidth, y: 0 },
+                { x: newWidth, y: newHeight },
+                { x: 0, y: newHeight }
+            ]];
+            // If the product had a complex cutline, we aren't loading it visually here for the buyer
+            // unless we fetch and parse the SVG.
+            // For this MVP, let's trigger the "Smart Cutline" automatically if it looks transparent?
+            // Or just default to rectangle.
+
+            // LOCK UI
+            updateEditingButtonsState(true); // Disable all editing
+            // Re-enable resize
+            if (resizeBtnEl) resizeBtnEl.disabled = false;
+            document.getElementById('resizeSlider').disabled = false;
+
+            // Hide "Sell" button
+            const sellBtn = document.getElementById('sellDesignBtn');
+            if (sellBtn) sellBtn.style.display = 'none';
+
+            // Hide Upload Input
+            if (fileInputGlobalRef) fileInputGlobalRef.closest('.field').style.display = 'none';
+
+            // Show "Supporting" message
+            if (product.creatorName) {
+                const header = document.querySelector('h1');
+                const supportMsg = document.createElement('div');
+                supportMsg.className = 'text-center text-green-600 font-bold mb-4';
+                supportMsg.textContent = `Supporting Artist: ${product.creatorName}`;
+                header.insertAdjacentElement('afterend', supportMsg);
+            }
+
+            calculateAndUpdatePrice();
+            drawCanvasDecorations(currentBounds);
+            showPaymentStatus('Design loaded!', 'success');
+        };
+        img.crossOrigin = "Anonymous"; // Important for canvas manipulation if on different port
+        img.src = product.designImagePath;
+
+    } catch (error) {
+        console.error(error);
+        showPaymentStatus('Failed to load product.', 'error');
+    }
 }

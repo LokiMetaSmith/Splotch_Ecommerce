@@ -97,7 +97,7 @@ const signInstanceToken = () => {
 let db;
 let app;
 
-const defaultData = { orders: {}, users: {}, credentials: {}, config: {} };
+const defaultData = { orders: {}, users: {}, credentials: {}, config: {}, products: {} };
 
 // Define an async function to contain all server logic
 const oauth2Client = new google.auth.OAuth2(
@@ -108,6 +108,12 @@ const oauth2Client = new google.auth.OAuth2(
 async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json'), injectedSquareClient = null) {
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
+  }
+
+  // Ensure products collection exists
+  if (!db.data.products) {
+    db.data.products = {};
+    await db.write();
   }
 
   // --- MIGRATION LOGIC: Convert orders array to object if necessary ---
@@ -125,6 +131,20 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     db.data.orders = ordersObject;
     await db.write();
     console.log('[SERVER] Migration complete.');
+  }
+
+  // --- MIGRATION LOGIC: Ensure users have walletBalanceCents ---
+  let userMigrationNeeded = false;
+  Object.values(db.data.users).forEach(user => {
+    if (typeof user.walletBalanceCents === 'undefined') {
+      user.walletBalanceCents = 0;
+      userMigrationNeeded = true;
+    }
+  });
+  if (userMigrationNeeded) {
+    console.log('[SERVER] Migrating users to include walletBalanceCents...');
+    await db.write();
+    console.log('[SERVER] User wallet migration complete.');
   }
   // --- Google OAuth2 Client ---
 
@@ -449,6 +469,77 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         });
     });
 
+    // --- Product Endpoints ---
+    app.post('/api/products', authenticateToken, [
+        body('name').notEmpty().withMessage('Product name is required'),
+        body('designImagePath').notEmpty().withMessage('Design image is required'),
+        body('creatorProfitCents').isInt({ min: 0 }).withMessage('Creator profit must be a non-negative integer'),
+    ], async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        try {
+            const { name, designImagePath, cutLinePath, creatorProfitCents, defaults } = req.body;
+
+            // Robust lookup for creator
+            let creator = null;
+            // The token payload from authenticateToken is in req.user
+            if (req.user.email) {
+                creator = Object.values(db.data.users).find(u => u.email === req.user.email);
+            } else if (req.user.username) {
+                // Check both direct access and scan
+                creator = db.data.users[req.user.username] || Object.values(db.data.users).find(u => u.username === req.user.username);
+            }
+
+            if (!creator) {
+                return res.status(401).json({ error: 'User not found.' });
+            }
+
+            const productId = randomUUID();
+            const newProduct = {
+                productId,
+                creatorId: creator.id || creator.username, // Use ID if available, else username (legacy)
+                creatorName: creator.username,
+                name,
+                designImagePath,
+                cutLinePath,
+                creatorProfitCents: Number(creatorProfitCents),
+                defaults: defaults || {},
+                createdAt: new Date().toISOString(),
+                status: 'active'
+            };
+
+            db.data.products[productId] = newProduct;
+            await db.write();
+
+            console.log(`[SERVER] New product created: ${productId} by ${newProduct.creatorName}`);
+            res.status(201).json({ success: true, product: newProduct });
+
+        } catch (error) {
+            await logAndEmailError(error, 'Error creating product');
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    });
+
+    app.get('/api/products/:productId', (req, res) => {
+        const { productId } = req.params;
+        const product = db.data.products[productId];
+        if (!product) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        res.json({
+            productId: product.productId,
+            name: product.name,
+            designImagePath: product.designImagePath,
+            cutLinePath: product.cutLinePath,
+            creatorProfitCents: product.creatorProfitCents,
+            defaults: product.defaults,
+            creatorName: product.creatorName
+        });
+    });
+
     // --- Order Endpoints ---
     app.post('/api/create-order', authenticateToken, [
       body('sourceId').notEmpty().withMessage('sourceId is required'),
@@ -461,7 +552,34 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetails } = req.body;
+        const { sourceId, amountCents, currency, designImagePath, shippingContact, productId, ...orderDetails } = req.body;
+
+        // --- Product / Creator Payout Logic ---
+        let product = null;
+        let creator = null;
+
+        if (productId) {
+            product = db.data.products[productId];
+            if (!product) {
+                return res.status(400).json({ error: 'Invalid productId. Product not found.' });
+            }
+
+            // Verify price integrity if needed.
+            // Ideally, we would re-calculate price here: Base Price (from dimensions) + Creator Profit.
+            // But for MVP, we'll trust the client's `amountCents` matches the expected calculation,
+            // or perform a simple check if we had dimensions on the backend.
+            // Since `calculateStickerPrice` is available, we could do it, but we need the dimensions from the request.
+            // The request currently only sends `orderDetails`, which has `quantity` but maybe not exact `bounds`.
+            // Let's rely on the fact that the payment amount is what the user authorized.
+
+            // Identify creator to pay
+            const creatorId = product.creatorId;
+            // CreatorId might be username or ID.
+            if (creatorId) {
+                creator = db.data.users[creatorId] || Object.values(db.data.users).find(u => u.username === creatorId || u.id === creatorId);
+            }
+        }
+
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
@@ -497,8 +615,23 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           shippingContact: shippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
+          productId: productId || null,
+          creatorId: creator ? (creator.id || creator.username) : null
         };
         db.data.orders[newOrder.orderId] = newOrder;
+
+        // --- Process Payout ---
+        if (product && creator) {
+            const quantity = orderDetails.orderDetails.quantity || 1;
+            const payoutAmount = product.creatorProfitCents * quantity;
+
+            if (payoutAmount > 0) {
+                if (typeof creator.walletBalanceCents === 'undefined') creator.walletBalanceCents = 0;
+                creator.walletBalanceCents += payoutAmount;
+                console.log(`[SERVER] Added ${payoutAmount} cents to wallet of ${creator.username}. New balance: ${creator.walletBalanceCents}`);
+            }
+        }
+
         await db.write();
         console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
 

@@ -48,7 +48,10 @@
     <main class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-center text-gray-700">Custom Sticker Editor & Secure Pay</h1>
-            <a href="/orders.html" class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full">View Order History</a>
+            <div class="flex space-x-2">
+                <button id="sellDesignBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-full hidden">Sell this Design</button>
+                <a href="/orders.html" class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full">View Order History</a>
+            </div>
         </div>
 
         <!-- PeerJS Connection Status -->
@@ -290,6 +293,36 @@
             </div>
             <div id="ipfsLinkContainer" class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow"></div>
         </form>
+
+        <!-- Product Creation Modal -->
+        <div id="productModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">Sell This Design</h2>
+                <p class="mb-4 text-gray-600">Create a shareable link. You earn the profit you set for every sale.</p>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="productName">Product Name</label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="productName" type="text" placeholder="My Awesome Sticker">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="creatorProfit">Your Profit (USD per sticker)</label>
+                    <div class="flex items-center">
+                        <span class="text-gray-500 mr-2">$</span>
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="creatorProfit" type="number" min="0" step="0.01" value="1.00">
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <button id="cancelProductBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                    <button id="createProductBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Create Link</button>
+                </div>
+                <div id="productLinkContainer" class="mt-4 hidden">
+                    <p class="text-sm font-bold text-green-600 mb-2">Success! Share this link:</p>
+                    <div class="flex">
+                        <input id="productLinkInput" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" type="text" readonly>
+                        <button id="copyLinkBtn" class="ml-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
     <div id="mascot-container" title="Hi! I'm the Splotch Mascot!">
         <div class="speech-bubble" id="mascot-text">Create something awesome today!</div>
