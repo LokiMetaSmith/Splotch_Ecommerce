@@ -17,7 +17,7 @@ let JWKS; // To hold the remote key set verifier
 
 // --- DOM Elements ---
 // A single object to hold all DOM elements for cleaner management
-const ui = {};
+export const ui = {};
 
 // --- Helper Functions ---
 
@@ -415,7 +415,7 @@ function filterAndDisplayOrders(status) {
  * Renders a single order card into the DOM using safe DOM creation methods.
  * @param {object} order - The order object from the server.
  */
-function displayOrder(order) {
+export function displayOrder(order) {
     const card = document.createElement('div');
     card.className = 'order-card';
     card.id = `order-card-${order.orderId}`;
@@ -785,7 +785,7 @@ async function getCsrfToken() {
 /**
  * Main application entry point.
  */
-async function init() {
+export async function init() {
     authToken = localStorage.getItem('authToken');
 
     // This creates a verifier that automatically fetches and caches keys from your JWKS endpoint

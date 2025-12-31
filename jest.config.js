@@ -5,4 +5,5 @@ export default {
     moduleNameMapper: {
         '\\.css$': '<rootDir>/tests/__mocks__/styleMock.js',
     },
+    setupFiles: ['<rootDir>/tests/jest-setup.js'],
 };
