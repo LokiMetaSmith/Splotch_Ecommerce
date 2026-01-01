@@ -64,7 +64,9 @@ async function main() {
         db.write = async function() {
             const data = JSON.stringify(this.data);
             const encryptedData = encrypt(data);
-            await fs.promises.writeFile(dbPath, encryptedData);
+            const tempPath = `${dbPath}.tmp`;
+            await fs.promises.writeFile(tempPath, encryptedData);
+            await fs.promises.rename(tempPath, dbPath);
         }
     }
 
