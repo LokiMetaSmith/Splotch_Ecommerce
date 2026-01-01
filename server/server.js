@@ -99,7 +99,7 @@ const signInstanceToken = () => {
 let db;
 let app;
 
-const defaultData = { orders: {}, users: {}, credentials: {}, config: {}, products: {} };
+const defaultData = { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
 
 // Define an async function to contain all server logic
 const oauth2Client = new google.auth.OAuth2(
@@ -156,6 +156,28 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     await db.write();
     console.log('[SERVER] User wallet migration complete.');
   }
+
+  // --- MIGRATION LOGIC: Build Email Index ---
+  if (!db.data.emailIndex) {
+      db.data.emailIndex = {};
+  }
+
+  // Rebuild index if empty (or always check consistency on startup? explicit rebuild is safer for now)
+  // We check if we have users but no index entries
+  const hasUsers = Object.keys(db.data.users).length > 0;
+  const hasIndex = Object.keys(db.data.emailIndex).length > 0;
+
+  if (hasUsers && !hasIndex) {
+      console.log('[SERVER] Building email index...');
+      Object.entries(db.data.users).forEach(([key, user]) => {
+          if (user.email) {
+              db.data.emailIndex[user.email] = key;
+          }
+      });
+      await db.write();
+      console.log('[SERVER] Email index built.');
+  }
+
   // --- Google OAuth2 Client ---
 
 
@@ -375,6 +397,24 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
     // --- Helper Functions ---
+    function getUserByEmail(email) {
+        if (!email) return undefined;
+        // Check index first
+        if (db.data.emailIndex && db.data.emailIndex[email]) {
+            const key = db.data.emailIndex[email];
+            const user = db.data.users[key];
+            if (user) return user;
+            // Index is stale?
+            console.warn(`[SERVER] Email index inconsistency: ${email} -> ${key} but user not found. Cleaning up.`);
+            delete db.data.emailIndex[email];
+        }
+        // Fallback to scan (should not happen if index is healthy)
+        // But for safety during rollout, we can do a scan or just return undefined.
+        // Returning undefined is strictly O(1) assuming index is authority.
+        // Let's stick to the plan: if not in index, it's not there.
+        return undefined;
+    }
+
     function authenticateToken(req, res, next) {
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
@@ -497,7 +537,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
             let creator = null;
             // The token payload from authenticateToken is in req.user
             if (req.user.email) {
-                creator = Object.values(db.data.users).find(u => u.email === req.user.email);
+                creator = getUserByEmail(req.user.email);
             } else if (req.user.username) {
                 // Check both direct access and scan
                 creator = db.data.users[req.user.username] || Object.values(db.data.users).find(u => u.username === req.user.username);
@@ -745,7 +785,7 @@ ${statusChecklist}
 
     app.get('/api/orders/search', authenticateToken, (req, res) => {
       const { q } = req.query;
-      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
+      const user = getUserByEmail(req.user.email);
       if (!user) {
         return res.status(401).json({ error: 'User not found' });
       }
@@ -1041,7 +1081,7 @@ ${statusChecklist}
             return res.status(400).json({ errors: errors.array() });
         }
         const { email } = req.body;
-        let user = Object.values(db.data.users).find(u => u.email === email);
+        let user = getUserByEmail(email);
         if (!user) {
             user = {
                 id: randomUUID(),
@@ -1049,6 +1089,8 @@ ${statusChecklist}
                 credentials: [],
             };
             db.data.users[user.id] = user;
+            // Update Index
+            db.data.emailIndex[email] = user.id;
             await db.write();
         }
         const { privateKey, kid } = getCurrentSigningKey();
@@ -1086,7 +1128,7 @@ ${statusChecklist}
         if (err) {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
-        const user = Object.values(db.data.users).find(u => u.email === decoded.email);
+        const user = getUserByEmail(decoded.email);
         if (!user) {
           return res.status(401).json({ error: 'User not found' });
         }
@@ -1167,7 +1209,7 @@ ${statusChecklist}
         console.log('Google authentication successful for:', userEmail);
 
         // Find or create a user in our database
-        let user = Object.values(db.data.users).find(u => u.email === userEmail);
+        let user = getUserByEmail(userEmail);
         if (!user) {
           // Create a new user if they don't exist
           const newUsername = userEmail.split('@')[0]; // Use email prefix as username
@@ -1180,6 +1222,8 @@ ${statusChecklist}
             google_tokens: tokens,
           };
           db.data.users[user.id] = user;
+          // Update Index
+          db.data.emailIndex[userEmail] = user.id;
           await db.write();
           console.log(`New user created for ${userEmail}`);
 
