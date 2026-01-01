@@ -157,6 +157,20 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     console.log('[SERVER] User wallet migration complete.');
   }
 
+  // --- MIGRATION LOGIC: Ensure users have role ---
+  let userRoleMigrationNeeded = false;
+  Object.values(db.data.users).forEach(user => {
+    if (!user.role) {
+      user.role = 'user'; // Default to user
+      userRoleMigrationNeeded = true;
+    }
+  });
+  if (userRoleMigrationNeeded) {
+    console.log('[SERVER] Migrating users to include role...');
+    await db.write();
+    console.log('[SERVER] User role migration complete.');
+  }
+
   // --- MIGRATION LOGIC: Build Email Index ---
   if (!db.data.emailIndex) {
       db.data.emailIndex = {};
@@ -439,10 +453,17 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       });
     }
 
-    const isAdmin = (user) => {
-      if (!user || !user.email) return false;
-      // Check if the user's email matches the admin email from environment variables
-      return user.email === process.env.ADMIN_EMAIL;
+    const isAdmin = (userPayload) => {
+      if (!userPayload) return false;
+      // Check env var fallback first (fastest)
+      if (userPayload.email === process.env.ADMIN_EMAIL) return true;
+
+      // Look up full user object
+      const user = getUserByEmail(userPayload.email) || (userPayload.username ? db.data.users[userPayload.username] : undefined);
+
+      if (user && user.role === 'admin') return true;
+
+      return false;
     };
 
     // --- API Endpoints ---
@@ -841,88 +862,99 @@ ${statusChecklist}
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
-      const { orderId } = req.params;
-      const { status } = req.body;
-      const order = db.data.orders[orderId];
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found.' });
-      }
-      order.status = status;
-      order.lastUpdatedAt = new Date().toISOString();
-      await db.write();
-      console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
-      // Update active orders cache
-      if (db.activeOrders) {
-          if (FINAL_STATUSES.includes(status)) {
-              // Remove from active orders if status is final
-              const idx = db.activeOrders.findIndex(o => o.orderId === orderId);
-              if (idx !== -1) {
-                  db.activeOrders.splice(idx, 1);
-              }
-          } else {
-              // Add to active orders if status is non-final (re-activation)
-              const exists = db.activeOrders.find(o => o.orderId === orderId);
-              if (!exists) {
-                  db.activeOrders.push(order);
+      try {
+          // Check for admin role
+          if (!isAdmin(req.user)) {
+              return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+          }
+
+          const { orderId } = req.params;
+          const { status } = req.body;
+          const order = db.data.orders[orderId];
+          if (!order) {
+            return res.status(404).json({ error: 'Order not found.' });
+          }
+          order.status = status;
+          order.lastUpdatedAt = new Date().toISOString();
+          await db.write();
+          console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
+
+          // Update active orders cache
+          if (db.activeOrders) {
+              if (FINAL_STATUSES.includes(status)) {
+                  // Remove from active orders if status is final
+                  const idx = db.activeOrders.findIndex(o => o.orderId === orderId);
+                  if (idx !== -1) {
+                      db.activeOrders.splice(idx, 1);
+                  }
+              } else {
+                  // Add to active orders if status is non-final (re-activation)
+                  const exists = db.activeOrders.find(o => o.orderId === orderId);
+                  if (!exists) {
+                      db.activeOrders.push(order);
+                  }
               }
           }
-      }
 
-      // Update Telegram message
-      if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
-        const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-        const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-        const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
-        const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
-        const completedOrLater = ['COMPLETED'];
+          // Update Telegram message
+          if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
+            const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
+            const completedOrLater = ['COMPLETED'];
 
-        const statusChecklist = `
+            const statusChecklist = `
 ✅ New
 ${acceptedOrLater.includes(status) ? '✅' : '⬜️'} Accepted
 ${printingOrLater.includes(status) ? '✅' : '⬜️'} Printing
 ${shippedOrLater.includes(status) ? '✅' : '⬜️'} Shipped
 ${deliveredOrLater.includes(status) ? '✅' : '⬜️'} Delivered
 ${completedOrLater.includes(status) ? '✅' : '⬜️'} Completed
-        `;
-        const message = `
+            `;
+            const message = `
 Order: ${order.orderId}
 Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
 Email: ${order.billingContact.email}
-Quantity: ${order.orderDetails.quantity}
+Quantity: ${order.orderDetails?.quantity || 0}
 Amount: $${(order.amount / 100).toFixed(2)}
 
 ${statusChecklist}
-        `;
-        try {
-          if (status === 'COMPLETED' || status === 'CANCELED') {
-            // Order is complete or canceled, delete the checklist message
-            await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
-            // also delete the photo if it exists and hasn't been deleted
-            if (order.telegramPhotoMessageId) {
-                await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
-            }
-          } else {
-            // For all other statuses, edit the message
-            const keyboard = getOrderStatusKeyboard(order);
-            await bot.telegram.editMessageText(
-                process.env.TELEGRAM_CHANNEL_ID,
-                order.telegramMessageId,
-                undefined,
-                message,
-                { reply_markup: keyboard }
-            );
-            // If the status is SHIPPED, also delete the photo
-            if (status === 'SHIPPED' && order.telegramPhotoMessageId) {
-              await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+            `;
+            try {
+              if (status === 'COMPLETED' || status === 'CANCELED') {
+                // Order is complete or canceled, delete the checklist message
+                await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+                // also delete the photo if it exists and hasn't been deleted
+                if (order.telegramPhotoMessageId) {
+                    await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+                }
+              } else {
+                // For all other statuses, edit the message
+                const keyboard = getOrderStatusKeyboard(order);
+                await bot.telegram.editMessageText(
+                    process.env.TELEGRAM_CHANNEL_ID,
+                    order.telegramMessageId,
+                    undefined,
+                    message,
+                    { reply_markup: keyboard }
+                );
+                // If the status is SHIPPED, also delete the photo
+                if (status === 'SHIPPED' && order.telegramPhotoMessageId) {
+                  await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+                }
+              }
+            } catch (error) {
+              console.error('[TELEGRAM] Failed to edit or delete message:', error);
             }
           }
-        } catch (error) {
-          console.error('[TELEGRAM] Failed to edit or delete message:', error);
-        }
-      }
 
-      res.status(200).json({ success: true, order: order });
+          res.status(200).json({ success: true, order: order });
+      } catch (error) {
+        await logAndEmailError(error, 'Error updating order status');
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
     });
 
     app.post('/api/orders/:orderId/tracking', authenticateToken, [
@@ -933,6 +965,12 @@ ${statusChecklist}
         if (!errors.isEmpty()) {
             return res.status(400).json({ errors: errors.array() });
         }
+
+        // Check for admin role
+        if (!isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+        }
+
         const { orderId } = req.params;
         const { trackingNumber, courier } = req.body;
         const order = db.data.orders[orderId];
@@ -965,14 +1003,14 @@ ${statusChecklist}
                 const productDetailsHtml = `
                     <tr>
                         <td style="padding: 10px; border-bottom: 1px solid #ddd;">Stickers</td>
-                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails.quantity}</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails?.quantity || 0}</td>
                     </tr>
                 `;
 
                 await sendEmail({
                     to: order.billingContact.email,
                     subject: `Your Splotch order #${order.orderId} has shipped!`,
-                    text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails.quantity}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join('\n')}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
+                    text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || 0}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join('\n')}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
                     html: `
                         <p>Hey ${customerName},</p>
                         <p>Heads up—your order has been sent out!</p>

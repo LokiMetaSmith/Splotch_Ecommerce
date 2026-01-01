@@ -267,7 +267,8 @@ describe('Order API Endpoints', () => {
              const agent = request.agent(app);
              const csrfRes = await agent.get('/api/csrf-token');
              const csrfToken = csrfRes.body.csrfToken;
-             const token = getAuthToken();
+             // Use admin token now that RBAC is enforced
+             const token = getAuthToken('admin', 'admin@example.com');
 
              const res = await agent
                 .post('/api/orders/order_4/status')
@@ -300,7 +301,8 @@ describe('Order API Endpoints', () => {
              const agent = request.agent(app);
              const csrfRes = await agent.get('/api/csrf-token');
              const csrfToken = csrfRes.body.csrfToken;
-             const token = getAuthToken();
+             // Use admin token now that RBAC is enforced
+             const token = getAuthToken('admin', 'admin@example.com');
 
              const res = await agent
                 .post('/api/orders/order_5/tracking')
@@ -315,24 +317,56 @@ describe('Order API Endpoints', () => {
     });
 
     describe('GET /api/orders (Admin List)', () => {
-        it('should allow admin to view all orders', async () => {
+        it('should allow env-defined admin to view all orders', async () => {
             db.data.orders['o1'] = { orderId: 'o1', receivedAt: '2023-01-01' };
             db.data.orders['o2'] = { orderId: 'o2', receivedAt: '2023-01-02' };
             await db.write();
 
-            const token = getAuthToken('admin', 'admin@example.com');
+            const token = getAuthToken('admin', 'admin@example.com'); // Matches process.env.ADMIN_EMAIL
             const res = await request(app)
                 .get('/api/orders')
                 .set('Authorization', `Bearer ${token}`);
 
             expect(res.statusCode).toBe(200);
             expect(res.body).toHaveLength(2);
-            // It reverses the order
             expect(res.body[0].orderId).toBe('o2');
         });
 
-        it('should deny non-admin users', async () => {
-            const token = getAuthToken('user', 'user@example.com');
+        it('should allow user with "admin" role to view all orders', async () => {
+            db.data.orders['o1'] = { orderId: 'o1', receivedAt: '2023-01-01' };
+            // Create a user with admin role who is NOT the env admin
+            const adminUser = {
+                id: 'role_admin',
+                username: 'roleadmin',
+                email: 'role@admin.com',
+                role: 'admin'
+            };
+            db.data.users['roleadmin'] = adminUser;
+            db.data.emailIndex['role@admin.com'] = 'roleadmin';
+            await db.write();
+
+            const token = getAuthToken('roleadmin', 'role@admin.com');
+            const res = await request(app)
+                .get('/api/orders')
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body).toHaveLength(1);
+        });
+
+        it('should deny non-admin users (even if migrated)', async () => {
+            // Create a regular user
+             const regularUser = {
+                id: 'regular_user',
+                username: 'regular',
+                email: 'regular@example.com',
+                role: 'user'
+            };
+            db.data.users['regular'] = regularUser;
+            db.data.emailIndex['regular@example.com'] = 'regular';
+            await db.write();
+
+            const token = getAuthToken('regular', 'regular@example.com');
             const res = await request(app)
                 .get('/api/orders')
                 .set('Authorization', `Bearer ${token}`);
