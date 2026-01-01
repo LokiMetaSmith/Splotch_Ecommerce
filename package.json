@@ -32,6 +32,7 @@
     "@google/generative-ai": "^0.24.1",
     "@simplewebauthn/browser": "^13.1.2",
     "@simplewebauthn/server": "^13.1.2",
+    "@tailwindcss/cli": "^4.1.18",
     "@tailwindcss/postcss": "^4.1.14",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
@@ -64,7 +65,7 @@
     "@commitlint/config-conventional": "^19.8.1",
     "@faker-js/faker": "^8.4.1",
     "@playwright/test": "^1.57.0",
-    "autoprefixer": "^10.4.21",
+    "autoprefixer": "^10.4.23",
     "eslint": "^9.35.0",
     "husky": "^9.1.7",
     "image-size": "^1.1.1",
@@ -77,7 +78,7 @@
     "serve": "^14.2.4",
     "supertest": "^7.1.4",
     "svg-parser": "^2.0.4",
-    "tailwindcss": "^4.1.11"
+    "tailwindcss": "^4.1.18"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json,css,md}": "prettier --write",
