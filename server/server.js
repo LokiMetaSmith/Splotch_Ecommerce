@@ -377,17 +377,28 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       saveUninitialized: true,
       cookie: { secure: process.env.NODE_ENV === 'production' }
     }));
+
     app.use(express.json());
-    app.use(express.static(path.join(__dirname, '..')));
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
     app.use(lusca({
         csrf: true,
         xframe: 'SAMEORIGIN',
         hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},
-        xssProtection: true,
-        nosniff: true
+        nosniff: true,
+        csp: {
+            policy: {
+                'default-src': "'self'",
+                'script-src': "'self' 'unsafe-inline' https://cdn.jsdelivr.net https://sandbox.web.squarecdn.com",
+                'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com https://sandbox.web.squarecdn.com",
+                'font-src': "'self' https://fonts.gstatic.com https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
+                'img-src': "'self' data: blob: https://sandbox.web.squarecdn.com",
+                'connect-src': "'self' https://sandbox.web.squarecdn.com https://connect.squareup.com https://pci-connect.squareupsandbox.com https://*.sentry.io",
+                'frame-src': "'self' https://sandbox.web.squarecdn.com"
+            }
+        }
     }));
+    app.use(express.static(path.join(__dirname, '..')));
+    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
