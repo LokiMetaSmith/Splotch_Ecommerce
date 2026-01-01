@@ -12,7 +12,7 @@ process.on('uncaughtException', (error) => {
 });
 // -----------------------------
 
-import { startServer } from './server.js';
+import { startServer, FINAL_STATUSES } from './server.js';
 import { initializeBot } from './bot.js';
 import { sendEmail } from './email.js';
 import { JSONFilePreset } from 'lowdb/node';
@@ -92,9 +92,11 @@ async function main() {
   // Check for stalled orders every hour
   setInterval(async () => {
     const now = new Date();
-    const finalStatuses = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
-    const stalledOrders = Object.values(db.data.orders).filter(order => {
-      if (finalStatuses.includes(order.status)) {
+    // Use activeOrders cache if available to avoid O(N) scan of history
+    const ordersToCheck = db.activeOrders || Object.values(db.data.orders);
+
+    const stalledOrders = ordersToCheck.filter(order => {
+      if (FINAL_STATUSES.includes(order.status)) {
         return false;
       }
       const lastUpdatedAt = new Date(order.lastUpdatedAt || order.receivedAt);

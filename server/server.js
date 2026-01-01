@@ -31,6 +31,8 @@ import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 
+export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+
 const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -108,6 +110,14 @@ const oauth2Client = new google.auth.OAuth2(
 async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json'), injectedSquareClient = null) {
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
+  }
+
+  // Initialize Active Orders Cache
+  // We use a simple array attached to the db object (not persisted to JSON)
+  if (!db.activeOrders) {
+      const allOrders = Object.values(db.data.orders);
+      db.activeOrders = allOrders.filter(order => !FINAL_STATUSES.includes(order.status));
+      console.log(`[SERVER] Initialized active orders cache. Count: ${db.activeOrders.length}`);
   }
 
   // Ensure products collection exists
@@ -620,6 +630,11 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         };
         db.data.orders[newOrder.orderId] = newOrder;
 
+        // Add to active orders cache
+        if (db.activeOrders) {
+            db.activeOrders.push(newOrder);
+        }
+
         // --- Process Payout ---
         if (product && creator) {
             const quantity = orderDetails.orderDetails.quantity || 1;
@@ -664,19 +679,19 @@ ${statusChecklist}
           try {
             const keyboard = getOrderStatusKeyboard(newOrder);
             const sentMessage = await bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, { reply_markup: keyboard });
-            const orderIndex = db.data.orders.findIndex(o => o.orderId === newOrder.orderId);
-            if (orderIndex !== -1) {
-              db.data.orders[orderIndex].telegramMessageId = sentMessage.message_id;
+            // db.data.orders is an object, so we access directly by ID
+            if (db.data.orders[newOrder.orderId]) {
+              db.data.orders[newOrder.orderId].telegramMessageId = sentMessage.message_id;
 
               // Send the design image
               if (newOrder.designImagePath) {
                 const imagePath = path.join(__dirname, newOrder.designImagePath);
                 const sentPhoto = await bot.telegram.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, { source: imagePath });
-                db.data.orders[orderIndex].telegramPhotoMessageId = sentPhoto.message_id;
+                db.data.orders[newOrder.orderId].telegramPhotoMessageId = sentPhoto.message_id;
               }
 
               // Send the cut line file
-              const cutLinePath = db.data.orders[orderIndex].cutLinePath;
+              const cutLinePath = db.data.orders[newOrder.orderId].cutLinePath;
               if (cutLinePath) {
                 const docPath = path.join(__dirname, cutLinePath);
                 await bot.telegram.sendDocument(process.env.TELEGRAM_CHANNEL_ID, { source: docPath });
@@ -785,6 +800,23 @@ ${statusChecklist}
       order.lastUpdatedAt = new Date().toISOString();
       await db.write();
       console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
+
+      // Update active orders cache
+      if (db.activeOrders) {
+          if (FINAL_STATUSES.includes(status)) {
+              // Remove from active orders if status is final
+              const idx = db.activeOrders.findIndex(o => o.orderId === orderId);
+              if (idx !== -1) {
+                  db.activeOrders.splice(idx, 1);
+              }
+          } else {
+              // Add to active orders if status is non-final (re-activation)
+              const exists = db.activeOrders.find(o => o.orderId === orderId);
+              if (!exists) {
+                  db.activeOrders.push(order);
+              }
+          }
+      }
 
       // Update Telegram message
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
