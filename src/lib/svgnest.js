@@ -332,7 +332,17 @@ export class SvgNest {
 
         if (!simple || simple.length === 0) return null;
         
-        const biggest = simple.reduce((a, b) => Math.abs(ClipperLib.Clipper.Area(a)) > Math.abs(ClipperLib.Clipper.Area(b)) ? a : b);
+        let biggest = simple[0];
+        let maxArea = Math.abs(ClipperLib.Clipper.Area(biggest));
+
+        for (let i = 1; i < simple.length; i++) {
+            const area = Math.abs(ClipperLib.Clipper.Area(simple[i]));
+            if (area > maxArea) {
+                biggest = simple[i];
+                maxArea = area;
+            }
+        }
+
         const clean = ClipperLib.Clipper.CleanPolygon(biggest, this.config.curveTolerance * scale);
         
         if (!clean || clean.length === 0) return null;
