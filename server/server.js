@@ -664,19 +664,19 @@ ${statusChecklist}
           try {
             const keyboard = getOrderStatusKeyboard(newOrder);
             const sentMessage = await bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, { reply_markup: keyboard });
-            const orderIndex = db.data.orders.findIndex(o => o.orderId === newOrder.orderId);
-            if (orderIndex !== -1) {
-              db.data.orders[orderIndex].telegramMessageId = sentMessage.message_id;
+            const orderReference = db.data.orders[newOrder.orderId];
+            if (orderReference) {
+              orderReference.telegramMessageId = sentMessage.message_id;
 
               // Send the design image
               if (newOrder.designImagePath) {
                 const imagePath = path.join(__dirname, newOrder.designImagePath);
                 const sentPhoto = await bot.telegram.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, { source: imagePath });
-                db.data.orders[orderIndex].telegramPhotoMessageId = sentPhoto.message_id;
+                orderReference.telegramPhotoMessageId = sentPhoto.message_id;
               }
 
               // Send the cut line file
-              const cutLinePath = db.data.orders[orderIndex].cutLinePath;
+              const cutLinePath = orderReference.cutLinePath;
               if (cutLinePath) {
                 const docPath = path.join(__dirname, cutLinePath);
                 await bot.telegram.sendDocument(process.env.TELEGRAM_CHANNEL_ID, { source: docPath });

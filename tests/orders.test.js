@@ -147,6 +147,9 @@ describe('Order API Endpoints', () => {
             expect(mockSquareClient.payments.create).toHaveBeenCalled();
             expect(Object.keys(db.data.orders)).toHaveLength(1);
             expect(bot.telegram.sendMessage).toHaveBeenCalled();
+
+            // Verify that telegramMessageId was updated (regression test for O(N) lookup fix)
+            expect(db.data.orders[res.body.order.orderId].telegramMessageId).toBe(123);
         });
 
         it('should fail with invalid data', async () => {
