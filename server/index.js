@@ -64,6 +64,7 @@ async function main() {
         db.write = async function() {
             const data = JSON.stringify(this.data);
             const encryptedData = encrypt(data);
+            // Use async write to avoid blocking the event loop
             await fs.promises.writeFile(dbPath, encryptedData);
         }
     }
