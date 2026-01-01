@@ -40,7 +40,9 @@ describe('XSS Patch Verification', () => {
         };
 
         // Run the real function from src/printshop.js
-        displayOrder(order);
+        // Bolt update: displayOrder now returns the card, it does not append it automatically.
+        const card = displayOrder(order);
+        ui.ordersList.appendChild(card);
 
         const orderCard = document.querySelector('#order-card-test-xss-order');
 
