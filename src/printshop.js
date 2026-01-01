@@ -407,13 +407,20 @@ function filterAndDisplayOrders(status) {
         ui.noOrdersMessage.style.display = 'block';
     } else {
         ui.noOrdersMessage.style.display = 'none';
-        ordersToDisplay.forEach(displayOrder);
+        const fragment = document.createDocumentFragment();
+        // Bolt Optimization: Use DocumentFragment to batch DOM insertions
+        ordersToDisplay.forEach(order => {
+            const card = displayOrder(order);
+            fragment.prepend(card);
+        });
+        ui.ordersList.appendChild(fragment);
     }
 }
 
 /**
  * Renders a single order card into the DOM using safe DOM creation methods.
  * @param {object} order - The order object from the server.
+ * @returns {HTMLElement} The created order card element.
  */
 export function displayOrder(order) {
     const card = document.createElement('div');
@@ -502,7 +509,8 @@ export function displayOrder(order) {
 
     // --- Assemble and Render Card ---
     card.append(header, detailsGrid, imageDiv, buttonsDiv, trackingDiv);
-    ui.ordersList.prepend(card);
+    // Bolt Optimization: removed direct DOM manipulation to allow batching
+    // ui.ordersList.prepend(card);
 
     // --- Attach Event Listeners ---
     card.querySelectorAll('.action-btn').forEach(btn => {
@@ -517,6 +525,8 @@ export function displayOrder(order) {
         const orderId = e.target.dataset.orderId;
         handleAddTracking(orderId);
     });
+
+    return card;
 }
 
 /**
