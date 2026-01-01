@@ -26,6 +26,7 @@ let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect, 
 let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
+let submitPaymentBtn;
 let widthDisplayEl, heightDisplayEl;
 
 let currentOrderAmountCents = 0;
@@ -71,6 +72,7 @@ async function BootStrap() {
     fileInputGlobalRef = document.getElementById('file');
     fileNameDisplayEl = document.getElementById('fileNameDisplay');
     paymentFormGlobalRef = document.getElementById('payment-form');
+    submitPaymentBtn = document.getElementById('submitPaymentBtn');
 
     widthDisplayEl = document.getElementById('widthDisplay');
     heightDisplayEl = document.getElementById('heightDisplay');
@@ -441,11 +443,28 @@ async function handlePaymentFormSubmit(event) {
     console.log('[CLIENT] handlePaymentFormSubmit triggered.');
     event.preventDefault();
 
+    let originalBtnContent = '';
+    if (submitPaymentBtn) {
+        originalBtnContent = submitPaymentBtn.innerHTML;
+        submitPaymentBtn.disabled = true;
+        submitPaymentBtn.innerHTML = `
+            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Processing...</span>
+        `;
+    }
+
     showPaymentStatus('Processing order...', 'info');
 
     // Ensure there is an image to submit
     if (!originalImage) {
         showPaymentStatus('Please upload a sticker design image before submitting.', 'error');
+        if (submitPaymentBtn) {
+            submitPaymentBtn.disabled = false;
+            submitPaymentBtn.innerHTML = originalBtnContent;
+        }
         return;
     }
 
@@ -453,12 +472,20 @@ async function handlePaymentFormSubmit(event) {
     if (!csrfToken) {
         showPaymentStatus('Cannot submit form. A required security token is missing. Please refresh the page.', 'error');
         console.error('[CLIENT] Aborting submission: CSRF token is missing.');
+        if (submitPaymentBtn) {
+            submitPaymentBtn.disabled = false;
+            submitPaymentBtn.innerHTML = originalBtnContent;
+        }
         return;
     }
 
     const email = document.getElementById('email').value;
     if (!email) {
         showPaymentStatus('Please enter an email address to proceed.', 'error');
+        if (submitPaymentBtn) {
+            submitPaymentBtn.disabled = false;
+            submitPaymentBtn.innerHTML = originalBtnContent;
+        }
         return;
     }
 
@@ -617,6 +644,10 @@ async function handlePaymentFormSubmit(event) {
     } catch (error) {
         console.error("[CLIENT] Error during payment form submission:", error);
         showPaymentStatus(`Error: ${error.message}`, 'error');
+        if (submitPaymentBtn) {
+            submitPaymentBtn.disabled = false;
+            submitPaymentBtn.innerHTML = originalBtnContent;
+        }
     }
 }
 
