@@ -114,15 +114,15 @@
                     <button class="size-btn" data-size="2">2"</button>
                     <button class="size-btn" data-size="3">3"</button>
                     <div class="ml-4 flex items-center">
-                        <span class="text-sm mr-2">in</span>
+                        <span class="text-sm mr-2" aria-hidden="true">in</span>
                         <label for="unitToggle" class="flex items-center cursor-pointer">
                             <div class="relative">
-                                <input type="checkbox" id="unitToggle" class="sr-only">
-                                <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                <input type="checkbox" id="unitToggle" class="sr-only peer" role="switch" aria-label="Use Metric Units">
+                                <div class="block bg-gray-600 w-14 h-8 rounded-full peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 transition-shadow"></div>
                                 <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
                             </div>
                         </label>
-                        <span class="text-sm ml-2">mm</span>
+                        <span class="text-sm ml-2" aria-hidden="true">mm</span>
                     </div>
                 </div>
 
