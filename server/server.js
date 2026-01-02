@@ -456,7 +456,8 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     const isAdmin = (userPayload) => {
       if (!userPayload) return false;
       // Check env var fallback first (fastest)
-      if (userPayload.email === process.env.ADMIN_EMAIL) return true;
+      // FIX: Ensure ADMIN_EMAIL is set and not empty before comparing
+      if (process.env.ADMIN_EMAIL && userPayload.email === process.env.ADMIN_EMAIL) return true;
 
       // Look up full user object
       const user = getUserByEmail(userPayload.email) || (userPayload.username ? db.data.users[userPayload.username] : undefined);
