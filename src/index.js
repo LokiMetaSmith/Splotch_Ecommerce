@@ -124,14 +124,26 @@ async function BootStrap() {
     if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', toggleGrayscaleFilter);
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
     if (resizeSliderEl) {
+        let resizeRequest = null;
         resizeSliderEl.addEventListener('input', (e) => {
             let value = parseFloat(e.target.value);
             if (isMetric) {
                 if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} mm`;
-                handleStandardResize(value / 25.4);
             } else {
                 if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} in`;
-                handleStandardResize(value);
+            }
+
+            if (!resizeRequest) {
+                resizeRequest = requestAnimationFrame(() => {
+                    // Always read the latest value from the input element to avoid using stale closure variables
+                    const latestValue = parseFloat(resizeSliderEl.value);
+                    if (isMetric) {
+                        handleStandardResize(latestValue / 25.4);
+                    } else {
+                        handleStandardResize(latestValue);
+                    }
+                    resizeRequest = null;
+                });
             }
         });
     }
