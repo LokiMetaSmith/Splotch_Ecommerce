@@ -179,7 +179,7 @@ describe('Order API Endpoints', () => {
                 designImagePath: '/uploads/design.png',
                  shippingContact: {},
                  billingContact: {},
-                 orderDetails: {}
+                 orderDetails: { quantity: 1 }
              };
 
              const res = await agent
@@ -408,6 +408,7 @@ describe('Order API Endpoints', () => {
             const email = 'search@example.com';
             // User must exist for search endpoint
             db.data.users['searchuser'] = { email, username: 'searchuser' };
+            db.data.emailIndex = { [email]: 'searchuser' };
             db.data.orders['search123'] = { orderId: 'search123', billingContact: { email }, receivedAt: '2023-01-01' };
             db.data.orders['search456'] = { orderId: 'search456', billingContact: { email }, receivedAt: '2023-01-02' };
             await db.write();
@@ -425,6 +426,7 @@ describe('Order API Endpoints', () => {
         it('should not find other users orders even if ID matches query', async () => {
              const email = 'user1@example.com';
              db.data.users['user1'] = { email, username: 'user1' };
+             db.data.emailIndex = { [email]: 'user1' };
              db.data.orders['secret123'] = { orderId: 'secret123', billingContact: { email: 'admin@example.com' } };
              await db.write();
 
@@ -441,6 +443,7 @@ describe('Order API Endpoints', () => {
         it('should return 404 if no order matches', async () => {
             const email = 'search@example.com';
             db.data.users['searchuser'] = { email, username: 'searchuser' };
+            db.data.emailIndex = { [email]: 'searchuser' };
             await db.write();
 
             const token = getAuthToken('searchuser', email);
