@@ -3,10 +3,13 @@
 import { describe, test, expect, beforeAll, jest } from '@jest/globals';
 
 // Mocks
-jest.mock('jose');
-jest.mock('jspdf');
-jest.mock('svg-to-pdfkit');
-jest.mock('@simplewebauthn/browser');
+jest.unstable_mockModule('jose', () => ({}));
+jest.unstable_mockModule('jspdf', () => ({ jsPDF: jest.fn() }));
+jest.unstable_mockModule('svg-to-pdfkit', () => ({ default: jest.fn() }));
+jest.unstable_mockModule('@simplewebauthn/browser', () => ({
+    startRegistration: jest.fn(),
+    startAuthentication: jest.fn()
+}));
 
 // Mock fetch
 global.fetch = jest.fn(() =>
@@ -17,7 +20,8 @@ global.fetch = jest.fn(() =>
     })
 );
 
-import { displayOrder, ui } from '../src/printshop.js';
+// Dynamic import to allow hoisting
+const { displayOrder, ui } = await import('../src/printshop.js');
 
 describe('XSS Patch Verification', () => {
     beforeAll(() => {
