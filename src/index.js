@@ -28,6 +28,7 @@ let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGl
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
 let submitPaymentBtn;
 let widthDisplayEl, heightDisplayEl;
+let canvasPlaceholder;
 
 let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
@@ -73,6 +74,7 @@ async function BootStrap() {
     fileNameDisplayEl = document.getElementById('fileNameDisplay');
     paymentFormGlobalRef = document.getElementById('payment-form');
     submitPaymentBtn = document.getElementById('submitPaymentBtn');
+    canvasPlaceholder = document.getElementById('canvas-placeholder');
 
     widthDisplayEl = document.getElementById('widthDisplay');
     heightDisplayEl = document.getElementById('heightDisplay');
@@ -746,6 +748,7 @@ function updateEditingButtonsState(disabled) {
     });
     if (designMarginNote) designMarginNote.style.display = disabled ? 'none' : 'block';
     if (textEditingControlsContainer) textEditingControlsContainer.hidden = disabled;
+    if (canvasPlaceholder) canvasPlaceholder.style.display = disabled ? 'flex' : 'none';
 }
 
 function setCanvasSize(logicalWidth, logicalHeight) {
