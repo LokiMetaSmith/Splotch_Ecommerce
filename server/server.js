@@ -629,13 +629,16 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
       body('designImagePath').notEmpty().withMessage('designImagePath is required'),
+      // Security Fix: Validate orderDetails structure
+      body('orderDetails').isObject().withMessage('orderDetails must be an object'),
+      body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, shippingContact, productId, ...orderDetails } = req.body;
+        const { sourceId, amountCents, currency, designImagePath, shippingContact, productId, orderDetails, billingContact } = req.body;
 
         // --- Product / Creator Payout Logic ---
         let product = null;
@@ -686,6 +689,11 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
         }
         console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
+        // Explicitly construct safe orderDetails object to prevent Stored XSS
+        const safeOrderDetails = {
+            quantity: orderDetails.quantity
+        };
+
         const newOrder = {
           orderId: randomUUID(),
           paymentId: paymentResult.payment.id,
@@ -693,8 +701,8 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           amount: Number(amountCents),
           currency: currency || 'USD',
           status: 'NEW',
-          orderDetails: orderDetails.orderDetails,
-          billingContact: orderDetails.billingContact,
+          orderDetails: safeOrderDetails,
+          billingContact: billingContact,
           shippingContact: shippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
@@ -710,7 +718,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
 
         // --- Process Payout ---
         if (product && creator) {
-            const quantity = orderDetails.orderDetails.quantity || 1;
+            const quantity = safeOrderDetails.quantity || 1;
             const payoutAmount = product.creatorProfitCents * quantity;
 
             if (payoutAmount > 0) {
