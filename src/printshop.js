@@ -513,20 +513,30 @@ export function displayOrder(order) {
     // ui.ordersList.prepend(card);
 
     // --- Attach Event Listeners ---
-    card.querySelectorAll('.action-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const orderId = e.target.dataset.orderId;
-            const status = e.target.dataset.status;
-            updateOrderStatus(orderId, status);
-        });
-    });
-
-    card.querySelector('.add-tracking-btn')?.addEventListener('click', (e) => {
-        const orderId = e.target.dataset.orderId;
-        handleAddTracking(orderId);
-    });
+    // Bolt Optimization: Removed per-card event listeners in favor of delegation on ui.ordersList
 
     return card;
+}
+
+/**
+ * Handles clicks on the orders list for event delegation.
+ * @param {Event} e - The click event.
+ */
+function handleOrderListClick(e) {
+    const actionBtn = e.target.closest('.action-btn');
+    if (actionBtn) {
+        const orderId = actionBtn.dataset.orderId;
+        const status = actionBtn.dataset.status;
+        updateOrderStatus(orderId, status);
+        return;
+    }
+
+    const trackingBtn = e.target.closest('.add-tracking-btn');
+    if (trackingBtn) {
+        const orderId = trackingBtn.dataset.orderId;
+        handleAddTracking(orderId);
+        return;
+    }
 }
 
 /**
@@ -815,6 +825,7 @@ export async function init() {
     await getCsrfToken();
 
     // Attach event listeners
+    ui.ordersList?.addEventListener('click', handleOrderListClick);
     ui.refreshOrdersBtn?.addEventListener('click', () => fetchAndDisplayOrders());
     ui.registerBtn?.addEventListener('click', handleRegistration);
     ui.closeErrorToast?.addEventListener('click', hideErrorToast);
