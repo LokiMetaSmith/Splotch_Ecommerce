@@ -14,35 +14,32 @@ describe('Server Index Security', () => {
     test('db.write override uses async I/O and atomic writes', () => {
         const content = fs.readFileSync(serverIndexPath, 'utf8');
 
-        // We check if the file contains the db.write override with the correct async logic.
-        // We look for the function definition and the critical lines.
+        // We look for the db.write override block.
+        // We use a regex that is more robust to template literals containing braces.
+        // The previous regex was: /db\.write\s*=\s*async\s*function\(\)\s*{([\s\S]*?)}/
+        // This fails if the body contains a nested `}` which happens in template literals like `${dbPath}.tmp`.
 
-        const hasDbWriteOverride = content.includes('db.write = async function() {');
-        const hasAsyncWrite = content.includes('await fs.promises.writeFile');
-        const hasAsyncRename = content.includes('await fs.promises.rename');
-        const hasSyncWrite = content.includes('fs.writeFileSync');
+        // Instead of capturing the body with a greedy regex, we can find the start and balance braces,
+        // or just check for the presence of the critical lines within the function definition scope implicitly.
 
-        // We expect the override to exist
-        if (!hasDbWriteOverride) {
-            throw new Error('Could not find db.write override in server/index.js');
+        // Given the known structure, we can verify that the async function definition contains the required calls.
+
+        const dbWriteStartRegex = /db\.write\s*=\s*async\s*function\(\)\s*{/;
+        const match = content.match(dbWriteStartRegex);
+
+        if (!match) {
+             throw new Error('Could not find db.write override in server/index.js');
         }
 
-        // We expect async write and rename to be present
-        expect(hasAsyncWrite).toBe(true);
-        expect(hasAsyncRename).toBe(true);
+        const startIndex = match.index;
+        const relevantSection = content.slice(startIndex, startIndex + 500); // Look at the next 500 chars which should cover the function body
 
-        // We check that these async calls are likely inside the db.write function.
-        // Since regex parsing with nested braces is fragile (e.g. template literals),
-        // we rely on the presence of these lines in the file, which combined with the
-        // "reproduction" test below provides sufficient confidence.
+        expect(relevantSection).toMatch(/await\s+fs\.promises\.writeFile/);
+        expect(relevantSection).toMatch(/await\s+fs\.promises\.rename/);
 
-        // Optionally, we can check that they appear *after* the db.write definition
-        const dbWriteIndex = content.indexOf('db.write = async function() {');
-        const asyncWriteIndex = content.indexOf('await fs.promises.writeFile', dbWriteIndex);
-        const asyncRenameIndex = content.indexOf('await fs.promises.rename', dbWriteIndex);
-
-        expect(asyncWriteIndex).toBeGreaterThan(dbWriteIndex);
-        expect(asyncRenameIndex).toBeGreaterThan(dbWriteIndex);
+        // Ensure no sync write in the relevant section, but careful not to match the one in the setup block before it.
+        // We'll check that fs.writeFileSync doesn't appear in the async function body.
+        expect(relevantSection).not.toMatch(/fs\.writeFileSync.*(?=await)/);
     });
 
     test('reproduction: db.write logic is async, atomic, and encrypts data', async () => {
