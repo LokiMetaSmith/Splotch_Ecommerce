@@ -385,8 +385,22 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
 
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
     app.use(cookieParser(csrfSecret));
+
+    let sessionSecret = process.env.SESSION_SECRET;
+    if (!sessionSecret) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('❌ [FATAL] SESSION_SECRET is not set in environment variables.');
+        console.error('   This is required for production security. The application will now exit.');
+        process.exit(1);
+      } else {
+        console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+        console.warn('   Sessions will not persist across server restarts.');
+        sessionSecret = randomUUID();
+      }
+    }
+
     app.use(session({
-      secret: process.env.SESSION_SECRET || 'super-secret-session-key',
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: true,
       cookie: { secure: process.env.NODE_ENV === 'production' }
