@@ -481,7 +481,9 @@ export function displayOrder(order) {
     const image = createEl('img', ['sticker-design'], {
         src: `${serverUrl}${order.designImagePath}`,
         alt: 'Sticker Design',
-        'data-cut-file-path': order.cutLinePath || ''
+        'data-cut-file-path': order.cutLinePath || '',
+        loading: 'lazy',
+        decoding: 'async'
     });
     imageLink.appendChild(image);
     imageDiv.appendChild(imageLink);
