@@ -942,29 +942,31 @@ function generateCutLine(polygons, offset) {
 }
 
 function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke = false) {
-    if (!ctx) return;
+    if (!ctx || polygons.length === 0) return;
+
+    // Bolt Optimization: Batch all polygons into a single path to reduce draw calls
+    ctx.beginPath();
 
     polygons.forEach(poly => {
         if (poly.length === 0) return;
 
-        ctx.beginPath();
         ctx.moveTo(poly[0].x + offset.x, poly[0].y + offset.y);
         for (let i = 1; i < poly.length; i++) {
             ctx.lineTo(poly[i].x + offset.x, poly[i].y + offset.y);
         }
         ctx.closePath();
-
-        if (stroke) {
-            ctx.strokeStyle = style;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]); // Make the cutline dashed
-            ctx.stroke();
-            ctx.setLineDash([]); // Reset for other drawing operations
-        } else {
-            ctx.fillStyle = style;
-            ctx.fill();
-        }
     });
+
+    if (stroke) {
+        ctx.strokeStyle = style;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]); // Make the cutline dashed
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset for other drawing operations
+    } else {
+        ctx.fillStyle = style;
+        ctx.fill();
+    }
 }
 
 function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
