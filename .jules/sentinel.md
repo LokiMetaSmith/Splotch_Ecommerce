@@ -1,0 +1,4 @@
+## 2024-02-18 - Insecure Randomness in File Uploads
+**Vulnerability:** The application was using `Date.now() + Math.random()` to generate filenames for uploaded files. `Math.random()` is not cryptographically secure, and the timestamp makes the filename predictable. This could allow an attacker to guess filenames and potentially access or overwrite other users' uploaded designs (Insecure Direct Object Reference / Privacy Leak).
+**Learning:** Developers often reach for `Math.random()` for uniqueness, not realizing the security implications when that uniqueness protects sensitive data (like user uploads). `multer`'s default `diskStorage` documentation examples often show this insecure pattern, propagating it.
+**Prevention:** Always use `crypto.randomUUID()` (or `uuid` v4) for generating identifiers that need to be unpredictable and unique. Avoid `Math.random()` for any ID generation that is exposed to users or used for security decisions.
