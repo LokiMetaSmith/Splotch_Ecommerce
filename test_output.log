@@ -1,0 +1,1645 @@
+
+> lokimetasmith.github.io@1.0.0 test:unit /app
+> node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit
+
+(node:2372) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL tests/google-oauth.test.js
+  ● Console
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 1 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [dotenv@17.2.3] injecting env (0) from server/.env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+
+      at _log (node_modules/.pnpm/dotenv@17.2.3/node_modules/dotenv/lib/main.js:142:11)
+
+    console.log
+      [SERVER] Pricing configuration loaded.
+
+      at server/server.js:78:13
+
+    console.log
+      [SERVER] Initialized active orders cache. Count: 0
+
+      at startServer (server/server.js:120:15)
+
+    console.log
+      [SERVER] Migrating orders from Array to Object...
+
+      at startServer (server/server.js:131:13)
+
+    console.log
+      [SERVER] Migration complete.
+
+      at startServer (server/server.js:143:13)
+
+    console.log
+      [SERVER] LowDB database initialized at: /app/tests/google-oauth-test-db.json
+
+      at startServer (server/server.js:244:13)
+
+    console.log
+      [SERVER] Multer configured for file uploads.
+
+      at startServer (server/server.js:268:13)
+
+    console.log
+      [SERVER] Initializing Square client...
+
+      at startServer (server/server.js:271:13)
+
+    console.error
+      [SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.
+
+      274 |     if (!squareClient) {
+      275 |       if (!process.env.SQUARE_ACCESS_TOKEN) {
+    > 276 |         console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+          |                 ^
+      277 |         // In a test environment, we don't want to kill the test runner.
+      278 |         if (process.env.NODE_ENV !== 'test') {
+      279 |           process.exit(1);
+
+      at startServer (server/server.js:276:17)
+      at Object.<anonymous> (tests/google-oauth.test.js:57:24)
+
+    console.log
+      [SERVER] Verifying connection to Square servers...
+
+      at startServer (server/server.js:287:15)
+
+    console.log
+      [SERVER] Square client initialized.
+
+      at startServer (server/server.js:307:13)
+
+    console.log
+      [SERVER] Performing sanity check on Square client...
+
+      at startServer (server/server.js:309:13)
+
+    console.log
+      ✅ [SERVER] Sanity check passed. Client has required API properties.
+
+      at startServer (server/server.js:315:13)
+
+    console.warn
+      ⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+
+      377 |             // but we should log a clear warning.
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+    > 379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+          |                     ^
+      380 |             console.warn('   Do not use this configuration in production.');
+      381 |         }
+      382 |     } else {
+
+      at startServer (server/server.js:379:21)
+      at Object.<anonymous> (tests/google-oauth.test.js:57:24)
+
+    console.warn
+         Do not use this configuration in production.
+
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+      379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+    > 380 |             console.warn('   Do not use this configuration in production.');
+          |                     ^
+      381 |         }
+      382 |     } else {
+      383 |         console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+
+      at startServer (server/server.js:380:21)
+      at Object.<anonymous> (tests/google-oauth.test.js:57:24)
+
+    console.warn
+      ⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.
+
+      394 |         process.exit(1);
+      395 |       } else {
+    > 396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+          |                 ^
+      397 |         console.warn('   Sessions will not persist across server restarts.');
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+
+      at startServer (server/server.js:396:17)
+      at Object.<anonymous> (tests/google-oauth.test.js:57:24)
+
+    console.warn
+         Sessions will not persist across server restarts.
+
+      395 |       } else {
+      396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+    > 397 |         console.warn('   Sessions will not persist across server restarts.');
+          |                 ^
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+      400 |     }
+
+      at startServer (server/server.js:397:17)
+      at Object.<anonymous> (tests/google-oauth.test.js:57:24)
+
+    console.log
+      [SERVER] Middleware (CORS, JSON, static file serving) enabled.
+
+      at startServer (server/server.js:436:13)
+
+    console.warn
+      [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+
+      12 |         console.log('[TRACKER] EasyPost shipment tracker initialized.');
+      13 |     } else {
+    > 14 |         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+         |                 ^
+      15 |     }
+      16 | }
+      17 |
+
+      at initializeTracker (server/tracker.js:14:17)
+      at startServer (server/server.js:1462:5)
+      at Object.<anonymous> (tests/google-oauth.test.js:57:24)
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 2 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [SERVER] Signed new session token with key ID: 9e83d34924562e78
+
+      at signInstanceToken (server/server.js:97:13)
+
+    console.log
+      [SERVER] Google OAuth2 refresh token stored.
+
+      at server/server.js:1274:19
+
+    console.log
+      Google authentication successful for: googleuser@example.com
+
+      at server/server.js:1281:17
+
+    console.error
+      [Error in /oauth2callback] TypeError: Cannot set properties of undefined (setting 'googleuser@example.com')
+          at /app/server/server.js:1298:41
+
+      205 |     }
+      206 |     // The full error (including stack) is still logged to the console for debugging.
+    > 207 |     console.error(`[${context}]`, error);
+          |             ^
+      208 |     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
+      209 |       try {
+      210 |         await sendEmail({
+
+      at logAndEmailError (server/server.js:207:13)
+      at server/server.js:1330:9
+
+    console.log
+      [SERVER] Google OAuth2 refresh token stored.
+
+      at server/server.js:1274:19
+
+    console.log
+      Google authentication successful for: googleuser@example.com
+
+      at server/server.js:1281:17
+
+    console.error
+      [Error in /oauth2callback] TypeError: Cannot set properties of undefined (setting 'googleuser@example.com')
+          at /app/server/server.js:1298:41
+
+      205 |     }
+      206 |     // The full error (including stack) is still logged to the console for debugging.
+    > 207 |     console.error(`[${context}]`, error);
+          |             ^
+      208 |     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
+      209 |       try {
+      210 |         await sendEmail({
+
+      at logAndEmailError (server/server.js:207:13)
+      at server/server.js:1330:9
+
+  ● Google OAuth Endpoints › should handle OAuth2 callback and log in existing user
+
+    expect(received).toEqual(expected) // deep equality
+
+    Expected: 302
+    Received: 500
+
+      124 |         const res = await request(app).get('/oauth2callback?code=test-code');
+      125 |
+    > 126 |         expect(res.statusCode).toEqual(302);
+          |                                ^
+      127 |         expect(res.headers.location).toMatch(/\/printshop\.html\?token=/);
+      128 |
+      129 |         // Verify token
+
+      at Object.<anonymous> (tests/google-oauth.test.js:126:32)
+
+  ● Google OAuth Endpoints › should handle OAuth2 callback and register new user
+
+    expect(received).toEqual(expected) // deep equality
+
+    Expected: 302
+    Received: 500
+
+      147 |         const res = await request(app).get('/oauth2callback?code=new-user-code');
+      148 |
+    > 149 |         expect(res.statusCode).toEqual(302);
+          |                                ^
+      150 |         expect(res.headers.location).toMatch(/\/printshop\.html\?token=/);
+      151 |
+      152 |         // Verify token
+
+      at Object.<anonymous> (tests/google-oauth.test.js:149:32)
+
+(node:2371) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2370) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/svg_sanitization.test.js (5.124 s)
+  ● Console
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 1 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [dotenv@17.2.3] injecting env (0) from server/.env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+
+      at _log (node_modules/.pnpm/dotenv@17.2.3/node_modules/dotenv/lib/main.js:142:11)
+
+    console.log
+      [SERVER] Pricing configuration loaded.
+
+      at server/server.js:78:13
+
+    console.warn
+      [TELEGRAM] Bot token not found. Bot is disabled.
+
+      162 |
+      163 |   } else {
+    > 164 |     console.warn('[TELEGRAM] Bot token not found. Bot is disabled.');
+          |             ^
+      165 |     // Create a mock bot to avoid errors when the token is not set
+      166 |     bot = {
+      167 |       telegram: {
+
+      at initializeBot (server/bot.js:164:13)
+      at Object.<anonymous> (tests/svg_sanitization.test.js:45:15)
+
+    console.log
+      [SERVER] Initialized active orders cache. Count: 0
+
+      at startServer (server/server.js:120:15)
+
+    console.log
+      [SERVER] Migrating orders from Array to Object...
+
+      at startServer (server/server.js:131:13)
+
+    console.log
+      [SERVER] Migration complete.
+
+      at startServer (server/server.js:143:13)
+
+    console.log
+      [SERVER] LowDB database initialized at: /app/tests/test-db-svg.json
+
+      at startServer (server/server.js:244:13)
+
+    console.log
+      [SERVER] Multer configured for file uploads.
+
+      at startServer (server/server.js:268:13)
+
+    console.log
+      [SERVER] Initializing Square client...
+
+      at startServer (server/server.js:271:13)
+
+    console.error
+      [SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.
+
+      274 |     if (!squareClient) {
+      275 |       if (!process.env.SQUARE_ACCESS_TOKEN) {
+    > 276 |         console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+          |                 ^
+      277 |         // In a test environment, we don't want to kill the test runner.
+      278 |         if (process.env.NODE_ENV !== 'test') {
+      279 |           process.exit(1);
+
+      at startServer (server/server.js:276:17)
+      at Object.<anonymous> (tests/svg_sanitization.test.js:47:24)
+
+    console.log
+      [SERVER] Verifying connection to Square servers...
+
+      at startServer (server/server.js:287:15)
+
+    console.log
+      [SERVER] Square client initialized.
+
+      at startServer (server/server.js:307:13)
+
+    console.log
+      [SERVER] Performing sanity check on Square client...
+
+      at startServer (server/server.js:309:13)
+
+    console.log
+      ✅ [SERVER] Sanity check passed. Client has required API properties.
+
+      at startServer (server/server.js:315:13)
+
+    console.warn
+      ⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+
+      377 |             // but we should log a clear warning.
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+    > 379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+          |                     ^
+      380 |             console.warn('   Do not use this configuration in production.');
+      381 |         }
+      382 |     } else {
+
+      at startServer (server/server.js:379:21)
+      at Object.<anonymous> (tests/svg_sanitization.test.js:47:24)
+
+    console.warn
+         Do not use this configuration in production.
+
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+      379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+    > 380 |             console.warn('   Do not use this configuration in production.');
+          |                     ^
+      381 |         }
+      382 |     } else {
+      383 |         console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+
+      at startServer (server/server.js:380:21)
+      at Object.<anonymous> (tests/svg_sanitization.test.js:47:24)
+
+    console.warn
+      ⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.
+
+      394 |         process.exit(1);
+      395 |       } else {
+    > 396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+          |                 ^
+      397 |         console.warn('   Sessions will not persist across server restarts.');
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+
+      at startServer (server/server.js:396:17)
+      at Object.<anonymous> (tests/svg_sanitization.test.js:47:24)
+
+    console.warn
+         Sessions will not persist across server restarts.
+
+      395 |       } else {
+      396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+    > 397 |         console.warn('   Sessions will not persist across server restarts.');
+          |                 ^
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+      400 |     }
+
+      at startServer (server/server.js:397:17)
+      at Object.<anonymous> (tests/svg_sanitization.test.js:47:24)
+
+    console.log
+      [SERVER] Middleware (CORS, JSON, static file serving) enabled.
+
+      at startServer (server/server.js:436:13)
+
+    console.warn
+      [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+
+      12 |         console.log('[TRACKER] EasyPost shipment tracker initialized.');
+      13 |     } else {
+    > 14 |         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+         |                 ^
+      15 |     }
+      16 | }
+      17 |
+
+      at initializeTracker (server/tracker.js:14:17)
+      at startServer (server/server.js:1462:5)
+      at Object.<anonymous> (tests/svg_sanitization.test.js:47:24)
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 2 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [SERVER] Signed new session token with key ID: 6af8e6c444305947
+
+      at signInstanceToken (server/server.js:97:13)
+
+    console.log
+      [SECURITY] SVG file sanitized successfully: /app/server/uploads/designImage-1767638096884-802726502.svg
+
+      at sanitizeSVGFile (server/server.js:59:17)
+
+    console.warn
+      [SECURITY] Malicious content detected in SVG and was rejected: /app/server/uploads/designImage-1767638096921-169387041.svg
+
+      52 |         if (!sanitized && fileContent.trim() !== '') {
+      53 |             await fs.promises.writeFile(filePath, ''); // Overwrite with empty string to reject.
+    > 54 |             console.warn(`[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`);
+         |                     ^
+      55 |             return false;
+      56 |         }
+      57 |
+
+      at sanitizeSVGFile (server/server.js:54:21)
+      at server/server.js:531:28
+
+    console.log
+      [SECURITY] SVG file sanitized successfully: /app/server/uploads/designImage-1767638096937-60611842.svg
+
+      at sanitizeSVGFile (server/server.js:59:17)
+
+FAIL server/auth.test.js (5.594 s)
+  ● Console
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 1 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [dotenv@17.2.3] injecting env (0) from server/.env -- tip: ⚙️  override existing env vars with { override: true }
+
+      at _log (node_modules/.pnpm/dotenv@17.2.3/node_modules/dotenv/lib/main.js:142:11)
+
+    console.log
+      [SERVER] Pricing configuration loaded.
+
+      at server/server.js:78:13
+
+    console.log
+      [SERVER] Initialized active orders cache. Count: 0
+
+      at startServer (server/server.js:120:15)
+
+    console.log
+      [SERVER] Migrating orders from Array to Object...
+
+      at startServer (server/server.js:131:13)
+
+    console.log
+      [SERVER] Migration complete.
+
+      at startServer (server/server.js:143:13)
+
+    console.log
+      [SERVER] LowDB database initialized at: /app/server/test-db.json
+
+      at startServer (server/server.js:244:13)
+
+    console.log
+      [SERVER] Multer configured for file uploads.
+
+      at startServer (server/server.js:268:13)
+
+    console.log
+      [SERVER] Initializing Square client...
+
+      at startServer (server/server.js:271:13)
+
+    console.error
+      [SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.
+
+      274 |     if (!squareClient) {
+      275 |       if (!process.env.SQUARE_ACCESS_TOKEN) {
+    > 276 |         console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+          |                 ^
+      277 |         // In a test environment, we don't want to kill the test runner.
+      278 |         if (process.env.NODE_ENV !== 'test') {
+      279 |           process.exit(1);
+
+      at startServer (server/server.js:276:17)
+      at Object.<anonymous> (server/auth.test.js:26:20)
+
+    console.log
+      [SERVER] Verifying connection to Square servers...
+
+      at startServer (server/server.js:287:15)
+
+    console.log
+      [SERVER] Square client initialized.
+
+      at startServer (server/server.js:307:13)
+
+    console.log
+      [SERVER] Performing sanity check on Square client...
+
+      at startServer (server/server.js:309:13)
+
+    console.log
+      ✅ [SERVER] Sanity check passed. Client has required API properties.
+
+      at startServer (server/server.js:315:13)
+
+    console.warn
+      ⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+
+      377 |             // but we should log a clear warning.
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+    > 379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+          |                     ^
+      380 |             console.warn('   Do not use this configuration in production.');
+      381 |         }
+      382 |     } else {
+
+      at startServer (server/server.js:379:21)
+      at Object.<anonymous> (server/auth.test.js:26:20)
+
+    console.warn
+         Do not use this configuration in production.
+
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+      379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+    > 380 |             console.warn('   Do not use this configuration in production.');
+          |                     ^
+      381 |         }
+      382 |     } else {
+      383 |         console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+
+      at startServer (server/server.js:380:21)
+      at Object.<anonymous> (server/auth.test.js:26:20)
+
+    console.warn
+      ⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.
+
+      394 |         process.exit(1);
+      395 |       } else {
+    > 396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+          |                 ^
+      397 |         console.warn('   Sessions will not persist across server restarts.');
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+
+      at startServer (server/server.js:396:17)
+      at Object.<anonymous> (server/auth.test.js:26:20)
+
+    console.warn
+         Sessions will not persist across server restarts.
+
+      395 |       } else {
+      396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+    > 397 |         console.warn('   Sessions will not persist across server restarts.');
+          |                 ^
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+      400 |     }
+
+      at startServer (server/server.js:397:17)
+      at Object.<anonymous> (server/auth.test.js:26:20)
+
+    console.log
+      [SERVER] Middleware (CORS, JSON, static file serving) enabled.
+
+      at startServer (server/server.js:436:13)
+
+    console.warn
+      [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+
+      12 |         console.log('[TRACKER] EasyPost shipment tracker initialized.');
+      13 |     } else {
+    > 14 |         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+         |                 ^
+      15 |     }
+      16 | }
+      17 |
+
+      at initializeTracker (server/tracker.js:14:17)
+      at startServer (server/server.js:1462:5)
+      at Object.<anonymous> (server/auth.test.js:26:20)
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 2 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [SERVER] Signed new session token with key ID: 010a08434f34d2bf
+
+      at signInstanceToken (server/server.js:97:13)
+
+    console.log
+      New user created for WebAuthn pre-registration: testuser
+
+      at server/server.js:1359:17
+
+  ● Auth Endpoints › Magic Link Authentication › should send a magic link email
+
+    expect(received).toEqual(expected) // deep equality
+
+    Expected: 200
+    Received: 500
+
+      157 |             .send({ email });
+      158 |
+    > 159 |         expect(res.statusCode).toEqual(200);
+          |                                ^
+      160 |         expect(res.body.success).toBe(true);
+      161 |
+      162 |         expect(mockSendEmail).toHaveBeenCalledTimes(1);
+
+      at Object.<anonymous> (server/auth.test.js:159:32)
+
+  ● Auth Endpoints › Magic Link Authentication › should verify a valid magic link token
+
+    TypeError: Cannot read properties of undefined (reading '0')
+
+      186 |
+      187 |         // 3. Extract Token from Email
+    > 188 |         const emailArgs = mockSendEmail.mock.calls[0][0];
+          |                                                      ^
+      189 |         const linkMatch = emailArgs.text.match(/token=([a-zA-Z0-9._-]+)/);
+      190 |         const token = linkMatch ? linkMatch[1] : null;
+      191 |         expect(token).toBeTruthy();
+
+      at Object.<anonymous> (server/auth.test.js:188:54)
+
+PASS tests/orders.test.js
+  ● Console
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 1 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [dotenv@17.2.3] injecting env (0) from server/.env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+      at _log (node_modules/.pnpm/dotenv@17.2.3/node_modules/dotenv/lib/main.js:142:11)
+
+    console.log
+      [SERVER] Pricing configuration loaded.
+
+      at server/server.js:78:13
+
+    console.log
+      [SERVER] Initialized active orders cache. Count: 0
+
+      at startServer (server/server.js:120:15)
+
+    console.log
+      [SERVER] LowDB database initialized at: /app/server/test-db-orders.json
+
+      at startServer (server/server.js:244:13)
+
+    console.log
+      [SERVER] Multer configured for file uploads.
+
+      at startServer (server/server.js:268:13)
+
+    console.log
+      [SERVER] Initializing Square client...
+
+      at startServer (server/server.js:271:13)
+
+    console.log
+      [SERVER] Using injected Square client.
+
+      at startServer (server/server.js:289:15)
+
+    console.log
+      [SERVER] Square client initialized.
+
+      at startServer (server/server.js:307:13)
+
+    console.log
+      [SERVER] Performing sanity check on Square client...
+
+      at startServer (server/server.js:309:13)
+
+    console.log
+      ✅ [SERVER] Sanity check passed. Client has required API properties.
+
+      at startServer (server/server.js:315:13)
+
+    console.warn
+      ⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+
+      377 |             // but we should log a clear warning.
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+    > 379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+          |                     ^
+      380 |             console.warn('   Do not use this configuration in production.');
+      381 |         }
+      382 |     } else {
+
+      at startServer (server/server.js:379:21)
+      at Object.<anonymous> (tests/orders.test.js:79:24)
+
+    console.warn
+         Do not use this configuration in production.
+
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+      379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+    > 380 |             console.warn('   Do not use this configuration in production.');
+          |                     ^
+      381 |         }
+      382 |     } else {
+      383 |         console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+
+      at startServer (server/server.js:380:21)
+      at Object.<anonymous> (tests/orders.test.js:79:24)
+
+    console.warn
+      ⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.
+
+      394 |         process.exit(1);
+      395 |       } else {
+    > 396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+          |                 ^
+      397 |         console.warn('   Sessions will not persist across server restarts.');
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+
+      at startServer (server/server.js:396:17)
+      at Object.<anonymous> (tests/orders.test.js:79:24)
+
+    console.warn
+         Sessions will not persist across server restarts.
+
+      395 |       } else {
+      396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+    > 397 |         console.warn('   Sessions will not persist across server restarts.');
+          |                 ^
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+      400 |     }
+
+      at startServer (server/server.js:397:17)
+      at Object.<anonymous> (tests/orders.test.js:79:24)
+
+    console.log
+      [SERVER] Middleware (CORS, JSON, static file serving) enabled.
+
+      at startServer (server/server.js:436:13)
+
+    console.warn
+      [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+
+      12 |         console.log('[TRACKER] EasyPost shipment tracker initialized.');
+      13 |     } else {
+    > 14 |         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+         |                 ^
+      15 |     }
+      16 | }
+      17 |
+
+      at initializeTracker (server/tracker.js:14:17)
+      at startServer (server/server.js:1462:5)
+      at Object.<anonymous> (tests/orders.test.js:79:24)
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 2 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [SERVER] Signed new session token with key ID: 760b13690d4b8317
+
+      at signInstanceToken (server/server.js:97:13)
+
+    console.log
+      [CLIENT INSPECTION] Keys on squareClient: [ 'locations', 'payments' ]
+
+      at server/server.js:699:17
+
+    console.log
+      [SERVER] Square payment successful. Payment ID: payment_123
+
+      at server/server.js:705:17
+
+    console.log
+      [SERVER] New order created and stored. Order ID: 86c1ce58-54fb-4109-b5eb-a6b5a145af92.
+
+      at server/server.js:746:17
+
+    console.log
+      [CLIENT INSPECTION] Keys on squareClient: [ 'locations', 'payments' ]
+
+      at server/server.js:699:17
+
+    console.error
+      [Critical error in /api/create-order] Error: Card declined
+          at Object.<anonymous> (/app/tests/orders.test.js:56:39)
+          at /app/node_modules/.pnpm/jest-mock@30.2.0/node_modules/jest-mock/build/index.js:305:39
+          at Object.<anonymous> (/app/node_modules/.pnpm/jest-mock@30.2.0/node_modules/jest-mock/build/index.js:312:13)
+          at Object.mockConstructor [as create] (/app/node_modules/.pnpm/jest-mock@30.2.0/node_modules/jest-mock/build/index.js:102:19)
+          at /app/server/server.js:700:59
+          at Layer.handleRequest (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:152:17)
+          at next (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/route.js:157:13)
+          at middleware (/app/node_modules/.pnpm/express-validator@7.3.1/node_modules/express-validator/lib/middlewares/check.js:16:13)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5) {
+        statusCode: 400,
+        result: { errors: [ [Object] ] }
+      }
+
+      205 |     }
+      206 |     // The full error (including stack) is still logged to the console for debugging.
+    > 207 |     console.error(`[${context}]`, error);
+          |             ^
+      208 |     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
+      209 |       try {
+      210 |         await sendEmail({
+
+      at logAndEmailError (server/server.js:207:13)
+      at server/server.js:803:9
+
+    console.log
+      [SERVER] Order ID order_4 status updated to PRINTING.
+
+      at server/server.js:904:19
+
+    console.log
+      [SERVER] Tracking info added to order ID order_5.
+
+      at server/server.js:1006:17
+
+    console.log
+      [SERVER] Shipment notification email sent for order ID order_5.
+
+      at server/server.js:1063:25
+
+PASS server/tests/form-data-exploit.test.js
+  ● Console
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 1 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [dotenv@17.2.3] injecting env (0) from server/.env -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+
+      at _log (node_modules/.pnpm/dotenv@17.2.3/node_modules/dotenv/lib/main.js:142:11)
+
+    console.log
+      [SERVER] Pricing configuration loaded.
+
+      at server/server.js:78:13
+
+    console.log
+      [SERVER] Initialized active orders cache. Count: 0
+
+      at startServer (server/server.js:120:15)
+
+    console.log
+      [SERVER] LowDB database initialized at: /app/server/tests/test-db.json
+
+      at startServer (server/server.js:244:13)
+
+    console.log
+      [SERVER] Multer configured for file uploads.
+
+      at startServer (server/server.js:268:13)
+
+    console.log
+      [SERVER] Initializing Square client...
+
+      at startServer (server/server.js:271:13)
+
+    console.error
+      [SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.
+
+      274 |     if (!squareClient) {
+      275 |       if (!process.env.SQUARE_ACCESS_TOKEN) {
+    > 276 |         console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+          |                 ^
+      277 |         // In a test environment, we don't want to kill the test runner.
+      278 |         if (process.env.NODE_ENV !== 'test') {
+      279 |           process.exit(1);
+
+      at startServer (server/server.js:276:17)
+      at Object.<anonymous> (server/tests/form-data-exploit.test.js:39:25)
+
+    console.log
+      [SERVER] Verifying connection to Square servers...
+
+      at startServer (server/server.js:287:15)
+
+    console.log
+      [SERVER] Square client initialized.
+
+      at startServer (server/server.js:307:13)
+
+    console.log
+      [SERVER] Performing sanity check on Square client...
+
+      at startServer (server/server.js:309:13)
+
+    console.log
+      ✅ [SERVER] Sanity check passed. Client has required API properties.
+
+      at startServer (server/server.js:315:13)
+
+    console.warn
+      ⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+
+      377 |             // but we should log a clear warning.
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+    > 379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+          |                     ^
+      380 |             console.warn('   Do not use this configuration in production.');
+      381 |         }
+      382 |     } else {
+
+      at startServer (server/server.js:379:21)
+      at Object.<anonymous> (server/tests/form-data-exploit.test.js:39:25)
+
+    console.warn
+         Do not use this configuration in production.
+
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+      379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+    > 380 |             console.warn('   Do not use this configuration in production.');
+          |                     ^
+      381 |         }
+      382 |     } else {
+      383 |         console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+
+      at startServer (server/server.js:380:21)
+      at Object.<anonymous> (server/tests/form-data-exploit.test.js:39:25)
+
+    console.warn
+      ⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.
+
+      394 |         process.exit(1);
+      395 |       } else {
+    > 396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+          |                 ^
+      397 |         console.warn('   Sessions will not persist across server restarts.');
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+
+      at startServer (server/server.js:396:17)
+      at Object.<anonymous> (server/tests/form-data-exploit.test.js:39:25)
+
+    console.warn
+         Sessions will not persist across server restarts.
+
+      395 |       } else {
+      396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+    > 397 |         console.warn('   Sessions will not persist across server restarts.');
+          |                 ^
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+      400 |     }
+
+      at startServer (server/server.js:397:17)
+      at Object.<anonymous> (server/tests/form-data-exploit.test.js:39:25)
+
+    console.log
+      [SERVER] Middleware (CORS, JSON, static file serving) enabled.
+
+      at startServer (server/server.js:436:13)
+
+    console.warn
+      [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+
+      12 |         console.log('[TRACKER] EasyPost shipment tracker initialized.');
+      13 |     } else {
+    > 14 |         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+         |                 ^
+      15 |     }
+      16 | }
+      17 |
+
+      at initializeTracker (server/tracker.js:14:17)
+      at startServer (server/server.js:1462:5)
+      at Object.<anonymous> (server/tests/form-data-exploit.test.js:39:25)
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 2 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [SERVER] Signed new session token with key ID: fab6c6f7aa0f844f
+
+      at signInstanceToken (server/server.js:97:13)
+
+PASS tests/server.test.js
+  ● Console
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 1 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [dotenv@17.2.3] injecting env (0) from server/.env -- tip: ⚙️  enable debug logging with { debug: true }
+
+      at _log (node_modules/.pnpm/dotenv@17.2.3/node_modules/dotenv/lib/main.js:142:11)
+
+    console.log
+      [SERVER] Pricing configuration loaded.
+
+      at server/server.js:78:13
+
+    console.warn
+      [TELEGRAM] Bot token not found. Bot is disabled.
+
+      162 |
+      163 |   } else {
+    > 164 |     console.warn('[TELEGRAM] Bot token not found. Bot is disabled.');
+          |             ^
+      165 |     // Create a mock bot to avoid errors when the token is not set
+      166 |     bot = {
+      167 |       telegram: {
+
+      at initializeBot (server/bot.js:164:13)
+      at Object.<anonymous> (tests/server.test.js:23:15)
+
+    console.log
+      [SERVER] Initialized active orders cache. Count: 0
+
+      at startServer (server/server.js:120:15)
+
+    console.log
+      [SERVER] Migrating orders from Array to Object...
+
+      at startServer (server/server.js:131:13)
+
+    console.log
+      [SERVER] Migration complete.
+
+      at startServer (server/server.js:143:13)
+
+    console.log
+      [SERVER] LowDB database initialized at: /app/tests/test-db.json
+
+      at startServer (server/server.js:244:13)
+
+    console.log
+      [SERVER] Multer configured for file uploads.
+
+      at startServer (server/server.js:268:13)
+
+    console.log
+      [SERVER] Initializing Square client...
+
+      at startServer (server/server.js:271:13)
+
+    console.error
+      [SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.
+
+      274 |     if (!squareClient) {
+      275 |       if (!process.env.SQUARE_ACCESS_TOKEN) {
+    > 276 |         console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+          |                 ^
+      277 |         // In a test environment, we don't want to kill the test runner.
+      278 |         if (process.env.NODE_ENV !== 'test') {
+      279 |           process.exit(1);
+
+      at startServer (server/server.js:276:17)
+      at Object.<anonymous> (tests/server.test.js:25:24)
+
+    console.log
+      [SERVER] Verifying connection to Square servers...
+
+      at startServer (server/server.js:287:15)
+
+    console.log
+      [SERVER] Square client initialized.
+
+      at startServer (server/server.js:307:13)
+
+    console.log
+      [SERVER] Performing sanity check on Square client...
+
+      at startServer (server/server.js:309:13)
+
+    console.log
+      ✅ [SERVER] Sanity check passed. Client has required API properties.
+
+      at startServer (server/server.js:315:13)
+
+    console.warn
+      ⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+
+      377 |             // but we should log a clear warning.
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+    > 379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+          |                     ^
+      380 |             console.warn('   Do not use this configuration in production.');
+      381 |         }
+      382 |     } else {
+
+      at startServer (server/server.js:379:21)
+      at Object.<anonymous> (tests/server.test.js:25:24)
+
+    console.warn
+         Do not use this configuration in production.
+
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+      379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+    > 380 |             console.warn('   Do not use this configuration in production.');
+          |                     ^
+      381 |         }
+      382 |     } else {
+      383 |         console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+
+      at startServer (server/server.js:380:21)
+      at Object.<anonymous> (tests/server.test.js:25:24)
+
+    console.warn
+      ⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.
+
+      394 |         process.exit(1);
+      395 |       } else {
+    > 396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+          |                 ^
+      397 |         console.warn('   Sessions will not persist across server restarts.');
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+
+      at startServer (server/server.js:396:17)
+      at Object.<anonymous> (tests/server.test.js:25:24)
+
+    console.warn
+         Sessions will not persist across server restarts.
+
+      395 |       } else {
+      396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+    > 397 |         console.warn('   Sessions will not persist across server restarts.');
+          |                 ^
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+      400 |     }
+
+      at startServer (server/server.js:397:17)
+      at Object.<anonymous> (tests/server.test.js:25:24)
+
+    console.log
+      [SERVER] Middleware (CORS, JSON, static file serving) enabled.
+
+      at startServer (server/server.js:436:13)
+
+    console.warn
+      [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+
+      12 |         console.log('[TRACKER] EasyPost shipment tracker initialized.');
+      13 |     } else {
+    > 14 |         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+         |                 ^
+      15 |     }
+      16 | }
+      17 |
+
+      at initializeTracker (server/tracker.js:14:17)
+      at startServer (server/server.js:1462:5)
+      at Object.<anonymous> (tests/server.test.js:25:24)
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 2 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [SERVER] Signed new session token with key ID: 601e878a9feeffa9
+
+      at signInstanceToken (server/server.js:97:13)
+
+PASS tests/xss-patch.test.js
+PASS tests/webauthn.test.js
+PASS tests/image.test.js
+PASS tests/server_index_security.test.js
+PASS tests/server-pricing.test.js
+PASS tests/pricing.test.js
+PASS tests/verify_index_async_write.test.js
+PASS tests/auth-webauthn.test.js
+  ● Console
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 1 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [dotenv@17.2.3] injecting env (0) from server/.env -- tip: ⚙️  enable debug logging with { debug: true }
+
+      at _log (node_modules/.pnpm/dotenv@17.2.3/node_modules/dotenv/lib/main.js:142:11)
+
+    console.log
+      [SERVER] Pricing configuration loaded.
+
+      at server/server.js:78:13
+
+    console.log
+      [SERVER] Initialized active orders cache. Count: 0
+
+      at startServer (server/server.js:120:15)
+
+    console.log
+      [SERVER] Migrating orders from Array to Object...
+
+      at startServer (server/server.js:131:13)
+
+    console.log
+      [SERVER] Migration complete.
+
+      at startServer (server/server.js:143:13)
+
+    console.log
+      [SERVER] LowDB database initialized at: /app/tests/webauthn-test-db.json
+
+      at startServer (server/server.js:244:13)
+
+    console.log
+      [SERVER] Multer configured for file uploads.
+
+      at startServer (server/server.js:268:13)
+
+    console.log
+      [SERVER] Initializing Square client...
+
+      at startServer (server/server.js:271:13)
+
+    console.error
+      [SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.
+
+      274 |     if (!squareClient) {
+      275 |       if (!process.env.SQUARE_ACCESS_TOKEN) {
+    > 276 |         console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+          |                 ^
+      277 |         // In a test environment, we don't want to kill the test runner.
+      278 |         if (process.env.NODE_ENV !== 'test') {
+      279 |           process.exit(1);
+
+      at startServer (server/server.js:276:17)
+      at Object.<anonymous> (tests/auth-webauthn.test.js:40:24)
+
+    console.log
+      [SERVER] Verifying connection to Square servers...
+
+      at startServer (server/server.js:287:15)
+
+    console.log
+      [SERVER] Square client initialized.
+
+      at startServer (server/server.js:307:13)
+
+    console.log
+      [SERVER] Performing sanity check on Square client...
+
+      at startServer (server/server.js:309:13)
+
+    console.log
+      ✅ [SERVER] Sanity check passed. Client has required API properties.
+
+      at startServer (server/server.js:315:13)
+
+    console.warn
+      ⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+
+      377 |             // but we should log a clear warning.
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+    > 379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+          |                     ^
+      380 |             console.warn('   Do not use this configuration in production.');
+      381 |         }
+      382 |     } else {
+
+      at startServer (server/server.js:379:21)
+      at Object.<anonymous> (tests/auth-webauthn.test.js:40:24)
+
+    console.warn
+         Do not use this configuration in production.
+
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+      379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+    > 380 |             console.warn('   Do not use this configuration in production.');
+          |                     ^
+      381 |         }
+      382 |     } else {
+      383 |         console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+
+      at startServer (server/server.js:380:21)
+      at Object.<anonymous> (tests/auth-webauthn.test.js:40:24)
+
+    console.warn
+      ⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.
+
+      394 |         process.exit(1);
+      395 |       } else {
+    > 396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+          |                 ^
+      397 |         console.warn('   Sessions will not persist across server restarts.');
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+
+      at startServer (server/server.js:396:17)
+      at Object.<anonymous> (tests/auth-webauthn.test.js:40:24)
+
+    console.warn
+         Sessions will not persist across server restarts.
+
+      395 |       } else {
+      396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+    > 397 |         console.warn('   Sessions will not persist across server restarts.');
+          |                 ^
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+      400 |     }
+
+      at startServer (server/server.js:397:17)
+      at Object.<anonymous> (tests/auth-webauthn.test.js:40:24)
+
+    console.log
+      [SERVER] Middleware (CORS, JSON, static file serving) enabled.
+
+      at startServer (server/server.js:436:13)
+
+    console.warn
+      [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+
+      12 |         console.log('[TRACKER] EasyPost shipment tracker initialized.');
+      13 |     } else {
+    > 14 |         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+         |                 ^
+      15 |     }
+      16 | }
+      17 |
+
+      at initializeTracker (server/tracker.js:14:17)
+      at startServer (server/server.js:1462:5)
+      at Object.<anonymous> (tests/auth-webauthn.test.js:40:24)
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 2 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [SERVER] Signed new session token with key ID: c2aeecfe6ba729d7
+
+      at signInstanceToken (server/server.js:97:13)
+
+    console.log
+      New user created for WebAuthn pre-registration: webauthnuser
+
+      at server/server.js:1359:17
+
+PASS tests/security_xss.test.js
+  ● Console
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 1 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [dotenv@17.2.3] injecting env (0) from server/.env -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+
+      at _log (node_modules/.pnpm/dotenv@17.2.3/node_modules/dotenv/lib/main.js:142:11)
+
+    console.log
+      [SERVER] Pricing configuration loaded.
+
+      at server/server.js:78:13
+
+    console.log
+      [SERVER] Initialized active orders cache. Count: 0
+
+      at startServer (server/server.js:120:15)
+
+    console.log
+      [SERVER] LowDB database initialized at: /app/server/test-db-xss.json
+
+      at startServer (server/server.js:244:13)
+
+    console.log
+      [SERVER] Multer configured for file uploads.
+
+      at startServer (server/server.js:268:13)
+
+    console.log
+      [SERVER] Initializing Square client...
+
+      at startServer (server/server.js:271:13)
+
+    console.log
+      [SERVER] Using injected Square client.
+
+      at startServer (server/server.js:289:15)
+
+    console.log
+      [SERVER] Square client initialized.
+
+      at startServer (server/server.js:307:13)
+
+    console.log
+      [SERVER] Performing sanity check on Square client...
+
+      at startServer (server/server.js:309:13)
+
+    console.log
+      ✅ [SERVER] Sanity check passed. Client has required API properties.
+
+      at startServer (server/server.js:315:13)
+
+    console.warn
+      ⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+
+      377 |             // but we should log a clear warning.
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+    > 379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+          |                     ^
+      380 |             console.warn('   Do not use this configuration in production.');
+      381 |         }
+      382 |     } else {
+
+      at startServer (server/server.js:379:21)
+      at Object.<anonymous> (tests/security_xss.test.js:72:24)
+
+    console.warn
+         Do not use this configuration in production.
+
+      378 |             csrfSecret = weakDefaultCsrfSecret;
+      379 |             console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+    > 380 |             console.warn('   Do not use this configuration in production.');
+          |                     ^
+      381 |         }
+      382 |     } else {
+      383 |         console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+
+      at startServer (server/server.js:380:21)
+      at Object.<anonymous> (tests/security_xss.test.js:72:24)
+
+    console.warn
+      ⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.
+
+      394 |         process.exit(1);
+      395 |       } else {
+    > 396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+          |                 ^
+      397 |         console.warn('   Sessions will not persist across server restarts.');
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+
+      at startServer (server/server.js:396:17)
+      at Object.<anonymous> (tests/security_xss.test.js:72:24)
+
+    console.warn
+         Sessions will not persist across server restarts.
+
+      395 |       } else {
+      396 |         console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+    > 397 |         console.warn('   Sessions will not persist across server restarts.');
+          |                 ^
+      398 |         sessionSecret = randomUUID();
+      399 |       }
+      400 |     }
+
+      at startServer (server/server.js:397:17)
+      at Object.<anonymous> (tests/security_xss.test.js:72:24)
+
+    console.log
+      [SERVER] Middleware (CORS, JSON, static file serving) enabled.
+
+      at startServer (server/server.js:436:13)
+
+    console.warn
+      [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+
+      12 |         console.log('[TRACKER] EasyPost shipment tracker initialized.');
+      13 |     } else {
+    > 14 |         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+         |                 ^
+      15 |     }
+      16 | }
+      17 |
+
+      at initializeTracker (server/tracker.js:14:17)
+      at startServer (server/server.js:1462:5)
+      at Object.<anonymous> (tests/security_xss.test.js:72:24)
+
+    console.log
+      [KEY_MANAGER] Rotating keys...
+
+      at rotateKeys (server/keyManager.js:38:13)
+
+    console.log
+      [KEY_MANAGER] Now managing 2 active keys.
+
+      at rotateKeys (server/keyManager.js:44:13)
+
+    console.log
+      [SERVER] Signed new session token with key ID: 4c398fd16152655b
+
+      at signInstanceToken (server/server.js:97:13)
+
+    console.log
+      [CLIENT INSPECTION] Keys on squareClient: [ 'locations', 'payments' ]
+
+      at server/server.js:699:17
+
+    console.log
+      [SERVER] Square payment successful. Payment ID: payment_123
+
+      at server/server.js:705:17
+
+    console.log
+      [SERVER] New order created and stored. Order ID: ba716c64-30f8-4460-bd42-a5e91a4870c7.
+
+      at server/server.js:746:17
+
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+
+Test Suites: 2 failed, 13 passed, 15 total
+Tests:       4 failed, 64 passed, 68 total
+Snapshots:   0 total
+Time:        12.838 s, estimated 19 s
+Ran all test suites.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+ ELIFECYCLE  Command failed with exit code 1.
