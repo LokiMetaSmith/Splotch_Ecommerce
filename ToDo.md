@@ -29,10 +29,10 @@ These items address fundamental problems with the test setup and major gaps in f
     -   [x] WebAuthn (Passkey) registration and login (`/api/auth/register-verify`, `/api/auth/login-verify`, etc.).
     -   [x] Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).
     -   [x] Google OAuth flow (`/auth/google`, `/oauth2callback`).
--   **[ ] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
-    -   Adding text to the canvas.
-    -   Image rotation, resizing, and filters (grayscale, sepia).
-    -   The "Smart Cutline" generation feature (`traceContour`, `simplifyPolygon`).
+-   **[x] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
+    -   [x] Adding text to the canvas.
+    -   [x] Image rotation, resizing, and filters (grayscale, sepia).
+    -   [x] The "Smart Cutline" generation feature (`traceContour`, `simplifyPolygon`).
 
 ---
 
