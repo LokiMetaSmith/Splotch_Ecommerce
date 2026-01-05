@@ -257,8 +257,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         cb(null, uploadDir);
       },
       filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, randomUUID() + path.extname(file.originalname));
       }
     });
     const upload = multer({
