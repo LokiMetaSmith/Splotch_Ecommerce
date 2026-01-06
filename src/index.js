@@ -1,5 +1,6 @@
 import { SVGParser } from './lib/svgparser.js';
 import { calculateStickerPrice } from './lib/pricing.js';
+import { drawRuler as drawCanvasRuler } from './lib/canvas-utils.js';
 
 // index.js
 
@@ -1042,50 +1043,8 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
 
 function drawRuler(bounds, offset = { x: 0, y: 0 }) {
     if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
-
     const ppi = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96;
-    const majorMarkSpacing = isMetric ? 10 * ppi / 25.4 : ppi; // 10mm or 1in
-    const minorMarkSpacing = isMetric ? majorMarkSpacing / 10 : majorMarkSpacing / 8; // 1mm or 1/8in
-
-    ctx.save();
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    ctx.font = "10px Arial";
-    ctx.lineWidth = 1;
-
-    // Top ruler
-    for (let i = 0; i * minorMarkSpacing <= bounds.width; i++) {
-        const x = offset.x + i * minorMarkSpacing;
-        const y = offset.y - 10;
-        const isMajorMark = i % (isMetric ? 10 : 8) === 0;
-        const markHeight = isMajorMark ? 10 : 5;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y + markHeight);
-        ctx.stroke();
-        if (isMajorMark && i > 0) {
-            const label = isMetric ? (i / 10) : (i / 8);
-            ctx.fillText(label, x - 3, y - 2);
-        }
-    }
-
-    // Left ruler
-    for (let i = 0; i * minorMarkSpacing <= bounds.height; i++) {
-        const y = offset.y + i * minorMarkSpacing;
-        const x = offset.x - 10;
-        const isMajorMark = i % (isMetric ? 10 : 8) === 0;
-        const markWidth = isMajorMark ? 10 : 5;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + markWidth, y);
-        ctx.stroke();
-        if (isMajorMark && i > 0) {
-            const label = isMetric ? (i / 10) : (i / 8);
-            ctx.fillText(label, x - 12, y + 3);
-        }
-    }
-
-    ctx.restore();
+    drawCanvasRuler(ctx, bounds, offset, ppi, isMetric);
 }
 
 function handleAddText() {
