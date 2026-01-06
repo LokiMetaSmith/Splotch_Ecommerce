@@ -321,6 +321,15 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       max: 100, // Limit each IP to 100 requests per windowMs
       message: 'Too many requests from this IP, please try again after 15 minutes',
     });
+
+    const authLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      // In test environment, allow more requests unless explicitly testing rate limiting
+      max: (process.env.NODE_ENV === 'test' && !process.env.ENABLE_RATE_LIMIT_TEST) ? 1000 : 10,
+      message: 'Too many login attempts from this IP, please try again after 15 minutes',
+      standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+      legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    });
     
     const allowedOrigins = [
       'https://lokimetasmith.github.io',
@@ -1070,7 +1079,7 @@ ${statusChecklist}
     });
 
     // --- Auth Endpoints ---
-    app.post('/api/auth/register-user', [
+    app.post('/api/auth/register-user', authLimiter, [
       body('username').notEmpty().withMessage('username is required'),
       body('password').notEmpty().withMessage('password is required'),
     ], async (req, res) => {
@@ -1114,7 +1123,7 @@ ${statusChecklist}
       res.json({ success: true });
     });
 
-    app.post('/api/auth/login', [
+    app.post('/api/auth/login', authLimiter, [
       ...validateUsername,
       body('password').notEmpty().withMessage('password is required'),
     ], async (req, res) => {
@@ -1144,7 +1153,7 @@ ${statusChecklist}
       res.json({ token });
     });
     
-    app.post('/api/auth/magic-login', [
+    app.post('/api/auth/magic-login', authLimiter, [
       body('email').isEmail().withMessage('email is not valid'),
     ], async (req, res) => {
         const errors = validationResult(req);
