@@ -1,5 +1,8 @@
 /*! tailwindcss v4.1.18 | MIT License | https://tailwindcss.com */
 @layer properties;
+.pointer-events-none {
+  pointer-events: none;
+}
 .visible {
   visibility: visible;
 }
@@ -25,6 +28,9 @@
 }
 .static {
   position: static;
+}
+.z-20 {
+  z-index: 20;
 }
 .z-50 {
   z-index: 50;
@@ -73,6 +79,9 @@
 }
 .min-h-\[50px\] {
   min-height: 50px;
+}
+.w-fit {
+  width: fit-content;
 }
 .w-full {
   width: 100%;
@@ -215,6 +224,10 @@
 .duration-150 {
   --tw-duration: 150ms;
   transition-duration: 150ms;
+}
+.select-none {
+  -webkit-user-select: none;
+  user-select: none;
 }
 .peer-focus\:ring-4 {
   &:is(:where(.peer):focus ~ *) {
