@@ -340,7 +340,7 @@
         </div>
     </footer>
 
-    <div id="mascot-container" title="Hi! I'm the Splotch Mascot!">
+    <div id="mascot-container" title="Hi! I'm the Splotch Mascot!" tabindex="0" role="button" aria-label="Interact with Splotch Mascot">
         <div class="speech-bubble" id="mascot-text">Create something awesome today!</div>
         <img id="mascot-img" src="/mascot.png" alt="Splotch Mascot">
     </div>
@@ -384,9 +384,30 @@
             "Don't forget to save!"
         ];
 
-        mascotContainer.addEventListener('mouseenter', () => {
+        function updateMascotMessage() {
             const randomMessage = messages[Math.floor(Math.random() * messages.length)];
             mascotText.textContent = randomMessage;
+        }
+
+        mascotContainer.addEventListener('mouseenter', updateMascotMessage);
+        mascotContainer.addEventListener('focus', updateMascotMessage);
+
+        function triggerMascotAction() {
+            updateMascotMessage();
+            mascotContainer.classList.remove('wiggle');
+            // Visual feedback for click/keyboard activation
+            mascotContainer.style.transform = "scale(1.2) rotate(0deg)";
+            setTimeout(() => {
+                mascotContainer.style.transform = "";
+            }, 200);
+        }
+
+        mascotContainer.addEventListener('click', triggerMascotAction);
+        mascotContainer.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerMascotAction();
+            }
         });
 
         // Wiggle on Proximity
