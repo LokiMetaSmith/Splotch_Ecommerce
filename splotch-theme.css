@@ -348,9 +348,13 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
     animation: wiggle 0.5s infinite ease-in-out;
 }
 
-#mascot-container:hover {
+#mascot-container:hover,
+#mascot-container:focus-visible {
     animation: none;
-    transform: scale(1.15) rotate(0deg); /* Straighten up on hover */
+    transform: scale(1.15) rotate(0deg); /* Straighten up on hover/focus */
+    outline: 4px solid var(--splotch-teal) !important;
+    outline-offset: 4px;
+    border-radius: 50%;
 }
 
 #mascot-img {
