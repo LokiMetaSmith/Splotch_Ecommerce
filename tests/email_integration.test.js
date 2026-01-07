@@ -5,8 +5,12 @@ describe('Email Integration Test (SMTP)', () => {
   let server;
   let port;
   let receivedEmails = [];
+  let originalEnv;
 
   beforeAll((done) => {
+    // Backup original environment variables
+    originalEnv = { ...process.env };
+
     // Start a local SMTP server on a random port
     server = new SMTPServer({
       authOptional: true, // We don't need auth for this test sink
@@ -39,11 +43,8 @@ describe('Email Integration Test (SMTP)', () => {
   });
 
   afterAll((done) => {
-    // Cleanup
-    delete process.env.SMTP_HOST;
-    delete process.env.SMTP_PORT;
-    delete process.env.SMTP_SECURE;
-    delete process.env.SMTP_REJECT_UNAUTHORIZED;
+    // Restore original environment variables
+    process.env = originalEnv;
     server.close(done);
   });
 

@@ -128,7 +128,58 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# 3. Create the Droplet
+# 3. SMTP Configuration Prompt
+echo "-------------------------------------"
+echo " Optional SMTP Configuration "
+echo "-------------------------------------"
+echo "Leave these blank to use the default Google API (legacy)."
+echo
+
+read -p "SMTP Host (e.g., smtp.example.com): " SMTP_HOST
+if [ -n "$SMTP_HOST" ]; then
+    read -p "SMTP Port (default: 587): " SMTP_PORT
+    SMTP_PORT=${SMTP_PORT:-587}
+    read -p "SMTP User: " SMTP_USER
+    read -s -p "SMTP Password: " SMTP_PASS
+    echo
+    read -p "SMTP From Address (e.g., noreply@example.com): " SMTP_FROM
+    read -p "Use Secure Connection? (true/false, default: false): " SMTP_SECURE
+    SMTP_SECURE=${SMTP_SECURE:-false}
+    read -p "Reject Unauthorized Certs? (true/false, default: true): " SMTP_REJECT_UNAUTHORIZED
+    SMTP_REJECT_UNAUTHORIZED=${SMTP_REJECT_UNAUTHORIZED:-true}
+fi
+
+# 4. Prepare Cloud Config with Secrets
+# We'll use a temporary file to inject secrets, then delete it.
+TEMP_CONFIG="cloud-config-generated.yml"
+cp "$CLOUD_CONFIG_PATH" "$TEMP_CONFIG"
+
+# Inject SMTP variables if provided
+if [ -n "$SMTP_HOST" ]; then
+    # Escape pipe characters in variables to prevent sed from breaking
+    ESCAPED_SMTP_USER=$(echo "$SMTP_USER" | sed 's/|/\\|/g')
+    ESCAPED_SMTP_PASS=$(echo "$SMTP_PASS" | sed 's/|/\\|/g')
+    ESCAPED_SMTP_FROM=$(echo "$SMTP_FROM" | sed 's/|/\\|/g')
+
+    sed -i "s|YOUR_SMTP_HOST|$SMTP_HOST|g" "$TEMP_CONFIG"
+    sed -i "s|YOUR_SMTP_PORT|$SMTP_PORT|g" "$TEMP_CONFIG"
+    sed -i "s|YOUR_SMTP_USER|$ESCAPED_SMTP_USER|g" "$TEMP_CONFIG"
+    sed -i "s|YOUR_SMTP_PASS|$ESCAPED_SMTP_PASS|g" "$TEMP_CONFIG"
+    sed -i "s|YOUR_SMTP_SECURE|$SMTP_SECURE|g" "$TEMP_CONFIG"
+    sed -i "s|YOUR_SMTP_FROM|$ESCAPED_SMTP_FROM|g" "$TEMP_CONFIG"
+    sed -i "s|YOUR_SMTP_REJECT_UNAUTHORIZED|$SMTP_REJECT_UNAUTHORIZED|g" "$TEMP_CONFIG"
+else
+    # Clear placeholders if not used
+    sed -i "s|SMTP_HOST=YOUR_SMTP_HOST|# SMTP_HOST not configured|g" "$TEMP_CONFIG"
+    sed -i "s|SMTP_PORT=YOUR_SMTP_PORT|#|g" "$TEMP_CONFIG"
+    sed -i "s|SMTP_USER=YOUR_SMTP_USER|#|g" "$TEMP_CONFIG"
+    sed -i "s|SMTP_PASS=YOUR_SMTP_PASS|#|g" "$TEMP_CONFIG"
+    sed -i "s|SMTP_SECURE=YOUR_SMTP_SECURE|#|g" "$TEMP_CONFIG"
+    sed -i "s|SMTP_FROM=YOUR_SMTP_FROM|#|g" "$TEMP_CONFIG"
+    sed -i "s|SMTP_REJECT_UNAUTHORIZED=YOUR_SMTP_REJECT_UNAUTHORIZED|#|g" "$TEMP_CONFIG"
+fi
+
+# 5. Create the Droplet
 echo
 echo "🚀 Creating Droplet '$DROPLET_NAME'..."
 
@@ -137,14 +188,17 @@ doctl compute droplet create "$DROPLET_NAME" \
     --size "$SIZE" \
     --image "$IMAGE" \
     --ssh-keys "$SSH_KEY_FINGERPRINT" \
-    --user-data-file "$CLOUD_CONFIG_PATH" \
+    --user-data-file "$TEMP_CONFIG" \
     --wait
+
+# Cleanup sensitive config
+rm "$TEMP_CONFIG"
 
 echo
 echo "✅ Droplet '$DROPLET_NAME' has been created successfully."
 echo
 
-# 4. Get Droplet IP and provide next steps
+# 6. Get Droplet IP and provide next steps
 DROPLET_IP=$(doctl compute droplet get "$DROPLET_NAME" --format "PublicIPv4" --no-header)
 
 echo "-------------------------------------"
