@@ -42,8 +42,6 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const { window } = new JSDOM('');
 const purify = DOMPurify(window);
 
-export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
-
 async function sanitizeSVGFile(filePath) {
     try {
         const fileContent = await fs.promises.readFile(filePath, 'utf-8');
