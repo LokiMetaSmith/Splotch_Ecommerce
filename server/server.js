@@ -416,6 +416,38 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
 
     app.use(express.json());
 
+    // SECURITY: Block access to sensitive files and directories
+    app.use((req, res, next) => {
+        const blockedPrefixes = [
+            '/server/',
+            '/node_modules/',
+            '/.git/',
+            '/verification/',
+            '/.jules/'
+        ];
+        const blockedExact = [
+            '/package.json',
+            '/package-lock.json',
+            '/pnpm-lock.yaml',
+            '/yarn.lock',
+            '/.env',
+            '/Dockerfile',
+            '/docker-compose.yaml',
+            '/docker-compose.yml'
+        ];
+
+        const reqPath = req.path;
+
+        const isBlockedPrefix = blockedPrefixes.some(prefix => reqPath.startsWith(prefix));
+        const isBlockedExact = blockedExact.includes(reqPath);
+
+        if (isBlockedPrefix || isBlockedExact) {
+            console.warn(`[SECURITY] Blocked access to sensitive path: ${reqPath}`);
+            return res.status(403).send('Forbidden');
+        }
+        next();
+    });
+
     app.use(lusca({
         csrf: true,
         xframe: 'SAMEORIGIN',
