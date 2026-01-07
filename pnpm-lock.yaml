@@ -150,6 +150,9 @@ importers:
       lint-staged:
         specifier: ^16.1.6
         version: 16.2.7
+      playwright:
+        specifier: ^1.57.0
+        version: 1.57.0
       postcss:
         specifier: ^8.5.6
         version: 8.5.6
