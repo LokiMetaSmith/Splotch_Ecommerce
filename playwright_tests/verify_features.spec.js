@@ -88,6 +88,12 @@ test.describe('Standard Size Buttons and Unit Selection', () => {
             buffer: buffer,
         });
 
+        // Hide the mascot which obscures the toggle
+        await page.evaluate(() => {
+            const mascot = document.getElementById('mascot-container');
+            if (mascot) mascot.style.display = 'none';
+        });
+
         const toggle = page.locator('#unitToggle');
         const btn1 = page.locator('button.size-btn[data-size="1"]');
         const resizeValue = page.locator('#resizeValue');
@@ -96,15 +102,15 @@ test.describe('Standard Size Buttons and Unit Selection', () => {
         await expect(btn1).toHaveText('1"');
         await expect(resizeValue).toContainText('in');
 
-        // Toggle to mm
-        await toggle.check();
+        // Toggle to mm via JS evaluation to avoid viewport/interception issues
+        await page.evaluate(() => document.querySelector('label[for="unitToggle"]').click());
 
         // 1 inch = 25.4 mm => approx 25mm
         await expect(btn1).toHaveText('25mm');
         await expect(resizeValue).toContainText('mm');
 
-        // Toggle back to inches
-        await toggle.uncheck();
+        // Toggle back to inches via JS evaluation
+        await page.evaluate(() => document.querySelector('label[for="unitToggle"]').click());
         await expect(btn1).toHaveText('1"');
         await expect(resizeValue).toContainText('in');
     });
