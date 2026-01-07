@@ -81,12 +81,16 @@ test.describe('Frontend Image Manipulation', () => {
     });
 
     test('should generate smart cutline', async ({ page }) => {
+        // Mock the confirm dialog to always accept
+        page.on('dialog', dialog => dialog.accept());
+
         // Use a larger test image (50x50) with a transparent border and a central shape (red square)
         // This ensures the "Smart Cutline" logic has a clear boundary to trace and isn't filtered out by cleanup steps.
         const testImagePath = path.join(__dirname, '../verification/test_transparent.png');
 
-        // 50x50 PNG. Red square in middle (10,10 to 40,40). Transparent border.
-        const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABTSURBVGhD7cEBDQAAAMKg909tDjgAAADgNwMCHgABAh4AAQIeAAECHgABAh4AAQIeAAECHgABAh4AAQIeAAECHgABAh4AAQIeAAECHgABAh4AgQeXlwC10E8fMwAAAABJRU5ErkJggg==', 'base64');
+        // 100x100 PNG. Solid black circle in the middle.
+        // Created to be large and simple enough to survive polygon cleaning.
+        const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAA7DAAAOwwHHb6hkAAACXElEQVR4nO3cTU7DMBAF4MyQe9Qj9AQ9Q49Qj9AOuQGVYgUtW7E99vimq1I5xZ/nZ2e+JEmSJEmSJEmSJEmSJEmSJEmSJEk628/Pz+X7+3t5fn4u9/f35f7+fl5/fX0tt7e3y+3t7fL19bW/7+PjY3l6elqenp6Wp6en5ePjY9/39fW13N3dLXd3d8vd3d3y9fW1v//l5WV5eXlZXl5elpeXl+Xz83Pf9/r6ur6/u7u75fX1df/8/PxcXl9fl9fX1+X19XX5/Pzc972+vi4PDw/Lw8PD8vDwsLy+vu7v+/z8XB4fH5fHx8fl8fFx+fr62t/38vKyPD4+Lo+Pj8vj4+Py8vKyv+/t7W15fn5enp+fl+fn5+Xt7W1/38fHx/L6+rq8vr4ur6+vy8fHx/6+t7e35fX1dXl9fV1eX1+Xt7e3/X2f/8/y/v6+vL+/L+/v78vn5+f+vpubm+Xm5ma5ublZbm5u9ve9vb0tDw8Py8PDw/Lw8LC8vb3t7/v6+lpub2+X29vb5fb2dvn6+trfd39/vzw9PS1PT0/L09PTcn9/v7/v7e1teXl5WV5eXpaXl5fl7e1tf9/X19dyc3Oz3NzcnP2v5Onpabm7u1vu7u6Wp6en/X2f/8/y8fGxfHx8LB8fH8vn5+f+vpubm+Xm5ma5ublZbm5u9ve9vb0tDw8Py8PDw/Lw8LC8vb3t7/v6+lpub2+X29vb5fb2dvn6+trfd39/vzw9PS1PT0/L09PTcn9/v7/v7e1teXl5WV5eXpaXl5fl7e1tf9/X19dyc3Oz3NzcnP2vJEmSJEmSJEmSJEmSJEmSJEmSJEn/0S/uW35509+R2QAAAABJRU5ErkJggg==', 'base64');
 
         if (!fs.existsSync(path.dirname(testImagePath))) {
             fs.mkdirSync(path.dirname(testImagePath), { recursive: true });

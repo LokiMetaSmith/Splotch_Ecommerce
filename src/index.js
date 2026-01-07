@@ -1,6 +1,7 @@
 import { SVGParser } from './lib/svgparser.js';
 import { calculateStickerPrice } from './lib/pricing.js';
 import { drawRuler as drawCanvasRuler } from './lib/canvas-utils.js';
+import { traceContour, simplifyPolygon, imageHasTransparentBorder } from './lib/image-processing.js';
 
 // index.js
 
@@ -1248,7 +1249,9 @@ function handleGenerateCutline() {
     }
 
     // --- Feedforward Check ---
-    if (!imageHasTransparentBorder()) {
+    // Pass the imageData to the function
+    const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    if (!imageHasTransparentBorder(currentImageData)) {
         const proceed = confirm("This image does not appear to have a transparent or white background. The 'Smart Cutline' feature may not produce a good result. Proceed anyway?");
         if (!proceed) {
             return;
@@ -1271,13 +1274,13 @@ function handleGenerateCutline() {
             }
 
             // The raw contour is too detailed, simplify it using the RDP algorithm.
-            const simplifiedContour = simplifyPolygon(contour, 2.0); // Epsilon of 2.0 pixels
+            const simplifiedContour = simplifyPolygon(contour, 0.5); // Epsilon of 0.5 pixels
 
             // Clean the polygon to remove self-intersections and other issues before offsetting.
             // This requires scaling up for Clipper's integer math.
             const scale = 100;
             const scaledPoly = simplifiedContour.map(p => ({ X: p.x * scale, Y: p.y * scale }));
-            const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(scaledPoly, 1.415);
+            const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(scaledPoly, 0.1);
 
             // Add validation to ensure we have a usable polygon AFTER cleaning
             if (!cleanedScaledPoly || cleanedScaledPoly.length < 3) {
