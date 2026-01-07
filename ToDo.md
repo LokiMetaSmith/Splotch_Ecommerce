@@ -8,6 +8,7 @@ This section outlines critical issues and gaps in the project's automated testin
 
 These issues represent the most severe risks to the application's functionality and require immediate attention.
 
+-   **[x] Fix Broken Test Environment (Dependencies & ESM):** The project is stuck in "dependency hell" with `jsdom` v27 requiring CommonJS but its transitive dependency `html-encoding-sniffer` v6 requiring ESM. This breaks global Jest tests like `svg_sanitization.test.js` and `server.test.js`. The environment must be repaired by either upgrading to a modern, ESM-compatible `jsdom` (v29+) or resolving the transitive dependency conflict.
 -   **[x] Fix Test Execution Script:** The main test script (`run-tests.sh`) only executes Playwright E2E tests and **completely ignores all Jest unit and integration tests**. This script must be updated to run the entire test suite (e.g., by running `npm run test:unit && npm run test:e2e`).
 -   **[x] Test the Payment & Order API Endpoints:** The backend API endpoints for creating orders and processing payments (`/api/create-order`) and managing orders (`/api/orders`, `/api/orders/:orderId`, etc.) have **zero test coverage**. These are the most critical, revenue-generating parts of the application and must have robust integration tests.
 -   **[x] Test the Frontend Payment Submission Flow:** The entire frontend user flow for submitting a payment is untested. The existing Playwright test (`payment-form.spec.js`) only checks for the visibility of form fields. A new test is needed to simulate a user filling out the form, submitting it, and verifying the entire process.
@@ -22,16 +23,16 @@ These issues represent the most severe risks to the application's functionality 
 
 These items address fundamental problems with the test setup and major gaps in feature coverage.
 
--   **[ ] Unify Test Environment Setup:** The Jest environment is not configured correctly to handle ES module imports from the `/src` directory, forcing bad practices like code duplication in tests. This needs to be fixed to allow for standard `import` statements in all unit tests.
--   **[ ] Remove API Mocking in E2E Tests:** The entire Playwright suite runs against a mocked backend. While this is useful for isolating the frontend, it is not a true end-to-end test. A separate E2E test suite or configuration should be created that runs against the **real backend** to validate full-stack integration.
+-   **[x] Unify Test Environment Setup:** The Jest environment is not configured correctly to handle ES module imports from the `/src` directory, forcing bad practices like code duplication in tests. This needs to be fixed to allow for standard `import` statements in all unit tests.
+-   **[x] Remove API Mocking in E2E Tests:** The entire Playwright suite runs against a mocked backend. While this is useful for isolating the frontend, it is not a true end-to-end test. A separate E2E test suite or configuration should be created that runs against the **real backend** to validate full-stack integration.
 -   **[x] Add Tests for All Authentication Flows:** Backend integration tests are missing for all non-password authentication methods. Test suites need to be created for:
     -   [x] WebAuthn (Passkey) registration and login (`/api/auth/register-verify`, `/api/auth/login-verify`, etc.).
     -   [x] Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).
     -   [x] Google OAuth flow (`/auth/google`, `/oauth2callback`).
--   **[ ] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
-    -   Adding text to the canvas.
-    -   Image rotation, resizing, and filters (grayscale, sepia).
-    -   The "Smart Cutline" generation feature (`traceContour`, `simplifyPolygon`).
+-   **[x] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
+    -   [x] Adding text to the canvas.
+    -   [x] Image rotation, resizing, and filters (grayscale, sepia).
+    -   [x] The "Smart Cutline" generation feature (`traceContour`, `simplifyPolygon`).
 
 ---
 
@@ -133,7 +134,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 -   **[ ] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[ ] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
 -   **[ ] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./docs/TELEGRAM_BOT_MIGRATION.md) for a step-by-step guide.
--   **[ ] Implement Role-Based Access Control (RBAC):** Add a `role` field to the user model and protect administrative endpoints (e.g., `/api/orders`) to ensure only authorized users can access them.
+-   **[x] Implement Role-Based Access Control (RBAC):** Add a `role` field to the user model and protect administrative endpoints (e.g., `/api/orders`) to ensure only authorized users can access them.
 
 ## Medium-Priority
 

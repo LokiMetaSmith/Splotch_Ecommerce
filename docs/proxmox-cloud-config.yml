@@ -30,6 +30,8 @@ users:
 packages:
   - docker.io
   - docker-compose
+  - getssl
+  - cron
 
 # 4. File creation
 # Defines the necessary configuration files that will be created on the VM.
@@ -58,9 +60,11 @@ write_files:
           restart: unless-stopped
           ports:
             - "80:80"
+            - "443:443"
           volumes:
             - ./nginx.conf:/etc/nginx/conf.d/default.conf
             - /home/loki/lokimetasmith.github.io/dist:/usr/share/nginx/html
+            - /home/loki/ssl:/etc/ssl:ro
           depends_on:
             - app
           networks:
@@ -79,6 +83,30 @@ write_files:
       server {
           listen 80;
           server_name YOUR_DOMAIN_OR_IP; # Replace with your domain or VM IP
+
+          location /.well-known/acme-challenge/ {
+              root /usr/share/nginx/html;
+          }
+
+          location / {
+              return 301 https://$host$request_uri;
+          }
+      }
+
+      server {
+          listen 443 ssl;
+          server_name YOUR_DOMAIN_OR_IP;
+
+          ssl_certificate /etc/ssl/certs/YOUR_DOMAIN_OR_IP.crt;
+          ssl_certificate_key /etc/ssl/private/YOUR_DOMAIN_OR_IP.key;
+
+          # Mozilla Intermediate configuration
+          ssl_protocols TLSv1.2 TLSv1.3;
+          ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+          ssl_prefer_server_ciphers off;
+
+          # HSTS (63072000 seconds)
+          add_header Strict-Transport-Security "max-age=63072000" always;
 
           root /usr/share/nginx/html;
           index index.html;
@@ -147,9 +175,12 @@ write_files:
 # 5. Post-setup commands
 # These commands are executed after the server is provisioned.
 runcmd:
-  # 1. Clone the application repository from GitHub
+  # 1. Create SSL directory and generate a self-signed certificate
+  - mkdir -p /home/loki/ssl/certs /home/loki/ssl/private
+  - openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /home/loki/ssl/private/YOUR_DOMAIN_OR_IP.key -out /home/loki/ssl/certs/YOUR_DOMAIN_OR_IP.crt -subj "/CN=YOUR_DOMAIN_OR_IP"
+  # 2. Clone the application repository from GitHub
   - git clone https://github.com/LokiMetaSmith/lokimetasmith.github.io.git /home/loki/lokimetasmith.github.io
-  # 2. Create directories for persistent data
+  # 3. Create directories for persistent data
   - mkdir -p /home/loki/app-data/uploads
   - touch /home/loki/app-data/db.json
   # 3. Set correct ownership for all application files
@@ -158,3 +189,31 @@ runcmd:
   - cd /home/loki/lokimetasmith.github.io && npm install && npm run build
   # 5. Launch the application using Docker Compose in detached mode
   - cd /home/loki/lokimetasmith.github.io && docker-compose up -d
+  # 6. Create ACME challenge directory
+  - mkdir -p /home/loki/lokimetasmith.github.io/dist/.well-known/acme-challenge
+  - chown -R loki:loki /home/loki/lokimetasmith.github.io/dist/.well-known
+  # 7. Configure getssl
+  - mkdir -p /home/loki/.getssl
+  - chown -R loki:loki /home/loki/.getssl
+  - |
+    runuser -l loki -c 'getssl -c YOUR_DOMAIN_OR_IP'
+  - |
+    runuser -l loki -c "echo 'SERVER=\"https://acme-staging-v02.api.letsencrypt.org/directory\"' >> /home/loki/.getssl/YOUR_DOMAIN_OR_IP/getssl.cfg"
+  - |
+    runuser -l loki -c "sed -i 's|#ACL=('/var/www/html/.well-known/acme-challenge')|ACL=('/home/loki/lokimetasmith.github.io/dist/.well-known/acme-challenge')|' /home/loki/.getssl/YOUR_DOMAIN_OR_IP/getssl.cfg"
+  - |
+    runuser -l loki -c "sed -i 's|#USE_SINGLE_ACL=\"true\"|USE_SINGLE_ACL=\"true\"|' /home/loki/.getssl/YOUR_DOMAIN_OR_IP/getssl.cfg"
+  - |
+    runuser -l loki -c "sed -i 's|#DOMAIN_CERT_LOCATION=\"\"|DOMAIN_CERT_LOCATION=\"/home/loki/ssl/certs/YOUR_DOMAIN_OR_IP.crt\"|' /home/loki/.getssl/YOUR_DOMAIN_OR_IP/getssl.cfg"
+  - |
+    runuser -l loki -c "sed -i 's|#DOMAIN_KEY_LOCATION=\"\"|DOMAIN_KEY_LOCATION=\"/home/loki/ssl/private/YOUR_DOMAIN_OR_IP.key\"|' /home/loki/.getssl/YOUR_DOMAIN_OR_IP/getssl.cfg"
+  # 8. Add comment about switching to Let's Encrypt production
+  - |
+    runuser -l loki -c "echo '# To switch to the production Let\\'s Encrypt server, comment out the STAGING server line above.' >> /home/loki/.getssl/YOUR_DOMAIN_OR_IP/getssl.cfg"
+  # 9. Get the initial certificate and reload nginx
+  - |
+    runuser -l loki -c 'getssl -f YOUR_DOMAIN_OR_IP'
+  - cd /home/loki/lokimetasmith.github.io && docker-compose exec nginx nginx -s reload
+  # 10. Set up cron job for renewal
+  - |
+    (crontab -l -u loki 2>/dev/null; echo "0 1 * * * /usr/bin/getssl -u -a -q && /usr/bin/docker-compose -f /home/loki/lokimetasmith.github.io/docker-compose.yml exec nginx nginx -s reload") | crontab -u loki -

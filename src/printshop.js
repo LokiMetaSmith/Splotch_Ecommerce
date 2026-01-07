@@ -10,14 +10,14 @@ import SVGtoPDF from 'svg-to-pdfkit';
 
 // --- Global Variables ---
 const serverUrl = ''; // Use relative paths for API calls
-let authToken = localStorage.getItem('authToken');
+let authToken;
 let csrfToken;
 let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
 
 // --- DOM Elements ---
 // A single object to hold all DOM elements for cleaner management
-const ui = {};
+export const ui = {};
 
 // --- Helper Functions ---
 
@@ -407,15 +407,22 @@ function filterAndDisplayOrders(status) {
         ui.noOrdersMessage.style.display = 'block';
     } else {
         ui.noOrdersMessage.style.display = 'none';
-        ordersToDisplay.forEach(displayOrder);
+        const fragment = document.createDocumentFragment();
+        // Bolt Optimization: Use DocumentFragment to batch DOM insertions
+        ordersToDisplay.forEach(order => {
+            const card = displayOrder(order);
+            fragment.prepend(card);
+        });
+        ui.ordersList.appendChild(fragment);
     }
 }
 
 /**
  * Renders a single order card into the DOM using safe DOM creation methods.
  * @param {object} order - The order object from the server.
+ * @returns {HTMLElement} The created order card element.
  */
-function displayOrder(order) {
+export function displayOrder(order) {
     const card = document.createElement('div');
     card.className = 'order-card';
     card.id = `order-card-${order.orderId}`;
@@ -474,7 +481,9 @@ function displayOrder(order) {
     const image = createEl('img', ['sticker-design'], {
         src: `${serverUrl}${order.designImagePath}`,
         alt: 'Sticker Design',
-        'data-cut-file-path': order.cutLinePath || ''
+        'data-cut-file-path': order.cutLinePath || '',
+        loading: 'lazy',
+        decoding: 'async'
     });
     imageLink.appendChild(image);
     imageDiv.appendChild(imageLink);
@@ -502,21 +511,34 @@ function displayOrder(order) {
 
     // --- Assemble and Render Card ---
     card.append(header, detailsGrid, imageDiv, buttonsDiv, trackingDiv);
-    ui.ordersList.prepend(card);
+    // Bolt Optimization: removed direct DOM manipulation to allow batching
+    // ui.ordersList.prepend(card);
 
     // --- Attach Event Listeners ---
-    card.querySelectorAll('.action-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const orderId = e.target.dataset.orderId;
-            const status = e.target.dataset.status;
-            updateOrderStatus(orderId, status);
-        });
-    });
+    // Bolt Optimization: Removed per-card event listeners in favor of delegation on ui.ordersList
 
-    card.querySelector('.add-tracking-btn')?.addEventListener('click', (e) => {
-        const orderId = e.target.dataset.orderId;
+    return card;
+}
+
+/**
+ * Handles clicks on the orders list for event delegation.
+ * @param {Event} e - The click event.
+ */
+function handleOrderListClick(e) {
+    const actionBtn = e.target.closest('.action-btn');
+    if (actionBtn) {
+        const orderId = actionBtn.dataset.orderId;
+        const status = actionBtn.dataset.status;
+        updateOrderStatus(orderId, status);
+        return;
+    }
+
+    const trackingBtn = e.target.closest('.add-tracking-btn');
+    if (trackingBtn) {
+        const orderId = trackingBtn.dataset.orderId;
         handleAddTracking(orderId);
-    });
+        return;
+    }
 }
 
 /**
@@ -785,7 +807,9 @@ async function getCsrfToken() {
 /**
  * Main application entry point.
  */
-async function init() {
+export async function init() {
+    authToken = localStorage.getItem('authToken');
+
     // This creates a verifier that automatically fetches and caches keys from your JWKS endpoint
     JWKS = jose.createRemoteJWKSet(new URL(`${serverUrl}/.well-known/jwks.json`, window.location.origin));
     console.log('[CLIENT] Remote JWKS verifier created.');
@@ -803,6 +827,7 @@ async function init() {
     await getCsrfToken();
 
     // Attach event listeners
+    ui.ordersList?.addEventListener('click', handleOrderListClick);
     ui.refreshOrdersBtn?.addEventListener('click', () => fetchAndDisplayOrders());
     ui.registerBtn?.addEventListener('click', handleRegistration);
     ui.closeErrorToast?.addEventListener('click', hideErrorToast);

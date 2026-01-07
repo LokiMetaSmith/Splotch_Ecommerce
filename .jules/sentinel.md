@@ -1,0 +1,9 @@
+## 2024-02-18 - Insecure Randomness in File Uploads
+**Vulnerability:** The application was using `Date.now() + Math.random()` to generate filenames for uploaded files. `Math.random()` is not cryptographically secure, and the timestamp makes the filename predictable. This could allow an attacker to guess filenames and potentially access or overwrite other users' uploaded designs (Insecure Direct Object Reference / Privacy Leak).
+**Learning:** Developers often reach for `Math.random()` for uniqueness, not realizing the security implications when that uniqueness protects sensitive data (like user uploads). `multer`'s default `diskStorage` documentation examples often show this insecure pattern, propagating it.
+**Prevention:** Always use `crypto.randomUUID()` (or `uuid` v4) for generating identifiers that need to be unpredictable and unique. Avoid `Math.random()` for any ID generation that is exposed to users or used for security decisions.
+
+## 2024-05-23 - Rate Limiting Regression in Tests
+**Vulnerability:** Lack of strict rate limiting on authentication endpoints (`/api/auth/*`) allowed potential brute-force attacks.
+**Learning:** Implementing strict rate limiting (e.g., 5-10 requests/15 min) breaks integration tests that simulate multiple user interactions in a short period (like `server/auth.test.js`). Simply applying a global rate limiter without environment awareness causes CI/CD failures.
+**Prevention:** When adding rate limiting, always include logic to relax or disable it in the test environment (e.g., check `NODE_ENV === 'test'`). For security tests that *verify* the rate limiter, use a specific environment variable (e.g., `ENABLE_RATE_LIMIT_TEST`) to forcefully enable the strict limit only for that test suite. This ensures both functional tests pass and the security control is verifiable.

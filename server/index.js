@@ -12,7 +12,7 @@ process.on('uncaughtException', (error) => {
 });
 // -----------------------------
 
-import { startServer } from './server.js';
+import { startServer, FINAL_STATUSES } from './server.js';
 import { initializeBot } from './bot.js';
 import { sendEmail } from './email.js';
 import { JSONFilePreset } from 'lowdb/node';
@@ -57,14 +57,16 @@ async function main() {
         }
     }
 
-    db = await JSONFilePreset(dbPath, { orders: [], users: {}, credentials: {}, config: {} });
+    db = await JSONFilePreset(dbPath, { orders: {}, users: {}, credentials: {}, config: {} });
 
     if (process.env.ENCRYPT_CLIENT_JSON === 'true') {
         const originalWrite = db.write;
         db.write = async function() {
             const data = JSON.stringify(this.data);
             const encryptedData = encrypt(data);
-            fs.writeFileSync(dbPath, encryptedData);
+            const tempPath = `${dbPath}.tmp`;
+            await fs.promises.writeFile(tempPath, encryptedData);
+            await fs.promises.rename(tempPath, dbPath);
         }
     }
 
@@ -92,8 +94,13 @@ async function main() {
   // Check for stalled orders every hour
   setInterval(async () => {
     const now = new Date();
-    // Using db.activeOrders cache for performance (avoid O(N) scan of all orders)
-    const stalledOrders = db.activeOrders.filter(order => {
+    // Use activeOrders cache if available to avoid O(N) scan of history
+    const ordersToCheck = db.activeOrders || Object.values(db.data.orders);
+
+    const stalledOrders = ordersToCheck.filter(order => {
+      if (FINAL_STATUSES.includes(order.status)) {
+        return false;
+      }
       const lastUpdatedAt = new Date(order.lastUpdatedAt || order.receivedAt);
       const hoursSinceUpdate = (now - lastUpdatedAt) / 1000 / 60 / 60;
       return hoursSinceUpdate > 4;
@@ -110,7 +117,7 @@ async function main() {
           reply_to_message_id: order.telegramMessageId,
         });
         // Store the message ID so we can delete it later
-        const orderInDb = db.data.orders.find(o => o.orderId === order.orderId);
+        const orderInDb = db.data.orders[order.orderId];
         if (orderInDb) {
             orderInDb.stalledMessageId = sentMessage.message_id;
             await db.write();

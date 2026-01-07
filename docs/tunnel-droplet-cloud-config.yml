@@ -20,7 +20,7 @@ package_upgrade: true
 # IMPORTANT: Replace with the public SSH key from your HOME server.
 users:
   - name: tunneluser
-    shell: /bin/bash
+    shell: /sbin/nologin
     ssh_authorized_keys:
       - ssh-rsa AAAA... your_home_server_ssh_public_key
 
@@ -44,6 +44,11 @@ write_files:
               proxy_set_header X-Real-IP $remote_addr;
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
               proxy_set_header X-Forwarded-Proto $scheme;
+
+              # WebSocket support
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
           }
       }
 
@@ -51,7 +56,9 @@ write_files:
 # Allows the tunnel user to forward ports.
 runcmd:
   # Configure sshd to allow port forwarding and restart the service
-  - echo "GatewayPorts yes" >> /etc/ssh/sshd_config
+  # Note: GatewayPorts is intentionally NOT enabled globally or for this user.
+  # This forces the SSH tunnel to bind to 127.0.0.1 on the droplet, ensuring
+  # that all external traffic MUST go through Nginx.
   - echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config
   - systemctl restart sshd
 

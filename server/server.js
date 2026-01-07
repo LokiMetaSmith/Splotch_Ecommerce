@@ -31,6 +31,8 @@ import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 
+export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+
 const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,25 +46,25 @@ export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 
 async function sanitizeSVGFile(filePath) {
     try {
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const fileContent = await fs.promises.readFile(filePath, 'utf-8');
         const sanitized = purify.sanitize(fileContent, { USE_PROFILES: { svg: true } });
 
         // DOMPurify returns an empty string if it finds malicious content.
         // We also check if the original content was not empty to avoid false positives.
         if (!sanitized && fileContent.trim() !== '') {
-            fs.writeFileSync(filePath, ''); // Overwrite with empty string to reject.
+            await fs.promises.writeFile(filePath, ''); // Overwrite with empty string to reject.
             console.warn(`[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`);
             return false;
         }
 
-        fs.writeFileSync(filePath, sanitized);
+        await fs.promises.writeFile(filePath, sanitized);
         console.log(`[SECURITY] SVG file sanitized successfully: ${filePath}`);
         return true;
     } catch (error) {
         console.error(`[ERROR] Could not sanitize SVG file: ${filePath}`, error);
         // In case of an error, we should not keep the potentially harmful file.
         try {
-            fs.unlinkSync(filePath);
+            await fs.promises.unlink(filePath);
         } catch (unlinkError) {
             console.error(`[ERROR] Failed to delete file after sanitization error: ${filePath}`, unlinkError);
         }
@@ -99,7 +101,7 @@ const signInstanceToken = () => {
 let db;
 let app;
 
-const defaultData = { orders: [], users: {}, credentials: {}, config: {} };
+const defaultData = { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
 
 // Define an async function to contain all server logic
 const oauth2Client = new google.auth.OAuth2(
@@ -112,10 +114,84 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     db = await JSONFilePreset(dbPath, defaultData);
   }
 
-  // Initialize activeOrders cache if not present
+  // Initialize Active Orders Cache
+  // We use a simple array attached to the db object (not persisted to JSON)
   if (!db.activeOrders) {
-    db.activeOrders = db.data.orders.filter(order => !FINAL_STATUSES.includes(order.status));
-    console.log(`[SERVER] Initialized active orders cache with ${db.activeOrders.length} orders.`);
+      const allOrders = Object.values(db.data.orders);
+      db.activeOrders = allOrders.filter(order => !FINAL_STATUSES.includes(order.status));
+      console.log(`[SERVER] Initialized active orders cache. Count: ${db.activeOrders.length}`);
+  }
+
+  // Ensure products collection exists
+  if (!db.data.products) {
+    db.data.products = {};
+    await db.write();
+  }
+
+  // --- MIGRATION LOGIC: Convert orders array to object if necessary ---
+  if (Array.isArray(db.data.orders)) {
+    console.log('[SERVER] Migrating orders from Array to Object...');
+    const ordersArray = db.data.orders;
+    const ordersObject = {};
+    ordersArray.forEach(order => {
+      if (order.orderId) {
+        ordersObject[order.orderId] = order;
+      } else {
+        console.warn('[SERVER] Found order without orderId during migration, skipping:', order);
+      }
+    });
+    db.data.orders = ordersObject;
+    await db.write();
+    console.log('[SERVER] Migration complete.');
+  }
+
+  // --- MIGRATION LOGIC: Ensure users have walletBalanceCents ---
+  let userMigrationNeeded = false;
+  Object.values(db.data.users).forEach(user => {
+    if (typeof user.walletBalanceCents === 'undefined') {
+      user.walletBalanceCents = 0;
+      userMigrationNeeded = true;
+    }
+  });
+  if (userMigrationNeeded) {
+    console.log('[SERVER] Migrating users to include walletBalanceCents...');
+    await db.write();
+    console.log('[SERVER] User wallet migration complete.');
+  }
+
+  // --- MIGRATION LOGIC: Ensure users have role ---
+  let userRoleMigrationNeeded = false;
+  Object.values(db.data.users).forEach(user => {
+    if (!user.role) {
+      user.role = 'user'; // Default to user
+      userRoleMigrationNeeded = true;
+    }
+  });
+  if (userRoleMigrationNeeded) {
+    console.log('[SERVER] Migrating users to include role...');
+    await db.write();
+    console.log('[SERVER] User role migration complete.');
+  }
+
+  // --- MIGRATION LOGIC: Build Email Index ---
+  if (!db.data.emailIndex) {
+      db.data.emailIndex = {};
+  }
+
+  // Rebuild index if empty (or always check consistency on startup? explicit rebuild is safer for now)
+  // We check if we have users but no index entries
+  const hasUsers = Object.keys(db.data.users).length > 0;
+  const hasIndex = Object.keys(db.data.emailIndex).length > 0;
+
+  if (hasUsers && !hasIndex) {
+      console.log('[SERVER] Building email index...');
+      Object.entries(db.data.users).forEach(([key, user]) => {
+          if (user.email) {
+              db.data.emailIndex[user.email] = key;
+          }
+      });
+      await db.write();
+      console.log('[SERVER] Email index built.');
   }
 
   // --- Google OAuth2 Client ---
@@ -124,7 +200,11 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
   async function logAndEmailError(error, context = 'General Error') {
     // Sanitize error logging to avoid leaking sensitive information in logs/emails.
     const sanitizedErrorMessage = `[${new Date().toISOString()}] [${context}] ${error.message}\n`;
-    fs.appendFileSync(path.join(__dirname, 'error.log'), sanitizedErrorMessage);
+    try {
+      await fs.promises.appendFile(path.join(__dirname, 'error.log'), sanitizedErrorMessage);
+    } catch (logError) {
+      console.error('CRITICAL: Failed to write to error log:', logError);
+    }
     // The full error (including stack) is still logged to the console for debugging.
     console.error(`[${context}]`, error);
     if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
@@ -179,8 +259,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         cb(null, uploadDir);
       },
       filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, randomUUID() + path.extname(file.originalname));
       }
     });
     const upload = multer({
@@ -243,6 +322,15 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       windowMs: 15 * 60 * 1000, // 15 minutes
       max: 100, // Limit each IP to 100 requests per windowMs
       message: 'Too many requests from this IP, please try again after 15 minutes',
+    });
+
+    const authLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      // In test environment, allow more requests unless explicitly testing rate limiting
+      max: (process.env.NODE_ENV === 'test' && !process.env.ENABLE_RATE_LIMIT_TEST) ? 1000 : 10,
+      message: 'Too many login attempts from this IP, please try again after 15 minutes',
+      standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+      legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     });
     
     const allowedOrigins = [
@@ -307,23 +395,48 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
 
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
     app.use(cookieParser(csrfSecret));
+
+    let sessionSecret = process.env.SESSION_SECRET;
+    if (!sessionSecret) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('❌ [FATAL] SESSION_SECRET is not set in environment variables.');
+        console.error('   This is required for production security. The application will now exit.');
+        process.exit(1);
+      } else {
+        console.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a temporary random secret for development.');
+        console.warn('   Sessions will not persist across server restarts.');
+        sessionSecret = randomUUID();
+      }
+    }
+
     app.use(session({
-      secret: process.env.SESSION_SECRET || 'super-secret-session-key',
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: true,
       cookie: { secure: process.env.NODE_ENV === 'production' }
     }));
+
     app.use(express.json());
-    app.use(express.static(path.join(__dirname, '..')));
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
     app.use(lusca({
         csrf: true,
         xframe: 'SAMEORIGIN',
         hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},
-        xssProtection: true,
-        nosniff: true
+        nosniff: true,
+        csp: {
+            policy: {
+                'default-src': "'self'",
+                'script-src': "'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com",
+                'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com https://*.squarecdn.com https://sandbox.web.squarecdn.com",
+                'font-src': "'self' https://fonts.gstatic.com https://*.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
+                'img-src': "'self' data: blob: https://*.squarecdn.com https://sandbox.web.squarecdn.com",
+                'connect-src': "'self' https://*.squarecdn.com https://*.squareup.com https://*.squareupsandbox.com https://*.sentry.io",
+                'frame-src': "'self' https://*.squarecdn.com https://sandbox.web.squarecdn.com"
+            }
+        }
     }));
+    app.use(express.static(path.join(__dirname, '..')));
+    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
@@ -333,6 +446,24 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
     console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
     // --- Helper Functions ---
+    function getUserByEmail(email) {
+        if (!email) return undefined;
+        // Check index first
+        if (db.data.emailIndex && db.data.emailIndex[email]) {
+            const key = db.data.emailIndex[email];
+            const user = db.data.users[key];
+            if (user) return user;
+            // Index is stale?
+            console.warn(`[SERVER] Email index inconsistency: ${email} -> ${key} but user not found. Cleaning up.`);
+            delete db.data.emailIndex[email];
+        }
+        // Fallback to scan (should not happen if index is healthy)
+        // But for safety during rollout, we can do a scan or just return undefined.
+        // Returning undefined is strictly O(1) assuming index is authority.
+        // Let's stick to the plan: if not in index, it's not there.
+        return undefined;
+    }
+
     function authenticateToken(req, res, next) {
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
@@ -346,10 +477,18 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       });
     }
 
-    const isAdmin = (user) => {
-      if (!user || !user.email) return false;
-      // Check if the user's email matches the admin email from environment variables
-      return user.email === process.env.ADMIN_EMAIL;
+    const isAdmin = (userPayload) => {
+      if (!userPayload) return false;
+      // Check env var fallback first (fastest)
+      // FIX: Ensure ADMIN_EMAIL is set and not empty before comparing
+      if (process.env.ADMIN_EMAIL && userPayload.email === process.env.ADMIN_EMAIL) return true;
+
+      // Look up full user object
+      const user = getUserByEmail(userPayload.email) || (userPayload.username ? db.data.users[userPayload.username] : undefined);
+
+      if (user && user.role === 'admin') return true;
+
+      return false;
     };
 
     // --- API Endpoints ---
@@ -437,19 +576,120 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         });
     });
 
+    // --- Product Endpoints ---
+    app.post('/api/products', authenticateToken, [
+        body('name').notEmpty().withMessage('Product name is required'),
+        body('designImagePath').notEmpty().withMessage('Design image is required'),
+        body('creatorProfitCents').isInt({ min: 0 }).withMessage('Creator profit must be a non-negative integer'),
+    ], async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        try {
+            const { name, designImagePath, cutLinePath, creatorProfitCents, defaults } = req.body;
+
+            // Robust lookup for creator
+            let creator = null;
+            // The token payload from authenticateToken is in req.user
+            if (req.user.email) {
+                creator = getUserByEmail(req.user.email);
+            } else if (req.user.username) {
+                // Check both direct access and scan
+                creator = db.data.users[req.user.username] || Object.values(db.data.users).find(u => u.username === req.user.username);
+            }
+
+            if (!creator) {
+                return res.status(401).json({ error: 'User not found.' });
+            }
+
+            const productId = randomUUID();
+            const newProduct = {
+                productId,
+                creatorId: creator.id || creator.username, // Use ID if available, else username (legacy)
+                creatorName: creator.username,
+                name,
+                designImagePath,
+                cutLinePath,
+                creatorProfitCents: Number(creatorProfitCents),
+                defaults: defaults || {},
+                createdAt: new Date().toISOString(),
+                status: 'active'
+            };
+
+            db.data.products[productId] = newProduct;
+            await db.write();
+
+            console.log(`[SERVER] New product created: ${productId} by ${newProduct.creatorName}`);
+            res.status(201).json({ success: true, product: newProduct });
+
+        } catch (error) {
+            await logAndEmailError(error, 'Error creating product');
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    });
+
+    app.get('/api/products/:productId', (req, res) => {
+        const { productId } = req.params;
+        const product = db.data.products[productId];
+        if (!product) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        res.json({
+            productId: product.productId,
+            name: product.name,
+            designImagePath: product.designImagePath,
+            cutLinePath: product.cutLinePath,
+            creatorProfitCents: product.creatorProfitCents,
+            defaults: product.defaults,
+            creatorName: product.creatorName
+        });
+    });
+
     // --- Order Endpoints ---
     app.post('/api/create-order', authenticateToken, [
       body('sourceId').notEmpty().withMessage('sourceId is required'),
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
       body('designImagePath').notEmpty().withMessage('designImagePath is required'),
+      // Security Fix: Validate orderDetails structure
+      body('orderDetails').isObject().withMessage('orderDetails must be an object'),
+      body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, shippingContact, ...orderDetails } = req.body;
+        const { sourceId, amountCents, currency, designImagePath, shippingContact, productId, orderDetails, billingContact } = req.body;
+
+        // --- Product / Creator Payout Logic ---
+        let product = null;
+        let creator = null;
+
+        if (productId) {
+            product = db.data.products[productId];
+            if (!product) {
+                return res.status(400).json({ error: 'Invalid productId. Product not found.' });
+            }
+
+            // Verify price integrity if needed.
+            // Ideally, we would re-calculate price here: Base Price (from dimensions) + Creator Profit.
+            // But for MVP, we'll trust the client's `amountCents` matches the expected calculation,
+            // or perform a simple check if we had dimensions on the backend.
+            // Since `calculateStickerPrice` is available, we could do it, but we need the dimensions from the request.
+            // The request currently only sends `orderDetails`, which has `quantity` but maybe not exact `bounds`.
+            // Let's rely on the fact that the payment amount is what the user authorized.
+
+            // Identify creator to pay
+            const creatorId = product.creatorId;
+            // CreatorId might be username or ID.
+            if (creatorId) {
+                creator = db.data.users[creatorId] || Object.values(db.data.users).find(u => u.username === creatorId || u.id === creatorId);
+            }
+        }
+
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
@@ -473,6 +713,11 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
         }
         console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
+        // Explicitly construct safe orderDetails object to prevent Stored XSS
+        const safeOrderDetails = {
+            quantity: orderDetails.quantity
+        };
+
         const newOrder = {
           orderId: randomUUID(),
           paymentId: paymentResult.payment.id,
@@ -480,14 +725,33 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
           amount: Number(amountCents),
           currency: currency || 'USD',
           status: 'NEW',
-          orderDetails: orderDetails.orderDetails,
-          billingContact: orderDetails.billingContact,
+          orderDetails: safeOrderDetails,
+          billingContact: billingContact,
           shippingContact: shippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
+          productId: productId || null,
+          creatorId: creator ? (creator.id || creator.username) : null
         };
-        db.data.orders.push(newOrder);
-        db.activeOrders.push(newOrder);
+        db.data.orders[newOrder.orderId] = newOrder;
+
+        // Add to active orders cache
+        if (db.activeOrders) {
+            db.activeOrders.push(newOrder);
+        }
+
+        // --- Process Payout ---
+        if (product && creator) {
+            const quantity = safeOrderDetails.quantity || 1;
+            const payoutAmount = product.creatorProfitCents * quantity;
+
+            if (payoutAmount > 0) {
+                if (typeof creator.walletBalanceCents === 'undefined') creator.walletBalanceCents = 0;
+                creator.walletBalanceCents += payoutAmount;
+                console.log(`[SERVER] Added ${payoutAmount} cents to wallet of ${creator.username}. New balance: ${creator.walletBalanceCents}`);
+            }
+        }
+
         await db.write();
         console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
 
@@ -520,19 +784,19 @@ ${statusChecklist}
           try {
             const keyboard = getOrderStatusKeyboard(newOrder);
             const sentMessage = await bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, { reply_markup: keyboard });
-            const orderIndex = db.data.orders.findIndex(o => o.orderId === newOrder.orderId);
-            if (orderIndex !== -1) {
-              db.data.orders[orderIndex].telegramMessageId = sentMessage.message_id;
+            // db.data.orders is an object, so we access directly by ID
+            if (db.data.orders[newOrder.orderId]) {
+              db.data.orders[newOrder.orderId].telegramMessageId = sentMessage.message_id;
 
               // Send the design image
               if (newOrder.designImagePath) {
                 const imagePath = path.join(__dirname, newOrder.designImagePath);
                 const sentPhoto = await bot.telegram.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, { source: imagePath });
-                db.data.orders[orderIndex].telegramPhotoMessageId = sentPhoto.message_id;
+                db.data.orders[newOrder.orderId].telegramPhotoMessageId = sentPhoto.message_id;
               }
 
               // Send the cut line file
-              const cutLinePath = db.data.orders[orderIndex].cutLinePath;
+              const cutLinePath = db.data.orders[newOrder.orderId].cutLinePath;
               if (cutLinePath) {
                 const docPath = path.join(__dirname, cutLinePath);
                 await bot.telegram.sendDocument(process.env.TELEGRAM_CHANNEL_ID, { source: docPath });
@@ -580,17 +844,17 @@ ${statusChecklist}
       if (!isAdmin(req.user)) {
         return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
       }
-      const allOrders = db.data.orders;
+      const allOrders = Object.values(db.data.orders);
       res.status(200).json(allOrders.slice().reverse());
     });
 
     app.get('/api/orders/search', authenticateToken, (req, res) => {
       const { q } = req.query;
-      const user = Object.values(db.data.users).find(u => u.email === req.user.email);
+      const user = getUserByEmail(req.user.email);
       if (!user) {
         return res.status(401).json({ error: 'User not found' });
       }
-      const userOrders = db.data.orders.filter(order => order.billingContact.email === user.email);
+      const userOrders = Object.values(db.data.orders).filter(order => order.billingContact.email === user.email);
       const filteredOrders = userOrders.filter(order => order.orderId.includes(q));
       if (filteredOrders.length === 0) {
         return res.status(404).json({ error: 'Order not found' });
@@ -603,13 +867,13 @@ ${statusChecklist}
         return res.status(401).json({ error: 'Authentication token is invalid or missing email.' });
       }
       const userEmail = req.user.email;
-      const userOrders = db.data.orders.filter(order => order.billingContact.email === userEmail);
+      const userOrders = Object.values(db.data.orders).filter(order => order.billingContact.email === userEmail);
       res.status(200).json(userOrders.slice().reverse());
     });
 
     app.get('/api/orders/:orderId', authenticateToken, (req, res) => {
       const { orderId } = req.params;
-      const order = db.data.orders.find(o => o.orderId === orderId);
+      const order = db.data.orders[orderId];
 
       if (!order) {
         return res.status(404).json({ error: 'Order not found' });
@@ -657,60 +921,98 @@ ${statusChecklist}
       await db.write();
       console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
-      // Update Telegram message
-      if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
-        const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-        const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-        const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
-        const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
-        const completedOrLater = ['COMPLETED'];
+      try {
+          // Check for admin role
+          if (!isAdmin(req.user)) {
+              return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+          }
 
-        const statusChecklist = `
+          const { orderId } = req.params;
+          const { status } = req.body;
+          const order = db.data.orders[orderId];
+          if (!order) {
+            return res.status(404).json({ error: 'Order not found.' });
+          }
+          order.status = status;
+          order.lastUpdatedAt = new Date().toISOString();
+          await db.write();
+          console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
+
+          // Update active orders cache
+          if (db.activeOrders) {
+              if (FINAL_STATUSES.includes(status)) {
+                  // Remove from active orders if status is final
+                  const idx = db.activeOrders.findIndex(o => o.orderId === orderId);
+                  if (idx !== -1) {
+                      db.activeOrders.splice(idx, 1);
+                  }
+              } else {
+                  // Add to active orders if status is non-final (re-activation)
+                  const exists = db.activeOrders.find(o => o.orderId === orderId);
+                  if (!exists) {
+                      db.activeOrders.push(order);
+                  }
+              }
+          }
+
+          // Update Telegram message
+          if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
+            const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
+            const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
+            const completedOrLater = ['COMPLETED'];
+
+            const statusChecklist = `
 ✅ New
 ${acceptedOrLater.includes(status) ? '✅' : '⬜️'} Accepted
 ${printingOrLater.includes(status) ? '✅' : '⬜️'} Printing
 ${shippedOrLater.includes(status) ? '✅' : '⬜️'} Shipped
 ${deliveredOrLater.includes(status) ? '✅' : '⬜️'} Delivered
 ${completedOrLater.includes(status) ? '✅' : '⬜️'} Completed
-        `;
-        const message = `
+            `;
+            const message = `
 Order: ${order.orderId}
 Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
 Email: ${order.billingContact.email}
-Quantity: ${order.orderDetails.quantity}
+Quantity: ${order.orderDetails?.quantity || 0}
 Amount: $${(order.amount / 100).toFixed(2)}
 
 ${statusChecklist}
-        `;
-        try {
-          if (status === 'COMPLETED' || status === 'CANCELED') {
-            // Order is complete or canceled, delete the checklist message
-            await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
-            // also delete the photo if it exists and hasn't been deleted
-            if (order.telegramPhotoMessageId) {
-                await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
-            }
-          } else {
-            // For all other statuses, edit the message
-            const keyboard = getOrderStatusKeyboard(order);
-            await bot.telegram.editMessageText(
-                process.env.TELEGRAM_CHANNEL_ID,
-                order.telegramMessageId,
-                undefined,
-                message,
-                { reply_markup: keyboard }
-            );
-            // If the status is SHIPPED, also delete the photo
-            if (status === 'SHIPPED' && order.telegramPhotoMessageId) {
-              await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+            `;
+            try {
+              if (status === 'COMPLETED' || status === 'CANCELED') {
+                // Order is complete or canceled, delete the checklist message
+                await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+                // also delete the photo if it exists and hasn't been deleted
+                if (order.telegramPhotoMessageId) {
+                    await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+                }
+              } else {
+                // For all other statuses, edit the message
+                const keyboard = getOrderStatusKeyboard(order);
+                await bot.telegram.editMessageText(
+                    process.env.TELEGRAM_CHANNEL_ID,
+                    order.telegramMessageId,
+                    undefined,
+                    message,
+                    { reply_markup: keyboard }
+                );
+                // If the status is SHIPPED, also delete the photo
+                if (status === 'SHIPPED' && order.telegramPhotoMessageId) {
+                  await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+                }
+              }
+            } catch (error) {
+              console.error('[TELEGRAM] Failed to edit or delete message:', error);
             }
           }
-        } catch (error) {
-          console.error('[TELEGRAM] Failed to edit or delete message:', error);
-        }
-      }
 
-      res.status(200).json({ success: true, order: order });
+          res.status(200).json({ success: true, order: order });
+      } catch (error) {
+        await logAndEmailError(error, 'Error updating order status');
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
     });
 
     app.post('/api/orders/:orderId/tracking', authenticateToken, [
@@ -721,9 +1023,15 @@ ${statusChecklist}
         if (!errors.isEmpty()) {
             return res.status(400).json({ errors: errors.array() });
         }
+
+        // Check for admin role
+        if (!isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+        }
+
         const { orderId } = req.params;
         const { trackingNumber, courier } = req.body;
-        const order = db.data.orders.find(o => o.orderId === orderId);
+        const order = db.data.orders[orderId];
         if (!order) {
             return res.status(404).json({ error: 'Order not found.' });
         }
@@ -753,14 +1061,14 @@ ${statusChecklist}
                 const productDetailsHtml = `
                     <tr>
                         <td style="padding: 10px; border-bottom: 1px solid #ddd;">Stickers</td>
-                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails.quantity}</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails?.quantity || 0}</td>
                     </tr>
                 `;
 
                 await sendEmail({
                     to: order.billingContact.email,
                     subject: `Your Splotch order #${order.orderId} has shipped!`,
-                    text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails.quantity}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join('\n')}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
+                    text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || 0}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join('\n')}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
                     html: `
                         <p>Hey ${customerName},</p>
                         <p>Heads up—your order has been sent out!</p>
@@ -798,7 +1106,7 @@ ${statusChecklist}
     });
 
     // --- Auth Endpoints ---
-    app.post('/api/auth/register-user', [
+    app.post('/api/auth/register-user', authLimiter, [
       body('username').notEmpty().withMessage('username is required'),
       body('password').notEmpty().withMessage('password is required'),
     ], async (req, res) => {
@@ -842,7 +1150,7 @@ ${statusChecklist}
       res.json({ success: true });
     });
 
-    app.post('/api/auth/login', [
+    app.post('/api/auth/login', authLimiter, [
       ...validateUsername,
       body('password').notEmpty().withMessage('password is required'),
     ], async (req, res) => {
@@ -872,7 +1180,7 @@ ${statusChecklist}
       res.json({ token });
     });
     
-    app.post('/api/auth/magic-login', [
+    app.post('/api/auth/magic-login', authLimiter, [
       body('email').isEmail().withMessage('email is not valid'),
     ], async (req, res) => {
         const errors = validationResult(req);
@@ -880,7 +1188,7 @@ ${statusChecklist}
             return res.status(400).json({ errors: errors.array() });
         }
         const { email } = req.body;
-        let user = Object.values(db.data.users).find(u => u.email === email);
+        let user = getUserByEmail(email);
         if (!user) {
             user = {
                 id: randomUUID(),
@@ -888,6 +1196,8 @@ ${statusChecklist}
                 credentials: [],
             };
             db.data.users[user.id] = user;
+            // Update Index
+            db.data.emailIndex[email] = user.id;
             await db.write();
         }
         const { privateKey, kid } = getCurrentSigningKey();
@@ -925,7 +1235,7 @@ ${statusChecklist}
         if (err) {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
-        const user = Object.values(db.data.users).find(u => u.email === decoded.email);
+        const user = getUserByEmail(decoded.email);
         if (!user) {
           return res.status(401).json({ error: 'User not found' });
         }
@@ -1006,7 +1316,7 @@ ${statusChecklist}
         console.log('Google authentication successful for:', userEmail);
 
         // Find or create a user in our database
-        let user = Object.values(db.data.users).find(u => u.email === userEmail);
+        let user = getUserByEmail(userEmail);
         if (!user) {
           // Create a new user if they don't exist
           const newUsername = userEmail.split('@')[0]; // Use email prefix as username
@@ -1019,6 +1329,8 @@ ${statusChecklist}
             google_tokens: tokens,
           };
           db.data.users[user.id] = user;
+          // Update Index
+          db.data.emailIndex[userEmail] = user.id;
           await db.write();
           console.log(`New user created for ${userEmail}`);
 

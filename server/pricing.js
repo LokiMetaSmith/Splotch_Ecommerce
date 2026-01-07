@@ -62,6 +62,9 @@ function calculateStickerPrice(quantity, material, bounds, cutline, resolution, 
 import sizeOf from 'image-size';
 import { parse } from 'svg-parser';
 import fs from 'fs';
+import { promisify } from 'util';
+
+const sizeOfAsync = promisify(sizeOf);
 
 function getPathPerimeter(pathNode) {
     // This is a simplified perimeter calculation for server-side.
@@ -92,7 +95,7 @@ async function getDesignDimensions(filePath) {
     const fileExtension = filePath.split('.').pop().toLowerCase();
 
     if (fileExtension === 'svg') {
-        const svgText = fs.readFileSync(filePath, 'utf8');
+        const svgText = await fs.promises.readFile(filePath, 'utf8');
         const parsed = parse(svgText);
         const svgNode = parsed.children[0];
         const width = parseFloat(svgNode.properties.width);
@@ -118,7 +121,7 @@ async function getDesignDimensions(filePath) {
         };
 
     } else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(fileExtension)) {
-        const dimensions = sizeOf(filePath);
+        const dimensions = await sizeOfAsync(filePath);
         const perimeter = (dimensions.width + dimensions.height) * 2;
         return {
             bounds: { width: dimensions.width, height: dimensions.height },

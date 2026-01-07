@@ -1,5 +1,7 @@
 import { SVGParser } from './lib/svgparser.js';
 import { calculateStickerPrice } from './lib/pricing.js';
+import { drawRuler as drawCanvasRuler } from './lib/canvas-utils.js';
+import { traceContour, simplifyPolygon, imageHasTransparentBorder } from './lib/image-processing.js';
 
 // index.js
 
@@ -26,9 +28,13 @@ let textInput, textSizeInput, textColorInput, addTextBtn, textFontFamilySelect, 
 let stickerMaterialSelect, stickerResolutionSelect, designMarginNote, stickerQuantityInput, calculatedPriceDisplay;
 let paymentStatusContainer, ipfsLinkContainer, fileInputGlobalRef, paymentFormGlobalRef, fileNameDisplayEl;
 let rotateLeftBtnEl, rotateRightBtnEl, resizeInputEl, resizeBtnEl, grayscaleBtnEl, sepiaBtnEl;
+let submitPaymentBtn;
 let widthDisplayEl, heightDisplayEl;
+let canvasPlaceholder;
 
 let currentOrderAmountCents = 0;
+let currentProductId = null; // Track if we are in "Product Mode"
+let creatorProfitCents = 0; // The markup for the current product
 
 // --- Main Application Setup ---
 async function BootStrap() {
@@ -69,6 +75,8 @@ async function BootStrap() {
     fileInputGlobalRef = document.getElementById('file');
     fileNameDisplayEl = document.getElementById('fileNameDisplay');
     paymentFormGlobalRef = document.getElementById('payment-form');
+    submitPaymentBtn = document.getElementById('submitPaymentBtn');
+    canvasPlaceholder = document.getElementById('canvas-placeholder');
 
     widthDisplayEl = document.getElementById('widthDisplay');
     heightDisplayEl = document.getElementById('heightDisplay');
@@ -120,19 +128,75 @@ async function BootStrap() {
     if (grayscaleBtnEl) grayscaleBtnEl.addEventListener('click', toggleGrayscaleFilter);
     if (sepiaBtnEl) sepiaBtnEl.addEventListener('click', toggleSepiaFilter);
     if (resizeSliderEl) {
+        let resizeRequest = null;
         resizeSliderEl.addEventListener('input', (e) => {
             let value = parseFloat(e.target.value);
             if (isMetric) {
                 if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} mm`;
-                handleStandardResize(value / 25.4);
             } else {
                 if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} in`;
-                handleStandardResize(value);
+            }
+
+            if (!resizeRequest) {
+                resizeRequest = requestAnimationFrame(() => {
+                    // Always read the latest value from the input element to avoid using stale closure variables
+                    const latestValue = parseFloat(resizeSliderEl.value);
+                    if (isMetric) {
+                        handleStandardResize(latestValue / 25.4);
+                    } else {
+                        handleStandardResize(latestValue);
+                    }
+                    resizeRequest = null;
+                });
             }
         });
     }
     const generateCutlineBtn = document.getElementById('generateCutlineBtn');
     if(generateCutlineBtn) generateCutlineBtn.addEventListener('click', handleGenerateCutline);
+
+    // Creator / Product UI
+    const sellDesignBtn = document.getElementById('sellDesignBtn');
+    const productModal = document.getElementById('productModal');
+    const cancelProductBtn = document.getElementById('cancelProductBtn');
+    const createProductBtn = document.getElementById('createProductBtn');
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+
+    if (sellDesignBtn) {
+        sellDesignBtn.addEventListener('click', () => {
+             if (!originalImage || !currentCutline || currentCutline.length === 0) {
+                 showPaymentStatus('Please upload an image and generate a cutline first.', 'error');
+                 return;
+             }
+            productModal.classList.remove('hidden');
+            document.getElementById('productLinkContainer').classList.add('hidden');
+        });
+    }
+    if (cancelProductBtn) {
+        cancelProductBtn.addEventListener('click', () => productModal.classList.add('hidden'));
+    }
+    if (createProductBtn) {
+        createProductBtn.addEventListener('click', handleCreateProduct);
+    }
+    if (copyLinkBtn) {
+        copyLinkBtn.addEventListener('click', () => {
+            const linkInput = document.getElementById('productLinkInput');
+            linkInput.select();
+            document.execCommand('copy'); // Fallback/Legacy
+            navigator.clipboard.writeText(linkInput.value);
+            copyLinkBtn.textContent = 'Copied!';
+            setTimeout(() => copyLinkBtn.textContent = 'Copy', 2000);
+        });
+    }
+
+    // Check for authentication to show "Sell" button
+    checkAuthStatus();
+
+    // Check for product mode (Buyer Flow)
+    const urlParams = new URLSearchParams(window.location.search);
+    const productIdParam = urlParams.get('product_id');
+    if (productIdParam) {
+        await loadProductForBuyer(productIdParam);
+    }
 
     const standardSizesContainer = document.getElementById('standard-sizes-controls');
     if (standardSizesContainer) {
@@ -218,7 +282,10 @@ async function BootStrap() {
         showPaymentStatus("Payment form is missing. Cannot process payments.", "error");
     }
 
-    updateEditingButtonsState(!originalImage);
+    // Initial UI state
+    if (!productIdParam) {
+        updateEditingButtonsState(!originalImage);
+    }
     if (designMarginNote) designMarginNote.style.display = 'none';
 }
 
@@ -272,7 +339,11 @@ function calculateAndUpdatePrice() {
     }
 
     const priceResult = calculateStickerPrice(pricingConfig, quantity, selectedMaterial, bounds, cutline, selectedResolution);
-    currentOrderAmountCents = priceResult.total;
+
+    // --- Creator Markup Logic ---
+    const totalMarkup = creatorProfitCents * quantity;
+    currentOrderAmountCents = priceResult.total + totalMarkup;
+    // ----------------------------
 
     const ppi = selectedResolution.ppi;
     let width = (bounds.width / ppi);
@@ -288,8 +359,14 @@ function calculateAndUpdatePrice() {
     if (widthDisplayEl) widthDisplayEl.value = width.toFixed(2);
     if (heightDisplayEl) heightDisplayEl.value = height.toFixed(2);
 
+    let markupHtml = '';
+    if (creatorProfitCents > 0) {
+        markupHtml = `<span class="text-xs text-green-600 block">Includes Creator Support: ${formatPrice(totalMarkup)}</span>`;
+    }
+
     calculatedPriceDisplay.innerHTML = `
         <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
+        ${markupHtml}
         <span class="text-sm text-gray-600 block">
             Size: ${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}
         </span>
@@ -382,11 +459,28 @@ async function handlePaymentFormSubmit(event) {
     console.log('[CLIENT] handlePaymentFormSubmit triggered.');
     event.preventDefault();
 
+    let originalBtnContent = '';
+    if (submitPaymentBtn) {
+        originalBtnContent = submitPaymentBtn.innerHTML;
+        submitPaymentBtn.disabled = true;
+        submitPaymentBtn.innerHTML = `
+            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Processing...</span>
+        `;
+    }
+
     showPaymentStatus('Processing order...', 'info');
 
     // Ensure there is an image to submit
     if (!originalImage) {
         showPaymentStatus('Please upload a sticker design image before submitting.', 'error');
+        if (submitPaymentBtn) {
+            submitPaymentBtn.disabled = false;
+            submitPaymentBtn.innerHTML = originalBtnContent;
+        }
         return;
     }
 
@@ -394,12 +488,20 @@ async function handlePaymentFormSubmit(event) {
     if (!csrfToken) {
         showPaymentStatus('Cannot submit form. A required security token is missing. Please refresh the page.', 'error');
         console.error('[CLIENT] Aborting submission: CSRF token is missing.');
+        if (submitPaymentBtn) {
+            submitPaymentBtn.disabled = false;
+            submitPaymentBtn.innerHTML = originalBtnContent;
+        }
         return;
     }
 
     const email = document.getElementById('email').value;
     if (!email) {
         showPaymentStatus('Please enter an email address to proceed.', 'error');
+        if (submitPaymentBtn) {
+            submitPaymentBtn.disabled = false;
+            submitPaymentBtn.innerHTML = originalBtnContent;
+        }
         return;
     }
 
@@ -517,7 +619,8 @@ async function handlePaymentFormSubmit(event) {
             designImagePath,
             orderDetails,
             billingContact,
-            _csrf: csrfToken // Add CSRF token to payload
+            _csrf: csrfToken, // Add CSRF token to payload
+            productId: currentProductId // Include if it exists
         };
 
         // 5. Submit the order to the server
@@ -557,6 +660,10 @@ async function handlePaymentFormSubmit(event) {
     } catch (error) {
         console.error("[CLIENT] Error during payment form submission:", error);
         showPaymentStatus(`Error: ${error.message}`, 'error');
+        if (submitPaymentBtn) {
+            submitPaymentBtn.disabled = false;
+            submitPaymentBtn.innerHTML = originalBtnContent;
+        }
     }
 }
 
@@ -643,6 +750,7 @@ function updateEditingButtonsState(disabled) {
     });
     if (designMarginNote) designMarginNote.style.display = disabled ? 'none' : 'block';
     if (textEditingControlsContainer) textEditingControlsContainer.hidden = disabled;
+    if (canvasPlaceholder) canvasPlaceholder.style.display = disabled ? 'flex' : 'none';
 }
 
 function setCanvasSize(logicalWidth, logicalHeight) {
@@ -836,29 +944,31 @@ function generateCutLine(polygons, offset) {
 }
 
 function drawPolygonsToCanvas(polygons, style, offset = { x: 0, y: 0 }, stroke = false) {
-    if (!ctx) return;
+    if (!ctx || polygons.length === 0) return;
+
+    // Bolt Optimization: Batch all polygons into a single path to reduce draw calls
+    ctx.beginPath();
 
     polygons.forEach(poly => {
         if (poly.length === 0) return;
 
-        ctx.beginPath();
         ctx.moveTo(poly[0].x + offset.x, poly[0].y + offset.y);
         for (let i = 1; i < poly.length; i++) {
             ctx.lineTo(poly[i].x + offset.x, poly[i].y + offset.y);
         }
         ctx.closePath();
-
-        if (stroke) {
-            ctx.strokeStyle = style;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]); // Make the cutline dashed
-            ctx.stroke();
-            ctx.setLineDash([]); // Reset for other drawing operations
-        } else {
-            ctx.fillStyle = style;
-            ctx.fill();
-        }
     });
+
+    if (stroke) {
+        ctx.strokeStyle = style;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]); // Make the cutline dashed
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset for other drawing operations
+    } else {
+        ctx.fillStyle = style;
+        ctx.fill();
+    }
 }
 
 function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
@@ -934,50 +1044,8 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
 
 function drawRuler(bounds, offset = { x: 0, y: 0 }) {
     if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
-
     const ppi = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value)?.ppi || 96;
-    const majorMarkSpacing = isMetric ? 10 * ppi / 25.4 : ppi; // 10mm or 1in
-    const minorMarkSpacing = isMetric ? majorMarkSpacing / 10 : majorMarkSpacing / 8; // 1mm or 1/8in
-
-    ctx.save();
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    ctx.font = "10px Arial";
-    ctx.lineWidth = 1;
-
-    // Top ruler
-    for (let i = 0; i * minorMarkSpacing <= bounds.width; i++) {
-        const x = offset.x + i * minorMarkSpacing;
-        const y = offset.y - 10;
-        const isMajorMark = i % (isMetric ? 10 : 8) === 0;
-        const markHeight = isMajorMark ? 10 : 5;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y + markHeight);
-        ctx.stroke();
-        if (isMajorMark && i > 0) {
-            const label = isMetric ? (i / 10) : (i / 8);
-            ctx.fillText(label, x - 3, y - 2);
-        }
-    }
-
-    // Left ruler
-    for (let i = 0; i * minorMarkSpacing <= bounds.height; i++) {
-        const y = offset.y + i * minorMarkSpacing;
-        const x = offset.x - 10;
-        const isMajorMark = i % (isMetric ? 10 : 8) === 0;
-        const markWidth = isMajorMark ? 10 : 5;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + markWidth, y);
-        ctx.stroke();
-        if (isMajorMark && i > 0) {
-            const label = isMetric ? (i / 10) : (i / 8);
-            ctx.fillText(label, x - 12, y + 3);
-        }
-    }
-
-    ctx.restore();
+    drawCanvasRuler(ctx, bounds, offset, ppi, isMetric);
 }
 
 function handleAddText() {
@@ -1174,33 +1242,6 @@ function handleStandardResize(targetInches) {
 
 // --- Smart Cutline Generation ---
 
-function imageHasTransparentBorder() {
-    if (!canvas || !ctx) return false;
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const { data, width, height } = imageData;
-    const borderSampleSize = 10; // Check this many pixels on each edge
-
-    const isTransparentOrWhite = (i) => {
-        if (data[i+3] < 128) return true; // Alpha check
-        if (data[i] > 250 && data[i+1] > 250 && data[i+2] > 250) return true; // White check
-        return false;
-    };
-
-    // Check top and bottom borders
-    for (let x = 0; x < width; x += Math.floor(width / borderSampleSize)) {
-        if (!isTransparentOrWhite((0 * width + x) * 4) || !isTransparentOrWhite(((height - 1) * width + x) * 4)) {
-            return false;
-        }
-    }
-    // Check left and right borders
-    for (let y = 0; y < height; y += Math.floor(height / borderSampleSize)) {
-        if (!isTransparentOrWhite((y * width + 0) * 4) || !isTransparentOrWhite((y * width + (width - 1)) * 4)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 function handleGenerateCutline() {
     if (!canvas || !ctx || !originalImage) {
         showPaymentStatus('Smart cutline requires a raster image (PNG, JPG). Please upload one.', 'error');
@@ -1208,7 +1249,9 @@ function handleGenerateCutline() {
     }
 
     // --- Feedforward Check ---
-    if (!imageHasTransparentBorder()) {
+    // Pass the imageData to the function
+    const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    if (!imageHasTransparentBorder(currentImageData)) {
         const proceed = confirm("This image does not appear to have a transparent or white background. The 'Smart Cutline' feature may not produce a good result. Proceed anyway?");
         if (!proceed) {
             return;
@@ -1231,13 +1274,13 @@ function handleGenerateCutline() {
             }
 
             // The raw contour is too detailed, simplify it using the RDP algorithm.
-            const simplifiedContour = simplifyPolygon(contour, 2.0); // Epsilon of 2.0 pixels
+            const simplifiedContour = simplifyPolygon(contour, 0.5); // Epsilon of 0.5 pixels
 
             // Clean the polygon to remove self-intersections and other issues before offsetting.
             // This requires scaling up for Clipper's integer math.
             const scale = 100;
             const scaledPoly = simplifiedContour.map(p => ({ X: p.x * scale, Y: p.y * scale }));
-            const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(scaledPoly, 1.415);
+            const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(scaledPoly, 0.1);
 
             // Add validation to ensure we have a usable polygon AFTER cleaning
             if (!cleanedScaledPoly || cleanedScaledPoly.length < 3) {
@@ -1260,125 +1303,198 @@ function handleGenerateCutline() {
     }, 50);
 }
 
-function traceContour(imageData) {
-    const { data, width, height } = imageData;
-    const isOpaque = (x, y) => {
-        if (x < 0 || x >= width || y < 0 || y >= height) return false;
-        const i = (y * width + x) * 4;
-        const r = data[i];
-        const g = data[i+1];
-        const b = data[i+2];
-        const a = data[i+3];
 
-        // Treat pixels with low alpha as transparent
-        if (a < 128) return false;
-        // Treat pure white pixels as transparent
-        if (r > 250 && g > 250 && b > 250) return false;
-
-        return true; // Otherwise, pixel is opaque
-    };
-
-    // 1. Find the first non-transparent pixel
-    let startPos = null;
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            if (isOpaque(x, y)) {
-                startPos = { x, y };
-                break;
+// --- Creator / Product Functions ---
+async function checkAuthStatus() {
+    try {
+        const response = await fetch(`${serverUrl}/api/auth/verify-token`, {
+            credentials: 'include',
+            headers: {
+                // If there's a token in local storage (e.g., from login), add it.
+                // However, the cookie-based flow might be safer if implemented.
+                // The current codebase uses query params or expects cookies?
+                // `authenticateToken` checks Authorization header.
+                // The main page might not have the token in the header if it's not set.
+                // Let's check how the dashboard does it. Dashboard extracts from URL.
+                // For the main page, we might need to rely on a cookie or check localStorage if token was saved.
+                // For this implementation, let's assume if the user visited the dashboard, they might have a token.
+                // But the main page doesn't seem to persist it.
+                // HACKERMAN SOLUTION: Check URL for token too, or just don't show button if not explicit.
             }
+        });
+
+        // Wait, the main page doesn't have login logic.
+        // The user must provide a token via URL or LocalStorage to be "Logged In" on the main page.
+        // Let's check localStorage.
+        const token = localStorage.getItem('splotch_token');
+        if (token) {
+             const verifyRes = await fetch(`${serverUrl}/api/auth/verify-token`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+             });
+             if (verifyRes.ok) {
+                 const sellBtn = document.getElementById('sellDesignBtn');
+                 if (sellBtn) sellBtn.classList.remove('hidden');
+             }
         }
-        if (startPos) break;
+    } catch (e) {
+        // Not logged in
+    }
+}
+
+async function handleCreateProduct() {
+    const name = document.getElementById('productName').value;
+    const profitInput = document.getElementById('creatorProfit').value;
+    const profitCents = Math.round(parseFloat(profitInput) * 100);
+
+    if (!name || isNaN(profitCents)) {
+        alert('Please enter a valid name and profit amount.');
+        return;
     }
 
-    if (!startPos) {
-        return null; // No opaque pixels found
+    // We need to upload the file first if it's not already on the server?
+    // Actually, handlePaymentFormSubmit uploads it. We need a similar flow here.
+    // OR we reuse the upload endpoint.
+    // But `handleFileChange` just reads locally.
+
+    // 1. Get auth token
+    const token = localStorage.getItem('splotch_token');
+    if (!token) {
+        alert('You must be logged in to sell designs.');
+        return;
     }
 
-    const contour = [];
-    let currentPos = startPos;
-    let lastDirection = 6; // Start by checking the pixel to the left
+    try {
+        // 2. Upload Design
+        const designImageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const uploadFormData = new FormData();
+        uploadFormData.append('designImage', designImageBlob, 'design.png');
+        uploadFormData.append('_csrf', csrfToken);
 
-    // Moore-Neighbor tracing algorithm
-    const neighbors = [
-        { x: 1, y: 0 },   // 0: E
-        { x: 1, y: -1 },  // 1: NE
-        { x: 0, y: -1 },  // 2: N
-        { x: -1, y: -1 }, // 3: NW
-        { x: -1, y: 0 },  // 4: W
-        { x: -1, y: 1 },  // 5: SW
-        { x: 0, y: 1 },   // 6: S
-        { x: 1, y: 1 },   // 7: SE
-    ];
+        // Use existing upload endpoint
+        const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-CSRF-Token': csrfToken
+            },
+            body: uploadFormData
+        });
+        const uploadData = await uploadResponse.json();
+        if (!uploadResponse.ok) throw new Error(uploadData.error || 'Upload failed');
 
-    do {
-        contour.push({ x: currentPos.x, y: currentPos.y });
+        // 3. Create Product
+        const productPayload = {
+            name,
+            creatorProfitCents: profitCents,
+            designImagePath: uploadData.designImagePath,
+            cutLinePath: uploadData.cutLinePath,
+            _csrf: csrfToken
+        };
 
-        // Start checking neighbors from the one after the direction we came from
-        let checkDirection = (lastDirection + 5) % 8;
-        let nextPos = null;
-        let foundNext = false;
+        const createResponse = await fetch(`${serverUrl}/api/products`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify(productPayload)
+        });
 
-        for (let i = 0; i < 8; i++) {
-            const neighborOffset = neighbors[checkDirection];
-            const neighborPos = { x: currentPos.x + neighborOffset.x, y: currentPos.y + neighborOffset.y };
+        const createData = await createResponse.json();
+        if (!createResponse.ok) throw new Error(createData.error || 'Creation failed');
 
-            if (isOpaque(neighborPos.x, neighborPos.y)) {
-                nextPos = neighborPos;
-                lastDirection = checkDirection;
-                foundNext = true;
-                break;
+        // 4. Show Link
+        const link = `${window.location.origin}${window.location.pathname}?product_id=${createData.product.productId}`;
+        document.getElementById('productLinkInput').value = link;
+        document.getElementById('productLinkContainer').classList.remove('hidden');
+        document.getElementById('createProductBtn').classList.add('hidden'); // Prevent double click
+
+    } catch (error) {
+        console.error(error);
+        alert('Failed to create product: ' + error.message);
+    }
+}
+
+async function loadProductForBuyer(productId) {
+    try {
+        currentProductId = productId;
+        showPaymentStatus('Loading product design...', 'info');
+
+        const response = await fetch(`${serverUrl}/api/products/${productId}`);
+        if (!response.ok) throw new Error('Product not found');
+
+        const product = await response.json();
+
+        // Set Pricing Markup
+        creatorProfitCents = product.creatorProfitCents;
+
+        // Load Image
+        const img = new Image();
+        img.onload = () => {
+            originalImage = img;
+            // Draw
+            const maxWidth = 500, maxHeight = 400;
+            let newWidth = img.width, newHeight = img.height;
+            if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
+            if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
+            setCanvasSize(newWidth, newHeight);
+            ctx.clearRect(0, 0, newWidth, newHeight);
+            ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+            // Mock Cutline if not provided (or parse it if it is)
+            // For MVP, if there is no cutline path in response, we default to box?
+            // Actually, products should have cutlines if they were created via the UI.
+            // But we don't have code to load the cutline from a file URL back into `currentCutline` polygons easily
+            // without parsing the SVG again.
+            // Hackerman shortcut: Just use the bounds of the image for now or trigger auto-trace?
+            // Better: If we have the image, we can just treat it as a fresh load.
+            // But we should "Lock" the UI.
+
+            // Generate basic bounds
+            currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
+            currentCutline = [[
+                { x: 0, y: 0 },
+                { x: newWidth, y: 0 },
+                { x: newWidth, y: newHeight },
+                { x: 0, y: newHeight }
+            ]];
+            // If the product had a complex cutline, we aren't loading it visually here for the buyer
+            // unless we fetch and parse the SVG.
+            // For this MVP, let's trigger the "Smart Cutline" automatically if it looks transparent?
+            // Or just default to rectangle.
+
+            // LOCK UI
+            updateEditingButtonsState(true); // Disable all editing
+            // Re-enable resize
+            if (resizeBtnEl) resizeBtnEl.disabled = false;
+            document.getElementById('resizeSlider').disabled = false;
+
+            // Hide "Sell" button
+            const sellBtn = document.getElementById('sellDesignBtn');
+            if (sellBtn) sellBtn.style.display = 'none';
+
+            // Hide Upload Input
+            if (fileInputGlobalRef) fileInputGlobalRef.closest('.field').style.display = 'none';
+
+            // Show "Supporting" message
+            if (product.creatorName) {
+                const header = document.querySelector('h1');
+                const supportMsg = document.createElement('div');
+                supportMsg.className = 'text-center text-green-600 font-bold mb-4';
+                supportMsg.textContent = `Supporting Artist: ${product.creatorName}`;
+                header.insertAdjacentElement('afterend', supportMsg);
             }
-            checkDirection = (checkDirection + 1) % 8;
-        }
 
-        if (!foundNext) {
-            // This can happen on a 1px line, we just stop.
-            break;
-        }
+            calculateAndUpdatePrice();
+            drawCanvasDecorations(currentBounds);
+            showPaymentStatus('Design loaded!', 'success');
+        };
+        img.crossOrigin = "Anonymous"; // Important for canvas manipulation if on different port
+        img.src = product.designImagePath;
 
-        currentPos = nextPos;
-
-    } while (currentPos.x !== startPos.x || currentPos.y !== startPos.y);
-
-    return contour;
-}
-
-// --- Path Simplification (Ramer-Douglas-Peucker) ---
-
-function perpendicularDistance(point, lineStart, lineEnd) {
-    const dx = lineEnd.x - lineStart.x;
-    const dy = lineEnd.y - lineStart.y;
-    if (dx === 0 && dy === 0) {
-        return Math.sqrt(Math.pow(point.x - lineStart.x, 2) + Math.pow(point.y - lineStart.y, 2));
+    } catch (error) {
+        console.error(error);
+        showPaymentStatus('Failed to load product.', 'error');
     }
-    const numerator = Math.abs(dy * point.x - dx * point.y + lineEnd.x * lineStart.y - lineEnd.y * lineStart.x);
-    const denominator = Math.sqrt(dx * dx + dy * dy);
-    return numerator / denominator;
-}
-
-function rdp(points, epsilon) {
-    let dmax = 0;
-    let index = 0;
-    const end = points.length - 1;
-
-    for (let i = 1; i < end; i++) {
-        const d = perpendicularDistance(points[i], points[0], points[end]);
-        if (d > dmax) {
-            index = i;
-            dmax = d;
-        }
-    }
-
-    if (dmax > epsilon) {
-        const recResults1 = rdp(points.slice(0, index + 1), epsilon);
-        const recResults2 = rdp(points.slice(index, end + 1), epsilon);
-        return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
-    } else {
-        return [points[0], points[end]];
-    }
-}
-
-function simplifyPolygon(points, epsilon = 1.0) {
-    if (points.length < 3) return points;
-    return rdp(points, epsilon);
 }

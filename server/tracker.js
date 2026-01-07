@@ -18,7 +18,7 @@ function initializeTracker(database) {
 async function updateTrackingData() {
     if (!db || !api) return;
 
-    const shippedOrders = db.data.orders.filter(o => o.status === 'SHIPPED' && o.trackingNumber && o.courier);
+    const shippedOrders = Object.values(db.data.orders).filter(o => o.status === 'SHIPPED' && o.trackingNumber && o.courier);
 
     if (shippedOrders.length === 0) {
         return;
@@ -35,7 +35,7 @@ async function updateTrackingData() {
 
             if (tracker.status && tracker.status.toLowerCase() === 'delivered') {
                 console.log(`[TRACKER] Order ${order.orderId} has been delivered. Updating status.`);
-                const orderToUpdate = db.data.orders.find(o => o.orderId === order.orderId);
+                const orderToUpdate = db.data.orders[order.orderId];
                 if (orderToUpdate) {
                     orderToUpdate.status = 'DELIVERED';
                     orderToUpdate.lastUpdatedAt = new Date().toISOString();
