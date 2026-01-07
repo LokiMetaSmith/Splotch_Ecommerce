@@ -82,6 +82,7 @@
     "postcss": "^8.5.6",
     "prettier": "^3.6.2",
     "serve": "^14.2.4",
+    "smtp-server": "^3.18.0",
     "supertest": "^7.1.4",
     "svg-parser": "^2.0.4",
     "tailwindcss": "^4.1.18"
