@@ -178,6 +178,16 @@ write_files:
       TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
       TELEGRAM_CHANNEL_ID=YOUR_TELEGRAM_CHANNEL_ID
 
+      # Optional: SMTP Configuration (for self-hosted email)
+      # If these are not set, the server will default to using the Google API.
+      SMTP_HOST=YOUR_SMTP_HOST
+      SMTP_PORT=YOUR_SMTP_PORT
+      SMTP_USER=YOUR_SMTP_USER
+      SMTP_PASS=YOUR_SMTP_PASS
+      SMTP_SECURE=YOUR_SMTP_SECURE # true or false
+      SMTP_FROM=YOUR_SMTP_FROM
+      SMTP_REJECT_UNAUTHORIZED=YOUR_SMTP_REJECT_UNAUTHORIZED # true or false
+
 # 5. Post-setup commands
 # These commands are executed after the server is provisioned.
 runcmd:
