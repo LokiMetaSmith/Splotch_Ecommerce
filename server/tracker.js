@@ -18,7 +18,14 @@ function initializeTracker(database) {
 async function updateTrackingData() {
     if (!db || !api) return;
 
-    const shippedOrders = Object.values(db.data.orders).filter(o => o.status === 'SHIPPED' && o.trackingNumber && o.courier);
+    // Bolt Optimization: Use cached shippedOrders array instead of filtering all orders
+    let shippedOrders;
+    if (db.shippedOrders) {
+        shippedOrders = db.shippedOrders.filter(o => o.trackingNumber && o.courier);
+    } else {
+        // Fallback if cache isn't initialized (shouldn't happen in normal operation)
+        shippedOrders = Object.values(db.data.orders).filter(o => o.status === 'SHIPPED' && o.trackingNumber && o.courier);
+    }
 
     if (shippedOrders.length === 0) {
         return;
@@ -39,6 +46,15 @@ async function updateTrackingData() {
                 if (orderToUpdate) {
                     orderToUpdate.status = 'DELIVERED';
                     orderToUpdate.lastUpdatedAt = new Date().toISOString();
+
+                    // Update Cache
+                    if (db.shippedOrders) {
+                        const idx = db.shippedOrders.findIndex(o => o.orderId === order.orderId);
+                        if (idx !== -1) {
+                            db.shippedOrders.splice(idx, 1);
+                        }
+                    }
+
                     await db.write();
                 }
             }

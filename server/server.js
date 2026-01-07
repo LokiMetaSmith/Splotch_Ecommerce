@@ -120,6 +120,14 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
       console.log(`[SERVER] Initialized active orders cache. Count: ${db.activeOrders.length}`);
   }
 
+  // Initialize Shipped Orders Cache for Tracker
+  // Optimizes tracking checks by avoiding full table scan
+  if (!db.shippedOrders) {
+      const allOrders = Object.values(db.data.orders);
+      db.shippedOrders = allOrders.filter(order => order.status === 'SHIPPED');
+      console.log(`[SERVER] Initialized shipped orders cache. Count: ${db.shippedOrders.length}`);
+  }
+
   // Ensure products collection exists
   if (!db.data.products) {
     db.data.products = {};
@@ -895,64 +903,60 @@ ${statusChecklist}
       }
       const { orderId } = req.params;
       const { status } = req.body;
-      const order = db.data.orders.find(o => o.orderId === orderId);
+      const order = db.data.orders[orderId]; // Optimized: O(1) lookup
+
       if (!order) {
         return res.status(404).json({ error: 'Order not found.' });
       }
+
+      // Check for admin role
+      if (!isAdmin(req.user)) {
+          return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+
+      const oldStatus = order.status;
       order.status = status;
       order.lastUpdatedAt = new Date().toISOString();
 
       // Update active orders cache
       const isFinal = FINAL_STATUSES.includes(status);
-      const activeIndex = db.activeOrders.findIndex(o => o.orderId === orderId);
 
-      if (isFinal) {
-        if (activeIndex !== -1) {
-          db.activeOrders.splice(activeIndex, 1);
-        }
-      } else {
-        if (activeIndex === -1) {
-          db.activeOrders.push(order);
-        }
+      // Update Active Orders
+      if (db.activeOrders) {
+          const activeIndex = db.activeOrders.findIndex(o => o.orderId === orderId);
+          if (isFinal) {
+            if (activeIndex !== -1) {
+              db.activeOrders.splice(activeIndex, 1);
+            }
+          } else {
+            if (activeIndex === -1) {
+              db.activeOrders.push(order);
+            }
+          }
+      }
+
+      // Update Shipped Orders Cache
+      if (db.shippedOrders) {
+          // If status BECOMES 'SHIPPED'
+          if (status === 'SHIPPED') {
+              const exists = db.shippedOrders.find(o => o.orderId === orderId);
+              if (!exists) {
+                  db.shippedOrders.push(order);
+              }
+          }
+          // If status WAS 'SHIPPED' but CHANGED
+          else if (oldStatus === 'SHIPPED' && status !== 'SHIPPED') {
+              const idx = db.shippedOrders.findIndex(o => o.orderId === orderId);
+              if (idx !== -1) {
+                  db.shippedOrders.splice(idx, 1);
+              }
+          }
       }
 
       await db.write();
       console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
       try {
-          // Check for admin role
-          if (!isAdmin(req.user)) {
-              return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-          }
-
-          const { orderId } = req.params;
-          const { status } = req.body;
-          const order = db.data.orders[orderId];
-          if (!order) {
-            return res.status(404).json({ error: 'Order not found.' });
-          }
-          order.status = status;
-          order.lastUpdatedAt = new Date().toISOString();
-          await db.write();
-          console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
-
-          // Update active orders cache
-          if (db.activeOrders) {
-              if (FINAL_STATUSES.includes(status)) {
-                  // Remove from active orders if status is final
-                  const idx = db.activeOrders.findIndex(o => o.orderId === orderId);
-                  if (idx !== -1) {
-                      db.activeOrders.splice(idx, 1);
-                  }
-              } else {
-                  // Add to active orders if status is non-final (re-activation)
-                  const exists = db.activeOrders.find(o => o.orderId === orderId);
-                  if (!exists) {
-                      db.activeOrders.push(order);
-                  }
-              }
-          }
-
           // Update Telegram message
           if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
             const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
@@ -1035,6 +1039,18 @@ ${statusChecklist}
         }
         order.trackingNumber = trackingNumber;
         order.courier = courier;
+
+        // --- CACHE UPDATE ---
+        // If the order is already SHIPPED, we need to ensure it's in the cache.
+        // It might not be there if status was updated before tracking info.
+        if (db.shippedOrders && order.status === 'SHIPPED') {
+             // Check if it's already in the cache (by reference or ID)
+             const exists = db.shippedOrders.find(o => o.orderId === orderId);
+             if (!exists) {
+                 db.shippedOrders.push(order);
+             }
+        }
+
         await db.write();
         console.log(`[SERVER] Tracking info added to order ID ${orderId}.`);
 
