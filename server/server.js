@@ -42,6 +42,8 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const { window } = new JSDOM('');
 const purify = DOMPurify(window);
 
+export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+
 async function sanitizeSVGFile(filePath) {
     try {
         const fileContent = await fs.promises.readFile(filePath, 'utf-8');
@@ -893,6 +895,31 @@ ${statusChecklist}
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
+      const { orderId } = req.params;
+      const { status } = req.body;
+      const order = db.data.orders.find(o => o.orderId === orderId);
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found.' });
+      }
+      order.status = status;
+      order.lastUpdatedAt = new Date().toISOString();
+
+      // Update active orders cache
+      const isFinal = FINAL_STATUSES.includes(status);
+      const activeIndex = db.activeOrders.findIndex(o => o.orderId === orderId);
+
+      if (isFinal) {
+        if (activeIndex !== -1) {
+          db.activeOrders.splice(activeIndex, 1);
+        }
+      } else {
+        if (activeIndex === -1) {
+          db.activeOrders.push(order);
+        }
+      }
+
+      await db.write();
+      console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
       try {
           // Check for admin role
