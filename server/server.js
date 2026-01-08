@@ -458,7 +458,7 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         csp: {
             policy: {
                 'default-src': "'self'",
-                'script-src': "'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com",
+                'script-src': "'self' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com",
                 'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com https://*.squarecdn.com https://sandbox.web.squarecdn.com",
                 'font-src': "'self' https://fonts.gstatic.com https://*.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
                 'img-src': "'self' data: blob: https://*.squarecdn.com https://sandbox.web.squarecdn.com",
