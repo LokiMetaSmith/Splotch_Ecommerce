@@ -304,9 +304,47 @@ export const GeometryUtil = {
 
     pointInPolygon: function(point, polygon) {
         if (!polygon || polygon.length < 3) return null;
-        let inside = false;
+
+        // Optimization: Check bounding box first
+        // If polygon doesn't have cached bounds, calculate them once (this is O(N))
+        // but saves us from the O(N) ray casting if the point is clearly outside.
+        // We cache LOCAL bounds (ignoring offset) so they remain valid even if the polygon is moved.
+        if (!polygon._bounds) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (let i = 0; i < polygon.length; i++) {
+                 const x = polygon[i].x;
+                 const y = polygon[i].y;
+                 if (x < minX) minX = x;
+                 if (x > maxX) maxX = x;
+                 if (y < minY) minY = y;
+                 if (y > maxY) maxY = y;
+            }
+            // Cache it (non-enumerable to avoid polluting JSON stringify if needed)
+            // Note: We use Object.defineProperty to ensure the property is not enumerable,
+            // preventing it from being serialized to JSON.
+            try {
+                Object.defineProperty(polygon, '_bounds', {
+                    value: { minX, minY, maxX, maxY },
+                    writable: true,
+                    configurable: true,
+                    enumerable: false
+                });
+            } catch (e) {
+                 // Fallback if object is frozen/sealed: just use a temporary variable (no caching benefit for this single call, but safe)
+                 polygon._bounds = { minX, minY, maxX, maxY };
+            }
+        }
+
+        const b = polygon._bounds;
         const offsetx = polygon.offsetx || 0;
         const offsety = polygon.offsety || 0;
+
+        if (point.x < b.minX + offsetx || point.x > b.maxX + offsetx || point.y < b.minY + offsety || point.y > b.maxY + offsety) {
+            return false;
+        }
+
+        let inside = false;
+        // The variables offsetx and offsety are already declared above
         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
             const xi = polygon[i].x + offsetx, yi = polygon[i].y + offsety;
             const xj = polygon[j].x + offsetx, yj = polygon[j].y + offsety;

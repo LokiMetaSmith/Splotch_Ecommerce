@@ -12,12 +12,15 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.node,
-        myCustomGlobal: "readonly"
+        myCustomGlobal: "readonly",
+        ClipperLib: "readonly",
+        SVGNest: "readonly"
       }
     },
     rules: {
       "no-unused-vars": "warn",
       "no-console": "off",
+      "no-undef": "error"
     }
   }
 ];
