@@ -100,8 +100,16 @@
 
                 <!-- Basic Image Editing Controls -->
                 <div id="editing-controls" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-10 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50">
-                    <button id="rotateLeftBtn" title="Rotate Left 90°">Rotate Left</button>
-                    <button id="rotateRightBtn" title="Rotate Right 90°">Rotate Right</button>
+    <button id="rotateLeftBtn" title="Rotate Left 90°" aria-label="Rotate Left" class="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+        </svg>
+    </button>
+    <button id="rotateRightBtn" title="Rotate Right 90°" aria-label="Rotate Right" class="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
+        </svg>
+    </button>
                     <div class="flex flex-col col-span-2">
                         <label for="resizeSlider" class="text-sm text-center">Size: <span id="resizeValue">3.0 in</span></label>
                         <input type="range" id="resizeSlider" min="1" max="8" value="3" step="0.1" class="w-full">
@@ -114,8 +122,8 @@
                             <input type="text" id="heightDisplay" readonly class="w-16 text-center text-xs border rounded bg-gray-50 text-gray-700 p-1" value="---">
                          </div>
                     </div>
-                    <button id="grayscaleBtn" title="Apply Grayscale Filter">Grayscale</button>
-                    <button id="sepiaBtn" title="Apply Sepia Filter">Sepia</button>
+    <button id="grayscaleBtn" title="Apply Grayscale Filter">Grayscale</button>
+    <button id="sepiaBtn" title="Apply Sepia Filter">Sepia</button>
                     <button id="generateCutlineBtn" class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-2" title="Generate Cutline from Image Alpha">Generate Smart Cutline</button>
                 </div>
                 <div id="standard-sizes-controls" class="flex justify-center items-center space-x-2 my-4">
