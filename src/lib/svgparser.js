@@ -165,9 +165,9 @@ export class SVGParser {
     }
 
     parsePath(d) {
+        // More robust splitting to handle commands without spaces (e.g., "M0 0H100")
+        const tokens = d.replace(/([a-zA-Z])/g, ' $1 ').trim().split(/[\s,]+/).filter(t => t.length > 0);
         const COMMAND = /([a-zA-Z])/;
-        const WSP = /[\s,]+/;
-        const tokens = d.split(WSP).filter(t => t.length > 0);
 
         const polygons = [];
         let currentPolygon = [];
@@ -186,6 +186,12 @@ export class SVGParser {
 
             // Helper to get the next number from tokens
             const next = () => parseFloat(tokens.shift());
+
+            // Handle parsing errors or missing tokens
+            const safeNext = () => {
+                const val = next();
+                return isNaN(val) ? 0 : val;
+            };
 
             switch(command) {
                 case 'M':

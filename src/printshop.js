@@ -661,7 +661,7 @@ async function handleNesting() {
         const addPrintingMarks = ui.addPrintingMarks.checked;
         const options = { spacing, rotations: 4, addPrintingMarks };
 
-        const nest = new SVGNest(null, svgs, options); // Pass null for binElement
+        const nest = new SvgNest(null, svgs, options); // Pass null for binElement
         nest.setBinPolygon(complexBinPolygon); // Use the new method
 
         const resultSvg = nest.start();
@@ -688,11 +688,12 @@ function generateCutFile(svgString) {
     cutFileSvg.setAttribute('height', svgElement.getAttribute('height'));
     cutFileSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox'));
 
-    svgElement.querySelectorAll('path').forEach(path => {
-        const newPath = path.cloneNode();
-        newPath.setAttribute('stroke', 'red');
-        newPath.setAttribute('fill', 'none');
-        cutFileSvg.appendChild(newPath);
+    // Support multiple shapes
+    svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline').forEach(el => {
+        const newEl = el.cloneNode(true);
+        newEl.setAttribute('stroke', 'red');
+        newEl.setAttribute('fill', 'none');
+        cutFileSvg.appendChild(newEl);
     });
 
     return new XMLSerializer().serializeToString(cutFileSvg);
