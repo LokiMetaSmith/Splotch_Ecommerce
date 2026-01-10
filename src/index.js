@@ -1,6 +1,6 @@
 import { SVGParser } from './lib/svgparser.js';
 import { calculateStickerPrice } from './lib/pricing.js';
-import { drawRuler as drawCanvasRuler } from './lib/canvas-utils.js';
+import { drawRuler as drawCanvasRuler, drawImageWithFilters } from './lib/canvas-utils.js';
 import { traceContour, simplifyPolygon, imageHasTransparentBorder } from './lib/image-processing.js';
 
 // index.js
@@ -1133,20 +1133,11 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
 function redrawOriginalImageWithFilters() {
     if (!originalImage || !ctx || !canvas) return;
 
-    // Bolt Optimization: Use hardware-accelerated Canvas filters instead of pixel manipulation
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.save();
-    if (isGrayscale) {
-        ctx.filter = 'grayscale(100%)';
-    } else if (isSepia) {
-        ctx.filter = 'sepia(100%)';
-    } else {
-        ctx.filter = 'none';
-    }
-
-    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
-    ctx.restore(); // Restores context state (including filter='none')
+    // Bolt Optimization: Use hardware-accelerated Canvas filters via helper
+    drawImageWithFilters(ctx, originalImage, canvas.width, canvas.height, {
+        grayscale: isGrayscale,
+        sepia: isSepia
+    });
 
     // Explicitly restore stroke style before drawing decorations
     ctx.strokeStyle = 'rgba(128, 128, 128, 0.9)';
