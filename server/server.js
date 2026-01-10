@@ -425,8 +425,25 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
             '/node_modules/',
             '/.git/',
             '/verification/',
-            '/.jules/'
+            '/.jules/',
+            '/tests/',
+            '/scripts/',
+            '/docs/',
+            '/playwright_tests/',
+            '/playwright_tests_real/',
+            '/.husky/'
         ];
+
+        const blockedExtensions = [
+            '.md',
+            '.sh',
+            '.log',
+            '.yml',
+            '.yaml',
+            '.config.js',
+            '.config.ts'
+        ];
+
         const blockedExact = [
             '/package.json',
             '/package-lock.json',
@@ -434,16 +451,17 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
             '/yarn.lock',
             '/.env',
             '/Dockerfile',
-            '/docker-compose.yaml',
-            '/docker-compose.yml'
+            '/.gitignore',
+            '/.eslintignore'
         ];
 
         const reqPath = req.path;
 
         const isBlockedPrefix = blockedPrefixes.some(prefix => reqPath.startsWith(prefix));
         const isBlockedExact = blockedExact.includes(reqPath);
+        const isBlockedExtension = blockedExtensions.some(ext => reqPath.endsWith(ext));
 
-        if (isBlockedPrefix || isBlockedExact) {
+        if (isBlockedPrefix || isBlockedExact || isBlockedExtension) {
             console.warn(`[SECURITY] Blocked access to sensitive path: ${reqPath}`);
             return res.status(403).send('Forbidden');
         }
