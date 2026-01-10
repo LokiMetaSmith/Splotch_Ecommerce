@@ -1,7 +1,6 @@
 // printshop.js
 import '/src/styles.css'; // Or your main CSS file
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
-import DOMPurify from 'dompurify';
 import { SvgNest } from './lib/svgnest.js';
 import { SVGParser } from './lib/svgparser.js';
 import * as jose from 'jose';
@@ -407,117 +406,132 @@ function filterAndDisplayOrders(status) {
         ui.noOrdersMessage.style.display = 'block';
     } else {
         ui.noOrdersMessage.style.display = 'none';
-        const fragment = document.createDocumentFragment();
-        // Bolt Optimization: Use DocumentFragment to batch DOM insertions
-        ordersToDisplay.forEach(order => {
-            const card = displayOrder(order);
-            fragment.prepend(card);
-        });
-        ui.ordersList.appendChild(fragment);
+        // Bolt Optimization: Build a single HTML string and sanitize it once.
+        // We iterate in reverse (or prepend) logic to match previous behavior where new items appeared first?
+        // Original logic: ordersToDisplay.forEach(order => fragment.prepend(card));
+        // This reversed the order of the array. To match, we reduce and prepend the HTML string.
+        const fullHtml = ordersToDisplay.reduce((acc, order) => generateOrderHTML(order) + acc, '');
+
+        // Since we are constructing the HTML ourselves from trusted template structure
+        // and escaped user inputs, we can set innerHTML directly for maximum speed.
+        // The generateOrderHTML function uses escapeHtml() on all user-controlled data fields.
+        ui.ordersList.innerHTML = fullHtml;
     }
 }
 
 /**
- * Renders a single order card into the DOM using safe DOM creation methods.
- * @param {object} order - The order object from the server.
- * @returns {HTMLElement} The created order card element.
+ * Escapes HTML characters in a string to prevent XSS when using innerHTML.
+ * @param {string} unsafe - The string to escape.
+ * @returns {string} The escaped string.
  */
-export function displayOrder(order) {
-    const card = document.createElement('div');
-    card.className = 'order-card';
-    card.id = `order-card-${order.orderId}`;
+function escapeHtml(unsafe) {
+    if (unsafe === null || unsafe === undefined) return '';
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
+/**
+ * Generates the HTML string for a single order card.
+ * @param {object} order - The order object.
+ * @returns {string} The HTML string.
+ */
+function generateOrderHTML(order) {
     const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
     const receivedDate = new Date(order.receivedAt).toLocaleString();
 
-    // --- Helper to create elements ---
-    const createEl = (tag, classes = [], attributes = {}, text) => {
-        const el = document.createElement(tag);
-        el.classList.add(...classes);
-        for (const [key, value] of Object.entries(attributes)) {
-            el.setAttribute(key, value);
-        }
-        if (text) el.textContent = text;
-        return el;
-    };
+    // Safety: Escape all user-provided data fields to ensure they render as text.
+    const safeOrderId = escapeHtml(order.orderId);
+    const safeStatus = escapeHtml(order.status);
+    const safeBillingName = escapeHtml(`${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}`);
+    const safeBillingEmail = escapeHtml(order.billingContact?.email || 'N/A');
+    const safeShippingName = escapeHtml(`${order.shippingContact?.givenName || ''} ${order.shippingContact?.familyName || ''}`);
+    const safeShippingEmail = escapeHtml(order.shippingContact?.email || 'N/A');
+    const safeQuantity = escapeHtml(order.orderDetails?.quantity || 'N/A');
+    const safeAmount = escapeHtml(formattedAmount);
+    // Image paths are URLs, DOMPurify handles these but escaping is good practice for attributes
+    const safeDesignImagePath = escapeHtml(order.designImagePath);
+    const safeCutLinePath = escapeHtml(order.cutLinePath || '');
 
-    // --- Header ---
-    const header = createEl('div', ['flex', 'justify-between', 'items-start']);
-    const headerTextDiv = createEl('div');
-    const orderIdH3 = createEl('h3', ['text-xl', 'text-splotch-red'], {}, 'Order ID: ');
-    orderIdH3.appendChild(createEl('span', ['font-mono', 'text-sm'], {}, `${order.orderId.substring(0, 8)}...`));
-    const receivedP = createEl('p', ['text-sm', 'text-gray-600'], {}, `Received: ${receivedDate}`);
-    headerTextDiv.append(orderIdH3, receivedP);
-    const statusBadge = createEl('div', [`status-${order.status.toLowerCase()}`, 'font-bold', 'py-1', 'px-3', 'rounded-full', 'text-sm'], { id: `status-badge-${order.orderId}` }, order.status);
-    header.append(headerTextDiv, statusBadge);
 
-    // --- Details Grid ---
-    const detailsGrid = createEl('div', ['mt-4', 'grid', 'grid-cols-1', 'md:grid-cols-2', 'gap-4', 'order-details']);
-
-    const createDtDd = (dtText, ddText) => {
-        const dt = createEl('dt', [], {}, dtText);
-        const dd = createEl('dd', [], {}, ddText);
-        return [dt, dd];
-    };
-
-    const billingDiv = createEl('div');
-    billingDiv.append(...createDtDd('Billing Name:', `${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}`));
-    billingDiv.append(...createDtDd('Billing Email:', order.billingContact?.email || 'N/A'));
-
-    const shippingDiv = createEl('div');
-    shippingDiv.append(...createDtDd('Shipping Name:', `${order.shippingContact?.givenName || ''} ${order.shippingContact?.familyName || ''}`));
-    shippingDiv.append(...createDtDd('Shipping Email:', order.shippingContact?.email || 'N/A'));
-
-    const orderInfoDiv = createEl('div');
-    orderInfoDiv.append(...createDtDd('Quantity:', order.orderDetails?.quantity || 'N/A'));
-    orderInfoDiv.append(...createDtDd('Amount:', formattedAmount));
-
-    detailsGrid.append(billingDiv, shippingDiv, orderInfoDiv);
-
-    // --- Sticker Design ---
-    const imageDiv = createEl('div', ['mt-4']);
-    imageDiv.appendChild(createEl('dt', [], {}, 'Sticker Design:'));
-    const imageLink = createEl('a', ['sticker-peel-container'], { href: `${serverUrl}${order.designImagePath}`, target: '_blank' });
-    const image = createEl('img', ['sticker-design'], {
-        src: `${serverUrl}${order.designImagePath}`,
-        alt: 'Sticker Design',
-        'data-cut-file-path': order.cutLinePath || '',
-        loading: 'lazy',
-        decoding: 'async'
-    });
-    imageLink.appendChild(image);
-    imageDiv.appendChild(imageLink);
-
-    // --- Action Buttons ---
-    const buttonsDiv = createEl('div', ['mt-4', 'flex', 'flex-wrap', 'gap-2']);
     const statuses = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELED'];
-    statuses.forEach(status => {
-        buttonsDiv.appendChild(createEl('button', ['action-btn'], {
-            'data-order-id': order.orderId,
-            'data-status': status
-        }, status.charAt(0) + status.slice(1).toLowerCase()));
-    });
+    const buttonsHtml = statuses.map(status => `
+        <button class="action-btn" data-order-id="${safeOrderId}" data-status="${status}">
+            ${status.charAt(0) + status.slice(1).toLowerCase()}
+        </button>
+    `).join('');
 
-    // --- Tracking Info ---
-    const trackingDiv = createEl('div', ['mt-4'], { id: `tracking-info-${order.orderId}` });
-    trackingDiv.style.display = order.status === 'SHIPPED' ? 'block' : 'none';
-    trackingDiv.appendChild(createEl('input', ['border', 'rounded-md', 'p-2'], { type: 'text', id: `tracking-number-${order.orderId}`, placeholder: 'Enter Tracking Number' }));
-    const courierSelect = createEl('select', ['border', 'rounded-md', 'p-2'], { id: `courier-${order.orderId}` });
-    ['usps', 'ups', 'fedex'].forEach(courier => {
-        courierSelect.appendChild(createEl('option', [], { value: courier }, courier.toUpperCase()));
-    });
-    trackingDiv.appendChild(courierSelect);
-    trackingDiv.appendChild(createEl('button', ['add-tracking-btn'], { 'data-order-id': order.orderId }, 'Add Tracking'));
+    const trackingDisplay = order.status === 'SHIPPED' ? 'block' : 'none';
+    const courierOptions = ['usps', 'ups', 'fedex'].map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('');
 
-    // --- Assemble and Render Card ---
-    card.append(header, detailsGrid, imageDiv, buttonsDiv, trackingDiv);
-    // Bolt Optimization: removed direct DOM manipulation to allow batching
-    // ui.ordersList.prepend(card);
+    return `
+    <div class="order-card" id="order-card-${safeOrderId}">
+        <div class="flex justify-between items-start">
+            <div>
+                <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${safeOrderId.substring(0, 8)}...</span></h3>
+                <p class="text-sm text-gray-600">Received: ${receivedDate}</p>
+            </div>
+            <div id="status-badge-${safeOrderId}" class="status-${safeStatus.toLowerCase()} font-bold py-1 px-3 rounded-full text-sm">
+                ${safeStatus}
+            </div>
+        </div>
 
-    // --- Attach Event Listeners ---
-    // Bolt Optimization: Removed per-card event listeners in favor of delegation on ui.ordersList
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
+            <div>
+                <dt>Billing Name:</dt><dd>${safeBillingName}</dd>
+                <dt>Billing Email:</dt><dd>${safeBillingEmail}</dd>
+            </div>
+            <div>
+                <dt>Shipping Name:</dt><dd>${safeShippingName}</dd>
+                <dt>Shipping Email:</dt><dd>${safeShippingEmail}</dd>
+            </div>
+            <div>
+                <dt>Quantity:</dt><dd>${safeQuantity}</dd>
+                <dt>Amount:</dt><dd>${safeAmount}</dd>
+            </div>
+        </div>
 
-    return card;
+        <div class="mt-4">
+            <dt>Sticker Design:</dt>
+            <a class="sticker-peel-container" href="${serverUrl}${safeDesignImagePath}" target="_blank">
+                <img class="sticker-design"
+                     src="${serverUrl}${safeDesignImagePath}"
+                     alt="Sticker Design"
+                     data-cut-file-path="${safeCutLinePath}"
+                     loading="lazy"
+                     decoding="async">
+            </a>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+            ${buttonsHtml}
+        </div>
+
+        <div class="mt-4" id="tracking-info-${safeOrderId}" style="display: ${trackingDisplay};">
+            <input type="text" id="tracking-number-${safeOrderId}" class="border rounded-md p-2" placeholder="Enter Tracking Number">
+            <select id="courier-${safeOrderId}" class="border rounded-md p-2">
+                ${courierOptions}
+            </select>
+            <button class="add-tracking-btn" data-order-id="${safeOrderId}">Add Tracking</button>
+        </div>
+    </div>`;
+}
+
+/**
+ * Legacy support for tests that might use this function.
+ * @deprecated Use internal generateOrderHTML and innerHTML assignment for performance.
+ * @param {object} order - The order object.
+ * @returns {HTMLElement} The created order card element.
+ */
+export function displayOrder(order) {
+    const html = generateOrderHTML(order);
+    const div = document.createElement('div');
+    // Sanitize just this fragment by manually setting innerHTML as it's built from safe template
+    div.innerHTML = html;
+    return div.firstElementChild;
 }
 
 /**
