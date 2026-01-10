@@ -14,3 +14,9 @@
 1. Ensure the icon is universally recognized (e.g., rotate arrows) or keep the text.
 2. Always add `aria-label` for screen readers.
 3. Explicitly set minimum dimensions (e.g., `min-w-[44px] min-h-[44px]`) to meet WCAG touch target guidelines, as standard padding might not be enough.
+
+## 2025-02-20 - Grid Stretching and Theme Overrides
+**Learning:** Buttons in a CSS grid may default to stretching (`justify-self: stretch`), making them visually "huge" when converted from text to icon-only. Additionally, theme stylesheets (like `splotch-theme.css`) may enforce generous padding that breaks specific icon button layouts.
+**Action:** For icon-only buttons in such environments:
+1. Use `justify-self-center` or similar to prevent grid stretching.
+2. If theme specificity is high (global `!important` on padding), use inline styles (e.g., `style="width: 3rem !important; padding: 0 !important"`) to forcefully reset box model properties for the specific component, ensuring correct dimensions (e.g., 48px/3rem) and alignment.
