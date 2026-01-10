@@ -348,24 +348,24 @@ export class SvgNest {
         
         const scale = this.config.clipperScale;
         const scaledPoly = polygon.map(p => ({ X: p.x * scale, Y: p.y * scale }));
-        const simple = ClipperLib.Clipper.SimplifyPolygon(scaledPoly, ClipperLib.PolyFillType.pftNonZero);
+        const simple = window.ClipperLib.Clipper.SimplifyPolygon(scaledPoly, window.ClipperLib.PolyFillType.pftNonZero);
 
         if (!simple || simple.length === 0) {
              return null;
         }
         
         let biggest = simple[0];
-        let maxArea = Math.abs(ClipperLib.Clipper.Area(biggest));
+        let maxArea = Math.abs(window.ClipperLib.Clipper.Area(biggest));
 
         for (let i = 1; i < simple.length; i++) {
-            const area = Math.abs(ClipperLib.Clipper.Area(simple[i]));
+            const area = Math.abs(window.ClipperLib.Clipper.Area(simple[i]));
             if (area > maxArea) {
                 biggest = simple[i];
                 maxArea = area;
             }
         }
 
-        const clean = ClipperLib.Clipper.CleanPolygon(biggest, this.config.curveTolerance * scale);
+        const clean = window.ClipperLib.Clipper.CleanPolygon(biggest, this.config.curveTolerance * scale);
         
         if (!clean || clean.length === 0) {
              return null;

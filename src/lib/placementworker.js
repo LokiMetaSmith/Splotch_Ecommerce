@@ -121,6 +121,35 @@ export class PlacementWorker {
     }
 
     getBounds(placements) {
-         return { x: 0, y: 0, width: 0, height: 0 };
+        if (!placements || placements.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+
+        // Flatten the placements if it's a 2D array (list of bins)
+        // In this implementation, placements is an array of placed parts [{x,y,id,rotation}, ...]
+        // But placePaths returns { placements: [placements] }
+        // The argument here seems to be the inner array of one bin?
+        // Let's assume it's an array of part placements.
+
+        placements.forEach(p => {
+            const part = this.parts[p.id];
+            const rotatedPart = GeometryUtil.rotatePolygon(part, p.rotation);
+            const bounds = GeometryUtil.getPolygonBounds(rotatedPart);
+
+            const partMinX = p.x + bounds.x;
+            const partMinY = p.y + bounds.y;
+            const partMaxX = p.x + bounds.x + bounds.width;
+            const partMaxY = p.y + bounds.y + bounds.height;
+
+            if (partMinX < minX) minX = partMinX;
+            if (partMinY < minY) minY = partMinY;
+            if (partMaxX > maxX) maxX = partMaxX;
+            if (partMaxY > maxY) maxY = partMaxY;
+        });
+
+        if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
+
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     }
 }
