@@ -60,3 +60,31 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
 
     ctx.restore();
 }
+
+/**
+ * Draws an image onto the canvas with hardware-accelerated filters.
+ * Replaces expensive pixel-manipulation loops.
+ *
+ * @param {CanvasRenderingContext2D} ctx - The canvas 2D context.
+ * @param {HTMLImageElement|HTMLCanvasElement} image - The source image.
+ * @param {number} width - The width to draw.
+ * @param {number} height - The height to draw.
+ * @param {object} options - Filter options { grayscale: boolean, sepia: boolean }.
+ */
+export function drawImageWithFilters(ctx, image, width, height, { grayscale, sepia } = {}) {
+    if (!ctx || !image) return;
+
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.save();
+    if (grayscale) {
+        ctx.filter = 'grayscale(100%)';
+    } else if (sepia) {
+        ctx.filter = 'sepia(100%)';
+    } else {
+        ctx.filter = 'none';
+    }
+
+    ctx.drawImage(image, 0, 0, width, height);
+    ctx.restore();
+}
