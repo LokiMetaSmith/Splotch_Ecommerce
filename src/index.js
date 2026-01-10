@@ -1133,35 +1133,24 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
 function redrawOriginalImageWithFilters() {
     if (!originalImage || !ctx || !canvas) return;
 
-    // Start with the fresh, original image
+    // Bolt Optimization: Use hardware-accelerated Canvas filters instead of pixel manipulation
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    if (isGrayscale) {
+        ctx.filter = 'grayscale(100%)';
+    } else if (isSepia) {
+        ctx.filter = 'sepia(100%)';
+    } else {
+        ctx.filter = 'none';
+    }
+
     ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+    ctx.restore(); // Restores context state (including filter='none')
 
     // Explicitly restore stroke style before drawing decorations
-    // as drawImage might reset some context state or previous operations might have polluted it.
     ctx.strokeStyle = 'rgba(128, 128, 128, 0.9)';
     ctx.lineWidth = 2;
-
-    // Apply filters based on state
-    if (isGrayscale) {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            data[i] = avg; data[i + 1] = avg; data[i + 2] = avg;
-        }
-        ctx.putImageData(imageData, 0, 0);
-    } else if (isSepia) {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i], g = data[i + 1], b = data[i + 2];
-            data[i] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
-            data[i + 1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
-            data[i + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
-        }
-        ctx.putImageData(imageData, 0, 0);
-    }
 
     // Also redraw the bounding box and size indicator, which are cleared by the operation.
     if (currentBounds) {
