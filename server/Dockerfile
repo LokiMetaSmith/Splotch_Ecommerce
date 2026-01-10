@@ -9,10 +9,19 @@ COPY package.json ./
 COPY package-lock.json ./
 
 # Install only production dependencies
-RUN npm install --production
+# NPM installs need to be done as root or a user with write access.
+# Running as root is default here.
+RUN npm ci --only=production
 
 # Copy the rest of the application source code
 COPY . .
+
+# Change ownership of the working directory to the non-root 'node' user
+# The 'node' user is included by default in the official node image
+RUN chown -R node:node /usr/src/app
+
+# Switch to the non-root user
+USER node
 
 # Make port 3000 available to the world outside this container
 EXPOSE 3000
