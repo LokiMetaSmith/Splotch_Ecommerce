@@ -20,3 +20,7 @@
 **Action:** For icon-only buttons in such environments:
 1. Use `justify-self-center` or similar to prevent grid stretching.
 2. If theme specificity is high (global `!important` on padding), use inline styles (e.g., `style="width: 3rem !important; padding: 0 !important"`) to forcefully reset box model properties for the specific component, ensuring correct dimensions (e.g., 48px/3rem) and alignment.
+
+## 2025-02-20 - Inline SVGs
+**Learning:** Using inline SVGs (embedded directly in HTML) is preferred over external assets for simple UI icons. It avoids network requests, ensures instant rendering, and allows `currentColor` inheritance for styling.
+**Action:** Always ensure SVGs are `fill="none"` or `fill="currentColor"` (depending on style) and use `xmlns` namespace correctly. Confirm to users that `xmlns` URLs are not network requests.
