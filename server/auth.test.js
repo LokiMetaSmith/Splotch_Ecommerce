@@ -21,7 +21,14 @@ describe('Auth Endpoints', () => {
   const testDbPath = path.join(__dirname, 'test-db.json');
 
   beforeAll(async () => {
-    db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
+    // Mock DB using memory instead of file I/O to avoid potential lock issues in test
+    const data = { orders: [], users: {}, credentials: {}, config: {} };
+    db = {
+      data: data,
+      write: async () => { console.log('[MOCK DB] write called'); },
+      read: async () => { console.log('[MOCK DB] read called'); }
+    };
+
     mockSendEmail = jest.fn();
     const server = await startServer(db, null, mockSendEmail, testDbPath);
     app = server.app;
@@ -31,8 +38,8 @@ describe('Auth Endpoints', () => {
   });
 
   beforeEach(async () => {
-    db.data = { orders: [], users: {}, credentials: {}, config: {} };
-    await db.write();
+    db.data = { orders: [], users: {}, credentials: {}, config: {}, emailIndex: {} };
+    // db.write is no-op, so synchronous assignment is enough
     mockSendEmail.mockClear();
   });
 

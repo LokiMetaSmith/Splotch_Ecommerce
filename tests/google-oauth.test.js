@@ -52,7 +52,14 @@ describe('Google OAuth Endpoints', () => {
     const testDbPath = path.join(__dirname, 'google-oauth-test-db.json');
 
     beforeAll(async () => {
-        db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
+        // Mock DB using memory instead of file I/O
+        const data = { orders: [], users: {}, credentials: {}, config: {}, emailIndex: {} };
+        db = {
+          data: data,
+          write: async () => { /* no-op */ },
+          read: async () => { /* no-op */ }
+        };
+
         mockSendEmail = jest.fn();
         const server = await startServer(db, null, mockSendEmail, testDbPath);
         app = server.app;
@@ -62,8 +69,8 @@ describe('Google OAuth Endpoints', () => {
     });
 
     beforeEach(async () => {
-        db.data = { orders: [], users: {}, credentials: {}, config: {} };
-        await db.write();
+        db.data = { orders: [], users: {}, credentials: {}, config: {}, emailIndex: {} };
+        // db.write is no-op
         mockSendEmail.mockClear();
         jest.clearAllMocks();
 
@@ -119,6 +126,7 @@ describe('Google OAuth Endpoints', () => {
             credentials: []
         };
         db.data.users[existingUser.id] = existingUser;
+        db.data.emailIndex['googleuser@example.com'] = existingUser.id;
         await db.write();
 
         const res = await request(app).get('/oauth2callback?code=test-code');

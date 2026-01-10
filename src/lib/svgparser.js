@@ -166,8 +166,9 @@ export class SVGParser {
 
     parsePath(d) {
         // More robust splitting to handle commands without spaces (e.g., "M0 0H100")
-        const tokens = d.replace(/([a-zA-Z])/g, ' $1 ').trim().split(/[\s,]+/).filter(t => t.length > 0);
-        const COMMAND = /([a-zA-Z])/;
+        // Fix: Use regex that excludes 'e' (scientific notation) from commands
+        const tokens = d.replace(/([MmLlHhVvCcSsQqTtAaZz])/g, ' $1 ').trim().split(/[\s,]+/).filter(t => t.length > 0);
+        const COMMAND = /([MmLlHhVvCcSsQqTtAaZz])/;
 
         const polygons = [];
         let currentPolygon = [];

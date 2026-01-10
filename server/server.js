@@ -19,7 +19,7 @@ import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import { google } from 'googleapis';
-import { sendEmail } from './email.js';
+import { sendEmail as defaultSendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
@@ -107,7 +107,7 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_SECRET,
     `${process.env.BASE_URL}/oauth2callback`
   );
-async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db.json'), injectedSquareClient = null) {
+async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.join(__dirname, 'db.json'), injectedSquareClient = null) {
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
   }

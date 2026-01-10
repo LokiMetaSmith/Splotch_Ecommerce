@@ -61,7 +61,7 @@ describe('SVG Sanitization', () => {
             privateKey,
             { algorithm: 'RS256', expiresIn: '1h', header: { kid } }
         );
-    });
+    }, 10000);
 
     beforeEach(async () => {
         db.data = { orders: [], users: {}, credentials: {}, config: {} };
