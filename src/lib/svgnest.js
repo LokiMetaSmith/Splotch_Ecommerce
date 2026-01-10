@@ -134,7 +134,7 @@ class GeneticAlgorithm {
 
 export class SvgNest {
     constructor(binElement, svgElements, options) {
-        this.svgParser = new SvgParser();
+        this.svgParser = new SVGParser();
         this.configure(options);
         
         if (binElement) {
@@ -199,14 +199,13 @@ export class SvgNest {
     }
 
     start() {
-        if (!this.binPolygon || !this.tree) {
-            console.error("Bin or parts not set.");
-            return;
+        if (!this.binPolygon || !this.tree || this.tree.length === 0) {
+            console.error("Bin or parts not set or empty.");
+            return '';
         }
 
         // The original logic uses web workers via Parallel.js
         // This is a simplified synchronous version for demonstration
-        console.log("Starting nesting process...");
         const adam = this.tree.slice(0);
         adam.sort((a, b) => Math.abs(GeometryUtil.polygonArea(b)) - Math.abs(GeometryUtil.polygonArea(a)));
 
@@ -306,16 +305,37 @@ export class SvgNest {
         const polygons = [];
         let idCounter = 0;
         
-        elements.forEach(element => {
-            const poly = this.svgParser.polygonify(element);
-            const cleanedPoly = this._cleanPolygon(poly);
-            if (cleanedPoly && cleanedPoly.length > 2 && Math.abs(GeometryUtil.polygonArea(cleanedPoly)) > this.config.curveTolerance * this.config.curveTolerance) {
-                cleanedPoly.id = idCounter++;
-                cleanedPoly.element = element; // Keep reference to original DOM element
-                polygons.push(cleanedPoly);
+        const processElement = (el) => {
+            // Recurse into containers
+            if (['svg', 'g', 'defs', 'symbol'].includes(el.tagName)) {
+                Array.from(el.children).forEach(child => processElement(child));
+                return;
             }
+
+            // Attempt to polygonify shape elements
+            const poly = this.svgParser.polygonify(el);
+
+            if (poly && poly.length > 0) {
+                const cleanedPoly = this._cleanPolygon(poly);
+
+                if (cleanedPoly && cleanedPoly.length > 2 && Math.abs(GeometryUtil.polygonArea(cleanedPoly)) > this.config.curveTolerance * this.config.curveTolerance) {
+                    cleanedPoly.id = idCounter++;
+                    cleanedPoly.element = el; // Keep reference to original DOM element
+                    polygons.push(cleanedPoly);
+                } else {
+                     console.warn(`Part skipped: Area too small or invalid.`);
+                }
+            }
+        };
+
+        elements.forEach(element => {
+            processElement(element);
         });
-        // Basic tree generation (without hole detection for simplicity)
+
+        if (polygons.length === 0) {
+            console.warn("No valid parts found in provided elements.");
+        }
+
         return polygons;
     }
 
@@ -328,24 +348,28 @@ export class SvgNest {
         
         const scale = this.config.clipperScale;
         const scaledPoly = polygon.map(p => ({ X: p.x * scale, Y: p.y * scale }));
-        const simple = ClipperLib.Clipper.SimplifyPolygon(scaledPoly, ClipperLib.PolyFillType.pftNonZero);
+        const simple = window.ClipperLib.Clipper.SimplifyPolygon(scaledPoly, window.ClipperLib.PolyFillType.pftNonZero);
 
-        if (!simple || simple.length === 0) return null;
+        if (!simple || simple.length === 0) {
+             return null;
+        }
         
         let biggest = simple[0];
-        let maxArea = Math.abs(ClipperLib.Clipper.Area(biggest));
+        let maxArea = Math.abs(window.ClipperLib.Clipper.Area(biggest));
 
         for (let i = 1; i < simple.length; i++) {
-            const area = Math.abs(ClipperLib.Clipper.Area(simple[i]));
+            const area = Math.abs(window.ClipperLib.Clipper.Area(simple[i]));
             if (area > maxArea) {
                 biggest = simple[i];
                 maxArea = area;
             }
         }
 
-        const clean = ClipperLib.Clipper.CleanPolygon(biggest, this.config.curveTolerance * scale);
+        const clean = window.ClipperLib.Clipper.CleanPolygon(biggest, this.config.curveTolerance * scale);
         
-        if (!clean || clean.length === 0) return null;
+        if (!clean || clean.length === 0) {
+             return null;
+        }
         
         return clean.map(p => ({ x: p.X / scale, y: p.Y / scale }));
     }

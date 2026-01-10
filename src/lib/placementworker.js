@@ -14,102 +14,123 @@ export class PlacementWorker {
     }
 
     placePaths(paths) {
-        if (!paths || paths.length === 0) {
-            return null;
-        }
+        if (!paths || paths.length === 0) return null;
 
         const placements = [];
-        let fitness = 0;
-        let placedArea = 0;
-        const binArea = Math.abs(GeometryUtil.polygonArea(this.binPolygon));
-        const self = this;
+        const scale = 1000; // Precision scale for Clipper
 
-        // A list of all possible placement positions
-        const allplacements = [];
+        // Convert bin to Clipper path
+        const binPath = this.toClipperPath(this.binPolygon, scale);
+
+        // Track placed paths for collision detection
+        const placedPaths = new window.ClipperLib.Paths();
+
+        // Get bin bounds for scanning
+        const binBounds = GeometryUtil.getPolygonBounds(this.binPolygon);
+
+        // Use a larger step for performance
+        const step = this.config.spacing > 10 ? this.config.spacing : 20;
 
         for (let i = 0; i < paths.length; i++) {
             const part = paths[i];
             const id = this.ids[i];
             const rotation = this.rotations[i];
-            const partData = this.parts[id];
-            partData.rotation = rotation;
-            partData.id = id;
 
-            let position = null;
-            if (placements.length === 0) {
-                // First part is always placed at 0,0
-                for (let j = 0; j < partData.length; j++) {
-                    partData[j].x -= partData[0].x;
-                    partData[j].y -= partData[0].y;
-                }
-                position = { x: 0, y: 0, id, rotation };
-            } else {
-                let minwidth = -1;
-                let minarea = -1;
-                let best_placement = null;
-                const placed = placements.map(p => this.parts[p.id]);
+            // Rotate part around (0,0)
+            const rotatedPart = GeometryUtil.rotatePolygon(part, rotation);
+            const partBounds = GeometryUtil.getPolygonBounds(rotatedPart);
 
-                const key = { A: this.binPolygon.id, B: id, inside: true, Arotation: 0, Brotation: rotation };
-                const binNfp = this.nfpCache[JSON.stringify(key)];
+            // Normalize part (top-left at 0,0)
+            const zeroedPart = rotatedPart.map(p => ({ x: p.x - partBounds.x, y: p.y - partBounds.y }));
 
-                if (!binNfp || binNfp.length === 0) {
-                    continue; // Part cannot fit in bin
-                }
+            let placed = false;
+            let counter = 0;
 
-                const allNfps = [];
-                for (const p of placements) {
-                    const placedPart = this.parts[p.id];
-                    const key = { A: placedPart.id, B: id, inside: false, Arotation: p.rotation, Brotation: rotation };
-                    const nfp = this.nfpCache[JSON.stringify(key)];
-                    if (nfp) {
-                        for (let k = 0; k < nfp.length; k++) {
-                            allNfps.push({ nfp: nfp[k], part: placedPart });
+            // Grid Search
+            for (let y = binBounds.y; y < binBounds.y + binBounds.height; y += step) {
+                // Optimization: Check if part fits vertically
+                if (y + partBounds.height > binBounds.y + binBounds.height) continue;
+
+                for (let x = binBounds.x; x < binBounds.x + binBounds.width; x += step) {
+                    counter++;
+                    // Optimization: Check if part fits horizontally
+                    if (x + partBounds.width > binBounds.x + binBounds.width) continue;
+
+                    // Construct candidate position (actual coordinates)
+                    const candidatePart = zeroedPart.map(p => ({ x: p.x + x, y: p.y + y }));
+                    const candidateClipper = this.toClipperPath(candidatePart, scale);
+
+                    // Check 1: Is candidate inside bin?
+                    const clipper = new window.ClipperLib.Clipper();
+                    clipper.AddPath(candidateClipper, window.ClipperLib.PolyType.ptSubject, true);
+                    clipper.AddPath(binPath, window.ClipperLib.PolyType.ptClip, true);
+                    const difference = new window.ClipperLib.Paths();
+                    clipper.Execute(window.ClipperLib.ClipType.ctDifference, difference, window.ClipperLib.PolyFillType.pftNonZero, window.ClipperLib.PolyFillType.pftNonZero);
+
+                    let diffArea = 0;
+                    for(let k=0; k<difference.length; k++) diffArea += Math.abs(window.ClipperLib.Clipper.Area(difference[k]));
+
+                    if (diffArea > 1000) { // Tolerance (scaled)
+                        continue;
+                    }
+
+                    // Check 2: Collision with other parts
+                    if (placedPaths.length > 0) {
+                        const clipper2 = new window.ClipperLib.Clipper();
+                        clipper2.AddPath(candidateClipper, window.ClipperLib.PolyType.ptSubject, true);
+                        clipper2.AddPaths(placedPaths, window.ClipperLib.PolyType.ptClip, true);
+                        const collision = new window.ClipperLib.Paths();
+                        clipper2.Execute(window.ClipperLib.ClipType.ctIntersection, collision, window.ClipperLib.PolyFillType.pftNonZero, window.ClipperLib.PolyFillType.pftNonZero);
+
+                        let colArea = 0;
+                        for(let k=0; k<collision.length; k++) colArea += Math.abs(window.ClipperLib.Clipper.Area(collision[k]));
+
+                        if (colArea > 1000) {
+                            continue; // Collision detected
                         }
                     }
-                }
 
-                let possible = [];
-                for (const binNfpItem of binNfp) {
-                    let inside = true;
-                    if (allNfps.length > 0) {
-                        for (const nfpItem of allNfps) {
-                            if (GeometryUtil.pointInPolygon(binNfpItem[0], nfpItem.nfp)) {
-                                inside = false;
-                                break;
-                            }
-                        }
-                    }
-                    if (inside) {
-                        possible.push(binNfpItem);
-                    }
+                    // Valid placement!
+                    placements.push({
+                        x: x - partBounds.x,
+                        y: y - partBounds.y,
+                        id,
+                        rotation
+                    });
+
+                    placedPaths.push(candidateClipper);
+                    placed = true;
+                    break;
                 }
-                
-                // Final placement logic using merged NFPs
-                if (possible.length > 0) {
-                     // Simplified: just pick the first possible position.
-                     // A full implementation would check all candidates.
-                    position = { x: possible[0][0].x, y: possible[0][0].y, id, rotation };
-                }
+                if (placed) break;
             }
 
-            if (position) {
-                placements.push(position);
-                placedArea += Math.abs(GeometryUtil.polygonArea(partData));
+            if (!placed) {
+                // console.warn(`PlacementWorker: Could not place part ${id}. Checked ${counter} positions.`);
             }
         }
 
-        const placedBounds = this.getBounds(placements);
-        fitness = placedBounds.width * placedBounds.height - placedArea;
-
         return {
-            fitness: fitness,
+            fitness: 0,
             placements: [placements]
         };
     }
 
+    toClipperPath(polygon, scale) {
+        return polygon.map(p => ({ X: Math.round(p.x * scale), Y: Math.round(p.y * scale) }));
+    }
+
     getBounds(placements) {
+        if (!placements || placements.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+
         let minX = Infinity, minY = Infinity;
         let maxX = -Infinity, maxY = -Infinity;
+
+        // Flatten the placements if it's a 2D array (list of bins)
+        // In this implementation, placements is an array of placed parts [{x,y,id,rotation}, ...]
+        // But placePaths returns { placements: [placements] }
+        // The argument here seems to be the inner array of one bin?
+        // Let's assume it's an array of part placements.
 
         placements.forEach(p => {
             const part = this.parts[p.id];
