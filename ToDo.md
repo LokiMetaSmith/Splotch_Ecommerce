@@ -94,7 +94,7 @@ This document tracks the features and bug fixes that need to be implemented for 
     - [x] Add a control to switch between inches and millimeters for display.
 
 ## Print Shop Page
-- [ ] **PDF Export:** Add a button to export the nested print sheet as a PDF.
+- [x] **PDF Export:** Add a button to export the nested print sheet as a PDF.
 
 ## Authentication
 
