@@ -720,6 +720,23 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
       // Security Fix: Validate orderDetails structure
       body('orderDetails').isObject().withMessage('orderDetails must be an object'),
       body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),
+
+      // Security & Integrity: Validate Billing Contact
+      body('billingContact').isObject().withMessage('billingContact must be an object'),
+      body('billingContact.givenName').notEmpty().withMessage('Billing First Name is required').not().contains('<').withMessage('Invalid characters in Billing First Name'),
+      body('billingContact.familyName').optional().not().contains('<').withMessage('Invalid characters in Billing Last Name'),
+      body('billingContact.email').isEmail().withMessage('Valid Billing Email is required'),
+
+      // Security & Integrity: Validate Shipping Contact
+      body('shippingContact').isObject().withMessage('shippingContact must be an object'),
+      body('shippingContact.givenName').notEmpty().withMessage('Shipping First Name is required').not().contains('<').withMessage('Invalid characters in Shipping First Name'),
+      body('shippingContact.familyName').optional().not().contains('<').withMessage('Invalid characters in Shipping Last Name'),
+      body('shippingContact.email').optional().isEmail().withMessage('Invalid Shipping Email'),
+      body('shippingContact.addressLines').isArray().withMessage('Shipping Address Lines must be an array'),
+      body('shippingContact.locality').notEmpty().withMessage('City is required').not().contains('<'),
+      body('shippingContact.administrativeDistrictLevel1').notEmpty().withMessage('State/Province is required').not().contains('<'),
+      body('shippingContact.postalCode').notEmpty().withMessage('Postal Code is required').not().contains('<'),
+      body('shippingContact.country').notEmpty().withMessage('Country is required').not().contains('<'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
