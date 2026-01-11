@@ -1,4 +1,4 @@
-import { body } from 'express-validator';
+import { body, param } from 'express-validator';
 
 // Basic username sanitization to prevent prototype pollution
 const sanitizeUsername = (username) => {
@@ -12,6 +12,13 @@ const sanitizeUsername = (username) => {
   return username;
 };
 
+// Check if an ID is valid (not a prototype key)
+export const isValidId = (id) => {
+    if (typeof id !== 'string') return false;
+    const forbiddenKeys = ['__proto__', 'constructor', 'prototype'];
+    return !forbiddenKeys.includes(id.toLowerCase());
+};
+
 // Reusable username validation middleware
 export const validateUsername = [
   body('username')
@@ -23,4 +30,15 @@ export const validateUsername = [
       }
       return true;
     }),
+];
+
+// Reusable ID validation middleware for route parameters
+export const validateId = (paramName) => [
+    param(paramName)
+        .custom((value) => {
+            if (!isValidId(value)) {
+                throw new Error('Invalid ID');
+            }
+            return true;
+        })
 ];

@@ -23,7 +23,7 @@ import { sendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
-import { validateUsername } from './validators.js';
+import { validateUsername, validateId } from './validators.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 import { Markup } from 'telegraf';
@@ -680,7 +680,11 @@ async function startServer(db, bot, sendEmail, dbPath = path.join(__dirname, 'db
         }
     });
 
-    app.get('/api/products/:productId', (req, res) => {
+    app.get('/api/products/:productId', validateId('productId'), (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
         const { productId } = req.params;
         const product = db.data.products[productId];
         if (!product) {
@@ -921,7 +925,11 @@ ${statusChecklist}
       res.status(200).json(userOrders.slice().reverse());
     });
 
-    app.get('/api/orders/:orderId', authenticateToken, (req, res) => {
+    app.get('/api/orders/:orderId', authenticateToken, validateId('orderId'), (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+      }
       const { orderId } = req.params;
       const order = db.data.orders[orderId];
 
@@ -939,6 +947,7 @@ ${statusChecklist}
     });
 
     app.post('/api/orders/:orderId/status', authenticateToken, [
+      ...validateId('orderId'),
       body('status').notEmpty().withMessage('status is required'),
     ], async (req, res) => {
       const errors = validationResult(req);
@@ -1062,6 +1071,7 @@ ${statusChecklist}
     });
 
     app.post('/api/orders/:orderId/tracking', authenticateToken, [
+        ...validateId('orderId'),
         body('trackingNumber').notEmpty().withMessage('trackingNumber is required'),
         body('courier').notEmpty().withMessage('courier is required'),
     ], async (req, res) => {
