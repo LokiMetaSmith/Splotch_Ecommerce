@@ -33,6 +33,11 @@ export const getCurrentSigningKey = () => {
     return activeKeys[activeKeys.length - 1];
 };
 
+// Get a key by its ID
+export const getKey = (kid) => {
+    return activeKeys.find(key => key.kid === kid);
+};
+
 // Rotate keys: Add a new one and remove expired ones
 export const rotateKeys = () => {
     console.log('[KEY_MANAGER] Rotating keys...');
