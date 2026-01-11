@@ -20,7 +20,7 @@ import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import { google } from 'googleapis';
 import { sendEmail as defaultSendEmail } from './email.js';
-import { getCurrentSigningKey, getJwks, rotateKeys } from './keyManager.js';
+import { getCurrentSigningKey, getJwks, rotateKeys, getKey } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
 import { validateUsername, validateId } from './validators.js';
@@ -519,8 +519,18 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
       const token = authHeader && authHeader.split(' ')[1];
       if (token == null) return res.sendStatus(401);
 
-      const { publicKey } = getCurrentSigningKey();
-      jwt.verify(token, publicKey, { algorithms: ['RS256'] }, (err, user) => {
+      // Decode the token header to find the Key ID (kid)
+      const decoded = jwt.decode(token, { complete: true });
+      if (!decoded || !decoded.header || !decoded.header.kid) {
+          return res.sendStatus(401);
+      }
+
+      const key = getKey(decoded.header.kid);
+      if (!key) {
+          return res.sendStatus(401); // Key not found or expired
+      }
+
+      jwt.verify(token, key.publicKey, { algorithms: ['RS256'] }, (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
         next();

@@ -47,6 +47,7 @@ describe('Security: Prototype Pollution Prevention', () => {
     beforeEach(async () => {
         db.data.orders = {};
         db.data.users = {};
+        db.data.emailIndex = {}; // IMPORTANT: Reset email index too!
         await db.write();
         jest.clearAllMocks();
     });
@@ -109,9 +110,14 @@ describe('Security: Prototype Pollution Prevention', () => {
         db.data.emailIndex['admin@example.com'] = 'admin';
         await db.write();
 
-        const res = await request(app)
+        const agent = request.agent(app);
+        const csrfRes = await agent.get('/api/csrf-token');
+        const csrfToken = csrfRes.body.csrfToken;
+
+        const res = await agent
             .post('/api/orders/__proto__/status')
             .set('Authorization', `Bearer ${token}`)
+            .set('X-CSRF-Token', csrfToken)
             .send({ status: 'SHIPPED' });
 
         expect(res.statusCode).toBe(400);
@@ -133,9 +139,14 @@ describe('Security: Prototype Pollution Prevention', () => {
         db.data.emailIndex['admin@example.com'] = 'admin';
         await db.write();
 
-        const res = await request(app)
+        const agent = request.agent(app);
+        const csrfRes = await agent.get('/api/csrf-token');
+        const csrfToken = csrfRes.body.csrfToken;
+
+        const res = await agent
             .post('/api/orders/__proto__/tracking')
             .set('Authorization', `Bearer ${token}`)
+            .set('X-CSRF-Token', csrfToken)
             .send({ trackingNumber: '123', courier: 'UPS' });
 
         expect(res.statusCode).toBe(400);
