@@ -177,8 +177,21 @@ describe('Order API Endpoints', () => {
                 sourceId: 'cnon:card-nonce-declined',
                 amountCents: 1000,
                 designImagePath: '/uploads/design.png',
-                 shippingContact: {},
-                 billingContact: {},
+                 shippingContact: {
+                     givenName: 'John',
+                     familyName: 'Doe',
+                     email: 'john@example.com',
+                     addressLines: ['123 Main St'],
+                     locality: 'Anytown',
+                     administrativeDistrictLevel1: 'NY',
+                     postalCode: '10001',
+                     country: 'US'
+                 },
+                 billingContact: {
+                     givenName: 'John',
+                     familyName: 'Doe',
+                     email: 'john@example.com'
+                 },
                  orderDetails: { quantity: 1 }
              };
 
