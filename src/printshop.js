@@ -186,7 +186,8 @@ function logout() {
     ui.loginBtn.addEventListener('click', showLoginModal);
 
     // Clear existing order cards without destroying the message element
-    ui.ordersList.innerHTML = '';
+    const orderCards = ui.ordersList.querySelectorAll('.order-card');
+    orderCards.forEach(card => card.remove());
 
     ui.noOrdersMessage.textContent = 'Please log in to view orders.';
     ui.noOrdersMessage.style.display = 'block';
@@ -410,21 +411,30 @@ async function fetchAndDisplayOrders(query = '') {
  * @param {string} status - The status to filter by (e.g., 'NEW', 'ALL').
  */
 function filterAndDisplayOrders(status) {
-    ui.ordersList.innerHTML = ''; // Clear the current list
+    // ui.ordersList.innerHTML = ''; // Do NOT clear here, as it removes the message element
 
     const ordersToDisplay = (status === 'ALL')
         ? allOrders
         : allOrders.filter(order => order.status === status);
 
     if (ordersToDisplay.length === 0) {
+        // Clear orders but keep message
+        ui.ordersList.innerHTML = '';
+        ui.ordersList.appendChild(ui.noOrdersMessage);
+
         ui.noOrdersMessage.textContent = `No orders found with status: ${status}.`;
         ui.noOrdersMessage.style.display = 'block';
     } else {
         ui.noOrdersMessage.style.display = 'none';
 
         // Bolt Optimization: Use map + join + innerHTML for batch DOM update
-        const html = ordersToDisplay.map(order => displayOrder(order)).join('');
+        // Note: original code used fragment.prepend(), effectively reversing the list.
+        // We replicate this by reversing the array before mapping.
+        const html = ordersToDisplay.slice().reverse().map(order => displayOrder(order)).join('');
+
+        // Update innerHTML and restore the message element (hidden)
         ui.ordersList.innerHTML = html;
+        ui.ordersList.appendChild(ui.noOrdersMessage);
     }
 }
 
@@ -435,6 +445,11 @@ function filterAndDisplayOrders(status) {
  * @returns {string} The created order card HTML string.
  */
 export function displayOrder(order) {
+    // Bolt Optimization: Return cached HTML if available and status hasn't changed
+    if (order._cachedHtml && order._cachedStatus === order.status) {
+        return order._cachedHtml;
+    }
+
     const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
     const receivedDate = new Date(order.receivedAt).toLocaleString();
 
@@ -447,7 +462,10 @@ export function displayOrder(order) {
     const quantity = escapeHtml(order.orderDetails?.quantity || 'N/A');
     const status = escapeHtml(order.status);
     const orderId = escapeHtml(order.orderId);
-    const orderIdShort = orderId.substring(0, 8);
+    // Truncate BEFORE escaping would be safer for logic, but since orderId is UUID (safe chars),
+    // and escapeHtml changes '&' to '&amp;', we should truncate the raw ID if we want exactly 8 chars.
+    // However, orderId is usually safe. Let's do it right:
+    const orderIdShort = escapeHtml(order.orderId.substring(0, 8));
 
     // Status badges styling class
     const statusClass = `status-${status.toLowerCase()}`;
@@ -469,7 +487,7 @@ export function displayOrder(order) {
         `<option value="${c}">${c.toUpperCase()}</option>`
     ).join('');
 
-    return `
+    const html = `
     <div class="order-card" id="order-card-${orderId}">
         <div class="flex justify-between items-start">
             <div>
@@ -514,6 +532,12 @@ export function displayOrder(order) {
         </div>
     </div>
     `;
+
+    // Cache the result
+    order._cachedHtml = html;
+    order._cachedStatus = order.status;
+
+    return html;
 }
 
 /**
