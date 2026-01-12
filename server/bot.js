@@ -1,6 +1,5 @@
-import { Telegraf, Markup } from 'telegraf';
+import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
-import dotenv from 'dotenv';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -151,12 +150,13 @@ ${statusChecklist}
       console.log('[BOT] Telegraf bot launched.');
     } else {
       // In a test environment, we don't launch the bot, but we need to mock the telegram object.
+      // Use no-op functions instead of assuming jest.fn() is available, since this code runs in the server process
       bot.telegram = {
-        sendMessage: jest.fn(),
-        sendPhoto: jest.fn(),
-        sendDocument: jest.fn(),
-        editMessageText: jest.fn(),
-        deleteMessage: jest.fn(),
+        sendMessage: () => Promise.resolve(),
+        sendPhoto: () => Promise.resolve(),
+        sendDocument: () => Promise.resolve(),
+        editMessageText: () => Promise.resolve(),
+        deleteMessage: () => Promise.resolve(),
       };
     }
 

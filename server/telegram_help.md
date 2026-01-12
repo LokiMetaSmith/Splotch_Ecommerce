@@ -1,7 +1,3 @@
-Of course\! Here is a well-formatted `README.md` file that explains the purpose and usage of the `findId.js` script. You can save this directly into your project.
-
------
-
 # Telegram Chat ID Finder
 
 A simple Node.js script to help you find the correct `chatId` for any Telegram user, group, or channel by logging the details of incoming messages sent to your bot.
@@ -11,7 +7,7 @@ A simple Node.js script to help you find the correct `chatId` for any Telegram u
 1.  **Install Dependencies:** Make sure you have the required Node.js packages installed.
 
     ```bash
-    npm install node-telegram-bot-api dotenv
+    pnpm install telegraf dotenv
     ```
 
 2.  **Environment Variables:** Ensure you have a `.env` file in the same directory with your bot token.
@@ -27,7 +23,7 @@ A simple Node.js script to help you find the correct `chatId` for any Telegram u
 
     ```javascript
     // findId.js
-    import TelegramBot from 'node-telegram-bot-api';
+    import { Telegraf } from 'telegraf';
     import dotenv from 'dotenv';
 
     // Load environment variables from your .env file
@@ -40,15 +36,21 @@ A simple Node.js script to help you find the correct `chatId` for any Telegram u
         process.exit(1);
     }
 
-    const bot = new TelegramBot(token, { polling: true });
+    const bot = new Telegraf(token);
 
     console.log('ID Finder Bot is running. Send or forward a message to it...');
 
-    bot.on('message', (msg) => {
+    bot.on('message', (ctx) => {
       console.log('--- NEW MESSAGE RECEIVED ---');
-      // This will print the entire message object in a readable format
-      console.log(JSON.stringify(msg, null, 2));
+      // In Telegraf, the message object is at ctx.message
+      console.log(JSON.stringify(ctx.message, null, 2));
     });
+
+    // Enable graceful stop
+    process.once('SIGINT', () => bot.stop('SIGINT'));
+    process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+    bot.launch();
     ```
 
 2.  **Run the Script:** Execute the script from your terminal.
