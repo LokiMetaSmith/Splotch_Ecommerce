@@ -45,8 +45,9 @@ describe('XSS Patch Verification', () => {
 
         // Run the real function from src/printshop.js
         // Bolt update: displayOrder now returns the card, it does not append it automatically.
-        const card = displayOrder(order);
-        ui.ordersList.appendChild(card);
+        // And now it returns a STRING, not an element.
+        const cardHtml = displayOrder(order);
+        ui.ordersList.innerHTML = cardHtml;
 
         const orderCard = document.querySelector('#order-card-test-xss-order');
 

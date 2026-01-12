@@ -67,6 +67,21 @@ function bufferEncode(value) {
         .replace(/=/g, '');
 }
 
+/**
+ * Safely escapes HTML characters to prevent XSS.
+ * @param {string} unsafe - The unsafe string.
+ * @returns {string} The escaped string.
+ */
+function escapeHtml(unsafe) {
+    if (unsafe == null) return '';
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 // The final fetchWithAuth function with robust verification
 async function fetchWithAuth(url, options = {}) {
     if (!JWKS) {
@@ -396,128 +411,133 @@ async function fetchAndDisplayOrders(query = '') {
  * @param {string} status - The status to filter by (e.g., 'NEW', 'ALL').
  */
 function filterAndDisplayOrders(status) {
-    ui.ordersList.innerHTML = ''; // Clear the current list
+    // ui.ordersList.innerHTML = ''; // Do NOT clear here, as it removes the message element
 
     const ordersToDisplay = (status === 'ALL')
         ? allOrders
         : allOrders.filter(order => order.status === status);
 
     if (ordersToDisplay.length === 0) {
+        // Clear orders but keep message
+        ui.ordersList.innerHTML = '';
+        ui.ordersList.appendChild(ui.noOrdersMessage);
+
         ui.noOrdersMessage.textContent = `No orders found with status: ${status}.`;
         ui.noOrdersMessage.style.display = 'block';
     } else {
         ui.noOrdersMessage.style.display = 'none';
-        const fragment = document.createDocumentFragment();
-        // Bolt Optimization: Use DocumentFragment to batch DOM insertions
-        ordersToDisplay.forEach(order => {
-            const card = displayOrder(order);
-            fragment.prepend(card);
-        });
-        ui.ordersList.appendChild(fragment);
+
+        // Bolt Optimization: Use map + join + innerHTML for batch DOM update
+        // Note: original code used fragment.prepend(), effectively reversing the list.
+        // We replicate this by reversing the array before mapping.
+        const html = ordersToDisplay.slice().reverse().map(order => displayOrder(order)).join('');
+
+        // Update innerHTML and restore the message element (hidden)
+        ui.ordersList.innerHTML = html;
+        ui.ordersList.appendChild(ui.noOrdersMessage);
     }
 }
 
 /**
- * Renders a single order card into the DOM using safe DOM creation methods.
+ * Renders a single order card into an HTML string.
+ * Bolt Optimization: Returns string instead of DOM element for performance.
  * @param {object} order - The order object from the server.
- * @returns {HTMLElement} The created order card element.
+ * @returns {string} The created order card HTML string.
  */
 export function displayOrder(order) {
-    const card = document.createElement('div');
-    card.className = 'order-card';
-    card.id = `order-card-${order.orderId}`;
+    // Bolt Optimization: Return cached HTML if available and status hasn't changed
+    if (order._cachedHtml && order._cachedStatus === order.status) {
+        return order._cachedHtml;
+    }
 
     const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
     const receivedDate = new Date(order.receivedAt).toLocaleString();
 
-    // --- Helper to create elements ---
-    const createEl = (tag, classes = [], attributes = {}, text) => {
-        const el = document.createElement(tag);
-        el.classList.add(...classes);
-        for (const [key, value] of Object.entries(attributes)) {
-            el.setAttribute(key, value);
-        }
-        if (text) el.textContent = text;
-        return el;
-    };
+    const billingName = `${escapeHtml(order.billingContact?.givenName || '')} ${escapeHtml(order.billingContact?.familyName || '')}`;
+    const billingEmail = escapeHtml(order.billingContact?.email || 'N/A');
 
-    // --- Header ---
-    const header = createEl('div', ['flex', 'justify-between', 'items-start']);
-    const headerTextDiv = createEl('div');
-    const orderIdH3 = createEl('h3', ['text-xl', 'text-splotch-red'], {}, 'Order ID: ');
-    orderIdH3.appendChild(createEl('span', ['font-mono', 'text-sm'], {}, `${order.orderId.substring(0, 8)}...`));
-    const receivedP = createEl('p', ['text-sm', 'text-gray-600'], {}, `Received: ${receivedDate}`);
-    headerTextDiv.append(orderIdH3, receivedP);
-    const statusBadge = createEl('div', [`status-${order.status.toLowerCase()}`, 'font-bold', 'py-1', 'px-3', 'rounded-full', 'text-sm'], { id: `status-badge-${order.orderId}` }, order.status);
-    header.append(headerTextDiv, statusBadge);
+    const shippingName = `${escapeHtml(order.shippingContact?.givenName || '')} ${escapeHtml(order.shippingContact?.familyName || '')}`;
+    const shippingEmail = escapeHtml(order.shippingContact?.email || 'N/A');
 
-    // --- Details Grid ---
-    const detailsGrid = createEl('div', ['mt-4', 'grid', 'grid-cols-1', 'md:grid-cols-2', 'gap-4', 'order-details']);
+    const quantity = escapeHtml(order.orderDetails?.quantity || 'N/A');
+    const status = escapeHtml(order.status);
+    const orderId = escapeHtml(order.orderId);
+    // Truncate BEFORE escaping would be safer for logic, but since orderId is UUID (safe chars),
+    // and escapeHtml changes '&' to '&amp;', we should truncate the raw ID if we want exactly 8 chars.
+    // However, orderId is usually safe. Let's do it right:
+    const orderIdShort = escapeHtml(order.orderId.substring(0, 8));
 
-    const createDtDd = (dtText, ddText) => {
-        const dt = createEl('dt', [], {}, dtText);
-        const dd = createEl('dd', [], {}, ddText);
-        return [dt, dd];
-    };
+    // Status badges styling class
+    const statusClass = `status-${status.toLowerCase()}`;
 
-    const billingDiv = createEl('div');
-    billingDiv.append(...createDtDd('Billing Name:', `${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}`));
-    billingDiv.append(...createDtDd('Billing Email:', order.billingContact?.email || 'N/A'));
+    const designImagePath = `${serverUrl}${escapeHtml(order.designImagePath)}`;
+    const cutFilePath = escapeHtml(order.cutLinePath || '');
 
-    const shippingDiv = createEl('div');
-    shippingDiv.append(...createDtDd('Shipping Name:', `${order.shippingContact?.givenName || ''} ${order.shippingContact?.familyName || ''}`));
-    shippingDiv.append(...createDtDd('Shipping Email:', order.shippingContact?.email || 'N/A'));
-
-    const orderInfoDiv = createEl('div');
-    orderInfoDiv.append(...createDtDd('Quantity:', order.orderDetails?.quantity || 'N/A'));
-    orderInfoDiv.append(...createDtDd('Amount:', formattedAmount));
-
-    detailsGrid.append(billingDiv, shippingDiv, orderInfoDiv);
-
-    // --- Sticker Design ---
-    const imageDiv = createEl('div', ['mt-4']);
-    imageDiv.appendChild(createEl('dt', [], {}, 'Sticker Design:'));
-    const imageLink = createEl('a', ['sticker-peel-container'], { href: `${serverUrl}${order.designImagePath}`, target: '_blank' });
-    const image = createEl('img', ['sticker-design'], {
-        src: `${serverUrl}${order.designImagePath}`,
-        alt: 'Sticker Design',
-        'data-cut-file-path': order.cutLinePath || '',
-        loading: 'lazy',
-        decoding: 'async'
-    });
-    imageLink.appendChild(image);
-    imageDiv.appendChild(imageLink);
-
-    // --- Action Buttons ---
-    const buttonsDiv = createEl('div', ['mt-4', 'flex', 'flex-wrap', 'gap-2']);
+    // Action buttons
     const statuses = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELED'];
-    statuses.forEach(status => {
-        buttonsDiv.appendChild(createEl('button', ['action-btn'], {
-            'data-order-id': order.orderId,
-            'data-status': status
-        }, status.charAt(0) + status.slice(1).toLowerCase()));
-    });
+    const buttonsHtml = statuses.map(s => `
+        <button class="action-btn" data-order-id="${orderId}" data-status="${s}">
+            ${s.charAt(0) + s.slice(1).toLowerCase()}
+        </button>
+    `).join('');
 
-    // --- Tracking Info ---
-    const trackingDiv = createEl('div', ['mt-4'], { id: `tracking-info-${order.orderId}` });
-    trackingDiv.style.display = order.status === 'SHIPPED' ? 'block' : 'none';
-    trackingDiv.appendChild(createEl('input', ['border', 'rounded-md', 'p-2'], { type: 'text', id: `tracking-number-${order.orderId}`, placeholder: 'Enter Tracking Number' }));
-    const courierSelect = createEl('select', ['border', 'rounded-md', 'p-2'], { id: `courier-${order.orderId}` });
-    ['usps', 'ups', 'fedex'].forEach(courier => {
-        courierSelect.appendChild(createEl('option', [], { value: courier }, courier.toUpperCase()));
-    });
-    trackingDiv.appendChild(courierSelect);
-    trackingDiv.appendChild(createEl('button', ['add-tracking-btn'], { 'data-order-id': order.orderId }, 'Add Tracking'));
+    // Tracking section
+    const trackingDisplay = order.status === 'SHIPPED' ? 'block' : 'none';
+    const courierOptions = ['usps', 'ups', 'fedex'].map(c =>
+        `<option value="${c}">${c.toUpperCase()}</option>`
+    ).join('');
 
-    // --- Assemble and Render Card ---
-    card.append(header, detailsGrid, imageDiv, buttonsDiv, trackingDiv);
-    // Bolt Optimization: removed direct DOM manipulation to allow batching
-    // ui.ordersList.prepend(card);
+    const html = `
+    <div class="order-card" id="order-card-${orderId}">
+        <div class="flex justify-between items-start">
+            <div>
+                <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${orderIdShort}...</span></h3>
+                <p class="text-sm text-gray-600">Received: ${escapeHtml(receivedDate)}</p>
+            </div>
+            <div class="${statusClass} font-bold py-1 px-3 rounded-full text-sm" id="status-badge-${orderId}">${status}</div>
+        </div>
 
-    // --- Attach Event Listeners ---
-    // Bolt Optimization: Removed per-card event listeners in favor of delegation on ui.ordersList
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
+            <div>
+                <dt>Billing Name:</dt><dd>${billingName}</dd>
+                <dt>Billing Email:</dt><dd>${billingEmail}</dd>
+            </div>
+            <div>
+                <dt>Shipping Name:</dt><dd>${shippingName}</dd>
+                <dt>Shipping Email:</dt><dd>${shippingEmail}</dd>
+            </div>
+            <div>
+                <dt>Quantity:</dt><dd>${quantity}</dd>
+                <dt>Amount:</dt><dd>${escapeHtml(formattedAmount)}</dd>
+            </div>
+        </div>
 
-    return card;
+        <div class="mt-4">
+            <dt>Sticker Design:</dt>
+            <a class="sticker-peel-container" href="${designImagePath}" target="_blank">
+                <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" loading="lazy" decoding="async">
+            </a>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+            ${buttonsHtml}
+        </div>
+
+        <div class="mt-4" id="tracking-info-${orderId}" style="display: ${trackingDisplay};">
+            <input class="border rounded-md p-2" type="text" id="tracking-number-${orderId}" placeholder="Enter Tracking Number">
+            <select class="border rounded-md p-2" id="courier-${orderId}">
+                ${courierOptions}
+            </select>
+            <button class="add-tracking-btn" data-order-id="${orderId}">Add Tracking</button>
+        </div>
+    </div>
+    `;
+
+    // Cache the result
+    order._cachedHtml = html;
+    order._cachedStatus = order.status;
+
+    return html;
 }
 
 /**
