@@ -14,13 +14,13 @@ import { getCurrentSigningKey } from '../server/keyManager.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-describe('Stored XSS Vulnerability Check', () => {
+describe('Stored XSS Vulnerability Check (Order Details)', () => {
     let app;
     let db;
     let bot;
     let serverInstance;
     let timers;
-    const testDbPath = path.join(__dirname, '../server/test-db-xss.json');
+    const testDbPath = path.join(__dirname, '../server/test-db-xss-details.json');
     let mockSquareClient;
     let mockSendEmail;
 
@@ -31,7 +31,7 @@ describe('Stored XSS Vulnerability Check', () => {
         }
 
         // Setup mock DB
-        db = await JSONFilePreset(testDbPath, { orders: {}, users: {}, credentials: {}, config: {} });
+        db = await JSONFilePreset(testDbPath, { orders: {}, users: {}, credentials: {}, config: {}, products: {} });
 
         // Mock Bot
         bot = {
@@ -67,6 +67,7 @@ describe('Stored XSS Vulnerability Check', () => {
         process.env.TELEGRAM_CHANNEL_ID = 'mock_channel';
         process.env.ADMIN_EMAIL = 'admin@example.com';
         process.env.NODE_ENV = 'test';
+        process.env.SQUARE_ACCESS_TOKEN = 'mock_square_token';
 
         // Start Server
         const server = await startServer(db, bot, mockSendEmail, testDbPath, mockSquareClient);

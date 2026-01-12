@@ -42,6 +42,16 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const { window } = new JSDOM('');
 const purify = DOMPurify(window);
 
+function escapeHtml(unsafe) {
+    if (unsafe == null) return '';
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 async function sanitizeSVGFile(filePath) {
     try {
         const fileContent = await fs.promises.readFile(filePath, 'utf-8');
@@ -1141,13 +1151,15 @@ ${statusChecklist}
                 const customerName = order.billingContact.givenName || 'Valued Customer';
                 const shippingAddress = order.shippingContact;
                 const orderDate = new Date(order.receivedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                // FIX: Sanitize address lines to prevent XSS
+                const safeAddressLines = shippingAddress.addressLines.map(line => escapeHtml(line)).join('<br>');
                 const addressHtml = `
                     <address>
-                        ${shippingAddress.givenName} ${shippingAddress.familyName}<br>
-                        ${shippingAddress.addressLines.join('<br>')}<br>
-                        ${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}<br>
-                        ${shippingAddress.country}<br>
-                        ${shippingAddress.phoneNumber || ''}
+                        ${escapeHtml(shippingAddress.givenName)} ${escapeHtml(shippingAddress.familyName)}<br>
+                        ${safeAddressLines}<br>
+                        ${escapeHtml(shippingAddress.locality)}, ${escapeHtml(shippingAddress.administrativeDistrictLevel1)} ${escapeHtml(shippingAddress.postalCode)}<br>
+                        ${escapeHtml(shippingAddress.country)}<br>
+                        ${escapeHtml(shippingAddress.phoneNumber || '')}
                     </address>
                 `;
                 // NOTE: The product name is hardcoded as "Stickers" because the current
