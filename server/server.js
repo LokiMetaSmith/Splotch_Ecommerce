@@ -11,6 +11,7 @@ import dns from 'dns';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import cookieParser from 'cookie-parser';
 import lusca from 'lusca';
+import compression from 'compression';
 import session from 'express-session';
 import { JSONFilePreset } from 'lowdb/node';
 import jwt from 'jsonwebtoken';
@@ -380,6 +381,7 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
     };
     
    // app.use(limiter);
+    app.use(compression());
     app.use(cors(corsOptions));
 
     // If running behind a reverse proxy, trust the first hop.
