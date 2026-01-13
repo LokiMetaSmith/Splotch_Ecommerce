@@ -695,9 +695,12 @@ function updateUnitUI(isMetric) {
     sizeBtns.forEach(btn => {
         const inches = parseFloat(btn.dataset.size);
         if (isMetric) {
-            btn.textContent = `${(inches * inchesToMm).toFixed(0)}mm`;
+            const mm = (inches * inchesToMm).toFixed(0);
+            btn.textContent = `${mm}mm`;
+            btn.setAttribute('aria-label', `Set max dimension to ${mm} millimeters`);
         } else {
             btn.textContent = `${inches}"`;
+            btn.setAttribute('aria-label', `Set max dimension to ${inches} ${inches === 1 ? 'inch' : 'inches'}`);
         }
     });
 
