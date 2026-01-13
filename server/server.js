@@ -1225,18 +1225,17 @@ ${statusChecklist}
 
     // --- Auth Endpoints ---
     app.post('/api/auth/register-user', authLimiter, [
-      body('username').notEmpty().withMessage('username is required'),
-      body('password').notEmpty().withMessage('password is required'),
+      ...validateUsername,
+      body('password')
+        .notEmpty().withMessage('password is required')
+        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
       const { username, password } = req.body;
-      // Prevent prototype pollution
-      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
-        return res.status(400).json({ error: 'Invalid username.' });
-      }
+      // Note: Prototype pollution check is handled by validateUsername middleware
       if (Object.prototype.hasOwnProperty.call(db.data.users, username)) {
         return res.status(400).json({ error: 'User already exists' });
       }
