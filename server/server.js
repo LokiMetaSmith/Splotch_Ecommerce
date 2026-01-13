@@ -498,8 +498,26 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
             }
         }
     }));
-    app.use(express.static(path.join(__dirname, '..')));
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+    // Bolt Optimization: Cache static assets for 1 day to reduce server load and improve performance
+    app.use(express.static(path.join(__dirname, '..'), {
+        maxAge: '1d',
+        setHeaders: (res, filePath) => {
+            if (process.env.NODE_ENV === 'production') {
+                // Do not cache HTML files to ensure users get the latest version (e.g. index.html)
+                if (filePath.endsWith('.html')) {
+                    res.setHeader('Cache-Control', 'public, max-age=0');
+                } else {
+                    res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 day in seconds
+                }
+            } else {
+                // In development, keep cache short or disable it
+                 res.setHeader('Cache-Control', 'public, max-age=0');
+            }
+        }
+    }));
+    app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+        maxAge: '1d'
+    }));
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
