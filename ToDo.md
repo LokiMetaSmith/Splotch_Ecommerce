@@ -111,10 +111,10 @@ This document tracks the features and bug fixes that need to be implemented for 
 
 ## Testing and Deployment
 
-- [ ] **End-to-End (E2E) Testing:**
-    - [ ] Install and configure Playwright for E2E testing.
-    - [ ] Create an initial test case to verify the homepage loads correctly.
-    - [ ] Add a `test:e2e` script to `package.json` to run the E2E tests.
+- [x] **End-to-End (E2E) Testing:**
+    - [x] Install and configure Playwright for E2E testing.
+    - [x] Create an initial test case to verify the homepage loads correctly.
+    - [x] Add a `test:e2e` script to `package.json` to run the E2E tests.
 - [x] **Staging Environment:**
     - [x] Set up a staging environment that mirrors production.
     - [x] Create a process for sanitizing and loading production data into the staging environment.
@@ -133,14 +133,14 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 
 -   **[ ] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[ ] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
--   **[ ] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./docs/TELEGRAM_BOT_MIGRATION.md) for a step-by-step guide.
+-   **[x] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./docs/TELEGRAM_BOT_MIGRATION.md) for a step-by-step guide.
 -   **[x] Implement Role-Based Access Control (RBAC):** Add a `role` field to the user model and protect administrative endpoints (e.g., `/api/orders`) to ensure only authorized users can access them.
 
 ## Medium-Priority
 
 -   **[x] Remove Fallback Session Secret:** Remove the hardcoded fallback session secret from `server/server.js` to ensure the application fails securely if the secret is not provided.
 -   **[x] Harden Docker Image:** Modify `server/Dockerfile` to create and use a non-root user to run the application, reducing the risk of container-based attacks.
--   **[ ] Improve Input Validation:** Perform a full audit of all API endpoints and apply consistent, strict input validation to all user-supplied data (including URL parameters, query strings, and request bodies).
+-   **[x] Improve Input Validation:** Perform a full audit of all API endpoints and apply consistent, strict input validation to all user-supplied data (including URL parameters, query strings, and request bodies).
 
 ## Low-Priority
 

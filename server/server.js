@@ -15,7 +15,7 @@ import compression from 'compression';
 import session from 'express-session';
 import { JSONFilePreset } from 'lowdb/node';
 import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
+import { body, validationResult, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
@@ -33,6 +33,7 @@ import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
 
 const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
 const __filename = fileURLToPath(import.meta.url);
@@ -650,8 +651,10 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
 
     // --- Product Endpoints ---
     app.post('/api/products', authenticateToken, [
-        body('name').notEmpty().withMessage('Product name is required'),
-        body('designImagePath').notEmpty().withMessage('Design image is required'),
+        body('name').notEmpty().withMessage('Product name is required').isString().trim(),
+        body('designImagePath').notEmpty().withMessage('Design image is required').isString(),
+        body('cutLinePath').optional().isString(),
+        body('defaults').optional().isObject(),
         body('creatorProfitCents').isInt({ min: 0 }).withMessage('Creator profit must be a non-negative integer'),
     ], async (req, res) => {
         const errors = validationResult(req);
@@ -941,7 +944,13 @@ ${statusChecklist}
       res.status(200).json(allOrders.slice().reverse());
     });
 
-    app.get('/api/orders/search', authenticateToken, (req, res) => {
+    app.get('/api/orders/search', authenticateToken, [
+        query('q').notEmpty().withMessage('Query is required').isString().trim(),
+    ], (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
       const { q } = req.query;
       const user = getUserByEmail(req.user.email);
       if (!user) {
@@ -987,7 +996,7 @@ ${statusChecklist}
 
     app.post('/api/orders/:orderId/status', authenticateToken, [
       ...validateId('orderId'),
-      body('status').notEmpty().withMessage('status is required'),
+      body('status').notEmpty().withMessage('status is required').isIn(VALID_STATUSES).withMessage('Invalid status'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -1111,8 +1120,8 @@ ${statusChecklist}
 
     app.post('/api/orders/:orderId/tracking', authenticateToken, [
         ...validateId('orderId'),
-        body('trackingNumber').notEmpty().withMessage('trackingNumber is required'),
-        body('courier').notEmpty().withMessage('courier is required'),
+        body('trackingNumber').notEmpty().withMessage('trackingNumber is required').isString().trim(),
+        body('courier').notEmpty().withMessage('courier is required').isString().trim(),
     ], async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
