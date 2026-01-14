@@ -88,6 +88,30 @@ async function BootStrap() {
     grayscaleBtnEl = document.getElementById('grayscaleBtn');
     sepiaBtnEl = document.getElementById('sepiaBtn');
 
+    // Sticker Selection Listeners (Attached early for responsiveness)
+    const stickerOptions = document.querySelectorAll('.sticker-option');
+    stickerOptions.forEach(option => {
+        option.addEventListener('click', () => {
+             const url = option.dataset.stickerUrl;
+             if (url) loadSticker(url);
+
+             // Visual feedback for selection
+             stickerOptions.forEach(opt => opt.classList.remove('ring-2', 'ring-indigo-500'));
+             option.classList.add('ring-2', 'ring-indigo-500');
+        });
+
+        option.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                const url = option.dataset.stickerUrl;
+                if (url) loadSticker(url);
+
+                stickerOptions.forEach(opt => opt.classList.remove('ring-2', 'ring-indigo-500'));
+                option.classList.add('ring-2', 'ring-indigo-500');
+            }
+        });
+    });
+
     // Fetch CSRF token and pricing info
     await Promise.all([
         fetchCsrfToken(),
@@ -780,6 +804,55 @@ function handleFileChange(event) {
     if (file) {
         loadFileAsImage(file);
     }
+}
+
+function loadSticker(url) {
+    if (!url) return;
+
+    // Reset vector state
+    currentPolygons = [];
+    basePolygons = [];
+    currentCutline = [];
+
+    // Clear file input so it doesn't look like we're still using the old file
+    if (fileInputGlobalRef) fileInputGlobalRef.value = '';
+    if (fileNameDisplayEl) fileNameDisplayEl.textContent = 'Premade Sticker Selected';
+
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+        originalImage = img;
+        updateEditingButtonsState(false);
+        showPaymentStatus('Sticker loaded successfully.', 'success');
+
+        // Use logic similar to loadFileAsImage for resizing and drawing
+        const maxWidth = 500, maxHeight = 400;
+        let newWidth = img.width, newHeight = img.height;
+        if (newWidth > maxWidth) { const r = maxWidth / newWidth; newWidth = maxWidth; newHeight *= r; }
+        if (newHeight > maxHeight) { const r = maxHeight / newHeight; newHeight = maxHeight; newWidth *= r; }
+
+        if (canvas && ctx) {
+            setCanvasSize(newWidth, newHeight);
+            ctx.clearRect(0, 0, newWidth, newHeight);
+            ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+            // For raster images, the bounds and cutline are the canvas itself initially
+            currentBounds = { left: 0, top: 0, right: newWidth, bottom: newHeight, width: newWidth, height: newHeight };
+            currentCutline = [[
+                { x: 0, y: 0 },
+                { x: newWidth, y: 0 },
+                { x: newWidth, y: newHeight },
+                { x: 0, y: newHeight }
+            ]];
+            currentPolygons = [];
+
+            // Trigger the price update and redraw the bounding box
+            calculateAndUpdatePrice();
+            drawCanvasDecorations(currentBounds);
+        }
+    };
+    img.onerror = () => showPaymentStatus('Error loading sticker.', 'error');
+    img.src = url;
 }
 
 function loadFileAsImage(file) {
