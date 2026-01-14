@@ -9,37 +9,7 @@ import jwt from 'jsonwebtoken';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- Mock googleapis ---
-const mockGenerateAuthUrl = jest.fn();
-const mockGetToken = jest.fn();
-const mockSetCredentials = jest.fn();
-const mockUserinfoGet = jest.fn();
-
-// Mock OAuth2 constructor
-const MockOAuth2 = jest.fn(() => ({
-    generateAuthUrl: mockGenerateAuthUrl,
-    getToken: mockGetToken,
-    setCredentials: mockSetCredentials,
-    credentials: {} // Add credentials property which is accessed in server.js
-}));
-
-// Mock google.oauth2
-const mockOauth2 = jest.fn(() => ({
-    userinfo: {
-        get: mockUserinfoGet
-    }
-}));
-
-jest.unstable_mockModule('googleapis', () => ({
-    google: {
-        auth: {
-            OAuth2: MockOAuth2
-        },
-        oauth2: mockOauth2
-    }
-}));
-
-// Import server dynamically AFTER mocking
+// Import server dynamically
 const { startServer } = await import('../server/server.js');
 
 describe('Google OAuth Endpoints', () => {
@@ -50,10 +20,12 @@ describe('Google OAuth Endpoints', () => {
     let bot;
     let mockSendEmail;
     const testDbPath = path.join(__dirname, 'google-oauth-test-db.json');
+    let mockGoogle;
+    let mockOAuth2Instance;
 
     beforeAll(async () => {
         // Mock DB using memory instead of file I/O
-        const data = { orders: [], users: {}, credentials: {}, config: {}, emailIndex: {} };
+        const data = { orders: {}, users: {}, credentials: {}, config: {}, emailIndex: {} };
         db = {
           data: data,
           write: async () => { /* no-op */ },
@@ -61,7 +33,31 @@ describe('Google OAuth Endpoints', () => {
         };
 
         mockSendEmail = jest.fn();
-        const server = await startServer(db, null, mockSendEmail, testDbPath);
+
+        // Create Mocks for Google
+        mockOAuth2Instance = {
+            generateAuthUrl: jest.fn(),
+            getToken: jest.fn(),
+            setCredentials: jest.fn(),
+            credentials: {}
+        };
+
+        const mockOAuth2Constructor = jest.fn(() => mockOAuth2Instance);
+        const mockUserinfoGet = jest.fn();
+
+        mockGoogle = {
+            auth: {
+                OAuth2: mockOAuth2Constructor
+            },
+            oauth2: jest.fn(() => ({
+                userinfo: {
+                    get: mockUserinfoGet
+                }
+            }))
+        };
+
+        // Inject mockGoogle
+        const server = await startServer(db, null, mockSendEmail, testDbPath, null, mockGoogle);
         app = server.app;
         timers = server.timers;
         bot = server.bot;
@@ -69,29 +65,27 @@ describe('Google OAuth Endpoints', () => {
     });
 
     beforeEach(async () => {
-        db.data = { orders: [], users: {}, credentials: {}, config: {}, emailIndex: {} };
-        // db.write is no-op
+        db.data = { orders: {}, users: {}, credentials: {}, config: {}, emailIndex: {} };
         mockSendEmail.mockClear();
         jest.clearAllMocks();
 
-        // Reset default mock implementations
-        mockGenerateAuthUrl.mockReturnValue('https://accounts.google.com/o/oauth2/auth?test=true');
-        mockGetToken.mockResolvedValue({
+        // Reset default mock implementations for the INSTANCE
+        mockOAuth2Instance.generateAuthUrl.mockReturnValue('https://accounts.google.com/o/oauth2/auth?test=true');
+        mockOAuth2Instance.getToken.mockResolvedValue({
             tokens: {
                 access_token: 'test-access-token',
                 refresh_token: 'test-refresh-token'
             }
         });
-        mockUserinfoGet.mockResolvedValue({
+
+        // Re-setup the mockUserinfoGet (since it's nested in the factory result)
+        const oauth2Client = mockGoogle.oauth2(); // Get the object returned by mockGoogle.oauth2
+        oauth2Client.userinfo.get.mockResolvedValue({
             data: {
                 email: 'googleuser@example.com',
                 name: 'Google User'
             }
         });
-
-        // Reset the MockOAuth2 instance so we can track calls to a fresh one if needed,
-        // although in startServer the instance is created once.
-        // Since the server is long-lived in tests, we are interacting with the single instance created at startup.
     });
 
     afterAll(async () => {
@@ -113,7 +107,7 @@ describe('Google OAuth Endpoints', () => {
         const res = await request(app).get('/auth/google');
         expect(res.statusCode).toEqual(302);
         expect(res.headers.location).toBe('https://accounts.google.com/o/oauth2/auth?test=true');
-        expect(mockGenerateAuthUrl).toHaveBeenCalled();
+        expect(mockOAuth2Instance.generateAuthUrl).toHaveBeenCalled();
     });
 
     it('should handle OAuth2 callback and log in existing user', async () => {
@@ -127,7 +121,7 @@ describe('Google OAuth Endpoints', () => {
         };
         db.data.users[existingUser.id] = existingUser;
         db.data.emailIndex['googleuser@example.com'] = existingUser.id;
-        await db.write();
+        // db.write is mocked to no-op
 
         const res = await request(app).get('/oauth2callback?code=test-code');
 
@@ -141,11 +135,15 @@ describe('Google OAuth Endpoints', () => {
         expect(decoded.username).toBe('googleuser');
 
         // Verify Google API calls
-        expect(mockGetToken).toHaveBeenCalledWith('test-code');
-        expect(mockUserinfoGet).toHaveBeenCalled();
+        expect(mockOAuth2Instance.getToken).toHaveBeenCalledWith('test-code');
+        // Check if oauth2() was called
+        expect(mockGoogle.oauth2).toHaveBeenCalled();
+        // Check if userinfo.get was called
+        const oauth2Client = mockGoogle.oauth2.mock.results[0].value;
+        expect(oauth2Client.userinfo.get).toHaveBeenCalled();
 
-        // Verify database update (refresh token should be stored in config, and tokens in user)
-        await db.read();
+        // Verify database update
+        // Since db is in memory, check it directly
         const user = Object.values(db.data.users).find(u => u.email === 'googleuser@example.com');
         expect(user.google_tokens).toBeDefined();
         expect(db.data.config.google_refresh_token).toBe('test-refresh-token');
@@ -164,7 +162,6 @@ describe('Google OAuth Endpoints', () => {
         expect(decoded.username).toBe('googleuser'); // Default username logic
 
         // Verify new user creation
-        await db.read();
         const user = Object.values(db.data.users).find(u => u.email === 'googleuser@example.com');
         expect(user).toBeDefined();
         expect(user.username).toBe('googleuser');
