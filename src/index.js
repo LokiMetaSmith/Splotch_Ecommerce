@@ -617,13 +617,20 @@ async function handlePaymentFormSubmit(event) {
             cutLinePath: cutLinePath,
         };
 
+        // Prepare server contact object (ensure phoneNumber is set)
+        const serverContact = {
+            ...billingContact,
+            phoneNumber: billingContact.phone
+        };
+
         const orderPayload = {
             sourceId,
             amountCents: currentOrderAmountCents,
             currency: 'USD',
             designImagePath,
             orderDetails,
-            billingContact,
+            billingContact: serverContact,
+            shippingContact: serverContact, // Use same contact for shipping for now
             _csrf: csrfToken, // Add CSRF token to payload
             productId: currentProductId // Include if it exists
         };
