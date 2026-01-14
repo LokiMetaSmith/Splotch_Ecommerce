@@ -265,6 +265,42 @@ async function BootStrap() {
         });
     }
 
+    // Add interaction listeners to the placeholder
+    if (canvasPlaceholder) {
+        // Drag and drop mirroring
+        canvasPlaceholder.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (canvas) canvas.classList.add('border-dashed', 'border-2', 'border-blue-500');
+        });
+
+        canvasPlaceholder.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            if (canvas) canvas.classList.remove('border-dashed', 'border-2', 'border-blue-500');
+        });
+
+        canvasPlaceholder.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (canvas) canvas.classList.remove('border-dashed', 'border-2', 'border-blue-500');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                loadFileAsImage(file);
+            }
+        });
+
+        // Click to upload
+        canvasPlaceholder.addEventListener('click', () => {
+            if (fileInputGlobalRef) fileInputGlobalRef.click();
+        });
+
+        // Keyboard accessibility
+        canvasPlaceholder.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (fileInputGlobalRef) fileInputGlobalRef.click();
+            }
+        });
+    }
+
     window.addEventListener('paste', (e) => {
         const items = (e.clipboardData || e.originalEvent.clipboardData).items;
         for (const item of items) {
