@@ -19,7 +19,8 @@ import { body, validationResult, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
-import { google } from 'googleapis';
+import { google as defaultGoogle } from 'googleapis';
+import * as defaultWebAuthn from '@simplewebauthn/server';
 import { sendEmail as defaultSendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys, getKey } from './keyManager.js';
 import { initializeBot } from './bot.js';
@@ -35,7 +36,7 @@ import { JSDOM } from 'jsdom';
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
 
-const allowedMimeTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
+const allowedMimeTypes = ['image/svg+xml', 'application/xml', 'image/png', 'image/jpeg', 'image/webp'];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
@@ -114,12 +115,15 @@ let app;
 const defaultData = { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
 
 // Define an async function to contain all server logic
-const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    `${process.env.BASE_URL}/oauth2callback`
-  );
-async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.join(__dirname, 'db.json'), injectedSquareClient = null) {
+async function startServer(
+    db,
+    bot,
+    sendEmail = defaultSendEmail,
+    dbPath = path.join(__dirname, 'db.json'),
+    injectedSquareClient = null,
+    injectedGoogle = defaultGoogle,
+    injectedWebAuthn = defaultWebAuthn
+) {
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
   }
@@ -248,7 +252,7 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
     const expectedOrigin = process.env.EXPECTED_ORIGIN;
 
     // --- Google OAuth2 Client ---
-    const oauth2Client = new google.auth.OAuth2(
+    const oauth2Client = new injectedGoogle.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       `${process.env.BASE_URL}/oauth2callback`
@@ -619,6 +623,7 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
 
         const designImageFile = req.files.designImage[0];
         const designFileType = await fileTypeFromFile(designImageFile.path);
+        console.log(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
         if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
             // It's good practice to remove the invalid file
             fs.unlink(designImageFile.path, (err) => {
@@ -628,7 +633,7 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
         }
 
         // --- SVG Sanitization for designImage ---
-        if (designFileType.mime === 'image/svg+xml') {
+        if (designFileType.mime === 'image/svg+xml' || designFileType.mime === 'application/xml') {
             const isSafe = await sanitizeSVGFile(designImageFile.path);
             if (!isSafe) {
                 return res.status(400).json({ error: 'The uploaded SVG file contains potentially malicious content and was rejected.' });
@@ -640,7 +645,10 @@ async function startServer(db, bot, sendEmail = defaultSendEmail, dbPath = path.
             const edgecutLineFile = req.files.cutLineFile[0];
             const edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
 
-            if (!edgecutLineFileType || edgecutLineFileType.ext !== 'svg') {
+            // Allow 'svg' extension or 'xml' extension if mime is application/xml (common for SVGs)
+            const isValidCutLine = edgecutLineFileType && (edgecutLineFileType.ext === 'svg' || (edgecutLineFileType.ext === 'xml' && edgecutLineFileType.mime === 'application/xml'));
+
+            if (!isValidCutLine) {
                 // It's good practice to remove the invalid file
                 fs.unlink(edgecutLineFile.path, (err) => {
                     if (err) console.error("Error deleting invalid file:", err);
@@ -929,6 +937,10 @@ ${statusChecklist}
             console.log(error.statusCode);
             console.log(error.message);
             console.log(error.body);
+        }
+        // Handle mocked Square errors or real Square errors that expose status code directly
+        if (error.statusCode && Number(error.statusCode) >= 400 && Number(error.statusCode) < 500) {
+             return res.status(Number(error.statusCode)).json({ error: 'Square API Error', details: error.result ? error.result.errors : error.message });
         }
         if (error.result && error.result.errors) {
           return res.status(error.statusCode || 500).json({ error: 'Square API Error', details: error.result.errors });
@@ -1445,7 +1457,7 @@ ${statusChecklist}
         }
 
         // The user is authenticated with Google, now get their profile info
-        const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+        const oauth2 = injectedGoogle.oauth2({ version: 'v2', auth: oauth2Client });
         const userInfo = await oauth2.userinfo.get();
         const userEmail = userInfo.data.email;
         console.log('Google authentication successful for:', userEmail);
@@ -1529,7 +1541,7 @@ ${statusChecklist}
         console.log(`New user created for WebAuthn pre-registration: ${username}`);
       }
 
-      const options = await generateRegistrationOptions({
+      const options = await injectedWebAuthn.generateRegistrationOptions({
         rpID: rpID,
         rpName: 'Splotch',
         userName: username,
@@ -1553,7 +1565,7 @@ ${statusChecklist}
       }
       const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
       try {
-        const verification = await verifyRegistrationResponse({
+        const verification = await injectedWebAuthn.verifyRegistrationResponse({
           response: body,
           expectedChallenge: user.challenge,
           expectedOrigin: expectedOrigin,
@@ -1582,7 +1594,7 @@ ${statusChecklist}
       if (!user) {
         return res.status(400).json({ error: 'User not found' });
       }
-      const options = await generateAuthenticationOptions({
+      const options = await injectedWebAuthn.generateAuthenticationOptions({
         allowCredentials: user.credentials.map(cred => ({
           id: cred.credentialID,
           type: 'public-key',
@@ -1607,7 +1619,7 @@ ${statusChecklist}
         return res.status(400).json({ error: 'Credential not found.' });
       }
       try {
-        const verification = await verifyAuthenticationResponse({
+        const verification = await injectedWebAuthn.verifyAuthenticationResponse({
           response: body,
           expectedChallenge: user.challenge,
           expectedOrigin: expectedOrigin,

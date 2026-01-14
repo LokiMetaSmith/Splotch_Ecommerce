@@ -8,20 +8,7 @@ import jwt from 'jsonwebtoken';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Mock @simplewebauthn/server BEFORE importing server
-const mockGenerateRegistrationOptions = jest.fn();
-const mockVerifyRegistrationResponse = jest.fn();
-const mockGenerateAuthenticationOptions = jest.fn();
-const mockVerifyAuthenticationResponse = jest.fn();
-
-jest.unstable_mockModule('@simplewebauthn/server', () => ({
-    generateRegistrationOptions: mockGenerateRegistrationOptions,
-    verifyRegistrationResponse: mockVerifyRegistrationResponse,
-    generateAuthenticationOptions: mockGenerateAuthenticationOptions,
-    verifyAuthenticationResponse: mockVerifyAuthenticationResponse
-}));
-
-// Import server dynamically after mocking
+// Import server dynamically
 const { startServer } = await import('../server/server.js');
 const { JSONFilePreset } = await import('lowdb/node');
 
@@ -33,11 +20,22 @@ describe('WebAuthn Endpoints', () => {
     let bot;
     let mockSendEmail;
     const testDbPath = path.join(__dirname, 'webauthn-test-db.json');
+    let mockWebAuthn;
 
     beforeAll(async () => {
-        db = await JSONFilePreset(testDbPath, { orders: [], users: {}, credentials: {}, config: {} });
+        db = await JSONFilePreset(testDbPath, { orders: {}, users: {}, credentials: {}, config: {} });
         mockSendEmail = jest.fn();
-        const server = await startServer(db, null, mockSendEmail, testDbPath);
+
+        // Create Mocks for WebAuthn
+        mockWebAuthn = {
+            generateRegistrationOptions: jest.fn(),
+            verifyRegistrationResponse: jest.fn(),
+            generateAuthenticationOptions: jest.fn(),
+            verifyAuthenticationResponse: jest.fn()
+        };
+
+        // Inject mockWebAuthn
+        const server = await startServer(db, null, mockSendEmail, testDbPath, null, undefined, mockWebAuthn);
         app = server.app;
         timers = server.timers;
         bot = server.bot;
@@ -45,7 +43,7 @@ describe('WebAuthn Endpoints', () => {
     });
 
     beforeEach(async () => {
-        db.data = { orders: [], users: {}, credentials: {}, config: {} };
+        db.data = { orders: {}, users: {}, credentials: {}, config: {} };
         await db.write();
         mockSendEmail.mockClear();
         jest.clearAllMocks();
@@ -76,7 +74,7 @@ describe('WebAuthn Endpoints', () => {
         // 2. Pre-register
         const username = 'webauthnuser';
         const testChallenge = 'test-challenge';
-        mockGenerateRegistrationOptions.mockResolvedValue({ challenge: testChallenge });
+        mockWebAuthn.generateRegistrationOptions.mockResolvedValue({ challenge: testChallenge });
 
         await agent
             .post('/api/auth/pre-register')
@@ -84,7 +82,7 @@ describe('WebAuthn Endpoints', () => {
             .send({ username });
 
         // 3. Verify Registration
-        mockVerifyRegistrationResponse.mockResolvedValue({
+        mockWebAuthn.verifyRegistrationResponse.mockResolvedValue({
             verified: true,
             registrationInfo: { credentialID: 'cred-id-123', publicKey: 'some-key' }
         });
@@ -97,7 +95,7 @@ describe('WebAuthn Endpoints', () => {
             .post(`/api/auth/register-verify?username=${username}`)
             .set('X-CSRF-Token', csrfToken)
             .send({
-                id: 'Y3JlZC1pZC0xMjM', // Base64URL encoded 'cred-id-123' just in case, though mock should bypass
+                id: 'Y3JlZC1pZC0xMjM', // Base64URL encoded 'cred-id-123'
                 response: {}
             });
 
@@ -130,7 +128,7 @@ describe('WebAuthn Endpoints', () => {
         let csrfToken = csrfRes.body.csrfToken;
 
         // 2. Verify Login
-        mockVerifyAuthenticationResponse.mockResolvedValue({ verified: true });
+        mockWebAuthn.verifyAuthenticationResponse.mockResolvedValue({ verified: true });
 
         const res = await agent
             .post(`/api/auth/login-verify?username=${username}`)
