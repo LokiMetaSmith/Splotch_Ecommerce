@@ -103,7 +103,12 @@ async function BootStrap() {
         payments = window.Square.payments(appId, locationId);
         card = await initializeCard(payments);
     } catch (error) {
-        showPaymentStatus(`Failed to initialize payments: ${error.message}`, 'error');
+        let msg = `Failed to initialize payments: ${error.message}`;
+        if (error.message.includes("Network") || typeof Square === 'undefined') {
+             msg += " (Check your AdBlocker)";
+             showAdBlockerWarning();
+        }
+        showPaymentStatus(msg, 'error');
         console.error("[CLIENT] Failed to initialize Square payments SDK:", error);
         return;
     }
