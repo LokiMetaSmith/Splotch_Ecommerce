@@ -134,9 +134,30 @@ function rdp(points, epsilon) {
     let dmax = 0;
     let index = 0;
     const end = points.length - 1;
+    const startPt = points[0];
+    const endPt = points[end];
+
+    // Bolt Optimization: Precompute line parameters to avoid recalculating inside the loop
+    const dx = endPt.x - startPt.x;
+    const dy = endPt.y - startPt.y;
+    // C is the constant term in the numerator: |dy*x - dx*y + C|
+    // Original numerator logic: Math.abs(dy * point.x - dx * point.y + lineEnd.x * lineStart.y - lineEnd.y * lineStart.x)
+    const C = endPt.x * startPt.y - endPt.y * startPt.x;
+    const denominator = Math.sqrt(dx * dx + dy * dy);
+
+    // Case where start and end points are the same
+    const isSinglePoint = (denominator === 0);
 
     for (let i = 1; i < end; i++) {
-        const d = perpendicularDistance(points[i], points[0], points[end]);
+        let d;
+        if (isSinglePoint) {
+            // Euclidean distance if line is a point
+             d = Math.sqrt(Math.pow(points[i].x - startPt.x, 2) + Math.pow(points[i].y - startPt.y, 2));
+        } else {
+            // Perpendicular distance to line
+             d = Math.abs(dy * points[i].x - dx * points[i].y + C) / denominator;
+        }
+
         if (d > dmax) {
             index = i;
             dmax = d;
