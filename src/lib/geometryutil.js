@@ -289,6 +289,11 @@ export const GeometryUtil = {
         }
     },
 
+    rectsIntersect: function(r1, r2) {
+        return (r1.x < r2.x + r2.width && r1.x + r1.width > r2.x &&
+                r1.y < r2.y + r2.height && r1.y + r1.height > r2.y);
+    },
+
     getPolygonBounds: function(polygon) {
         if (!polygon || polygon.length < 1) return null;
         let xmin = polygon[0].x, xmax = polygon[0].x;
