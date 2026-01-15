@@ -126,6 +126,52 @@ describe('PlacementWorker', () => {
         expect(p2.x).toBeGreaterThanOrEqual(100);
         expect(p2.y).toBe(0);
     });
+
+    it('should handle complex nesting with multiple parts ensuring bounding box collision check is effective', () => {
+         // Bin: 500x500
+         const bin = [{x:0, y:0}, {x:500, y:0}, {x:500, y:500}, {x:0, y:500}];
+
+         // Create 3 parts
+         // Part 1: 100x100 Rect
+         const p1 = [{x:0, y:0}, {x:100, y:0}, {x:100, y:100}, {x:0, y:100}];
+         // Part 2: 50x50 Rect
+         const p2 = [{x:0, y:0}, {x:50, y:0}, {x:50, y:50}, {x:0, y:50}];
+         // Part 3: 200x50 Rect
+         const p3 = [{x:0, y:0}, {x:200, y:0}, {x:200, y:50}, {x:0, y:50}];
+
+         const parts = [p1, p2, p3];
+         const ids = [0, 1, 2];
+         const rotations = [0, 0, 0];
+
+         const worker = new PlacementWorker(bin, parts, ids, rotations, { spacing: 10 }, {});
+         const result = worker.placePaths(parts);
+
+         expect(result.placements[0]).toHaveLength(3);
+
+         // Helper to get bounds of a placed part
+         const getBounds = (part, pos) => {
+             return {
+                 x: pos.x,
+                 y: pos.y,
+                 width: part[2].x - part[0].x,
+                 height: part[2].y - part[0].y
+             };
+         };
+
+         const b1 = getBounds(p1, result.placements[0][0]);
+         const b2 = getBounds(p2, result.placements[0][1]);
+         const b3 = getBounds(p3, result.placements[0][2]);
+
+         // Check for overlap using our utility logic
+         const overlaps = (r1, r2) => {
+             return (r1.x < r2.x + r2.width && r1.x + r1.width > r2.x &&
+                     r1.y < r2.y + r2.height && r1.y + r1.height > r2.y);
+         };
+
+         expect(overlaps(b1, b2)).toBe(false);
+         expect(overlaps(b1, b3)).toBe(false);
+         expect(overlaps(b2, b3)).toBe(false);
+    });
 });
 
 describe('SvgNest', () => {

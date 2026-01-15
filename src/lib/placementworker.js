@@ -22,8 +22,8 @@ export class PlacementWorker {
         // Convert bin to Clipper path
         const binPath = this.toClipperPath(this.binPolygon, scale);
 
-        // Track placed paths for collision detection
-        const placedPaths = new window.ClipperLib.Paths();
+        // Track placed items for collision detection: { path, bounds }
+        const placedItems = [];
 
         // Get bin bounds for scanning
         const binBounds = GeometryUtil.getPolygonBounds(this.binPolygon);
@@ -75,10 +75,20 @@ export class PlacementWorker {
                     }
 
                     // Check 2: Collision with other parts
-                    if (placedPaths.length > 0) {
+                    // Optimization: Bounding Box Collision Check
+                    const candidateRect = { x: x, y: y, width: partBounds.width, height: partBounds.height };
+                    const potentialColliders = [];
+
+                    for (let k = 0; k < placedItems.length; k++) {
+                        if (GeometryUtil.rectsIntersect(candidateRect, placedItems[k].bounds)) {
+                            potentialColliders.push(placedItems[k].path);
+                        }
+                    }
+
+                    if (potentialColliders.length > 0) {
                         const clipper2 = new window.ClipperLib.Clipper();
                         clipper2.AddPath(candidateClipper, window.ClipperLib.PolyType.ptSubject, true);
-                        clipper2.AddPaths(placedPaths, window.ClipperLib.PolyType.ptClip, true);
+                        clipper2.AddPaths(potentialColliders, window.ClipperLib.PolyType.ptClip, true);
                         const collision = new window.ClipperLib.Paths();
                         clipper2.Execute(window.ClipperLib.ClipType.ctIntersection, collision, window.ClipperLib.PolyFillType.pftNonZero, window.ClipperLib.PolyFillType.pftNonZero);
 
@@ -98,7 +108,7 @@ export class PlacementWorker {
                         rotation
                     });
 
-                    placedPaths.push(candidateClipper);
+                    placedItems.push({ path: candidateClipper, bounds: candidateRect });
                     placed = true;
                     break;
                 }
