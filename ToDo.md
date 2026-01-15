@@ -144,5 +144,5 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 
 ## Low-Priority
 
--   **[ ] Improve Example Secrets:** Update `server/env.example` to remove weak example secrets and replace them with clear instructions for generating strong, random values.
+-   **[x] Improve Example Secrets:** Update `server/env.example` to remove weak example secrets and replace them with clear instructions for generating strong, random values.
 -   **[ ] Use Environment Variables for Test Passwords:** Refactor tests to pull sensitive data like passwords from environment variables instead of hardcoding them, especially for CI/CD environments.
