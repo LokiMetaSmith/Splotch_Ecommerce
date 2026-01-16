@@ -15,7 +15,7 @@ import compression from 'compression';
 import session from 'express-session';
 import { JSONFilePreset } from 'lowdb/node';
 import jwt from 'jsonwebtoken';
-import { body, validationResult, query } from 'express-validator';
+import { body, validationResult, query, matchedData } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
@@ -660,7 +660,7 @@ async function startServer(
 
     // --- Product Endpoints ---
     app.post('/api/products', authenticateToken, [
-        body('name').notEmpty().withMessage('Product name is required').isString().trim(),
+        body('name').notEmpty().withMessage('Product name is required').isString().trim().escape().not().contains('<script>'),
         body('designImagePath').notEmpty().withMessage('Design image is required').isString(),
         body('cutLinePath').optional().isString(),
         body('defaults').optional().isObject(),
@@ -672,7 +672,7 @@ async function startServer(
         }
 
         try {
-            const { name, designImagePath, cutLinePath, creatorProfitCents, defaults } = req.body;
+            const { name, designImagePath, cutLinePath, creatorProfitCents, defaults } = matchedData(req);
 
             // Robust lookup for creator
             let creator = null;
