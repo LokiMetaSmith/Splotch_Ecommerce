@@ -28,8 +28,23 @@ export class PlacementWorker {
         // Get bin bounds for scanning
         const binBounds = GeometryUtil.getPolygonBounds(this.binPolygon);
 
+        // Bolt Optimization: Check if bin is effectively a rectangle.
+        // If the bin area matches the bounding box area (within tolerance), it's a rectangle.
+        // This allows us to skip the expensive Clipper check for "is part inside bin"
+        // if the candidate bounding box is already within the bin bounding box (which the loop ensures).
+        const binArea = Math.abs(GeometryUtil.polygonArea(this.binPolygon));
+        const binBoundsArea = binBounds.width * binBounds.height;
+        const isBinRect = Math.abs(binArea - binBoundsArea) < (binBoundsArea * 0.001);
+
         // Use a larger step for performance
         const step = this.config.spacing > 10 ? this.config.spacing : 20;
+
+        // Bolt Optimization: Lift Clipper instantiation out of the loop.
+        // We reuse these instances to avoid thousands of allocations/deallocations.
+        const clipper = new window.ClipperLib.Clipper();
+        const clipper2 = new window.ClipperLib.Clipper();
+        const difference = new window.ClipperLib.Paths();
+        const collision = new window.ClipperLib.Paths();
 
         for (let i = 0; i < paths.length; i++) {
             const part = paths[i];
@@ -61,17 +76,22 @@ export class PlacementWorker {
                     const candidateClipper = this.toClipperPath(candidatePart, scale);
 
                     // Check 1: Is candidate inside bin?
-                    const clipper = new window.ClipperLib.Clipper();
-                    clipper.AddPath(candidateClipper, window.ClipperLib.PolyType.ptSubject, true);
-                    clipper.AddPath(binPath, window.ClipperLib.PolyType.ptClip, true);
-                    const difference = new window.ClipperLib.Paths();
-                    clipper.Execute(window.ClipperLib.ClipType.ctDifference, difference, window.ClipperLib.PolyFillType.pftNonZero, window.ClipperLib.PolyFillType.pftNonZero);
+                    // Bolt Optimization: Skip this check if bin is a rectangle (already checked by bounds).
+                    if (!isBinRect) {
+                        // Bolt Optimization: Use Clear() instead of new instance
+                        clipper.Clear();
+                        clipper.AddPath(candidateClipper, window.ClipperLib.PolyType.ptSubject, true);
+                        clipper.AddPath(binPath, window.ClipperLib.PolyType.ptClip, true);
 
-                    let diffArea = 0;
-                    for(let k=0; k<difference.length; k++) diffArea += Math.abs(window.ClipperLib.Clipper.Area(difference[k]));
+                        // Execute clears the output 'difference' array internally
+                        clipper.Execute(window.ClipperLib.ClipType.ctDifference, difference, window.ClipperLib.PolyFillType.pftNonZero, window.ClipperLib.PolyFillType.pftNonZero);
 
-                    if (diffArea > 1000) { // Tolerance (scaled)
-                        continue;
+                        let diffArea = 0;
+                        for(let k=0; k<difference.length; k++) diffArea += Math.abs(window.ClipperLib.Clipper.Area(difference[k]));
+
+                        if (diffArea > 1000) { // Tolerance (scaled)
+                            continue;
+                        }
                     }
 
                     // Check 2: Collision with other parts
@@ -86,10 +106,10 @@ export class PlacementWorker {
                     }
 
                     if (potentialColliders.length > 0) {
-                        const clipper2 = new window.ClipperLib.Clipper();
+                        // Bolt Optimization: Use Clear()
+                        clipper2.Clear();
                         clipper2.AddPath(candidateClipper, window.ClipperLib.PolyType.ptSubject, true);
                         clipper2.AddPaths(potentialColliders, window.ClipperLib.PolyType.ptClip, true);
-                        const collision = new window.ClipperLib.Paths();
                         clipper2.Execute(window.ClipperLib.ClipType.ctIntersection, collision, window.ClipperLib.PolyFillType.pftNonZero, window.ClipperLib.PolyFillType.pftNonZero);
 
                         let colArea = 0;
