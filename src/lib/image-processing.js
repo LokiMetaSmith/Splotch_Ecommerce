@@ -38,16 +38,21 @@ export function imageHasTransparentBorder(imageData) {
  */
 export function traceContour(imageData) {
     const { data, width, height } = imageData;
+
+    // Bolt Optimization: Check alpha first to avoid unnecessary reads
     const isOpaque = (x, y) => {
         if (x < 0 || x >= width || y < 0 || y >= height) return false;
         const i = (y * width + x) * 4;
+
+        // Check Alpha first
+        const a = data[i+3];
+        if (a < 128) return false;
+
+        // Only read RGB if alpha check passes
         const r = data[i];
         const g = data[i+1];
         const b = data[i+2];
-        const a = data[i+3];
 
-        // Treat pixels with low alpha as transparent
-        if (a < 128) return false;
         // Treat pure white pixels as transparent
         if (r > 250 && g > 250 && b > 250) return false;
 
@@ -55,15 +60,27 @@ export function traceContour(imageData) {
     };
 
     // 1. Find the first non-transparent pixel
+    // Bolt Optimization: Linear scan over the array is faster than nested x/y loops with coordinate calculation
     let startPos = null;
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            if (isOpaque(x, y)) {
-                startPos = { x, y };
-                break;
-            }
-        }
-        if (startPos) break;
+    const len = data.length;
+    for (let i = 0; i < len; i += 4) {
+        // Inline transparency check for speed in the scan loop
+        const a = data[i+3];
+        if (a < 128) continue;
+
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
+
+        if (r > 250 && g > 250 && b > 250) continue;
+
+        // Found it
+        const pixelIndex = i / 4;
+        startPos = {
+            x: pixelIndex % width,
+            y: Math.floor(pixelIndex / width)
+        };
+        break;
     }
 
     if (!startPos) {
