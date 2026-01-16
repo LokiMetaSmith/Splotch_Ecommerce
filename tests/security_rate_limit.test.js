@@ -61,10 +61,11 @@ describe('Auth Rate Limiting', () => {
     let csrfToken = csrfRes.body.csrfToken;
 
     // 2. Register a user
+    const password = process.env.TEST_PASSWORD || 'password123';
     await agent
       .post('/api/auth/register-user')
       .set('X-CSRF-Token', csrfToken)
-      .send({ username: 'victim', password: 'password123' });
+      .send({ username: 'victim', password });
 
     // 3. Attempt to login 11 times with wrong password
     // The rate limit is 10 attempts shared across auth endpoints.
