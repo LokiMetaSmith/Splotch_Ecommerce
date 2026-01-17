@@ -15,7 +15,7 @@ import compression from 'compression';
 import session from 'express-session';
 import { JSONFilePreset } from 'lowdb/node';
 import jwt from 'jsonwebtoken';
-import { body, validationResult, query } from 'express-validator';
+import { body, validationResult, query, matchedData } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
@@ -680,7 +680,7 @@ async function startServer(
         }
 
         try {
-            const { name, designImagePath, cutLinePath, creatorProfitCents, defaults } = req.body;
+            const { name, designImagePath, cutLinePath, creatorProfitCents, defaults } = matchedData(req);
 
             // Robust lookup for creator
             let creator = null;
