@@ -2,16 +2,27 @@ import EasyPost from '@easypost/api';
 
 let db;
 let api;
+let updateInterval; // Store interval ID for cleanup
 
 function initializeTracker(database) {
     db = database;
     if (process.env.EASYPOST_API_KEY) {
         api = new EasyPost(process.env.EASYPOST_API_KEY);
+        // Clear existing interval if any (for testing reload)
+        if (updateInterval) clearInterval(updateInterval);
         // Check for updates every 5 minutes
-        setInterval(updateTrackingData, 5 * 60 * 1000);
+        updateInterval = setInterval(updateTrackingData, 5 * 60 * 1000);
         console.log('[TRACKER] EasyPost shipment tracker initialized.');
     } else {
         console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+    }
+}
+
+// Function to stop the tracker (useful for tests)
+function stopTracker() {
+    if (updateInterval) {
+        clearInterval(updateInterval);
+        updateInterval = null;
     }
 }
 
@@ -64,4 +75,4 @@ async function updateTrackingData() {
     }
 }
 
-export { initializeTracker };
+export { initializeTracker, updateTrackingData, stopTracker };
