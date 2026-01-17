@@ -90,12 +90,13 @@ describe('Auth Registration Security Tests', () => {
         const csrfRes = await agent.get('/api/csrf-token');
         const csrfToken = csrfRes.body.csrfToken;
 
+        const password = process.env.TEST_PASSWORD || 'password123';
         const res = await agent
             .post('/api/auth/register-user')
             .set('X-CSRF-Token', csrfToken)
             .send({
                 username: 'stronguser',
-                password: 'password123'
+                password: password
             });
 
         expect(res.statusCode).toBe(200);

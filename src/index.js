@@ -1200,6 +1200,31 @@ function redrawOriginalImageWithFilters() {
     }
 }
 
+function updateFilterButtonVisuals() {
+    const setStyle = (el, active) => {
+        if (!el) return;
+        el.setAttribute('aria-pressed', active);
+        if (active) {
+            el.style.setProperty('transform', 'scale(0.95) translateY(2px)', 'important');
+            el.style.setProperty('box-shadow', 'inset 0 3px 5px rgba(0,0,0,0.5)', 'important');
+            el.style.setProperty('filter', 'brightness(0.9)', 'important');
+            // Ensure text remains readable
+            el.style.setProperty('border', '2px solid rgba(255,255,255,0.5)', 'important');
+        } else {
+            el.style.removeProperty('transform');
+            el.style.removeProperty('box-shadow');
+            el.style.removeProperty('filter');
+            el.style.removeProperty('border');
+        }
+    };
+    // Ensure we have the latest elements if globals are not ready or lost
+    const grayEl = grayscaleBtnEl || document.getElementById('grayscaleBtn');
+    const sepiaEl = sepiaBtnEl || document.getElementById('sepiaBtn');
+
+    setStyle(grayEl, isGrayscale);
+    setStyle(sepiaEl, isSepia);
+}
+
 function toggleGrayscaleFilter() {
     if (!canvas || !ctx || !originalImage) return;
 
@@ -1207,6 +1232,7 @@ function toggleGrayscaleFilter() {
     isGrayscale = !wasOn; // Toggle state
     isSepia = false; // Ensure sepia is off
 
+    updateFilterButtonVisuals();
     redrawOriginalImageWithFilters();
 }
 
@@ -1217,6 +1243,7 @@ function toggleSepiaFilter() {
     isSepia = !wasOn; // Toggle state
     isGrayscale = false; // Ensure grayscale is off
 
+    updateFilterButtonVisuals();
     redrawOriginalImageWithFilters();
 }
 

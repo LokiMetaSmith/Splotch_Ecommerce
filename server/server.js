@@ -660,9 +660,17 @@ async function startServer(
 
     // --- Product Endpoints ---
     app.post('/api/products', authenticateToken, [
-        body('name').notEmpty().withMessage('Product name is required').isString().trim().escape().not().contains('<script>'),
-        body('designImagePath').notEmpty().withMessage('Design image is required').isString(),
-        body('cutLinePath').optional().isString(),
+        body('name').notEmpty().withMessage('Product name is required').isString().trim(),
+        body('designImagePath').notEmpty().withMessage('Design image is required').isString().custom(value => {
+            if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
+            if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
+            return true;
+        }),
+        body('cutLinePath').optional().isString().custom(value => {
+            if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
+            if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
+            return true;
+        }),
         body('defaults').optional().isObject(),
         body('creatorProfitCents').isInt({ min: 0 }).withMessage('Creator profit must be a non-negative integer'),
     ], async (req, res) => {
@@ -740,7 +748,11 @@ async function startServer(
       body('sourceId').notEmpty().withMessage('sourceId is required'),
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
-      body('designImagePath').notEmpty().withMessage('designImagePath is required'),
+      body('designImagePath').notEmpty().withMessage('designImagePath is required').custom(value => {
+            if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
+            if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
+            return true;
+      }),
       // Security Fix: Validate orderDetails structure
       body('orderDetails').isObject().withMessage('orderDetails must be an object'),
       body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),

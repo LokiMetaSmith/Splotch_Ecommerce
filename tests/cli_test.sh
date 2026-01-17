@@ -9,7 +9,7 @@ set -e
 CLI_PATH="server/cli.js"
 export DB_PATH="server/test-db.json"
 TEST_USER="clitestuser"
-TEST_PASS="password123"
+TEST_PASS="${TEST_PASSWORD:-password123}"
 
 # Ensure we are in the project root
 if [ ! -f "$CLI_PATH" ]; then
