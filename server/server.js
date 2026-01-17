@@ -660,7 +660,7 @@ async function startServer(
 
     // --- Product Endpoints ---
     app.post('/api/products', authenticateToken, [
-        body('name').notEmpty().withMessage('Product name is required').isString().trim(),
+        body('name').notEmpty().withMessage('Product name is required').isString().trim().escape(),
         body('designImagePath').notEmpty().withMessage('Design image is required').isString().custom(value => {
             if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
             if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
