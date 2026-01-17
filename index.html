@@ -30,6 +30,29 @@
         .size-btn:hover {
             background-color: #e5e7eb;
         }
+        .size-btn:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+            background-color: #e5e7eb;
+        }
+        /* Skip Link CSS */
+        .skip-link {
+            position: absolute;
+            transform: translateY(-100%);
+            left: 0;
+            background: #2A284D; /* splotch-navy */
+            color: #FFFFFF; /* splotch-white */
+            padding: 8px 16px;
+            z-index: 9999;
+            transition: transform 0.2s;
+            font-weight: bold;
+            border-bottom-right-radius: 8px;
+            text-decoration: none;
+        }
+        .skip-link:focus {
+            transform: translateY(0);
+            outline: 3px solid #FF003A; /* splotch-red */
+        }
         /* Toggle Switch CSS */
         input:checked ~ .dot {
             transform: translateX(100%);
@@ -39,9 +62,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
     <script type="module" src="./src/index.js" defer></script>
     <script type="module" src="./src/mascot.js" defer></script>
+    <script type="module" src="./src/a11y-improvements.js" defer></script>
     <link rel="manifest" href="/manifest.json">
 </head>
 <body class="bg-gray-100">
+    <a href="#sticker-design-box" class="skip-link">Skip to Sticker Editor</a>
     <div id="adblock-warning" style="display: none; padding: 1rem; background-color: #fffbe6; border: 1px solid #facc15; border-radius: 0.5rem; color: #713f12; margin: 1rem auto; max-width: 800px;">
         <p style="font-weight: bold;">Payment Form Blocked 🛡️</p>
         <p>It looks like an ad blocker is preventing our secure payment form from loading. Please disable it for this site to complete your purchase.</p>
