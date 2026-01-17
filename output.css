@@ -1,8 +1,5 @@
 /*! tailwindcss v4.1.18 | MIT License | https://tailwindcss.com */
 @layer properties;
-.pointer-events-none {
-  pointer-events: none;
-}
 .visible {
   visibility: visible;
 }
@@ -65,14 +62,14 @@
 .hidden {
   display: none;
 }
-.inline {
-  display: inline;
-}
 .inline-block {
   display: inline-block;
 }
 .inline-flex {
   display: inline-flex;
+}
+.table {
+  display: table;
 }
 .h-full {
   height: 100%;
@@ -139,6 +136,14 @@
 }
 .self-end {
   align-self: flex-end;
+}
+.justify-self-center {
+  justify-self: center;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rounded-full {
   border-radius: calc(infinity * 1px);
@@ -213,6 +218,11 @@
 }
 .transition {
   transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+  transition-timing-function: var(--tw-ease, ease);
+  transition-duration: var(--tw-duration, 0s);
+}
+.transition-colors {
+  transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
   transition-timing-function: var(--tw-ease, ease);
   transition-duration: var(--tw-duration, 0s);
 }

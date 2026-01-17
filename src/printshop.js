@@ -876,9 +876,13 @@ export async function init() {
     filterContainer?.addEventListener('click', (e) => {
         if (e.target.classList.contains('filter-btn')) {
             // Remove active class from all buttons
-            filterContainer.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            filterContainer.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-pressed', 'false');
+            });
             // Add active class to the clicked button
             e.target.classList.add('active');
+            e.target.setAttribute('aria-pressed', 'true');
             // Actually filter the orders
             const status = e.target.dataset.status;
             filterAndDisplayOrders(status);
