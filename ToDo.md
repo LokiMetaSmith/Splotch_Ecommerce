@@ -105,9 +105,9 @@ This document tracks the features and bug fixes that need to be implemented for 
 
 ## Order Fulfillment
 
-- [ ] **Shipment Tracking:**
-    - [ ] Integrate with UPS or USPS APIs to track the delivery status of shipped orders.
-    - [ ] Use the tracking information to automatically move orders to the "Delivered" status.
+- [x] **Shipment Tracking:**
+    - [x] Integrate with UPS or USPS APIs to track the delivery status of shipped orders.
+    - [x] Use the tracking information to automatically move orders to the "Delivered" status.
 
 ## Testing and Deployment
 
