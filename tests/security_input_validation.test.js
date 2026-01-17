@@ -148,7 +148,7 @@ describe('Security Input Validation', () => {
             .send({
                 sourceId: 'cnon:card-nonce-ok',
                 amountCents: 1000,
-                designImagePath: '/u/d.png',
+                designImagePath: '/uploads/d.png',
                 shippingContact: {
                     givenName: 'Good', familyName: 'User',
                     email: 'good@user.com',

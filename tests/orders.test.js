@@ -104,6 +104,21 @@ describe('Order API Endpoints', () => {
         return jwt.sign({ username, email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
     };
 
+    // Helper to rebuild the userOrderIndex since we bypass the server logic when injecting data directly
+    const rebuildIndex = () => {
+        if (!db.userOrderIndex) db.userOrderIndex = {};
+        // Clear existing
+        for (const key in db.userOrderIndex) delete db.userOrderIndex[key];
+
+        Object.values(db.data.orders).forEach(order => {
+            const email = order.billingContact?.email;
+            if (email) {
+                if (!db.userOrderIndex[email]) db.userOrderIndex[email] = [];
+                db.userOrderIndex[email].push(order);
+            }
+        });
+    };
+
     describe('POST /api/create-order', () => {
         it('should create an order successfully', async () => {
             const agent = request.agent(app);
@@ -401,6 +416,7 @@ describe('Order API Endpoints', () => {
             db.data.orders['my1'] = { orderId: 'my1', billingContact: { email }, receivedAt: '2023-01-01' };
             db.data.orders['other1'] = { orderId: 'other1', billingContact: { email: 'other@example.com' }, receivedAt: '2023-01-02' };
             await db.write();
+            rebuildIndex();
 
             const token = getAuthToken('myuser', email);
             const res = await request(app)
@@ -432,6 +448,7 @@ describe('Order API Endpoints', () => {
             db.data.orders['search123'] = { orderId: 'search123', billingContact: { email }, receivedAt: '2023-01-01' };
             db.data.orders['search456'] = { orderId: 'search456', billingContact: { email }, receivedAt: '2023-01-02' };
             await db.write();
+            rebuildIndex();
 
             const token = getAuthToken('searchuser', email);
             const res = await request(app)
@@ -449,6 +466,7 @@ describe('Order API Endpoints', () => {
              db.data.emailIndex = { [email]: 'user1' };
              db.data.orders['secret123'] = { orderId: 'secret123', billingContact: { email: 'admin@example.com' } };
              await db.write();
+             rebuildIndex();
 
              const token = getAuthToken('user1', email);
              const res = await request(app)
@@ -465,6 +483,7 @@ describe('Order API Endpoints', () => {
             db.data.users['searchuser'] = { email, username: 'searchuser' };
             db.data.emailIndex = { [email]: 'searchuser' };
             await db.write();
+            rebuildIndex();
 
             const token = getAuthToken('searchuser', email);
             const res = await request(app)
