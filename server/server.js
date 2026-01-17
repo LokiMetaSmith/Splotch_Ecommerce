@@ -144,6 +144,22 @@ async function startServer(
       console.log(`[SERVER] Initialized shipped orders cache. Count: ${db.shippedOrders.length}`);
   }
 
+  // Initialize User Orders Index
+  // Bolt Optimization: Optimizes my-orders and search endpoints by avoiding O(n) scan
+  if (!db.userOrderIndex) {
+      db.userOrderIndex = {};
+      Object.values(db.data.orders).forEach(order => {
+          const email = order.billingContact?.email;
+          if (email) {
+              if (!db.userOrderIndex[email]) {
+                  db.userOrderIndex[email] = [];
+              }
+              db.userOrderIndex[email].push(order);
+          }
+      });
+      console.log(`[SERVER] Initialized user orders index. Users indexed: ${Object.keys(db.userOrderIndex).length}`);
+  }
+
   // Ensure products collection exists
   if (!db.data.products) {
     db.data.products = {};
@@ -860,6 +876,17 @@ async function startServer(
             db.activeOrders.push(newOrder);
         }
 
+        // Bolt Optimization: Update user orders index
+        if (db.userOrderIndex) {
+            const email = newOrder.billingContact?.email;
+            if (email) {
+                if (!db.userOrderIndex[email]) {
+                    db.userOrderIndex[email] = [];
+                }
+                db.userOrderIndex[email].push(newOrder);
+            }
+        }
+
         // --- Process Payout ---
         if (product && creator) {
             const quantity = safeOrderDetails.quantity || 1;
@@ -986,7 +1013,12 @@ ${statusChecklist}
       if (!user) {
         return res.status(401).json({ error: 'User not found' });
       }
-      const userOrders = Object.values(db.data.orders).filter(order => order.billingContact.email === user.email);
+
+      // Bolt Optimization: Use cached index
+      const userOrders = (db.userOrderIndex && db.userOrderIndex[user.email])
+          ? db.userOrderIndex[user.email]
+          : [];
+
       const filteredOrders = userOrders.filter(order => order.orderId.includes(q));
       if (filteredOrders.length === 0) {
         return res.status(404).json({ error: 'Order not found' });
@@ -999,7 +1031,12 @@ ${statusChecklist}
         return res.status(401).json({ error: 'Authentication token is invalid or missing email.' });
       }
       const userEmail = req.user.email;
-      const userOrders = Object.values(db.data.orders).filter(order => order.billingContact.email === userEmail);
+
+      // Bolt Optimization: Use cached index instead of full table scan
+      const userOrders = (db.userOrderIndex && db.userOrderIndex[userEmail])
+          ? db.userOrderIndex[userEmail]
+          : [];
+
       res.status(200).json(userOrders.slice().reverse());
     });
 
