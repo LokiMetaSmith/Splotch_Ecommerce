@@ -824,6 +824,18 @@ async function startServer(
             if (creatorId) {
                 creator = db.data.users[creatorId] || Object.values(db.data.users).find(u => u.username === creatorId || u.id === creatorId);
             }
+
+            // SECURITY: Verify that the payment covers at least the creator's profit margin.
+            // This prevents attackers from paying 1 cent for a product where the creator gets $50 payout.
+            const quantity = orderDetails.quantity || 1;
+            const minRequiredAmount = (product.creatorProfitCents || 0) * quantity;
+            // We also enforce a global minimum of 1 cent per item to cover printing/base costs roughly.
+            const globalMin = 1 * quantity;
+
+            if (amountCents < minRequiredAmount || amountCents < globalMin) {
+                console.warn(`[SECURITY] Price manipulation attempt detected. Order amount: ${amountCents}, Min Required: ${minRequiredAmount}`);
+                return res.status(400).json({ error: 'Order amount is too low.' });
+            }
         }
 
         const paymentPayload = {
