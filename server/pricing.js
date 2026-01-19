@@ -61,31 +61,22 @@ function calculateStickerPrice(quantity, material, bounds, cutline, resolution, 
 
 import sizeOf from 'image-size';
 import { parse } from 'svg-parser';
+import { svgPathProperties } from 'svg-path-properties';
 import fs from 'fs';
 import { promisify } from 'util';
 
 const sizeOfAsync = promisify(sizeOf);
 
 function getPathPerimeter(pathNode) {
-    // This is a simplified perimeter calculation for server-side.
-    // It assumes straight line segments in the 'd' attribute.
-    // A full implementation would need to handle curves (C, S, Q, T, A).
     let perimeter = 0;
     if (pathNode.properties && pathNode.properties.d) {
         const d = pathNode.properties.d;
-        // This regex is a simplification and may not cover all cases.
-        const points = (d.match(/[MLHVCSQTAZ][^MLHVCSQTAZ]*/ig) || [])
-            .map(cmd => {
-                const points = cmd.slice(1).trim().split(/[\s,]+/);
-                return { x: parseFloat(points[0]), y: parseFloat(points[1]) };
-            });
-
-        for (let i = 0; i < points.length - 1; i++) {
-            const p1 = points[i];
-            const p2 = points[i+1];
-            if(p1.x && p1.y && p2.x && p2.y) {
-                 perimeter += Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-            }
+        try {
+            const properties = new svgPathProperties(d);
+            perimeter = properties.getTotalLength();
+        } catch (e) {
+            console.warn('Failed to calculate path perimeter:', e);
+            // Fallback or just return 0
         }
     }
     return perimeter;
