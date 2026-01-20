@@ -450,6 +450,7 @@ async function startServer(
     }));
 
     app.use(express.json());
+    app.disable('x-powered-by');
 
     // SECURITY: Block access to sensitive files and directories
     app.use((req, res, next) => {
@@ -838,6 +839,74 @@ async function startServer(
             }
         }
 
+        // --- SECURITY: Validate Order Price ---
+        try {
+            // Determine which file determines the pricing geometry (Cutline takes precedence if custom)
+            // But if it's a product, the product definition might dictate paths.
+            // For now, trust the paths in body (validated to be in /uploads/).
+            let validationPath = designImagePath;
+            if (orderDetails.cutLinePath) {
+                validationPath = orderDetails.cutLinePath;
+            } else if (product && product.cutLinePath) {
+                validationPath = product.cutLinePath;
+            }
+
+            // Construct local file path (strip leading slash to join correctly with __dirname)
+            const relativePath = validationPath.startsWith('/') ? validationPath.slice(1) : validationPath;
+            const fullPath = path.join(__dirname, relativePath);
+
+            // Get dimensions/complexity
+            // We use the validationPath file to calculate bounds and perimeter.
+            // Note: If the file is missing (deleted?), this will throw, which is good (fail secure).
+            if (fs.existsSync(fullPath)) {
+                const dimensions = await getDesignDimensions(fullPath);
+
+                const quantity = orderDetails.quantity || 1;
+                // Use default material if not specified
+                const material = orderDetails.material || (product && product.defaults && product.defaults.material) || 'pp_standard';
+                // Use default resolution (300DPI) if not specified.
+                // Note: Client currently defaults to 'dpi_300' if not explicit.
+                const resolutionId = orderDetails.resolution || (product && product.defaults && product.defaults.resolution) || 'dpi_300';
+                const resolution = pricingConfig.resolutions.find(r => r.id === resolutionId) || pricingConfig.resolutions[0];
+
+                const priceResult = calculateStickerPrice(
+                    pricingConfig,
+                    quantity,
+                    material,
+                    dimensions.bounds,
+                    dimensions.cutline,
+                    resolution
+                );
+
+                let expectedTotal = priceResult.total;
+
+                // Add Creator Profit if applicable
+                if (product) {
+                    expectedTotal += (product.creatorProfitCents * quantity);
+                }
+
+                const submittedTotal = Number(amountCents);
+
+                // Allow a small tolerance (e.g., 5 cents) for rounding differences
+                if (Math.abs(expectedTotal - submittedTotal) > 5) {
+                    console.warn(`[SECURITY] Price mismatch for Order. Expected: ${expectedTotal}, Received: ${submittedTotal}. Diff: ${expectedTotal - submittedTotal}`);
+                    return res.status(400).json({ error: 'Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.' });
+                } else {
+                    console.log(`[SECURITY] Price validated. Expected: ${expectedTotal}, Received: ${submittedTotal}`);
+                }
+            } else {
+                console.warn(`[SECURITY] Could not validate price because file not found: ${fullPath}`);
+                // Proceeding cautiously - or should we fail?
+                // If it's a fresh upload, it should be there.
+                // Failsafe: Reject.
+                return res.status(400).json({ error: 'Validation failed: Design file not found.' });
+            }
+        } catch (validationError) {
+            console.error('[SECURITY] Error during price validation:', validationError);
+            return res.status(400).json({ error: 'Order validation failed.' });
+        }
+        // --------------------------------------
+
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
@@ -861,9 +930,32 @@ async function startServer(
           return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
         }
         console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
-        // Explicitly construct safe orderDetails object to prevent Stored XSS
+
         const safeOrderDetails = {
             quantity: orderDetails.quantity
+        };
+
+        // Explicitly construct safe billingContact to prevent Mass Assignment
+        const safeBillingContact = {
+            givenName: escapeHtml(billingContact.givenName),
+            familyName: escapeHtml(billingContact.familyName),
+            email: billingContact.email, // email validator ensures format
+            phoneNumber: (typeof billingContact.phoneNumber === 'string') ? billingContact.phoneNumber.trim() : undefined
+        };
+
+        // Explicitly construct safe shippingContact to prevent Mass Assignment
+        const safeShippingContact = {
+            givenName: escapeHtml(shippingContact.givenName),
+            familyName: escapeHtml(shippingContact.familyName),
+            email: shippingContact.email, // email validator ensures format
+            phoneNumber: (typeof shippingContact.phoneNumber === 'string') ? shippingContact.phoneNumber.trim() : undefined,
+            addressLines: Array.isArray(shippingContact.addressLines)
+                ? shippingContact.addressLines.map(line => escapeHtml(line))
+                : [],
+            locality: escapeHtml(shippingContact.locality),
+            administrativeDistrictLevel1: escapeHtml(shippingContact.administrativeDistrictLevel1),
+            postalCode: escapeHtml(shippingContact.postalCode),
+            country: escapeHtml(shippingContact.country)
         };
 
         const newOrder = {
@@ -874,8 +966,8 @@ async function startServer(
           currency: currency || 'USD',
           status: 'NEW',
           orderDetails: safeOrderDetails,
-          billingContact: billingContact,
-          shippingContact: shippingContact,
+          billingContact: safeBillingContact,
+          shippingContact: safeShippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
           productId: productId || null,
