@@ -74,6 +74,7 @@ function calculateStickerPrice(pricingConfig, quantity, material, bounds, cutlin
 
 import sizeOf from 'image-size';
 import { parse } from 'svg-parser';
+import { svgPathProperties } from 'svg-path-properties';
 import fs from 'fs';
 import { promisify } from 'util';
 import { svgPathProperties } from "svg-path-properties";
@@ -81,11 +82,13 @@ import { svgPathProperties } from "svg-path-properties";
 function getPathPerimeter(pathNode) {
     let perimeter = 0;
     if (pathNode.properties && pathNode.properties.d) {
+        const d = pathNode.properties.d;
         try {
-            const properties = new svgPathProperties(pathNode.properties.d);
+            const properties = new svgPathProperties(d);
             perimeter = properties.getTotalLength();
         } catch (e) {
-            console.error("Error calculating path length:", e);
+            console.warn('Failed to calculate path perimeter:', e);
+            // Fallback or just return 0
         }
     }
     return perimeter;
