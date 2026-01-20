@@ -854,6 +854,29 @@ async function startServer(
             quantity: orderDetails.quantity
         };
 
+        // Explicitly construct safe billingContact to prevent Mass Assignment
+        const safeBillingContact = {
+            givenName: escapeHtml(billingContact.givenName),
+            familyName: escapeHtml(billingContact.familyName),
+            email: billingContact.email, // email validator ensures format
+            phoneNumber: (typeof billingContact.phoneNumber === 'string') ? billingContact.phoneNumber.trim() : undefined
+        };
+
+        // Explicitly construct safe shippingContact to prevent Mass Assignment
+        const safeShippingContact = {
+            givenName: escapeHtml(shippingContact.givenName),
+            familyName: escapeHtml(shippingContact.familyName),
+            email: shippingContact.email, // email validator ensures format
+            phoneNumber: (typeof shippingContact.phoneNumber === 'string') ? shippingContact.phoneNumber.trim() : undefined,
+            addressLines: Array.isArray(shippingContact.addressLines)
+                ? shippingContact.addressLines.map(line => escapeHtml(line))
+                : [],
+            locality: escapeHtml(shippingContact.locality),
+            administrativeDistrictLevel1: escapeHtml(shippingContact.administrativeDistrictLevel1),
+            postalCode: escapeHtml(shippingContact.postalCode),
+            country: escapeHtml(shippingContact.country)
+        };
+
         const newOrder = {
           orderId: randomUUID(),
           paymentId: paymentResult.payment.id,
@@ -862,8 +885,8 @@ async function startServer(
           currency: currency || 'USD',
           status: 'NEW',
           orderDetails: safeOrderDetails,
-          billingContact: billingContact,
-          shippingContact: shippingContact,
+          billingContact: safeBillingContact,
+          shippingContact: safeShippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
           productId: productId || null,
