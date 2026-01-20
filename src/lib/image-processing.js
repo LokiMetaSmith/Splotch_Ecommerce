@@ -147,47 +147,67 @@ export function perpendicularDistance(point, lineStart, lineEnd) {
     return numerator / denominator;
 }
 
+// Bolt Optimization: Iterative implementation of RDP using a stack to avoid recursion and array slicing
 function rdp(points, epsilon) {
-    let dmax = 0;
-    let index = 0;
-    const end = points.length - 1;
-    const startPt = points[0];
-    const endPt = points[end];
+    const n = points.length;
+    if (n < 3) return points;
 
-    // Bolt Optimization: Precompute line parameters to avoid recalculating inside the loop
-    const dx = endPt.x - startPt.x;
-    const dy = endPt.y - startPt.y;
-    // C is the constant term in the numerator: |dy*x - dx*y + C|
-    // Original numerator logic: Math.abs(dy * point.x - dx * point.y + lineEnd.x * lineStart.y - lineEnd.y * lineStart.x)
-    const C = endPt.x * startPt.y - endPt.y * startPt.x;
-    const denominator = Math.sqrt(dx * dx + dy * dy);
+    // Use a Uint8Array to mark points to keep (1 = keep, 0 = discard)
+    const markers = new Uint8Array(n);
+    markers[0] = 1;
+    markers[n - 1] = 1;
 
-    // Case where start and end points are the same
-    const isSinglePoint = (denominator === 0);
+    const stack = [];
+    stack.push([0, n - 1]);
 
-    for (let i = 1; i < end; i++) {
-        let d;
-        if (isSinglePoint) {
-            // Euclidean distance if line is a point
-             d = Math.sqrt(Math.pow(points[i].x - startPt.x, 2) + Math.pow(points[i].y - startPt.y, 2));
-        } else {
-            // Perpendicular distance to line
-             d = Math.abs(dy * points[i].x - dx * points[i].y + C) / denominator;
+    while (stack.length > 0) {
+        const [startIndex, endIndex] = stack.pop();
+
+        // Find point with maximum distance
+        let dmax = 0;
+        let index = 0;
+
+        const startPt = points[startIndex];
+        const endPt = points[endIndex];
+
+        const dx = endPt.x - startPt.x;
+        const dy = endPt.y - startPt.y;
+
+        // C is the constant term in the numerator: |dy*x - dx*y + C|
+        const C = endPt.x * startPt.y - endPt.y * startPt.x;
+        const denominator = Math.sqrt(dx * dx + dy * dy);
+        const isSinglePoint = (denominator === 0);
+
+        for (let i = startIndex + 1; i < endIndex; i++) {
+            let d;
+            if (isSinglePoint) {
+                 d = Math.sqrt(Math.pow(points[i].x - startPt.x, 2) + Math.pow(points[i].y - startPt.y, 2));
+            } else {
+                 d = Math.abs(dy * points[i].x - dx * points[i].y + C) / denominator;
+            }
+
+            if (d > dmax) {
+                index = i;
+                dmax = d;
+            }
         }
 
-        if (d > dmax) {
-            index = i;
-            dmax = d;
+        if (dmax > epsilon) {
+            markers[index] = 1;
+            stack.push([startIndex, index]);
+            stack.push([index, endIndex]);
         }
     }
 
-    if (dmax > epsilon) {
-        const recResults1 = rdp(points.slice(0, index + 1), epsilon);
-        const recResults2 = rdp(points.slice(index, end + 1), epsilon);
-        return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
-    } else {
-        return [points[0], points[end]];
+    // Collect marked points
+    const newPoints = [];
+    for (let i = 0; i < n; i++) {
+        if (markers[i]) {
+            newPoints.push(points[i]);
+        }
     }
+
+    return newPoints;
 }
 
 export function simplifyPolygon(points, epsilon = 1.0) {
