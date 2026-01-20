@@ -75,6 +75,14 @@ describe('Order API Endpoints', () => {
         process.env.ADMIN_EMAIL = 'admin@example.com';
         process.env.NODE_ENV = 'test';
 
+        // Ensure dummy upload file exists for pricing validation
+        const uploadsDir = path.join(__dirname, '../server/uploads');
+        if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        // Copy a real image to satisfy image-size
+        fs.copyFileSync(path.join(__dirname, '../favicon.png'), path.join(uploadsDir, 'design.png'));
+
         // Start Server with injections
         const server = await startServer(db, bot, mockSendEmail, testDbPath, mockSquareClient);
         app = server.app;
@@ -96,6 +104,11 @@ describe('Order API Endpoints', () => {
         if (serverInstance) await new Promise(resolve => serverInstance.close(resolve));
         if (fs.existsSync(testDbPath)) {
             fs.unlinkSync(testDbPath);
+        }
+        // Cleanup dummy upload
+        const dummyUpload = path.join(__dirname, '../server/uploads/design.png');
+        if (fs.existsSync(dummyUpload)) {
+            fs.unlinkSync(dummyUpload);
         }
     });
 
@@ -128,7 +141,7 @@ describe('Order API Endpoints', () => {
 
             const orderData = {
                 sourceId: 'cnon:card-nonce-ok',
-                amountCents: 1000,
+                amountCents: 2, // Correct price for 10x favicon.png (approx 0.15 cents each -> 1.5 -> 2)
                 designImagePath: '/uploads/design.png',
                 shippingContact: {
                     givenName: 'John',
@@ -182,6 +195,47 @@ describe('Order API Endpoints', () => {
              expect(res.statusCode).toEqual(400);
         });
 
+        it('should fail if order amount is significantly less than calculated price', async () => {
+             const agent = request.agent(app);
+             const csrfRes = await agent.get('/api/csrf-token');
+             const csrfToken = csrfRes.body.csrfToken;
+             const token = getAuthToken();
+
+             const orderData = {
+                sourceId: 'cnon:card-nonce-ok',
+                amountCents: 1, // Intentionally low amount (1 cent)
+                designImagePath: '/uploads/design.png',
+                shippingContact: {
+                    givenName: 'John',
+                    familyName: 'Doe',
+                    email: 'john@example.com',
+                    addressLines: ['123 Main St'],
+                    locality: 'Anytown',
+                    administrativeDistrictLevel1: 'NY',
+                    postalCode: '10001',
+                    country: 'US'
+                },
+                billingContact: {
+                    givenName: 'John',
+                    familyName: 'Doe',
+                    email: 'john@example.com'
+                },
+                orderDetails: {
+                    quantity: 1000, // Large quantity to make price ~171 cents
+                    material: 'pp_standard' // Explicitly set material
+                }
+             };
+
+             const res = await agent
+                .post('/api/create-order')
+                .set('Authorization', `Bearer ${token}`)
+                .set('X-CSRF-Token', csrfToken)
+                .send(orderData);
+
+             expect(res.statusCode).toEqual(400);
+             expect(res.body.error).toMatch(/Price mismatch/i);
+        });
+
         it('should handle Square API errors', async () => {
              const agent = request.agent(app);
              const csrfRes = await agent.get('/api/csrf-token');
@@ -190,7 +244,8 @@ describe('Order API Endpoints', () => {
 
              const orderData = {
                 sourceId: 'cnon:card-nonce-declined',
-                amountCents: 1000,
+                amountCents: 1, // Correct price for quantity 1 (0.17 cents -> 0 or 1?) Rounds to 0. Let's try 1.
+                // Wait, if it rounds to 0, and we send 1, diff is 1. Tolerance 5. So 1 is accepted.
                 designImagePath: '/uploads/design.png',
                  shippingContact: {
                      givenName: 'John',

@@ -147,12 +147,15 @@ export function perpendicularDistance(point, lineStart, lineEnd) {
     return numerator / denominator;
 }
 
+// Bolt Optimization: Iterative implementation of RDP using a stack to avoid recursion and array slicing
 function rdp(points, epsilon) {
     if (points.length < 3) return points;
     const len = points.length;
 
     // Bolt Optimization: Iterative implementation using a stack and Uint8Array marker
     // to avoid recursion depth limits and excessive array slicing/allocation.
+    // Note: The upstream version also implemented an iterative approach, but we are keeping
+    // our specific implementation logic (e.g., flattened stack) which we've verified.
     const keep = new Uint8Array(len);
     keep[0] = 1;
     keep[len - 1] = 1;
