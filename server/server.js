@@ -450,6 +450,7 @@ async function startServer(
     }));
 
     app.use(express.json());
+    app.disable('x-powered-by');
 
     // SECURITY: Block access to sensitive files and directories
     app.use((req, res, next) => {
@@ -798,7 +799,31 @@ async function startServer(
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, shippingContact, productId, orderDetails, billingContact } = req.body;
+        const { sourceId, amountCents, currency, designImagePath, productId } = req.body;
+
+        // Manually construct safe objects to prevent Mass Assignment
+        const safeBillingContact = {
+            givenName: req.body.billingContact.givenName,
+            familyName: req.body.billingContact.familyName,
+            email: req.body.billingContact.email,
+            phoneNumber: req.body.billingContact.phoneNumber
+        };
+
+        const safeShippingContact = {
+            givenName: req.body.shippingContact.givenName,
+            familyName: req.body.shippingContact.familyName,
+            email: req.body.shippingContact.email,
+            addressLines: req.body.shippingContact.addressLines, // Array of strings (validated)
+            locality: req.body.shippingContact.locality,
+            administrativeDistrictLevel1: req.body.shippingContact.administrativeDistrictLevel1,
+            postalCode: req.body.shippingContact.postalCode,
+            country: req.body.shippingContact.country,
+            phoneNumber: req.body.shippingContact.phoneNumber
+        };
+
+        const safeOrderDetails = {
+            quantity: req.body.orderDetails.quantity
+        };
 
         // --- Product / Creator Payout Logic ---
         let product = null;
@@ -849,10 +874,6 @@ async function startServer(
           return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
         }
         console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
-        // Explicitly construct safe orderDetails object to prevent Stored XSS
-        const safeOrderDetails = {
-            quantity: orderDetails.quantity
-        };
 
         // Explicitly construct safe billingContact to prevent Mass Assignment
         const safeBillingContact = {
