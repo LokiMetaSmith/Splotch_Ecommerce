@@ -1,9 +1,19 @@
 import { describe, beforeAll, beforeEach, afterAll, it, expect, jest } from '@jest/globals';
 import request from 'supertest';
-import { startServer } from '../server.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
+
+// Mock pricing to ensure validation passes regardless of image
+jest.unstable_mockModule('../pricing.js', () => ({
+    calculateStickerPrice: jest.fn().mockReturnValue({ total: 1000, complexityMultiplier: 1 }),
+    getDesignDimensions: jest.fn().mockResolvedValue({
+        bounds: { width: 100, height: 100 },
+        cutline: []
+    })
+}));
+
+const { startServer } = await import('../server.js');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +47,16 @@ describe('Security: Mass Assignment in Create Order', () => {
 
     mockSendEmail = jest.fn();
 
+    // Create dummy design file
+    const uploadDir = path.join(__dirname, '../uploads');
+    try {
+        await fs.mkdir(uploadDir, { recursive: true });
+        const faviconPath = path.resolve(__dirname, '../../favicon.png');
+        await fs.copyFile(faviconPath, path.join(uploadDir, 'test.png'));
+    } catch (e) {
+        console.error('Failed to create dummy file:', e);
+    }
+
     // Pass mock Square client
     const server = await startServer(db, null, mockSendEmail, testDbPath, mockSquareClient);
     app = server.app;
@@ -57,6 +77,7 @@ describe('Security: Mass Assignment in Create Order', () => {
     await new Promise(resolve => serverInstance.close(resolve));
     try {
       await fs.unlink(testDbPath);
+      await fs.unlink(path.join(__dirname, '../uploads/test.png'));
     } catch (error) {
        // ignore
     }
