@@ -799,30 +799,13 @@ async function startServer(
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, productId } = req.body;
-
-        // Manually construct safe objects to prevent Mass Assignment
-        const safeBillingContact = {
-            givenName: req.body.billingContact.givenName,
-            familyName: req.body.billingContact.familyName,
-            email: req.body.billingContact.email,
-            phoneNumber: req.body.billingContact.phoneNumber
-        };
-
-        const safeShippingContact = {
-            givenName: req.body.shippingContact.givenName,
-            familyName: req.body.shippingContact.familyName,
-            email: req.body.shippingContact.email,
-            addressLines: req.body.shippingContact.addressLines, // Array of strings (validated)
-            locality: req.body.shippingContact.locality,
-            administrativeDistrictLevel1: req.body.shippingContact.administrativeDistrictLevel1,
-            postalCode: req.body.shippingContact.postalCode,
-            country: req.body.shippingContact.country,
-            phoneNumber: req.body.shippingContact.phoneNumber
-        };
+        const { sourceId, amountCents, currency, designImagePath, productId, orderDetails, billingContact, shippingContact } = req.body;
 
         const safeOrderDetails = {
-            quantity: req.body.orderDetails.quantity
+            quantity: orderDetails.quantity,
+            material: orderDetails.material,
+            resolution: orderDetails.resolution,
+            cutLinePath: orderDetails.cutLinePath
         };
 
         // --- Product / Creator Payout Logic ---
@@ -955,8 +938,27 @@ async function startServer(
         }
         console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
 
-        const safeOrderDetails = {
-            quantity: orderDetails.quantity
+        // Explicitly construct safe billingContact to prevent Mass Assignment
+        const finalBillingContact = {
+            givenName: escapeHtml(billingContact.givenName),
+            familyName: escapeHtml(billingContact.familyName),
+            email: billingContact.email, // email validator ensures format
+            phoneNumber: (typeof billingContact.phoneNumber === 'string') ? billingContact.phoneNumber.trim() : undefined
+        };
+
+        // Explicitly construct safe shippingContact to prevent Mass Assignment
+        const finalShippingContact = {
+            givenName: escapeHtml(shippingContact.givenName),
+            familyName: escapeHtml(shippingContact.familyName),
+            email: shippingContact.email, // email validator ensures format
+            phoneNumber: (typeof shippingContact.phoneNumber === 'string') ? shippingContact.phoneNumber.trim() : undefined,
+            addressLines: Array.isArray(shippingContact.addressLines)
+                ? shippingContact.addressLines.map(line => escapeHtml(line))
+                : [],
+            locality: escapeHtml(shippingContact.locality),
+            administrativeDistrictLevel1: escapeHtml(shippingContact.administrativeDistrictLevel1),
+            postalCode: escapeHtml(shippingContact.postalCode),
+            country: escapeHtml(shippingContact.country)
         };
 
         // Explicitly construct safe billingContact to prevent Mass Assignment
@@ -990,8 +992,8 @@ async function startServer(
           currency: currency || 'USD',
           status: 'NEW',
           orderDetails: safeOrderDetails,
-          billingContact: safeBillingContact,
-          shippingContact: safeShippingContact,
+          billingContact: finalBillingContact,
+          shippingContact: finalShippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
           productId: productId || null,

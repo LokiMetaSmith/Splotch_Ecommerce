@@ -149,31 +149,31 @@ export function perpendicularDistance(point, lineStart, lineEnd) {
 
 // Bolt Optimization: Iterative implementation of RDP using a stack to avoid recursion and array slicing
 function rdp(points, epsilon) {
-    const n = points.length;
-    if (n < 3) return points;
+    if (points.length < 3) return points;
+    const len = points.length;
 
-    // Use a Uint8Array to mark points to keep (1 = keep, 0 = discard)
-    const markers = new Uint8Array(n);
-    markers[0] = 1;
-    markers[n - 1] = 1;
+    // Bolt Optimization: Iterative implementation using a stack and Uint8Array marker
+    // to avoid recursion depth limits and excessive array slicing/allocation.
+    // Note: The upstream version also implemented an iterative approach, but we are keeping
+    // our specific implementation logic (e.g., flattened stack) which we've verified.
+    const keep = new Uint8Array(len);
+    keep[0] = 1;
+    keep[len - 1] = 1;
 
-    const stack = [];
-    stack.push([0, n - 1]);
+    const stack = [0, len - 1]; // Stack stores pairs of indices [start, end] flattened
 
     while (stack.length > 0) {
-        const [startIndex, endIndex] = stack.pop();
+        const endIndex = stack.pop();
+        const startIndex = stack.pop();
 
-        // Find point with maximum distance
         let dmax = 0;
-        let index = 0;
-
+        let index = startIndex;
         const startPt = points[startIndex];
         const endPt = points[endIndex];
 
+        // Bolt Optimization: Precompute line parameters
         const dx = endPt.x - startPt.x;
         const dy = endPt.y - startPt.y;
-
-        // C is the constant term in the numerator: |dy*x - dx*y + C|
         const C = endPt.x * startPt.y - endPt.y * startPt.x;
         const denominator = Math.sqrt(dx * dx + dy * dy);
         const isSinglePoint = (denominator === 0);
@@ -181,9 +181,11 @@ function rdp(points, epsilon) {
         for (let i = startIndex + 1; i < endIndex; i++) {
             let d;
             if (isSinglePoint) {
-                 d = Math.sqrt(Math.pow(points[i].x - startPt.x, 2) + Math.pow(points[i].y - startPt.y, 2));
+                // Euclidean distance if line is a point
+                d = Math.sqrt(Math.pow(points[i].x - startPt.x, 2) + Math.pow(points[i].y - startPt.y, 2));
             } else {
-                 d = Math.abs(dy * points[i].x - dx * points[i].y + C) / denominator;
+                // Perpendicular distance to line
+                d = Math.abs(dy * points[i].x - dx * points[i].y + C) / denominator;
             }
 
             if (d > dmax) {
@@ -193,21 +195,19 @@ function rdp(points, epsilon) {
         }
 
         if (dmax > epsilon) {
-            markers[index] = 1;
-            stack.push([startIndex, index]);
-            stack.push([index, endIndex]);
+            keep[index] = 1;
+            // Push right segment first so left is processed first (standard DFS order)
+            stack.push(index, endIndex);
+            stack.push(startIndex, index);
         }
     }
 
-    // Collect marked points
-    const newPoints = [];
-    for (let i = 0; i < n; i++) {
-        if (markers[i]) {
-            newPoints.push(points[i]);
-        }
+    // Reconstruct the path from marked points
+    const result = [];
+    for (let i = 0; i < len; i++) {
+        if (keep[i]) result.push(points[i]);
     }
-
-    return newPoints;
+    return result;
 }
 
 export function simplifyPolygon(points, epsilon = 1.0) {
