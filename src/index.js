@@ -118,6 +118,29 @@ async function BootStrap() {
         calculateAndUpdatePrice();
         stickerQuantityInput.addEventListener('input', calculateAndUpdatePrice);
         stickerQuantityInput.addEventListener('change', calculateAndUpdatePrice);
+
+        const decreaseQuantityBtn = document.getElementById('decreaseQuantityBtn');
+        const increaseQuantityBtn = document.getElementById('increaseQuantityBtn');
+
+        if (decreaseQuantityBtn) {
+            decreaseQuantityBtn.addEventListener('click', () => {
+                let currentVal = parseInt(stickerQuantityInput.value) || 0;
+                if (currentVal > 1) {
+                    stickerQuantityInput.value = currentVal - 1;
+                    stickerQuantityInput.dispatchEvent(new Event('input'));
+                    stickerQuantityInput.dispatchEvent(new Event('change'));
+                }
+            });
+        }
+
+        if (increaseQuantityBtn) {
+            increaseQuantityBtn.addEventListener('click', () => {
+                let currentVal = parseInt(stickerQuantityInput.value) || 0;
+                stickerQuantityInput.value = currentVal + 1;
+                stickerQuantityInput.dispatchEvent(new Event('input'));
+                stickerQuantityInput.dispatchEvent(new Event('change'));
+            });
+        }
     }
     if (stickerMaterialSelect) {
         stickerMaterialSelect.addEventListener('change', calculateAndUpdatePrice);
