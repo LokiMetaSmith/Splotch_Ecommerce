@@ -832,6 +832,18 @@ async function startServer(
             if (creatorId) {
                 creator = db.data.users[creatorId] || Object.values(db.data.users).find(u => u.username === creatorId || u.id === creatorId);
             }
+
+            // SECURITY: Verify that the payment covers at least the creator's profit margin.
+            // This prevents attackers from paying 1 cent for a product where the creator gets $50 payout.
+            const quantity = orderDetails.quantity || 1;
+            const minRequiredAmount = (product.creatorProfitCents || 0) * quantity;
+            // We also enforce a global minimum of 1 cent per item to cover printing/base costs roughly.
+            const globalMin = 1 * quantity;
+
+            if (amountCents < minRequiredAmount || amountCents < globalMin) {
+                console.warn(`[SECURITY] Price manipulation attempt detected. Order amount: ${amountCents}, Min Required: ${minRequiredAmount}`);
+                return res.status(400).json({ error: 'Order amount is too low.' });
+            }
         }
 
         // --- SECURITY: Validate Order Price ---
@@ -936,6 +948,29 @@ async function startServer(
 
         // Explicitly construct safe shippingContact to prevent Mass Assignment
         const finalShippingContact = {
+            givenName: escapeHtml(shippingContact.givenName),
+            familyName: escapeHtml(shippingContact.familyName),
+            email: shippingContact.email, // email validator ensures format
+            phoneNumber: (typeof shippingContact.phoneNumber === 'string') ? shippingContact.phoneNumber.trim() : undefined,
+            addressLines: Array.isArray(shippingContact.addressLines)
+                ? shippingContact.addressLines.map(line => escapeHtml(line))
+                : [],
+            locality: escapeHtml(shippingContact.locality),
+            administrativeDistrictLevel1: escapeHtml(shippingContact.administrativeDistrictLevel1),
+            postalCode: escapeHtml(shippingContact.postalCode),
+            country: escapeHtml(shippingContact.country)
+        };
+
+        // Explicitly construct safe billingContact to prevent Mass Assignment
+        const safeBillingContact = {
+            givenName: escapeHtml(billingContact.givenName),
+            familyName: escapeHtml(billingContact.familyName),
+            email: billingContact.email, // email validator ensures format
+            phoneNumber: (typeof billingContact.phoneNumber === 'string') ? billingContact.phoneNumber.trim() : undefined
+        };
+
+        // Explicitly construct safe shippingContact to prevent Mass Assignment
+        const safeShippingContact = {
             givenName: escapeHtml(shippingContact.givenName),
             familyName: escapeHtml(shippingContact.familyName),
             email: shippingContact.email, // email validator ensures format
