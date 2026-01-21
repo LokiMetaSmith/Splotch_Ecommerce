@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { jest } from '@jest/globals';
-import { getDesignDimensions } from '../server/pricing.js';
+import { getDesignDimensions, calculatePerimeter } from '../server/pricing.js';
 
 const tempSvgPath = path.join(process.cwd(), 'tests', 'temp_test.svg');
 const complexSvgPath = path.join(process.cwd(), 'tests', 'complex_test.svg');
@@ -46,7 +46,8 @@ describe('getDesignDimensions', () => {
             // Perimeter of 80x80 square = 320
             // The path is M 10 10 L 90 10 L 90 90 L 10 90 Z
             // 80 + 80 + 80 + 80 = 320
-            expect(result.cutline[0].length).toBeCloseTo(320, 1);
+            const perimeter = calculatePerimeter(result.cutline);
+            expect(perimeter).toBeCloseTo(320, 1);
 
             expect(readFileSyncSpy).not.toHaveBeenCalled();
             expect(readFileAsyncSpy).toHaveBeenCalledWith(tempSvgPath, 'utf8');
@@ -60,7 +61,7 @@ describe('getDesignDimensions', () => {
     it('should correctly calculate perimeter for complex path commands (C, S, Q, T)', async () => {
         const result = await getDesignDimensions(complexSvgPath);
         // We expect a valid calculation, not 0 and not linear approximation
-        const perimeter = result.cutline[0].length;
+        const perimeter = calculatePerimeter(result.cutline);
         expect(perimeter).toBeGreaterThan(100);
         // Value from previous test run was ~373.58
         expect(perimeter).toBeCloseTo(373.58, 1);
