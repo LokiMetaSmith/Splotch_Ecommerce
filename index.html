@@ -209,15 +209,22 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="field">
                             <label class="label text-sm font-medium text-gray-700" for="stickerQuantity">Quantity:</label>
-                            <div class="control">
+                            <div class="control flex items-center mt-1">
+                                <button type="button" id="decreaseQuantityBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-l-md border border-r-0 border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" aria-label="Decrease quantity">
+                                    -
+                                </button>
                                 <input
-                                    class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                    class="input block w-full px-3 py-2 bg-white border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-center z-10"
                                     id="stickerQuantity"
                                     name="stickerQuantity"
                                     type="number"
                                     value="50"
                                     min="1"
+                                    style="border-radius: 0;"
                                 />
+                                <button type="button" id="increaseQuantityBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-r-md border border-l-0 border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors" aria-label="Increase quantity">
+                                    +
+                                </button>
                             </div>
                         </div>
                         <div class="field">

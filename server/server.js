@@ -799,31 +799,34 @@ async function startServer(
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, productId } = req.body;
+        const { sourceId, amountCents, currency, designImagePath, productId, orderDetails, billingContact, shippingContact } = req.body;
 
         // Manually construct safe objects to prevent Mass Assignment
         // Variable names updated to avoid conflict with response variable names
         const inputSafeBillingContact = {
-            givenName: req.body.billingContact.givenName,
-            familyName: req.body.billingContact.familyName,
-            email: req.body.billingContact.email,
-            phoneNumber: req.body.billingContact.phoneNumber
+            givenName: billingContact.givenName,
+            familyName: billingContact.familyName,
+            email: billingContact.email,
+            phoneNumber: billingContact.phoneNumber
         };
 
         const inputSafeShippingContact = {
-            givenName: req.body.shippingContact.givenName,
-            familyName: req.body.shippingContact.familyName,
-            email: req.body.shippingContact.email,
-            addressLines: req.body.shippingContact.addressLines, // Array of strings (validated)
-            locality: req.body.shippingContact.locality,
-            administrativeDistrictLevel1: req.body.shippingContact.administrativeDistrictLevel1,
-            postalCode: req.body.shippingContact.postalCode,
-            country: req.body.shippingContact.country,
-            phoneNumber: req.body.shippingContact.phoneNumber
+            givenName: shippingContact.givenName,
+            familyName: shippingContact.familyName,
+            email: shippingContact.email,
+            addressLines: shippingContact.addressLines, // Array of strings (validated)
+            locality: shippingContact.locality,
+            administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1,
+            postalCode: shippingContact.postalCode,
+            country: shippingContact.country,
+            phoneNumber: shippingContact.phoneNumber
         };
 
         const inputSafeOrderDetails = {
-            quantity: req.body.orderDetails.quantity
+            quantity: orderDetails.quantity,
+            material: orderDetails.material,
+            resolution: orderDetails.resolution,
+            cutLinePath: orderDetails.cutLinePath
         };
 
         // --- Product / Creator Payout Logic ---
@@ -849,6 +852,18 @@ async function startServer(
             // CreatorId might be username or ID.
             if (creatorId) {
                 creator = db.data.users[creatorId] || Object.values(db.data.users).find(u => u.username === creatorId || u.id === creatorId);
+            }
+
+            // SECURITY: Verify that the payment covers at least the creator's profit margin.
+            // This prevents attackers from paying 1 cent for a product where the creator gets $50 payout.
+            const quantity = orderDetails.quantity || 1;
+            const minRequiredAmount = (product.creatorProfitCents || 0) * quantity;
+            // We also enforce a global minimum of 1 cent per item to cover printing/base costs roughly.
+            const globalMin = 1 * quantity;
+
+            if (amountCents < minRequiredAmount || amountCents < globalMin) {
+                console.warn(`[SECURITY] Price manipulation attempt detected. Order amount: ${amountCents}, Min Required: ${minRequiredAmount}`);
+                return res.status(400).json({ error: 'Order amount is too low.' });
             }
         }
 
@@ -946,10 +961,7 @@ async function startServer(
 
         // Explicitly construct safe billingContact to prevent Mass Assignment
         // Use input variable names (renamed above) to construct output variables
-        const billingContact = req.body.billingContact;
-        const shippingContact = req.body.shippingContact;
-
-        const safeBillingContact = {
+        const finalBillingContact = {
             givenName: escapeHtml(billingContact.givenName),
             familyName: escapeHtml(billingContact.familyName),
             email: billingContact.email, // email validator ensures format
@@ -957,7 +969,7 @@ async function startServer(
         };
 
         // Explicitly construct safe shippingContact to prevent Mass Assignment
-        const safeShippingContact = {
+        const finalShippingContact = {
             givenName: escapeHtml(shippingContact.givenName),
             familyName: escapeHtml(shippingContact.familyName),
             email: shippingContact.email, // email validator ensures format
@@ -979,8 +991,8 @@ async function startServer(
           currency: currency || 'USD',
           status: 'NEW',
           orderDetails: inputSafeOrderDetails,
-          billingContact: safeBillingContact,
-          shippingContact: safeShippingContact,
+          billingContact: finalBillingContact,
+          shippingContact: finalShippingContact,
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
           productId: productId || null,
