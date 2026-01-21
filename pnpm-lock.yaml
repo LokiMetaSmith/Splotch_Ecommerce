@@ -89,6 +89,9 @@ importers:
       square:
         specifier: ^43.0.1
         version: 43.2.1
+      svg-path-properties:
+        specifier: ^2.0.0
+        version: 2.0.0
       svg-to-pdfkit:
         specifier: ^0.1.8
         version: 0.1.8
@@ -3880,6 +3883,10 @@ packages:
 
   svg-parser@2.0.4:
     resolution: {integrity: sha512-e4hG1hRwoOdRb37cIMSgzNsxyzKfayW6VOflrwvR+/bzrkyxY/31WkbgnQpgtrNp1SdpJvpUAGTa/ZoiPNDuRQ==}
+
+  svg-path-properties@2.0.0:
+    resolution: {integrity: sha512-7+zZ4gQB8/aOnNOMy+tqCO1b1oju5umaiiNX2KuXihUX9IwFctOiCXAetpyk2if/q+YZB9qiKbo2Q/klgpfuSQ==}
+    engines: {node: '>=22.0.0'}
 
   svg-pathdata@6.0.3:
     resolution: {integrity: sha512-qsjeeq5YjBZ5eMdFuUa4ZosMLxgr5RZ+F+Y1OrDhuOCEInRMA3x74XdBtggJcj9kOeInz0WE+LgCPDkZFlBYJw==}
@@ -8383,6 +8390,8 @@ snapshots:
       has-flag: 4.0.0
 
   svg-parser@2.0.4: {}
+
+  svg-path-properties@2.0.0: {}
 
   svg-pathdata@6.0.3:
     optional: true
