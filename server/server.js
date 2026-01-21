@@ -799,7 +799,31 @@ async function startServer(
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, shippingContact, productId, orderDetails, billingContact } = req.body;
+        const { sourceId, amountCents, currency, designImagePath, productId } = req.body;
+
+        // Manually construct safe objects to prevent Mass Assignment
+        const safeBillingContact = {
+            givenName: req.body.billingContact.givenName,
+            familyName: req.body.billingContact.familyName,
+            email: req.body.billingContact.email,
+            phoneNumber: req.body.billingContact.phoneNumber
+        };
+
+        const safeShippingContact = {
+            givenName: req.body.shippingContact.givenName,
+            familyName: req.body.shippingContact.familyName,
+            email: req.body.shippingContact.email,
+            addressLines: req.body.shippingContact.addressLines, // Array of strings (validated)
+            locality: req.body.shippingContact.locality,
+            administrativeDistrictLevel1: req.body.shippingContact.administrativeDistrictLevel1,
+            postalCode: req.body.shippingContact.postalCode,
+            country: req.body.shippingContact.country,
+            phoneNumber: req.body.shippingContact.phoneNumber
+        };
+
+        const safeOrderDetails = {
+            quantity: req.body.orderDetails.quantity
+        };
 
         // --- Product / Creator Payout Logic ---
         let product = null;

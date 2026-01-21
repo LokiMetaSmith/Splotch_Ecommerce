@@ -74,6 +74,7 @@ function calculateStickerPrice(pricingConfig, quantity, material, bounds, cutlin
 
 import sizeOf from 'image-size';
 import { parse } from 'svg-parser';
+import { svgPathProperties } from 'svg-path-properties';
 import fs from 'fs';
 import { promisify } from 'util';
 import { svgPathProperties } from "svg-path-properties";
