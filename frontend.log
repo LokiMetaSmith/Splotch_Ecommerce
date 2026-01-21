@@ -1,0 +1,119 @@
+ INFO  Accepting connections at http://localhost:5173
+ HTTP  1/21/2026 7:08:52 PM ::1 GET /
+ HTTP  1/21/2026 7:08:52 PM ::1 Returned 200 in 21 ms
+ HTTP  1/21/2026 7:08:52 PM ::1 GET /src/lib/clipper.js
+ HTTP  1/21/2026 7:08:52 PM ::1 GET /assets/styles-ClfVjiyV.css
+ HTTP  1/21/2026 7:08:52 PM ::1 GET /assets/splotch-theme-DpI6hdKf.css
+ HTTP  1/21/2026 7:08:52 PM ::1 GET /assets/main-BjJ-pcns.js
+ HTTP  1/21/2026 7:08:52 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  1/21/2026 7:08:52 PM ::1 GET /assets/svgparser-CQWDQCzv.js
+ HTTP  1/21/2026 7:08:52 PM ::1 Returned 404 in 9 ms
+ HTTP  1/21/2026 7:08:52 PM ::1 Returned 200 in 10 ms
+ HTTP  1/21/2026 7:08:52 PM ::1 Returned 200 in 11 ms
+ HTTP  1/21/2026 7:08:52 PM ::1 Returned 200 in 11 ms
+ HTTP  1/21/2026 7:08:52 PM ::1 Returned 200 in 11 ms
+ HTTP  1/21/2026 7:08:52 PM ::1 Returned 200 in 12 ms
+ HTTP  1/21/2026 7:08:52 PM ::1 GET /mascot.png
+ HTTP  1/21/2026 7:08:52 PM ::1 Returned 200 in 20 ms
+ HTTP  1/21/2026 7:08:53 PM ::1 GET /sw.js
+ HTTP  1/21/2026 7:08:53 PM ::1 Returned 404 in 3 ms
+ HTTP  1/21/2026 7:10:46 PM ::1 GET /
+ HTTP  1/21/2026 7:10:46 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:10:46 PM ::1 GET /src/lib/clipper.js
+ HTTP  1/21/2026 7:10:46 PM ::1 Returned 404 in 2 ms
+ HTTP  1/21/2026 7:10:46 PM ::1 GET /assets/styles-ClfVjiyV.css
+ HTTP  1/21/2026 7:10:46 PM ::1 GET /assets/splotch-theme-DpI6hdKf.css
+ HTTP  1/21/2026 7:10:46 PM ::1 GET /assets/main-BjJ-pcns.js
+ HTTP  1/21/2026 7:10:46 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  1/21/2026 7:10:46 PM ::1 GET /assets/svgparser-CQWDQCzv.js
+ HTTP  1/21/2026 7:10:46 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:10:46 PM ::1 Returned 200 in 3 ms
+ HTTP  1/21/2026 7:10:46 PM ::1 Returned 200 in 3 ms
+ HTTP  1/21/2026 7:10:46 PM ::1 Returned 200 in 3 ms
+ HTTP  1/21/2026 7:10:46 PM ::1 Returned 200 in 7 ms
+ HTTP  1/21/2026 7:10:46 PM ::1 GET /mascot.png
+ HTTP  1/21/2026 7:10:46 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:10:47 PM ::1 GET /sw.js
+ HTTP  1/21/2026 7:10:47 PM ::1 Returned 404 in 4 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /src/lib/clipper.js
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /assets/styles-ClfVjiyV.css
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /assets/splotch-theme-DpI6hdKf.css
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /assets/main-BjJ-pcns.js
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /assets/svgparser-CQWDQCzv.js
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 200 in 4 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 200 in 4 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 200 in 4 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 200 in 4 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 200 in 5 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 404 in 13 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /mascot.png
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 200 in 3 ms
+ HTTP  1/21/2026 7:11:42 PM ::1 GET /mascot-5.png
+ HTTP  1/21/2026 7:11:42 PM ::1 Returned 200 in 57 ms
+ HTTP  1/21/2026 7:11:43 PM ::1 GET /sw.js
+ HTTP  1/21/2026 7:11:43 PM ::1 Returned 404 in 7 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /src/lib/clipper.js
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 404 in 3 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /assets/styles-ClfVjiyV.css
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /assets/splotch-theme-DpI6hdKf.css
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /assets/main-BjJ-pcns.js
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /assets/svgparser-CQWDQCzv.js
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /mascot.png
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /mascot-6.png
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 200 in 38 ms
+ HTTP  1/21/2026 7:12:38 PM ::1 GET /sw.js
+ HTTP  1/21/2026 7:12:38 PM ::1 Returned 404 in 4 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /src/lib/clipper.js
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 404 in 1 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /assets/styles-ClfVjiyV.css
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /assets/splotch-theme-DpI6hdKf.css
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /assets/main-BjJ-pcns.js
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /assets/svgparser-CQWDQCzv.js
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /mascot.png
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:13:21 PM ::1 GET /mascot-6.png
+ HTTP  1/21/2026 7:13:21 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:13:22 PM ::1 GET /sw.js
+ HTTP  1/21/2026 7:13:22 PM ::1 Returned 404 in 1 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /src/lib/clipper.js
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /assets/styles-ClfVjiyV.css
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /assets/splotch-theme-DpI6hdKf.css
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /assets/main-BjJ-pcns.js
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 200 in 2 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /assets/svgparser-CQWDQCzv.js
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 200 in 3 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 404 in 6 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /mascot.png
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 200 in 1 ms
+ HTTP  1/21/2026 7:14:11 PM ::1 GET /mascot-4.png
+ HTTP  1/21/2026 7:14:11 PM ::1 Returned 200 in 62 ms
+ HTTP  1/21/2026 7:14:12 PM ::1 GET /sw.js
+ HTTP  1/21/2026 7:14:12 PM ::1 Returned 404 in 4 ms
+
+ INFO  Gracefully shutting down. Please wait...
