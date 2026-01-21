@@ -82,13 +82,11 @@ import { svgPathProperties } from "svg-path-properties";
 function getPathPerimeter(pathNode) {
     let perimeter = 0;
     if (pathNode.properties && pathNode.properties.d) {
-        const d = pathNode.properties.d;
         try {
-            const properties = new svgPathProperties(d);
+            const properties = new svgPathProperties(pathNode.properties.d);
             perimeter = properties.getTotalLength();
         } catch (e) {
-            console.warn('Failed to calculate path perimeter:', e);
-            // Fallback or just return 0
+            console.error("Error calculating path length:", e);
         }
     }
     return perimeter;
