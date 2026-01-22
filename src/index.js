@@ -398,8 +398,8 @@ function calculateAndUpdatePrice() {
     if (!bounds || !cutline || !selectedResolution) {
         currentOrderAmountCents = 0;
         calculatedPriceDisplay.innerHTML = `Price: <span class="text-gray-500">---</span>`;
-        if (widthDisplayEl) widthDisplayEl.value = '---';
-        if (heightDisplayEl) heightDisplayEl.value = '---';
+        if (widthDisplayEl) widthDisplayEl.textContent = '---';
+        if (heightDisplayEl) heightDisplayEl.textContent = '---';
         return;
     }
 
@@ -421,8 +421,8 @@ function calculateAndUpdatePrice() {
         unit = 'mm';
     }
 
-    if (widthDisplayEl) widthDisplayEl.value = width.toFixed(2);
-    if (heightDisplayEl) heightDisplayEl.value = height.toFixed(2);
+    if (widthDisplayEl) widthDisplayEl.textContent = `${width.toFixed(2)} ${unit}`;
+    if (heightDisplayEl) heightDisplayEl.textContent = `${height.toFixed(2)} ${unit}`;
 
     let markupHtml = '';
     if (creatorProfitCents > 0) {
