@@ -773,6 +773,11 @@ async function startServer(
       // Security Fix: Validate orderDetails structure
       body('orderDetails').isObject().withMessage('orderDetails must be an object'),
       body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),
+      body('orderDetails.cutLinePath').optional().isString().withMessage('cutLinePath must be a string').custom(value => {
+            if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
+            if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
+            return true;
+      }),
 
       // Security & Integrity: Validate Billing Contact
       body('billingContact').isObject().withMessage('billingContact must be an object'),
