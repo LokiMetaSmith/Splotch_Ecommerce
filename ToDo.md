@@ -44,6 +44,7 @@ These are smaller tasks for improving test quality and covering minor edge cases
 -   **[x] Expand Incomplete Server Tests:** The main backend integration test (`tests/server.test.js`) only covers the `/api/ping` endpoint. It should be expanded to cover all other non-auth, non-order-related endpoints.
 -   **[x] Add Test for CLI `remove-key` Command:** The command-line interface test (`tests/cli_test.sh`) is missing coverage for the `remove-key` command.
 -   **[x] Consolidate Redundant Tests:** The `/api/ping` endpoint is tested in two different files. The duplicate test should be removed.
+-   **[x] Fix Server Pricing Tests:** Fix the regression in `tests/server-pricing.test.js` where perimeters were checked against array length instead of calculated value.
 
 ---
 <br>
