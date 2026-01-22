@@ -176,18 +176,36 @@ function rdp(points, epsilon) {
         const denominator = Math.sqrt(dx * dx + dy * dy);
         const isSinglePoint = (denominator === 0);
 
-        for (let i = start + 1; i < end; i++) {
-            let d;
-            if (isSinglePoint) {
-                 d = Math.sqrt(Math.pow(points[i].x - startPt.x, 2) + Math.pow(points[i].y - startPt.y, 2));
-            } else {
-                 d = Math.abs(dy * points[i].x - dx * points[i].y + C) / denominator;
+        // Bolt Optimization: Minimize operations in the hot loop
+        // 1. Avoid Math.sqrt inside the loop (use squared distance).
+        // 2. Avoid division inside the loop (compare numerators).
+        // 3. Cache points[i] to avoid repeated array access.
+        if (isSinglePoint) {
+            let maxDistSq = 0;
+            const sx = startPt.x; // Cache property access
+            const sy = startPt.y;
+            for (let i = start + 1; i < end; i++) {
+                const p = points[i];
+                const dx_i = p.x - sx;
+                const dy_i = p.y - sy;
+                const dSq = dx_i * dx_i + dy_i * dy_i;
+                if (dSq > maxDistSq) {
+                    index = i;
+                    maxDistSq = dSq;
+                }
             }
-
-            if (d > dmax) {
-                index = i;
-                dmax = d;
+            dmax = Math.sqrt(maxDistSq);
+        } else {
+            let maxNumerator = 0;
+            for (let i = start + 1; i < end; i++) {
+                const p = points[i];
+                const numerator = Math.abs(dy * p.x - dx * p.y + C);
+                if (numerator > maxNumerator) {
+                    index = i;
+                    maxNumerator = numerator;
+                }
             }
+            dmax = maxNumerator / denominator;
         }
 
         if (dmax > epsilon) {
