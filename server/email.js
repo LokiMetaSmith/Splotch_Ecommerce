@@ -1,29 +1,32 @@
 import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
+import { getSecret } from './secretManager.js';
 
 async function sendEmail({ to, subject, text, html, oauth2Client }) {
   // If SMTP_HOST is defined, use SMTP transport (Nodemailer)
-  if (process.env.SMTP_HOST) {
-    console.log(`[sendEmail] Using SMTP config: Host=${process.env.SMTP_HOST} Port=${process.env.SMTP_PORT}`);
+  const smtpHost = getSecret('SMTP_HOST');
+  if (smtpHost) {
+    const smtpPort = getSecret('SMTP_PORT');
+    console.log(`[sendEmail] Using SMTP config: Host=${smtpHost} Port=${smtpPort}`);
 
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-      auth: (process.env.SMTP_USER && process.env.SMTP_PASS) ? {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+      host: smtpHost,
+      port: Number(smtpPort) || 587,
+      secure: getSecret('SMTP_SECURE') === 'true', // true for 465, false for other ports
+      auth: (getSecret('SMTP_USER') && getSecret('SMTP_PASS')) ? {
+        user: getSecret('SMTP_USER'),
+        pass: getSecret('SMTP_PASS'),
       } : undefined,
       tls: {
           // Do not fail on invalid certs if explicitly allowed (useful for local testing/self-signed)
-          rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false'
+          rejectUnauthorized: getSecret('SMTP_REJECT_UNAUTHORIZED') !== 'false'
       }
     });
 
     try {
       const info = await transporter.sendMail({
-        from: process.env.SMTP_FROM || '"Print Shop" <noreply@example.com>',
+        from: getSecret('SMTP_FROM') || '"Print Shop" <noreply@example.com>',
         to,
         subject,
         text,
