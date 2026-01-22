@@ -45,6 +45,13 @@ describe('Security Input Validation', () => {
 
         process.env.SESSION_SECRET = 'test-secret'; // Ensure session secret is set
 
+        // Ensure dummy file exists for tests
+        const uploadsDir = path.join(__dirname, '../server/uploads');
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+        if (fs.existsSync(path.join(__dirname, '../favicon.png'))) {
+             fs.copyFileSync(path.join(__dirname, '../favicon.png'), path.join(uploadsDir, 'd.png'));
+        }
+
         const server = await startServer(db, bot, jest.fn(), testDbPath, mockSquareClient);
         app = server.app;
         timers = server.timers;
@@ -147,7 +154,7 @@ describe('Security Input Validation', () => {
             .set('X-CSRF-Token', csrfRes.body.csrfToken)
             .send({
                 sourceId: 'cnon:card-nonce-ok',
-                amountCents: 1000,
+                amountCents: 1, // Correct price for dummy file
                 designImagePath: '/uploads/d.png',
                 shippingContact: {
                     givenName: 'Good', familyName: 'User',

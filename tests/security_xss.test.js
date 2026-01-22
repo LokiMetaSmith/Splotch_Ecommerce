@@ -69,6 +69,13 @@ describe('Stored XSS Vulnerability Check (Order Details)', () => {
         process.env.NODE_ENV = 'test';
         process.env.SQUARE_ACCESS_TOKEN = 'mock_square_token';
 
+        // Ensure dummy file exists for tests
+        const uploadsDir = path.join(__dirname, '../server/uploads');
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+        if (fs.existsSync(path.join(__dirname, '../favicon.png'))) {
+             fs.copyFileSync(path.join(__dirname, '../favicon.png'), path.join(uploadsDir, 'd.png'));
+        }
+
         // Start Server
         const server = await startServer(db, bot, mockSendEmail, testDbPath, mockSquareClient);
         app = server.app;
@@ -104,8 +111,8 @@ describe('Stored XSS Vulnerability Check (Order Details)', () => {
 
         const maliciousPayload = {
             sourceId: 'cnon:card-nonce-ok',
-            amountCents: 1000,
-            designImagePath: '/uploads/design.png',
+            amountCents: 1, // Correct price for dummy file
+            designImagePath: '/uploads/d.png',
             shippingContact: {
                 givenName: 'Hacker',
                 familyName: 'One',
