@@ -35,6 +35,7 @@ let canvasPlaceholder;
 let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
 let creatorProfitCents = 0; // The markup for the current product
+let cutlineOffset = 10; // Default offset
 
 // --- Main Application Setup ---
 async function BootStrap() {
@@ -398,8 +399,8 @@ function calculateAndUpdatePrice() {
     if (!bounds || !cutline || !selectedResolution) {
         currentOrderAmountCents = 0;
         calculatedPriceDisplay.innerHTML = `Price: <span class="text-gray-500">---</span>`;
-        if (widthDisplayEl) widthDisplayEl.value = '---';
-        if (heightDisplayEl) heightDisplayEl.value = '---';
+        if (widthDisplayEl) widthDisplayEl.textContent = '---';
+        if (heightDisplayEl) heightDisplayEl.textContent = '---';
         return;
     }
 
@@ -421,8 +422,8 @@ function calculateAndUpdatePrice() {
         unit = 'mm';
     }
 
-    if (widthDisplayEl) widthDisplayEl.value = width.toFixed(2);
-    if (heightDisplayEl) heightDisplayEl.value = height.toFixed(2);
+    if (widthDisplayEl) widthDisplayEl.textContent = `${width.toFixed(2)} ${unit}`;
+    if (heightDisplayEl) heightDisplayEl.textContent = `${height.toFixed(2)} ${unit}`;
 
     let markupHtml = '';
     if (creatorProfitCents > 0) {
@@ -916,7 +917,7 @@ function redrawAll() {
     }
 
     // Generate the cutline from the current state of the polygons
-    const cutline = generateCutLine(currentPolygons, 10); // 10px offset
+    const cutline = generateCutLine(currentPolygons, cutlineOffset); // Use dynamic offset
 
     // Store the results globally
     currentCutline = cutline;
@@ -970,7 +971,7 @@ function handleSvgUpload(svgText) {
         }
 
         // Generate the cutline
-        const cutline = generateCutLine(polygons, 10); // 10px offset
+        const cutline = generateCutLine(polygons, cutlineOffset); // Use dynamic offset
 
         // Store the results globally
         basePolygons = polygons; // Store the original, unscaled polygons
