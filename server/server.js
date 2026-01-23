@@ -46,6 +46,31 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const { window } = new JSDOM('');
 const purify = DOMPurify(window);
 
+async function enforceCorrectExtension(fileObj, detectedType) {
+    if (!detectedType || !detectedType.ext) return;
+
+    const currentExt = path.extname(fileObj.filename).toLowerCase().replace('.', '');
+    const correctExt = detectedType.ext;
+
+    // Strict enforcement: Always rename to detected extension if different
+    // (allowing jpg/jpeg equivalence)
+    const isJpeg = (ext) => ext === 'jpg' || ext === 'jpeg';
+    const match = currentExt === correctExt || (isJpeg(currentExt) && isJpeg(correctExt));
+
+    if (!match) {
+        const nameWithoutExt = path.basename(fileObj.filename, path.extname(fileObj.filename));
+        const newFilename = `${nameWithoutExt}.${correctExt}`;
+        const newPath = path.join(path.dirname(fileObj.path), newFilename);
+
+        await fs.promises.rename(fileObj.path, newPath);
+
+        // Update file object
+        fileObj.filename = newFilename;
+        fileObj.path = newPath;
+        console.log(`[SECURITY] Renamed uploaded file to enforce extension: ${newFilename}`);
+    }
+}
+
 function escapeHtml(unsafe) {
     if (unsafe == null) return '';
     return String(unsafe)
@@ -641,6 +666,9 @@ async function startServer(
             }
         }
 
+        // --- SECURITY: Enforce correct extension ---
+        await enforceCorrectExtension(designImageFile, designFileType);
+
         let cutLinePath = null;
         if (req.files.cutLineFile && req.files.cutLineFile[0]) {
             const edgecutLineFile = req.files.cutLineFile[0];
@@ -664,6 +692,10 @@ async function startServer(
                 fs.unlink(designImageFile.path, (err) => { if (err) console.error("Error deleting orphaned design file:", err); });
                 return res.status(400).json({ error: 'The uploaded cut line file contains potentially malicious content and was rejected.' });
             }
+
+            // --- SECURITY: Enforce correct extension ---
+            await enforceCorrectExtension(edgecutLineFile, edgecutLineFileType);
+
             cutLinePath = `/uploads/${edgecutLineFile.filename}`;
         }
 
