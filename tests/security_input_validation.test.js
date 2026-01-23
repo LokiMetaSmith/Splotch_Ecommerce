@@ -141,13 +141,23 @@ describe('Security Input Validation', () => {
         const csrfRes = await agent.get('/api/csrf-token');
         const token = getAuthToken();
 
+        // Calculate expected price for d.png (favicon.png, 64x64)
+        // 64x64 at 300 DPI (default resolution)
+        // Width = 64/300 = 0.2133 in
+        // Height = 64/300 = 0.2133 in
+        // Area = 0.0455 sq in
+        // Price per sq inch = 15 cents
+        // Base Price = 0.0455 * 15 = 0.6825 cents
+        // Resolution Multiplier (300 DPI) = 1.3
+        // Total = 0.6825 * 1.3 = 0.887 cents -> Rounds to 1 cent
+
         const res = await agent
             .post('/api/create-order')
             .set('Authorization', `Bearer ${token}`)
             .set('X-CSRF-Token', csrfRes.body.csrfToken)
             .send({
                 sourceId: 'cnon:card-nonce-ok',
-                amountCents: 1000,
+                amountCents: 1, // Correct calculated price for favicon.png
                 designImagePath: '/uploads/d.png',
                 shippingContact: {
                     givenName: 'Good', familyName: 'User',

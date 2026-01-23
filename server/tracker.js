@@ -1,4 +1,5 @@
 import EasyPost from '@easypost/api';
+import { getSecret } from './secretManager.js';
 
 let db;
 let api;
@@ -6,8 +7,9 @@ let updateInterval; // Store interval ID for cleanup
 
 function initializeTracker(database) {
     db = database;
-    if (process.env.EASYPOST_API_KEY) {
-        api = new EasyPost(process.env.EASYPOST_API_KEY);
+    const apiKey = getSecret('EASYPOST_API_KEY');
+    if (apiKey) {
+        api = new EasyPost(apiKey);
         // Clear existing interval if any (for testing reload)
         if (updateInterval) clearInterval(updateInterval);
         // Check for updates every 5 minutes

@@ -6,13 +6,14 @@ import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getSecret } from './secretManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const program = new Command();
 
 const defaultData = { orders: [], users: {}, credentials: {} };
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'db.json');
+const dbPath = getSecret('DB_PATH') || path.join(__dirname, 'db.json');
 const db = await JSONFilePreset(dbPath, defaultData);
 
 program
