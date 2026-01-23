@@ -11,15 +11,37 @@ import { SVGParser } from './svgparser.js';
 import { GeometryUtil } from './geometryutil.js';
 import { PlacementWorker } from './placementworker.js';
 
-class GeneticAlgorithm {
+export class GeneticAlgorithm {
     constructor(adam, bin, config) {
         this.config = config || { populationSize: 10, mutationRate: 10, rotations: 4 };
         this.binBounds = GeometryUtil.getPolygonBounds(bin);
 
+        // Bolt Optimization: Precompute valid rotations to avoid repeated geometry calculations in the hot loop.
+        // This makes randomAngle O(1) instead of O(Rotations * Points).
+        this.validRotations = {};
+        const allAngles = [];
+        for (let i = 0; i < Math.max(this.config.rotations, 1); i++) {
+            allAngles.push(i * (360 / this.config.rotations));
+        }
+
+        for (const part of adam) {
+            const valid = [];
+            for (const angle of allAngles) {
+                const rotatedPart = GeometryUtil.rotatePolygon(part, angle);
+                const rotatedBounds = GeometryUtil.getPolygonBounds(rotatedPart);
+                if (rotatedBounds.width < this.binBounds.width && rotatedBounds.height < this.binBounds.height) {
+                    valid.push(angle);
+                }
+            }
+            // If no rotation fits, fallback to 0 (though ideally we should handle this gracefully)
+            if (valid.length === 0) valid.push(0);
+            this.validRotations[part.id] = valid;
+        }
+
         const angles = [];
         for (let i = 0; i < adam.length; i++) {
             angles.push(this.randomAngle(adam[i]));
-}
+        }
 
         this.population = [{ placement: adam, rotation: angles }];
 
@@ -30,25 +52,9 @@ class GeneticAlgorithm {
     }
 
     randomAngle(part) {
-        const angleList = [];
-        for (let i = 0; i < Math.max(this.config.rotations, 1); i++) {
-            angleList.push(i * (360 / this.config.rotations));
-        }
-
-        // Fisher-Yates shuffle
-        for (let i = angleList.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [angleList[i], angleList[j]] = [angleList[j], angleList[i]];
-        }
-
-        for (const angle of angleList) {
-            const rotatedPart = GeometryUtil.rotatePolygon(part, angle);
-            const rotatedBounds = GeometryUtil.getPolygonBounds(rotatedPart);
-            if (rotatedBounds.width < this.binBounds.width && rotatedBounds.height < this.binBounds.height) {
-                return angle;
-            }
-        }
-        return 0;
+        const valid = this.validRotations[part.id];
+        if (!valid || valid.length === 0) return 0;
+        return valid[Math.floor(Math.random() * valid.length)];
     }
 
     mutate(individual) {

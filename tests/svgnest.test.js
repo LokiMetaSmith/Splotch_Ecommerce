@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, beforeAll, afterAll } from '@jest/glo
 import { SVGParser } from '../src/lib/svgparser.js';
 import { PlacementWorker } from '../src/lib/placementworker.js';
 import { GeometryUtil } from '../src/lib/geometryutil.js';
-import { SvgNest } from '../src/lib/svgnest.js';
+import { SvgNest, GeneticAlgorithm } from '../src/lib/svgnest.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -205,5 +205,66 @@ describe('SvgNest', () => {
         const parts = nest._getParts([svg]);
         // Should find 2 parts (rect and circle)
         expect(parts.length).toBe(2);
+    });
+});
+
+describe('GeneticAlgorithm Optimization', () => {
+    let binPolygon;
+    let parts;
+
+    beforeAll(() => {
+        // Create a simple bin 500x500
+        binPolygon = [{x:0, y:0}, {x:500, y:0}, {x:500, y:500}, {x:0, y:500}];
+
+        // Create a simple part 100x100
+        const part = [{x:0, y:0}, {x:100, y:0}, {x:100, y:100}, {x:0, y:100}];
+        part.id = 1;
+        part.source = 1;
+        parts = [part];
+    });
+
+    it('should precompute valid rotations in constructor', () => {
+        const config = { populationSize: 10, mutationRate: 10, rotations: 4 };
+        const ga = new GeneticAlgorithm(parts, binPolygon, config);
+
+        expect(ga.validRotations).toBeDefined();
+        expect(ga.validRotations[1]).toBeDefined();
+        // 4 rotations: 0, 90, 180, 270. All should fit in 500x500 bin.
+        expect(ga.validRotations[1].length).toBe(4);
+        expect(ga.validRotations[1]).toContain(0);
+        expect(ga.validRotations[1]).toContain(90);
+    });
+
+    it('should handle parts that only fit at certain angles', () => {
+        // Bin that is wide but short: 500x50
+        const narrowBin = [{x:0, y:0}, {x:500, y:0}, {x:500, y:50}, {x:0, y:50}];
+
+        // Part is 100x40. Fits at 0 and 180.
+        // If rotated 90, it becomes 40x100, which doesn't fit height 50.
+        const part = [{x:0, y:0}, {x:100, y:0}, {x:100, y:40}, {x:0, y:40}];
+        part.id = 2;
+
+        const config = { populationSize: 10, mutationRate: 10, rotations: 4 };
+        const ga = new GeneticAlgorithm([part], narrowBin, config);
+
+        const valid = ga.validRotations[2];
+        expect(valid).toBeDefined();
+        // Should contain 0 and 180. Should NOT contain 90 or 270.
+        // Note: 180 is same bounds as 0 for rect.
+        // 90 is 40x100 (w x h). Bin is 500x50. Height 100 > 50. Fail.
+
+        const hasHorizontal = valid.includes(0) || valid.includes(180);
+        const hasVertical = valid.includes(90) || valid.includes(270);
+
+        expect(hasHorizontal).toBe(true);
+        expect(hasVertical).toBe(false);
+    });
+
+    it('randomAngle should return one of the precomputed angles', () => {
+        const config = { populationSize: 10, mutationRate: 10, rotations: 4 };
+        const ga = new GeneticAlgorithm(parts, binPolygon, config);
+
+        const angle = ga.randomAngle(parts[0]);
+        expect(ga.validRotations[parts[0].id]).toContain(angle);
     });
 });
