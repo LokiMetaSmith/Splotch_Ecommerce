@@ -16,24 +16,20 @@ const { startServer } = await import('../server.js');
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-describe('Security: Error Handling and Information Leakage', () => {
+describe('Security: Input Length Limits (DoS Protection)', () => {
   let app;
   let db;
   let serverInstance;
   let timers;
   let bot;
   let mockSendEmail;
-  const testDbPath = path.join(__dirname, 'test-db-error-handling.json');
-  const dummyFilePath = path.join(__dirname, '../uploads/dummy_error_test.png');
+  const testDbPath = path.join(__dirname, 'test-db-input-limits.json');
+  const dummyFilePath = path.join(__dirname, '../uploads/dummy_limit_test.png');
 
-  // A mock Square client that throws a generic Error (not a SquareError)
-  // This simulates an unexpected internal error (e.g. network crash, bug in SDK wrapper, etc.)
   const mockSquareClient = {
     locations: {},
     payments: {
-      create: jest.fn().mockImplementation(() => {
-        throw new Error('CRITICAL_DATABASE_CONNECTION_STRING_LEAKED');
-      })
+      create: jest.fn().mockResolvedValue({ payment: { id: 'mock_payment_id', orderId: 'mock_square_order_id' } })
     }
   };
 
@@ -72,7 +68,7 @@ describe('Security: Error Handling and Information Leakage', () => {
     } catch (e) {}
   });
 
-  it('should NOT leak internal error details in 500 responses', async () => {
+  it('should reject requests with excessively long input fields', async () => {
     const agent = request.agent(app);
 
     // 1. Get CSRF Token
@@ -82,26 +78,27 @@ describe('Security: Error Handling and Information Leakage', () => {
     // 2. Register/Login
     await agent.post('/api/auth/register-user')
       .set('X-CSRF-Token', csrfToken)
-      .send({ username: 'tester', password: 'password123' });
+      .send({ username: 'limittester', password: 'password123' });
 
     csrfRes = await agent.get('/api/csrf-token');
     csrfToken = csrfRes.body.csrfToken;
 
     const loginRes = await agent.post('/api/auth/login')
       .set('X-CSRF-Token', csrfToken)
-      .send({ username: 'tester', password: 'password123' });
+      .send({ username: 'limittester', password: 'password123' });
 
     const authToken = loginRes.body.token;
 
-    // 3. Create Order
+    // 3. Create Order with MASSIVE payload
+    const longString = 'a'.repeat(2000); // 2000 characters
     const payload = {
       sourceId: 'cnon:card-nonce-ok',
-      amountCents: 100, // Matches our mock pricing
+      amountCents: 100,
       currency: 'USD',
-      designImagePath: '/uploads/dummy_error_test.png',
+      designImagePath: '/uploads/dummy_limit_test.png',
       orderDetails: { quantity: 1 },
       shippingContact: {
-        givenName: 'Test',
+        givenName: longString, // SHOULD FAIL (max 100)
         addressLines: ['123 Test St'],
         locality: 'Testville',
         administrativeDistrictLevel1: 'TS',
@@ -120,19 +117,11 @@ describe('Security: Error Handling and Information Leakage', () => {
       .set('X-CSRF-Token', csrfToken)
       .send(payload);
 
-    // Expect 500 because we threw an error
-    expect(res.statusCode).toEqual(500);
+    // Expect 400 Bad Request
+    expect(res.statusCode).toEqual(400);
 
-    // SECURITY ASSERTION: The response should NOT contain the sensitive error message
-    // CURRENT BEHAVIOR (Vulnerable): Returns { error: 'Internal Server Error', message: 'CRITICAL_DATABASE_CONNECTION_STRING_LEAKED' }
-    // EXPECTED BEHAVIOR (Secure): Returns { error: 'Internal Server Error', message: 'An unexpected error occurred.' }
-
-    if (res.body.message === 'An unexpected error occurred.') {
-        console.log("Success: Sensitive error message suppressed.");
-    } else {
-        console.log("Failure: Error message might be leaked:", res.body.message);
-    }
-
-    expect(res.body.message).toEqual('An unexpected error occurred.');
+    // Verify specific error message
+    const hasNameError = res.body.errors.some(e => e.msg === 'Shipping First Name is too long');
+    expect(hasNameError).toBe(true);
   });
 });
