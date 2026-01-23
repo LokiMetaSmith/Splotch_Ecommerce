@@ -46,13 +46,26 @@ async function updateTrackingData() {
 
     console.log(`[TRACKER] Checking status for ${shippedOrders.length} shipped orders...`);
 
-    for (const order of shippedOrders) {
+    // Bolt Optimization: Parallelize API requests and batch DB writes
+    let hasUpdates = false;
+    const promises = shippedOrders.map(async (order) => {
         try {
             const tracker = await api.Tracker.create({
                 tracking_code: order.trackingNumber,
                 carrier: order.courier,
             });
+            return { order, tracker };
+        } catch (error) {
+            console.error(`[TRACKER] Failed to track order ${order.orderId}:`, error);
+            return null;
+        }
+    });
 
+    const results = await Promise.allSettled(promises);
+
+    for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+            const { order, tracker } = result.value;
             if (tracker.status && tracker.status.toLowerCase() === 'delivered') {
                 console.log(`[TRACKER] Order ${order.orderId} has been delivered. Updating status.`);
                 const orderToUpdate = db.data.orders[order.orderId];
@@ -67,13 +80,14 @@ async function updateTrackingData() {
                             db.shippedOrders.splice(idx, 1);
                         }
                     }
-
-                    await db.write();
+                    hasUpdates = true;
                 }
             }
-        } catch (error) {
-            console.error(`[TRACKER] Failed to track order ${order.orderId}:`, error);
         }
+    }
+
+    if (hasUpdates) {
+        await db.write();
     }
 }
 
