@@ -37,6 +37,15 @@ describe('Security: Mass Assignment in Create Order', () => {
 
     mockSendEmail = jest.fn();
 
+    // Ensure dummy file exists for tests
+    const uploadsDir = path.join(__dirname, '../uploads');
+    try {
+        await fs.mkdir(uploadsDir, { recursive: true });
+        await fs.copyFile(path.join(__dirname, '../../favicon.png'), path.join(uploadsDir, 'test.png'));
+    } catch (error) {
+        console.warn('Could not create dummy test file:', error);
+    }
+
     // Pass mock Square client
     const server = await startServer(db, null, mockSendEmail, testDbPath, mockSquareClient);
     app = server.app;
@@ -59,6 +68,11 @@ describe('Security: Mass Assignment in Create Order', () => {
       await fs.unlink(testDbPath);
     } catch (error) {
        // ignore
+    }
+    try {
+        await fs.unlink(path.join(__dirname, '../uploads/test.png'));
+    } catch (error) {
+        // ignore
     }
   });
 

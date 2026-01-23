@@ -16,6 +16,7 @@ These issues represent the most severe risks to the application's functionality 
 -   **[x] Fix Broken Playwright Tests:** Two Playwright tests have their core verification steps commented out due to "intractable failures". They must be fixed to perform proper automated validation instead of relying on manual screenshot checks.
     -   [x] `playwright_tests/add-text.spec.js`
     -   [x] `playwright_tests/image-upload.spec.js`
+-   **[x] Fix failing security tests due to missing test files:** The security tests `tests/security_xss.test.js` and `server/tests/security_mass_assignment.test.js` were failing because they relied on non-existent dummy files. They have been updated to dynamically create and clean up these files.
 
 ---
 
