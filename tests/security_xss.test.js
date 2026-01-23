@@ -96,6 +96,10 @@ describe('Stored XSS Vulnerability Check (Order Details)', () => {
         if (fs.existsSync(testDbPath)) {
             fs.unlinkSync(testDbPath);
         }
+        const uploadsDir = path.join(__dirname, '../server/uploads');
+        if (fs.existsSync(path.join(uploadsDir, 'd.png'))) {
+            fs.unlinkSync(path.join(uploadsDir, 'd.png'));
+        }
     });
 
     const getAuthToken = (username = 'testuser', email = 'test@example.com') => {
@@ -112,7 +116,7 @@ describe('Stored XSS Vulnerability Check (Order Details)', () => {
         const maliciousPayload = {
             sourceId: 'cnon:card-nonce-ok',
             amountCents: 1, // Adjusted to match calculated price of favicon.png (approx 1 cent)
-            designImagePath: '/uploads/design.png',
+            designImagePath: '/uploads/d.png',
             shippingContact: {
                 givenName: 'Hacker',
                 familyName: 'One',
