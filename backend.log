@@ -1,0 +1,25 @@
+[dotenv@17.2.3] injecting env (0) from server/.env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+[KEY_MANAGER] Rotating keys...
+[KEY_MANAGER] Now managing 1 active keys.
+[dotenv@17.2.3] injecting env (0) from server/.env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[SERVER] Pricing configuration loaded.
+[TELEGRAM] Bot token not found. Bot is disabled.
+[SERVER] Initialized active orders cache. Count: 0
+[SERVER] Initialized shipped orders cache. Count: 0
+[SERVER] Initialized user orders index. Users indexed: 0
+[SERVER] LowDB database initialized at: /app/server/db.json
+[SERVER] Multer configured for file uploads.
+[SERVER] Initializing Square client...
+[SERVER] Verifying connection to Square servers...
+✅ [SERVER] DNS resolution successful. Network connection appears to be working.
+[SERVER] Square client initialized.
+[SERVER] Performing sanity check on Square client...
+✅ [SERVER] Sanity check passed. Client has required API properties.
+⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+   Do not use this configuration in production.
+[SERVER] Middleware (CORS, JSON, static file serving) enabled.
+[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+[KEY_MANAGER] Rotating keys...
+[KEY_MANAGER] Now managing 2 active keys.
+[SERVER] Signed new session token with key ID: f0c0a742011c79f9
+[SERVER] Server listening at http://localhost:3000

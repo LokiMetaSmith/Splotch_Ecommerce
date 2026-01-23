@@ -230,8 +230,9 @@ async function BootStrap() {
     const standardSizesContainer = document.getElementById('standard-sizes-controls');
     if (standardSizesContainer) {
         standardSizesContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('size-btn')) {
-                const targetInches = parseFloat(e.target.dataset.size);
+            const btn = e.target.closest('.size-btn');
+            if (btn) {
+                const targetInches = parseFloat(btn.dataset.size);
                 handleStandardResize(targetInches);
 
                 // Also update the slider
@@ -596,7 +597,7 @@ async function handlePaymentFormSubmit(event) {
             throw new Error('Temporary authentication token was not received.');
         }
         console.log('[CLIENT] Temporary auth token received.');
-        await fetchCsrfToken(); 
+        await fetchCsrfToken();
         if (!csrfToken) {
             throw new Error('Could not retrieve a new security token for file upload.');
         }
@@ -622,7 +623,7 @@ async function handlePaymentFormSubmit(event) {
             credentials: 'include',
             headers: {
                 'Authorization': `Bearer ${tempAuthToken}`,
-                'X-CSRF-Token': csrfToken 
+                'X-CSRF-Token': csrfToken
             },
             body: uploadFormData,
         });
@@ -1294,6 +1295,27 @@ function handleStandardResize(targetInches) {
     if (currentMaxWidthPixels <= 0) return;
 
     const scale = targetPixels / currentMaxWidthPixels;
+
+    // Update Size Buttons State
+    const sizeBtns = document.querySelectorAll('.size-btn');
+    sizeBtns.forEach(btn => {
+        const size = parseFloat(btn.dataset.size);
+        // Use a small epsilon for float comparison
+        if (Math.abs(size - targetInches) < 0.05) {
+            btn.setAttribute('aria-pressed', 'true');
+            // Use setProperty with 'important' to override aggressive themes
+            btn.style.setProperty('background-color', 'var(--splotch-red)', 'important');
+            btn.style.setProperty('color', 'white', 'important');
+            btn.style.setProperty('border-color', 'var(--splotch-red)', 'important');
+            btn.style.fontWeight = 'bold';
+        } else {
+            btn.setAttribute('aria-pressed', 'false');
+            btn.style.removeProperty('background-color');
+            btn.style.removeProperty('color');
+            btn.style.removeProperty('border-color');
+            btn.style.fontWeight = '';
+        }
+    });
 
     if (basePolygons.length > 0) {
         // SVG Vector Resizing - always scale from the original
