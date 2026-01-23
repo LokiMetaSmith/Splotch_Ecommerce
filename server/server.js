@@ -1207,7 +1207,8 @@ ${statusChecklist}
         if (error.result && error.result.errors) {
           return res.status(error.statusCode || 500).json({ error: 'Square API Error', details: error.result.errors });
         }
-        return res.status(500).json({ error: 'Internal Server Error', message: error.message });
+        // SECURITY: Do not leak error details to the client
+        return res.status(500).json({ error: 'Internal Server Error', message: 'An unexpected error occurred.' });
       }
     });
     app.get('/api/auth/verify-token', authenticateToken, (req, res) => {
@@ -1852,7 +1853,8 @@ ${statusChecklist}
         res.json({ verified });
       } catch (error) {
         await logAndEmailError(error, 'Error in /api/auth/register-verify');
-        res.status(400).json({ error: error.message });
+        // SECURITY: Do not leak error details to the client
+        res.status(400).json({ error: 'Verification failed.' });
       }
     });
 
@@ -1908,7 +1910,8 @@ ${statusChecklist}
         }
       } catch (error) {
         await logAndEmailError(error, 'Error in /api/auth/login-verify');
-        res.status(400).json({ error: error.message });
+        // SECURITY: Do not leak error details to the client
+        res.status(400).json({ error: 'Verification failed.' });
       }
     });
 
