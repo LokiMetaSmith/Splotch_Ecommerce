@@ -216,6 +216,7 @@
             class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-10 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
           >
             <button
+              type="button"
               id="rotateLeftBtn"
               title="Rotate Left 90°"
               aria-label="Rotate Left"
@@ -243,6 +244,7 @@
               </svg>
             </button>
             <button
+              type="button"
               id="rotateRightBtn"
               title="Rotate Right 90°"
               aria-label="Rotate Right"
@@ -286,23 +288,19 @@
             <div class="flex flex-col justify-center items-center col-span-2">
               <label class="text-xs text-gray-500 mb-1">Dimensions</label>
               <div class="flex items-center space-x-1">
-                <input
-                  type="text"
+                <span
                   id="widthDisplay"
                   aria-label="Calculated Width"
-                  readonly
-                  class="w-16 text-center text-xs border rounded bg-gray-50 text-gray-700 p-1"
-                  value="---"
-                />
+                  class="w-24 inline-block text-center text-xs border rounded bg-gray-50 text-gray-700 p-1"
+                  >---</span
+                >
                 <span class="text-xs text-gray-400">x</span>
-                <input
-                  type="text"
+                <span
                   id="heightDisplay"
                   aria-label="Calculated Height"
-                  readonly
-                  class="w-16 text-center text-xs border rounded bg-gray-50 text-gray-700 p-1"
-                  value="---"
-                />
+                  class="w-24 inline-block text-center text-xs border rounded bg-gray-50 text-gray-700 p-1"
+                  >---</span
+                >
               </div>
             </div>
             <button
@@ -322,6 +320,7 @@
               Sepia
             </button>
             <button
+              type="button"
               id="generateCutlineBtn"
               class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-2 flex justify-center items-center gap-2"
               title="Generate Cutline from Image Alpha"
@@ -447,6 +446,7 @@
                 />
               </div>
               <button
+                type="button"
                 id="addTextBtn"
                 class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2.5 px-4 rounded-full shadow-md transition duration-150 ease-in-out transform hover:scale-105 self-end"
                 style="
@@ -706,7 +706,7 @@
                   class="input mt-1 block w-full"
                   id="email"
                   name="email"
-                  type="email"
+                  type="text"
                   placeholder="you@example.com"
                   required
                   autocomplete="email"
