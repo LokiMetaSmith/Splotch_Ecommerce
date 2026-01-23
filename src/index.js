@@ -387,6 +387,13 @@ function calculateAndUpdatePrice() {
     const selectedResolution = pricingConfig.resolutions.find(r => r.id === selectedResolutionId);
 
     const quantity = parseInt(stickerQuantityInput.value, 10);
+
+    // Update Quantity Button State
+    const decreaseQuantityBtn = document.getElementById('decreaseQuantityBtn');
+    if (decreaseQuantityBtn) {
+        decreaseQuantityBtn.disabled = isNaN(quantity) || quantity <= 1;
+    }
+
     const bounds = currentBounds;
     const cutline = currentCutline;
 
