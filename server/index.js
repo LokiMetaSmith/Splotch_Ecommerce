@@ -15,6 +15,7 @@ process.on('uncaughtException', (error) => {
 import { startServer, FINAL_STATUSES } from './server.js';
 import { initializeBot } from './bot.js';
 import { sendEmail } from './email.js';
+import { getSecret } from './secretManager.js';
 import { JSONFilePreset } from 'lowdb/node';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -24,7 +25,7 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ENCRYPTION_KEY = process.env.JWT_SECRET; // 32 bytes
+const ENCRYPTION_KEY = getSecret('JWT_SECRET'); // 32 bytes
 const IV_LENGTH = 16; // For AES, this is always 16
 
 function encrypt(text) {
@@ -49,7 +50,7 @@ async function main() {
     const dbPath = path.join(__dirname, 'db.json');
     let db;
 
-    if (process.env.ENCRYPT_CLIENT_JSON === 'true') {
+    if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
         if (fs.existsSync(dbPath)) {
             const encryptedData = fs.readFileSync(dbPath, 'utf8');
             const decryptedData = decrypt(encryptedData);
@@ -59,7 +60,7 @@ async function main() {
 
     db = await JSONFilePreset(dbPath, { orders: {}, users: {}, credentials: {}, config: {} });
 
-    if (process.env.ENCRYPT_CLIENT_JSON === 'true') {
+    if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
         const originalWrite = db.write;
         db.write = async function() {
             const data = JSON.stringify(this.data);
@@ -74,7 +75,7 @@ async function main() {
     // startServer now returns the app and timers
     const { app } = await startServer(db, bot, sendEmail);
 
-  const port = process.env.PORT || 3000;
+  const port = getSecret('PORT') || 3000;
 
   const server = app.listen(port, () => {
     console.log(`[SERVER] Server listening at http://localhost:${port}`);
@@ -113,7 +114,7 @@ async function main() {
   Last Update: ${new Date(order.lastUpdatedAt || order.receivedAt).toLocaleString()}
       `;
       try {
-        const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, {
+        const sentMessage = await bot.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, {
           reply_to_message_id: order.telegramMessageId,
         });
         // Store the message ID so we can delete it later

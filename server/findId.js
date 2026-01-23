@@ -1,11 +1,8 @@
 // findId.js
 import { Telegraf } from 'telegraf';
-import dotenv from 'dotenv';
+import { getSecret } from './secretManager.js';
 
-// Load environment variables from your .env file
-dotenv.config();
-
-const token = process.env.TELEGRAM_BOT_TOKEN;
+const token = getSecret('TELEGRAM_BOT_TOKEN');
 
 if (!token) {
     console.error("Error: TELEGRAM_BOT_TOKEN is not set in your .env file.");

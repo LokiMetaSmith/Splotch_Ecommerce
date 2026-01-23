@@ -21,6 +21,7 @@ import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import { google as defaultGoogle } from 'googleapis';
 import * as defaultWebAuthn from '@simplewebauthn/server';
+import { getSecret } from './secretManager.js';
 import { sendEmail as defaultSendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys, getKey } from './keyManager.js';
 import { initializeBot } from './bot.js';
@@ -270,10 +271,10 @@ async function startServer(
     }
     // The full error (including stack) is still logged to the console for debugging.
     console.error(`[${context}]`, error);
-    if (process.env.ADMIN_EMAIL && oauth2Client.credentials.access_token) {
+    if (getSecret('ADMIN_EMAIL') && oauth2Client.credentials.access_token) {
       try {
         await sendEmail({
-          to: process.env.ADMIN_EMAIL,
+          to: getSecret('ADMIN_EMAIL'),
           subject: `Print Shop Server Error: ${context}`,
           text: `An error occurred in the Print Shop server.\n\nContext: ${context}\n\nError: ${error.message}`,
           html: `<p>An error occurred in the Print Shop server.</p><p><b>Context:</b> ${context}</p><pre>${error.message}</pre>`,
@@ -289,14 +290,14 @@ async function startServer(
     app = express();
     const port = process.env.PORT || 3000;
 
-    const rpID = process.env.RP_ID;
-    const expectedOrigin = process.env.EXPECTED_ORIGIN;
+    const rpID = getSecret('RP_ID');
+    const expectedOrigin = getSecret('EXPECTED_ORIGIN');
 
     // --- Google OAuth2 Client ---
     const oauth2Client = new injectedGoogle.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      `${process.env.BASE_URL}/oauth2callback`
+      getSecret('GOOGLE_CLIENT_ID'),
+      getSecret('GOOGLE_CLIENT_SECRET'),
+      `${getSecret('BASE_URL')}/oauth2callback`
     );
 
     // --- Ensure upload directory exists ---
@@ -336,7 +337,7 @@ async function startServer(
     let squareClient = injectedSquareClient;
 
     if (!squareClient) {
-      if (!process.env.SQUARE_ACCESS_TOKEN) {
+      if (!getSecret('SQUARE_ACCESS_TOKEN')) {
         console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
         // In a test environment, we don't want to kill the test runner.
         if (process.env.NODE_ENV !== 'test') {
@@ -345,7 +346,7 @@ async function startServer(
       }
       squareClient = new SquareClient({
         version: '2025-07-16',
-        token: process.env.SQUARE_ACCESS_TOKEN,
+        token: getSecret('SQUARE_ACCESS_TOKEN'),
         environment: SquareEnvironment.Sandbox,
       });
       console.log('[SERVER] Verifying connection to Square servers...');
@@ -432,14 +433,14 @@ async function startServer(
 
     // If running behind a reverse proxy, trust the first hop.
     // This is required for rate limiting and other security features to work correctly.
-    if (process.env.TRUST_PROXY === 'true') {
+    if (getSecret('TRUST_PROXY') === 'true') {
         app.set('trust proxy', 1);
         console.log('[SERVER] Trusting reverse proxy headers.');
     }
 
     // --- CSRF Secret Management ---
     const weakDefaultCsrfSecret = '12345678901234567890123456789012';
-    let csrfSecret = process.env.CSRF_SECRET;
+    let csrfSecret = getSecret('CSRF_SECRET');
 
     if (!csrfSecret || csrfSecret === weakDefaultCsrfSecret) {
         if (process.env.NODE_ENV === 'production') {
@@ -460,7 +461,7 @@ async function startServer(
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
     app.use(cookieParser(csrfSecret));
 
-    let sessionSecret = process.env.SESSION_SECRET;
+    let sessionSecret = getSecret('SESSION_SECRET');
     if (!sessionSecret) {
         console.error('❌ [FATAL] SESSION_SECRET is not set in environment variables.');
         console.error('   This is required for security in all environments. The application will now exit.');
@@ -601,7 +602,7 @@ async function startServer(
       if (!userPayload) return false;
       // Check env var fallback first (fastest)
       // FIX: Ensure ADMIN_EMAIL is set and not empty before comparing
-      if (process.env.ADMIN_EMAIL && userPayload.email === process.env.ADMIN_EMAIL) return true;
+      if (getSecret('ADMIN_EMAIL') && userPayload.email === getSecret('ADMIN_EMAIL')) return true;
 
       // Look up full user object
       const user = getUserByEmail(userPayload.email) || (userPayload.username ? db.data.users[userPayload.username] : undefined);
@@ -1043,7 +1044,7 @@ async function startServer(
         const paymentPayload = {
           sourceId: sourceId,
           idempotencyKey: randomUUID(),
-          locationId: process.env.SQUARE_LOCATION_ID,
+          locationId: getSecret('SQUARE_LOCATION_ID'),
           amountMoney: {
             amount: BigInt(amountCents),
             currency: currency || 'USD',
@@ -1137,7 +1138,7 @@ async function startServer(
         console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
 
         // Send Telegram notification
-        if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID) {
+        if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
           const status = 'NEW';
           const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
           const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
@@ -1164,7 +1165,7 @@ ${statusChecklist}
           `;
           try {
             const keyboard = getOrderStatusKeyboard(newOrder);
-            const sentMessage = await bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, { reply_markup: keyboard });
+            const sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, { reply_markup: keyboard });
             // db.data.orders is an object, so we access directly by ID
             if (db.data.orders[newOrder.orderId]) {
               db.data.orders[newOrder.orderId].telegramMessageId = sentMessage.message_id;
@@ -1172,7 +1173,7 @@ ${statusChecklist}
               // Send the design image
               if (newOrder.designImagePath) {
                 const imagePath = path.join(__dirname, newOrder.designImagePath);
-                const sentPhoto = await bot.telegram.sendPhoto(process.env.TELEGRAM_CHANNEL_ID, { source: imagePath });
+                const sentPhoto = await bot.telegram.sendPhoto(getSecret('TELEGRAM_CHANNEL_ID'), { source: imagePath });
                 db.data.orders[newOrder.orderId].telegramPhotoMessageId = sentPhoto.message_id;
               }
 
@@ -1180,7 +1181,7 @@ ${statusChecklist}
               const cutLinePath = db.data.orders[newOrder.orderId].cutLinePath;
               if (cutLinePath) {
                 const docPath = path.join(__dirname, cutLinePath);
-                await bot.telegram.sendDocument(process.env.TELEGRAM_CHANNEL_ID, { source: docPath });
+                await bot.telegram.sendDocument(getSecret('TELEGRAM_CHANNEL_ID'), { source: docPath });
               }
               await db.write();
             }
@@ -1360,7 +1361,7 @@ ${statusChecklist}
 
       try {
           // Update Telegram message
-          if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
+          if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID') && order.telegramMessageId) {
             const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
             const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
             const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
@@ -1387,16 +1388,16 @@ ${statusChecklist}
             try {
               if (status === 'COMPLETED' || status === 'CANCELED') {
                 // Order is complete or canceled, delete the checklist message
-                await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
+                await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.telegramMessageId);
                 // also delete the photo if it exists and hasn't been deleted
                 if (order.telegramPhotoMessageId) {
-                    await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+                    await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.telegramPhotoMessageId);
                 }
               } else {
                 // For all other statuses, edit the message
                 const keyboard = getOrderStatusKeyboard(order);
                 await bot.telegram.editMessageText(
-                    process.env.TELEGRAM_CHANNEL_ID,
+                    getSecret('TELEGRAM_CHANNEL_ID'),
                     order.telegramMessageId,
                     undefined,
                     message,
@@ -1404,7 +1405,7 @@ ${statusChecklist}
                 );
                 // If the status is SHIPPED, also delete the photo
                 if (status === 'SHIPPED' && order.telegramPhotoMessageId) {
-                  await bot.telegram.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramPhotoMessageId);
+                  await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.telegramPhotoMessageId);
                 }
               }
             } catch (error) {
@@ -1551,10 +1552,10 @@ ${statusChecklist}
       await db.write();
 
       // Send notification email to admin
-      if (process.env.ADMIN_EMAIL) {
+      if (getSecret('ADMIN_EMAIL')) {
         try {
           await sendEmail({
-            to: process.env.ADMIN_EMAIL,
+            to: getSecret('ADMIN_EMAIL'),
             subject: 'New User Account Created',
             text: `A new user has registered on the Print Shop.\n\nUsername: ${username}`,
             html: `<p>A new user has registered on the Print Shop.</p><p><b>Username:</b> ${username}</p>`,
@@ -1620,7 +1621,7 @@ ${statusChecklist}
         }
         const { privateKey, kid } = getCurrentSigningKey();
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
-        const magicLink = `${process.env.BASE_URL}/magic-login.html?token=${token}`;
+        const magicLink = `${getSecret('BASE_URL')}/magic-login.html?token=${token}`;
 
         // The magic link is sensitive and should not be logged.
         // console.log('Magic Link (for testing):', magicLink);
@@ -1753,10 +1754,10 @@ ${statusChecklist}
           console.log(`New user created for ${userEmail}`);
 
           // Send notification email to admin
-          if (process.env.ADMIN_EMAIL) {
+          if (getSecret('ADMIN_EMAIL')) {
             try {
               await sendEmail({
-                to: process.env.ADMIN_EMAIL,
+                to: getSecret('ADMIN_EMAIL'),
                 subject: 'New User Account Created (via Google)',
                 text: `A new user has registered using their Google account.\n\nEmail: ${userEmail}\nUsername: ${newUsername}`,
                 html: `<p>A new user has registered using their Google account.</p><p><b>Email:</b> ${userEmail}</p><p><b>Username:</b> ${newUsername}</p>`,

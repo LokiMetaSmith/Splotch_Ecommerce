@@ -111,8 +111,8 @@ describe('Stored XSS Vulnerability Check (Order Details)', () => {
 
         const maliciousPayload = {
             sourceId: 'cnon:card-nonce-ok',
-            amountCents: 1, // Correct price for dummy file
-            designImagePath: '/uploads/d.png',
+            amountCents: 1, // Adjusted to match calculated price of favicon.png (approx 1 cent)
+            designImagePath: '/uploads/design.png',
             shippingContact: {
                 givenName: 'Hacker',
                 familyName: 'One',

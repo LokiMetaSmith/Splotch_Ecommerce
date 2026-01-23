@@ -1,14 +1,15 @@
 import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
+import { getSecret } from './secretManager.js';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
-
-const token = process.env.TELEGRAM_BOT_TOKEN;
 
 let bot;
 let db;
 
 function initializeBot(database) {
   db = database;
+  const token = getSecret('TELEGRAM_BOT_TOKEN');
+
   if (token) {
     const isTestEnv = process.env.NODE_ENV === 'test';
     bot = new Telegraf(token);
