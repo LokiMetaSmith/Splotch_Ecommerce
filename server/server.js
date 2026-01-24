@@ -1322,6 +1322,19 @@ ${statusChecklist}
       order.status = status;
       order.lastUpdatedAt = new Date().toISOString();
 
+      // Check for stalled message cleanup
+      if (order.stalledMessageId) {
+          if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
+             try {
+                 await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.stalledMessageId);
+                 console.log(`[TELEGRAM] Deleted stalled message for order ${orderId}`);
+             } catch (err) {
+                 console.error('[TELEGRAM] Failed to delete stalled message:', err);
+             }
+          }
+          delete order.stalledMessageId;
+      }
+
       // Update active orders cache
       const isFinal = FINAL_STATUSES.includes(status);
 
