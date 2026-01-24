@@ -167,7 +167,7 @@
               </canvas>
               <div
                 id="canvas-placeholder"
-                class="absolute inset-0 flex flex-col items-center justify-center select-none z-20 bg-white/60 backdrop-blur-sm rounded-lg cursor-pointer hover:bg-white/80 transition-colors"
+                class="absolute inset-0 flex flex-col items-center justify-center select-none z-20 bg-white/60 backdrop-blur-sm rounded-lg cursor-pointer hover:bg-white/80 transition-colors focus-visible:ring-4 focus-visible:ring-splotch-teal focus-visible:outline-none focus-visible:ring-inset"
                 role="button"
                 tabindex="0"
                 aria-label="Upload an image by clicking or dragging and dropping"
@@ -608,6 +608,7 @@
               <div
                 id="calculatedPriceDisplay"
                 class="mt-1 p-3 bg-white border border-gray-300 rounded-md shadow-sm text-lg font-semibold text-gray-700"
+                aria-live="polite"
               >
                 $0.00
               </div>
