@@ -814,22 +814,22 @@ async function startServer(
 
       // Security & Integrity: Validate Billing Contact
       body('billingContact').isObject().withMessage('billingContact must be an object'),
-      body('billingContact.givenName').notEmpty().withMessage('Billing First Name is required').not().contains('<').withMessage('Invalid characters in Billing First Name'),
-      body('billingContact.familyName').optional().not().contains('<').withMessage('Invalid characters in Billing Last Name'),
+      body('billingContact.givenName').notEmpty().withMessage('Billing First Name is required').isLength({ max: 100 }).withMessage('Billing First Name is too long').not().contains('<').withMessage('Invalid characters in Billing First Name'),
+      body('billingContact.familyName').optional().isLength({ max: 100 }).withMessage('Billing Last Name is too long').not().contains('<').withMessage('Invalid characters in Billing Last Name'),
       body('billingContact.email').isEmail().withMessage('Valid Billing Email is required'),
       body('billingContact.phoneNumber').optional().isString().trim().not().contains('<').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
 
       // Security & Integrity: Validate Shipping Contact
       body('shippingContact').isObject().withMessage('shippingContact must be an object'),
-      body('shippingContact.givenName').notEmpty().withMessage('Shipping First Name is required').not().contains('<').withMessage('Invalid characters in Shipping First Name'),
-      body('shippingContact.familyName').optional().not().contains('<').withMessage('Invalid characters in Shipping Last Name'),
+      body('shippingContact.givenName').notEmpty().withMessage('Shipping First Name is required').isLength({ max: 100 }).withMessage('Shipping First Name is too long').not().contains('<').withMessage('Invalid characters in Shipping First Name'),
+      body('shippingContact.familyName').optional().isLength({ max: 100 }).withMessage('Shipping Last Name is too long').not().contains('<').withMessage('Invalid characters in Shipping Last Name'),
       body('shippingContact.email').optional().isEmail().withMessage('Invalid Shipping Email'),
       body('shippingContact.addressLines').isArray().withMessage('Shipping Address Lines must be an array'),
-      body('shippingContact.addressLines.*').isString().withMessage('Address lines must be strings').not().contains('<').withMessage('Invalid characters in Address Lines'),
-      body('shippingContact.locality').notEmpty().withMessage('City is required').not().contains('<'),
-      body('shippingContact.administrativeDistrictLevel1').notEmpty().withMessage('State/Province is required').not().contains('<'),
-      body('shippingContact.postalCode').notEmpty().withMessage('Postal Code is required').not().contains('<'),
-      body('shippingContact.country').notEmpty().withMessage('Country is required').not().contains('<'),
+      body('shippingContact.addressLines.*').isString().withMessage('Address lines must be strings').isLength({ max: 200 }).withMessage('Address Line is too long').not().contains('<').withMessage('Invalid characters in Address Lines'),
+      body('shippingContact.locality').notEmpty().withMessage('City is required').isLength({ max: 100 }).withMessage('City name is too long').not().contains('<'),
+      body('shippingContact.administrativeDistrictLevel1').notEmpty().withMessage('State/Province is required').isLength({ max: 100 }).withMessage('State/Province name is too long').not().contains('<'),
+      body('shippingContact.postalCode').notEmpty().withMessage('Postal Code is required').isLength({ max: 20 }).withMessage('Postal Code is too long').not().contains('<'),
+      body('shippingContact.country').notEmpty().withMessage('Country is required').isLength({ max: 100 }).withMessage('Country name is too long').not().contains('<'),
       body('shippingContact.phoneNumber').optional().isString().trim().not().contains('<').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
     ], async (req, res) => {
       const errors = validationResult(req);
