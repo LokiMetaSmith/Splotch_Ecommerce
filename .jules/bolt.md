@@ -11,3 +11,7 @@
 ## 2024-05-22 - [DocumentFragment]
 **Learning:** Appending elements to the DOM in a loop causes reflows. Using `DocumentFragment` to batch appends and inserting it once eliminates this overhead.
 **Action:** Always check loop-based DOM insertions.
+
+## 2024-05-22 - [ClipperLib Object Reuse]
+**Learning:** `ClipperLib` operations and path creation in loops can generate massive GC pressure. Reusing path arrays and updating coordinates in-place significantly reduces allocations in grid search algorithms.
+**Action:** When performing grid-based geometric checks with `ClipperLib`, lift path creation out of the loop and update coordinates in-place.
