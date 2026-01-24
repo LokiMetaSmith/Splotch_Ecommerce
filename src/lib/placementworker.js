@@ -58,6 +58,12 @@ export class PlacementWorker {
             // Normalize part (top-left at 0,0)
             const zeroedPart = rotatedPart.map(p => ({ x: p.x - partBounds.x, y: p.y - partBounds.y }));
 
+            // Bolt Optimization: Pre-calculate the scaled clipper path for the zeroed part.
+            // We use this base path to quickly generate candidate paths by adding offsets in the loop,
+            // avoiding thousands of object allocations and floating point multiplications.
+            const zeroedClipperPath = this.toClipperPath(zeroedPart, scale);
+            const candidateClipper = zeroedClipperPath.map(p => ({ X: p.X, Y: p.Y })); // Initial allocation
+
             let placed = false;
             let counter = 0;
 
@@ -66,14 +72,19 @@ export class PlacementWorker {
                 // Optimization: Check if part fits vertically
                 if (y + partBounds.height > binBounds.y + binBounds.height) continue;
 
+                const startY = Math.round(y * scale);
+
                 for (let x = binBounds.x; x < binBounds.x + binBounds.width; x += step) {
                     counter++;
                     // Optimization: Check if part fits horizontally
                     if (x + partBounds.width > binBounds.x + binBounds.width) continue;
 
-                    // Construct candidate position (actual coordinates)
-                    const candidatePart = zeroedPart.map(p => ({ x: p.x + x, y: p.y + y }));
-                    const candidateClipper = this.toClipperPath(candidatePart, scale);
+                    // Update candidateClipper in-place with the current grid position
+                    const startX = Math.round(x * scale);
+                    for (let k = 0; k < zeroedClipperPath.length; k++) {
+                        candidateClipper[k].X = zeroedClipperPath[k].X + startX;
+                        candidateClipper[k].Y = zeroedClipperPath[k].Y + startY;
+                    }
 
                     // Check 1: Is candidate inside bin?
                     // Bolt Optimization: Skip this check if bin is a rectangle (already checked by bounds).
@@ -128,7 +139,9 @@ export class PlacementWorker {
                         rotation
                     });
 
-                    placedItems.push({ path: candidateClipper, bounds: candidateRect });
+                    // Bolt Optimization: Must clone candidateClipper because we reuse the instance in the loop
+                    const placedPath = candidateClipper.map(p => ({ X: p.X, Y: p.Y }));
+                    placedItems.push({ path: placedPath, bounds: candidateRect });
                     placed = true;
                     break;
                 }
