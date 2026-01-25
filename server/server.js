@@ -795,9 +795,9 @@ async function startServer(
 
     // --- Order Endpoints ---
     app.post('/api/create-order', authenticateToken, [
-      body('sourceId').notEmpty().withMessage('sourceId is required'),
+      body('sourceId').notEmpty().withMessage('sourceId is required').isString().withMessage('sourceId must be a string'),
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
-      body('currency').optional().isAlpha().withMessage('currency must be alphabetic'),
+      body('currency').optional().isString().withMessage('currency must be a string').isAlpha().withMessage('currency must be alphabetic'),
       body('designImagePath').notEmpty().withMessage('designImagePath is required').custom(value => {
             if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
             if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
