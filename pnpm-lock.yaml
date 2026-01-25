@@ -77,9 +77,6 @@ importers:
       lowdb:
         specifier: ^7.0.1
         version: 7.0.1
-      lucas:
-        specifier: ^1.0.4
-        version: 1.0.4
       lusca:
         specifier: ^1.7.0
         version: 1.7.0
@@ -3119,9 +3116,6 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
-
-  lucas@1.0.4:
-    resolution: {integrity: sha512-VHweLJddsKjKHpawGl2KwYsQ6nKSxQ02MM8fEAaPQpwVc6h9FA98WlaYYDj2eE4lve4wWO0jYH8pgY74g07tuQ==}
 
   lusca@1.7.0:
     resolution: {integrity: sha512-msnrplCfY7zaqlZBDEloCIKld+RUeMZVeWzSPaGUKeRXFlruNSdKg2XxCyR+zj6BqzcXhXlRnvcvx6rAGgsvMA==}
@@ -7640,8 +7634,6 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
-
-  lucas@1.0.4: {}
 
   lusca@1.7.0:
     dependencies:
