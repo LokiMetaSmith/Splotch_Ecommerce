@@ -51,17 +51,9 @@ export class PlacementWorker {
             const id = this.ids[i];
             const rotation = this.rotations[i];
 
-            // Rotate part around (0,0)
-            const rotatedPart = GeometryUtil.rotatePolygon(part, rotation);
-            const partBounds = GeometryUtil.getPolygonBounds(rotatedPart);
-
-            // Normalize part (top-left at 0,0)
-            const zeroedPart = rotatedPart.map(p => ({ x: p.x - partBounds.x, y: p.y - partBounds.y }));
-
-            // Bolt Optimization: Pre-calculate the scaled clipper path for the zeroed part.
-            // We use this base path to quickly generate candidate paths by adding offsets in the loop,
-            // avoiding thousands of object allocations and floating point multiplications.
-            const zeroedClipperPath = this.toClipperPath(zeroedPart, scale);
+            // Bolt Optimization: Combine rotation, bounding box calculation, zeroing, and clipper conversion
+            // into a single 2-pass O(N) operation to avoid creating intermediate O(N) arrays and objects.
+            const { clipperPath: zeroedClipperPath, bounds: partBounds } = this.createRotatedZeroedClipperPath(part, rotation, scale);
             const candidateClipper = zeroedClipperPath.map(p => ({ X: p.X, Y: p.Y })); // Initial allocation
 
             let placed = false;
@@ -161,6 +153,47 @@ export class PlacementWorker {
 
     toClipperPath(polygon, scale) {
         return polygon.map(p => ({ X: Math.round(p.x * scale), Y: Math.round(p.y * scale) }));
+    }
+
+    // Bolt Optimization: Efficiently create the clipper path by combining operations
+    createRotatedZeroedClipperPath(part, rotation, scale) {
+        const angleRad = rotation * (Math.PI / 180);
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const len = part.length;
+
+        // Pass 1: Calculate Bounds (in rotated space)
+        // We do this to determine the offset needed to 'zero' the part (move to 0,0)
+        for (let i = 0; i < len; i++) {
+            const p = part[i];
+            const rx = p.x * cos - p.y * sin;
+            const ry = p.x * sin + p.y * cos;
+
+            if (rx < minX) minX = rx;
+            if (rx > maxX) maxX = rx;
+            if (ry < minY) minY = ry;
+            if (ry > maxY) maxY = ry;
+        }
+
+        const bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        const clipperPath = new Array(len);
+
+        // Pass 2: Create Clipper Path
+        // Apply rotation, subtract minX/minY (zeroing), and scale to integer coordinates.
+        for (let i = 0; i < len; i++) {
+            const p = part[i];
+            const rx = p.x * cos - p.y * sin;
+            const ry = p.x * sin + p.y * cos;
+
+            clipperPath[i] = {
+                X: Math.round((rx - minX) * scale),
+                Y: Math.round((ry - minY) * scale)
+            };
+        }
+
+        return { clipperPath, bounds };
     }
 
     getBounds(placements) {
