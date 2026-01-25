@@ -15,3 +15,7 @@
 ## 2025-02-19 - Dynamic Pricing Announcements
 **Learning:** Sighted users see price updates immediately, but screen reader users miss these changes if they occur outside their current focus.
 **Action:** Use `aria-live="polite"` on pricing or status display containers to ensure updates are announced without interrupting the user's flow.
+
+## 2025-02-21 - Accessible Dynamic Units
+**Learning:** Standard range inputs announce numeric values but miss context when units change dynamically (e.g., inches vs mm).
+**Action:** Synchronize `aria-valuetext` on `input[type="range"]` with the visual display text whenever the value or unit changes to ensure screen readers announce the full context.

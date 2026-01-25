@@ -165,6 +165,7 @@ async function BootStrap() {
             } else {
                 if(resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} in`;
             }
+            if(resizeValueEl) resizeSliderEl.setAttribute('aria-valuetext', resizeValueEl.textContent);
 
             if (!resizeRequest) {
                 resizeRequest = requestAnimationFrame(() => {
@@ -246,6 +247,7 @@ async function BootStrap() {
                         resizeSliderEl.value = targetInches;
                         resizeValueEl.textContent = `${targetInches.toFixed(1)} in`;
                     }
+                    resizeSliderEl.setAttribute('aria-valuetext', resizeValueEl.textContent);
                 }
             }
         });
@@ -805,6 +807,9 @@ function updateUnitUI(isMetric) {
                 resizeSliderEl.value = currentValue / inchesToMm;
                 resizeValueEl.textContent = `${(currentValue / inchesToMm).toFixed(1)} in`;
             }
+        }
+        if (resizeValueEl) {
+            resizeSliderEl.setAttribute('aria-valuetext', resizeValueEl.textContent);
         }
     }
 
