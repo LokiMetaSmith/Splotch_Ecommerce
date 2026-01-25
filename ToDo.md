@@ -46,6 +46,7 @@ These are smaller tasks for improving test quality and covering minor edge cases
 -   **[x] Add Test for CLI `remove-key` Command:** The command-line interface test (`tests/cli_test.sh`) is missing coverage for the `remove-key` command.
 -   **[x] Consolidate Redundant Tests:** The `/api/ping` endpoint is tested in two different files. The duplicate test should be removed.
 -   **[x] Fix Server Pricing Tests:** Fix the regression in `tests/server-pricing.test.js` where perimeters were checked against array length instead of calculated value.
+-   **[x] Remove Unused Dependency `lucas`:** This package appears to be a typo for `lusca` and is unused.
 
 ---
 <br>

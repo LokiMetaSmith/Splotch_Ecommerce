@@ -52,7 +52,6 @@
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.1",
     "lowdb": "^7.0.1",
-    "lucas": "^1.0.4",
     "lusca": "^1.7.0",
     "multer": "^2.0.1",
     "nodemailer": "^7.0.5",
