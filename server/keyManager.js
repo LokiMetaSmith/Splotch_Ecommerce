@@ -4,7 +4,11 @@ import { exportJWK } from 'jose';
 import { getSecret } from './secretManager.js';
 
 let activeKeys = [];
-const KEY_LIFETIME_MS = 60 * 60 * 1000; // Rotate keys every hour
+// Retention period must exceed token lifetime (1h) + rotation buffer.
+// 2 hours provides ample overlap to ensure tokens are verifiable until they expire.
+const KEY_RETENTION_MS = 2 * 60 * 60 * 1000;
+
+export const KEY_ROTATION_MS = 60 * 60 * 1000; // Rotate keys every hour
 
 // Generate a new RSA key pair
 const generateKeyPair = () => {
@@ -48,8 +52,8 @@ export const rotateKeys = () => {
     const now = Date.now();
     // Add a new key
     activeKeys.push(generateKeyPair());
-    // Filter out old keys (older than 1 hour)
-    activeKeys = activeKeys.filter(key => now - key.createdAt < KEY_LIFETIME_MS);
+    // Filter out old keys (older than retention period)
+    activeKeys = activeKeys.filter(key => now - key.createdAt < KEY_RETENTION_MS);
     console.log(`[KEY_MANAGER] Now managing ${activeKeys.length} active keys.`);
 };
 
@@ -70,7 +74,4 @@ export const getJwks = async () => {
     }
 };
 
-// Initial key generation
-rotateKeys();
-// Set up automatic rotation - This will be handled by the main server entry point
- setInterval(rotateKeys, KEY_LIFETIME_MS);
+// Note: Automatic rotation is handled by the main server entry point (server.js)
