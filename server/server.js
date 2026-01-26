@@ -154,36 +154,42 @@ async function startServer(
     db = await JSONFilePreset(dbPath, defaultData);
   }
 
-  // Initialize Active Orders Cache
-  // We use a simple array attached to the db object (not persisted to JSON)
-  if (!db.activeOrders) {
-      const allOrders = Object.values(db.data.orders);
-      db.activeOrders = allOrders.filter(order => !FINAL_STATUSES.includes(order.status));
-      console.log(`[SERVER] Initialized active orders cache. Count: ${db.activeOrders.length}`);
-  }
+  // Initialize Caches and Indices
+  // Bolt Optimization: Consolidated separate loops into a single O(N) pass over orders
+  const needsActive = !db.activeOrders;
+  const needsShipped = !db.shippedOrders;
+  const needsUserIndex = !db.userOrderIndex;
 
-  // Initialize Shipped Orders Cache for Tracker
-  // Optimizes tracking checks by avoiding full table scan
-  if (!db.shippedOrders) {
-      const allOrders = Object.values(db.data.orders);
-      db.shippedOrders = allOrders.filter(order => order.status === 'SHIPPED');
-      console.log(`[SERVER] Initialized shipped orders cache. Count: ${db.shippedOrders.length}`);
-  }
+  if (needsActive || needsShipped || needsUserIndex) {
+      if (needsActive) db.activeOrders = [];
+      if (needsShipped) db.shippedOrders = [];
+      if (needsUserIndex) db.userOrderIndex = {};
 
-  // Initialize User Orders Index
-  // Bolt Optimization: Optimizes my-orders and search endpoints by avoiding O(n) scan
-  if (!db.userOrderIndex) {
-      db.userOrderIndex = {};
-      Object.values(db.data.orders).forEach(order => {
-          const email = order.billingContact?.email;
-          if (email) {
-              if (!db.userOrderIndex[email]) {
-                  db.userOrderIndex[email] = [];
-              }
-              db.userOrderIndex[email].push(order);
+      const allOrders = Object.values(db.data.orders);
+
+      for (const order of allOrders) {
+          // 1. Active Orders
+          if (needsActive && !FINAL_STATUSES.includes(order.status)) {
+              db.activeOrders.push(order);
           }
-      });
-      console.log(`[SERVER] Initialized user orders index. Users indexed: ${Object.keys(db.userOrderIndex).length}`);
+
+          // 2. Shipped Orders
+          if (needsShipped && order.status === 'SHIPPED') {
+              db.shippedOrders.push(order);
+          }
+
+          // 3. User Order Index
+          if (needsUserIndex) {
+              const email = order.billingContact?.email;
+              if (email) {
+                  if (!db.userOrderIndex[email]) {
+                      db.userOrderIndex[email] = [];
+                  }
+                  db.userOrderIndex[email].push(order);
+              }
+          }
+      }
+      console.log(`[SERVER] Initialized caches (O(N) optimized). Active: ${db.activeOrders?.length}, Shipped: ${db.shippedOrders?.length}, Users Indexed: ${db.userOrderIndex ? Object.keys(db.userOrderIndex).length : 0}`);
   }
 
   // Ensure products collection exists
