@@ -19,3 +19,7 @@
 ## 2025-02-21 - Accessible Dynamic Units
 **Learning:** Standard range inputs announce numeric values but miss context when units change dynamically (e.g., inches vs mm).
 **Action:** Synchronize `aria-valuetext` on `input[type="range"]` with the visual display text whenever the value or unit changes to ensure screen readers announce the full context.
+
+## 2025-02-24 - Modal Focus Management
+**Learning:** Modals implemented with simple visibility toggles (like `.hidden`) often trap focus or fail to restore it, leaving keyboard users lost.
+**Action:** When opening a modal, save `document.activeElement` and move focus to the modal's first input. When closing, restore focus to the saved element. Always map `Escape` to close.
