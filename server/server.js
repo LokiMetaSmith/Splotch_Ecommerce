@@ -23,7 +23,7 @@ import { google as defaultGoogle } from 'googleapis';
 import * as defaultWebAuthn from '@simplewebauthn/server';
 import { getSecret } from './secretManager.js';
 import { sendEmail as defaultSendEmail } from './email.js';
-import { getCurrentSigningKey, getJwks, rotateKeys, getKey } from './keyManager.js';
+import { getCurrentSigningKey, getJwks, rotateKeys, getKey, KEY_ROTATION_MS } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
 import { validateUsername, validateId } from './validators.js';
@@ -1937,7 +1937,7 @@ ${statusChecklist}
     // Sign the initial token and re-sign periodically
     signInstanceToken();
     const sessionTokenTimer = setInterval(signInstanceToken, 30 * 60 * 1000);
-    const keyRotationTimer = setInterval(rotateKeys, 60 * 60 * 1000);
+    const keyRotationTimer = setInterval(rotateKeys, KEY_ROTATION_MS);
 
     if (process.env.NODE_ENV === 'test') {
       sessionTokenTimer.unref();
