@@ -63,6 +63,12 @@ main.container h1.text-3xl { /* Main Page Title: "Image Editor & Secure Pay" */
     text-shadow: 3px 3px 0px var(--splotch-teal) !important;
 }
 
+h3[style*="var(--font-modak)"] {
+    -webkit-text-stroke: 1.5px var(--splotch-white) !important;
+    text-shadow: 2px 2px 0px var(--splotch-teal) !important;
+    letter-spacing: 0.5px;
+}
+
 form h2.text-xl { /* Form Subtitle: "Payment Information" */
     font-family: var(--font-modak) !important;
     color: var(--splotch-navy) !important;
