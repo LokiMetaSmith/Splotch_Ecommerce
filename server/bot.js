@@ -36,14 +36,18 @@ function initializeBot(database) {
             return;
           }
 
-          let list = `*${title}:*\n\n`;
+          // SECURITY: Use HTML mode for safer rendering.
+          // Note: input variables like billingContact are expected to be HTML-escaped by server.js (using escapeHtml)
+          // before being stored in the database. This prevents HTML injection.
+          // We switched from Markdown because Markdown characters in user input were not escaped, causing injection.
+          let list = `<b>${title}:</b>\n\n`;
           orders.forEach(order => {
-            list += `• *Order ID:* \`${order.orderId}\`\n`;
-            list += `  *Status:* ${order.status}\n`;
-            list += `  *Customer:* ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
+            list += `• <b>Order ID:</b> <code>${order.orderId}</code>\n`;
+            list += `  <b>Status:</b> ${order.status}\n`;
+            list += `  <b>Customer:</b> ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
           });
 
-          ctx.replyWithMarkdown(list)
+          ctx.replyWithHTML(list)
              .catch(err => console.error('[TELEGRAM] Error sending message:', err));
         } catch (error) {
           console.error('[TELEGRAM] A critical error occurred in listOrdersByStatus:', error);
