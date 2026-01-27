@@ -112,7 +112,53 @@ async function getDesignDimensions(filePath) {
         function traverse(node) {
             if(node.tagName === 'path') {
                 perimeter += getPathPerimeter(node);
+            } else if (node.tagName === 'rect') {
+                 const w = parseFloat(node.properties.width || 0);
+                 const h = parseFloat(node.properties.height || 0);
+                 perimeter += 2 * (w + h);
+            } else if (node.tagName === 'circle') {
+                 const r = parseFloat(node.properties.r || 0);
+                 perimeter += 2 * Math.PI * r;
+            } else if (node.tagName === 'ellipse') {
+                 const rx = parseFloat(node.properties.rx || 0);
+                 const ry = parseFloat(node.properties.ry || 0);
+                 // Approximation: 2 * PI * sqrt((rx^2 + ry^2) / 2)
+                 perimeter += 2 * Math.PI * Math.sqrt((rx * rx + ry * ry) / 2);
+            } else if (node.tagName === 'polygon' || node.tagName === 'polyline') {
+                 const pointsStr = node.properties.points || "";
+                 // Simple splitting by comma or whitespace
+                 const points = pointsStr.trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+
+                 // Ensure even number of points (pairs of x,y)
+                 if (points.length % 2 !== 0) {
+                     points.pop();
+                 }
+
+                 if (points.length >= 4) {
+                     for (let i = 0; i < points.length; i += 2) {
+                        const x1 = points[i];
+                        const y1 = points[i+1];
+
+                        let x2, y2;
+                        if (i + 2 < points.length) {
+                             x2 = points[i+2];
+                             y2 = points[i+3];
+                        } else {
+                             // Last point
+                             if (node.tagName === 'polygon') {
+                                 // Close the loop to first point
+                                 x2 = points[0];
+                                 y2 = points[1];
+                             } else {
+                                 // Polyline does not close
+                                 continue;
+                             }
+                        }
+                        perimeter += Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                     }
+                 }
             }
+
             if (node.children && node.children.length > 0) {
                 node.children.forEach(traverse);
             }
