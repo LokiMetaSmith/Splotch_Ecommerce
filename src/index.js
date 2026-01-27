@@ -355,23 +355,36 @@ async function BootStrap() {
 
   // Add interaction listeners to the placeholder
   if (canvasPlaceholder) {
+    const activeClasses = [
+      "bg-blue-50",
+      "bg-opacity-90",
+      "border-2",
+      "border-dashed",
+      "border-splotch-teal",
+      "scale-105",
+      "shadow-lg",
+    ];
+
     // Drag and drop mirroring
     canvasPlaceholder.addEventListener("dragover", (e) => {
       e.preventDefault();
       if (canvas)
         canvas.classList.add("border-dashed", "border-2", "border-blue-500");
+      canvasPlaceholder.classList.add(...activeClasses);
     });
 
     canvasPlaceholder.addEventListener("dragleave", (e) => {
       e.preventDefault();
       if (canvas)
         canvas.classList.remove("border-dashed", "border-2", "border-blue-500");
+      canvasPlaceholder.classList.remove(...activeClasses);
     });
 
     canvasPlaceholder.addEventListener("drop", (e) => {
       e.preventDefault();
       if (canvas)
         canvas.classList.remove("border-dashed", "border-2", "border-blue-500");
+      canvasPlaceholder.classList.remove(...activeClasses);
       const file = e.dataTransfer.files[0];
       if (file) {
         loadFileAsImage(file);
