@@ -60,6 +60,8 @@ export class PlacementWorker {
             let counter = 0;
 
             // Grid Search
+            const potentialColliders = [];
+
             for (let y = binBounds.y; y < binBounds.y + binBounds.height; y += step) {
                 // Optimization: Check if part fits vertically
                 if (y + partBounds.height > binBounds.y + binBounds.height) continue;
@@ -98,12 +100,16 @@ export class PlacementWorker {
                     }
 
                     // Check 2: Collision with other parts
-                    // Optimization: Bounding Box Collision Check
-                    const candidateRect = { x: x, y: y, width: partBounds.width, height: partBounds.height };
-                    const potentialColliders = [];
+                    // Bolt Optimization: Reuse potentialColliders array and inline collision check to avoid object creation in hot loop
+                    potentialColliders.length = 0;
+                    const pWidth = partBounds.width;
+                    const pHeight = partBounds.height;
 
                     for (let k = 0; k < placedItems.length; k++) {
-                        if (GeometryUtil.rectsIntersect(candidateRect, placedItems[k].bounds)) {
+                        const itemBounds = placedItems[k].bounds;
+                        // Inline intersect check: x < r2.x + r2.width && x + width > r2.x ...
+                        if (x < itemBounds.x + itemBounds.width && x + pWidth > itemBounds.x &&
+                            y < itemBounds.y + itemBounds.height && y + pHeight > itemBounds.y) {
                             potentialColliders.push(placedItems[k].path);
                         }
                     }
@@ -133,6 +139,9 @@ export class PlacementWorker {
 
                     // Bolt Optimization: Must clone candidateClipper because we reuse the instance in the loop
                     const placedPath = candidateClipper.map(p => ({ X: p.X, Y: p.Y }));
+
+                    // Bolt Optimization: Create candidateRect only on successful placement
+                    const candidateRect = { x: x, y: y, width: partBounds.width, height: partBounds.height };
                     placedItems.push({ path: placedPath, bounds: candidateRect });
                     placed = true;
                     break;
