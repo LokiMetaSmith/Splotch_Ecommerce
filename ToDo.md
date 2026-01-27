@@ -85,6 +85,7 @@ This document tracks the features and bug fixes that need to be implemented for 
     - [x] Move the pricing model to be based on the square inch bounding box of the sticker.
     - [x] Adjust the price based on the complexity or length of the generated/provided cut path.
     - [x] **Improve Server-Side Perimeter Calculation:** Replace the simplified regex-based perimeter calculation in `server/pricing.js` with `svg-path-properties` to accurately handle curves and complex paths.
+    - [x] **Support Basic SVG Shapes:** Extend server-side perimeter calculation to support `rect`, `circle`, `ellipse`, `polygon`, and `polyline` elements.
 - [x] **Visual Bounding Box:**
     - [x] Allow the customer to see the calculated bounding box when they scale their uploaded image.
     - [x] **Bug:** Bounding box is not visible.
