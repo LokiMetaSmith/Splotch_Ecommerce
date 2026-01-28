@@ -68,8 +68,6 @@ describe('Security: Price Manipulation & Logic', () => {
         process.env.TELEGRAM_CHANNEL_ID = 'mock_channel';
         process.env.ADMIN_EMAIL = 'admin@example.com';
         process.env.NODE_ENV = 'test';
-        process.env.CSRF_SECRET = '12345678901234567890123456789012'; // Ensure weak secret for test
-        process.env.SESSION_SECRET = 'test_session_secret';
 
         // Start Server
         const server = await startServer(db, bot, mockSendEmail, testDbPath, mockSquareClient);
