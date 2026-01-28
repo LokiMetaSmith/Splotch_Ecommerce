@@ -43,6 +43,9 @@ describe('Security: Type Confusion', () => {
   const testDbPath = path.join(__dirname, 'test_db_type_confusion.json');
 
   beforeAll(async () => {
+    process.env.SESSION_SECRET = 'test_secret';
+    process.env.CSRF_SECRET = '12345678901234567890123456789012';
+
     // Setup generic DB
     db = await JSONFilePreset(testDbPath, {
         orders: {},

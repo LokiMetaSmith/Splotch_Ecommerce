@@ -38,6 +38,9 @@ describe('Security: Error Handling and Information Leakage', () => {
   };
 
   beforeAll(async () => {
+    process.env.SESSION_SECRET = 'test_secret';
+    process.env.CSRF_SECRET = '12345678901234567890123456789012';
+
     // Create dummy file for validation
     await fs.writeFile(dummyFilePath, 'fake image content');
 

@@ -21,6 +21,9 @@ describe('Auth Endpoints', () => {
   const testDbPath = path.join(__dirname, 'test-db.json');
 
   beforeAll(async () => {
+    process.env.SESSION_SECRET = 'test_secret';
+    process.env.CSRF_SECRET = '12345678901234567890123456789012';
+
     // Mock DB using memory instead of file I/O to avoid potential lock issues in test
     const data = { orders: [], users: {}, credentials: {}, config: {} };
     db = {

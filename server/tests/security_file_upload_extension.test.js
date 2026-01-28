@@ -27,6 +27,9 @@ describe('Security: File Extension Spoofing', () => {
   };
 
   beforeAll(async () => {
+    process.env.SESSION_SECRET = 'test_secret';
+    process.env.CSRF_SECRET = '12345678901234567890123456789012';
+
     // Mock DB structure
     const data = { orders: {}, users: {}, credentials: {}, config: {}, products: {}, activeOrders: [], shippedOrders: [], userOrderIndex: {} };
     db = {
