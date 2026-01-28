@@ -1,5 +1,5 @@
 import { SVGParser } from "./lib/svgparser.js";
-import { calculateStickerPrice } from "./lib/pricing.js";
+import { calculateStickerPrice, calculatePerimeter } from "./lib/pricing.js";
 import {
   drawRuler as drawCanvasRuler,
   drawImageWithFilters,
@@ -61,6 +61,10 @@ let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
 let creatorProfitCents = 0; // The markup for the current product
 let cutlineOffset = 10; // Default offset
+
+// Memoization globals for pricing
+let lastCalculatedPerimeter = 0;
+let lastCalculatedPerimeterCutlineRef = null;
 
 // --- Main Application Setup ---
 async function BootStrap() {
@@ -507,6 +511,12 @@ function calculateAndUpdatePrice() {
     return;
   }
 
+  // Bolt Optimization: Memoize the perimeter calculation to avoid O(N) loop on every input event (like typing quantity)
+  if (cutline && cutline !== lastCalculatedPerimeterCutlineRef) {
+    lastCalculatedPerimeter = calculatePerimeter(cutline);
+    lastCalculatedPerimeterCutlineRef = cutline;
+  }
+
   const priceResult = calculateStickerPrice(
     pricingConfig,
     quantity,
@@ -514,6 +524,7 @@ function calculateAndUpdatePrice() {
     bounds,
     cutline,
     selectedResolution,
+    lastCalculatedPerimeter,
   );
 
   // --- Creator Markup Logic ---

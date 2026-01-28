@@ -1,7 +1,11 @@
 
 function calculatePerimeter(polygons) {
     let totalPerimeter = 0;
-    const distance = (p1, p2) => Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+    const distance = (p1, p2) => {
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    };
 
     if (!Array.isArray(polygons)) return 0;
 
@@ -154,7 +158,9 @@ async function getDesignDimensions(filePath) {
                                  continue;
                              }
                         }
-                        perimeter += Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                        const dx = x2 - x1;
+                        const dy = y2 - y1;
+                        perimeter += Math.sqrt(dx * dx + dy * dy);
                      }
                  }
             }
