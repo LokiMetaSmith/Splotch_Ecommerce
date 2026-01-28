@@ -140,6 +140,7 @@
                 name="file"
                 type="file"
                 accept="image/*"
+                aria-describedby="file-helper"
               />
               <span
                 id="fileNameDisplay"
@@ -147,6 +148,7 @@
               ></span>
             </div>
             <p
+              id="file-helper"
               class="text-xs text-gray-500 mt-1"
               style="font-family: var(--font-baumans)"
             >
@@ -538,6 +540,7 @@
                     id="stickerMaterial"
                     name="stickerMaterial"
                     class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    aria-describedby="material-helper"
                   >
                     <option value="pp_standard">Standard PP (Indoor)</option>
                     <option value="pvc_laminated">
@@ -546,6 +549,7 @@
                   </select>
                 </div>
                 <p
+                  id="material-helper"
                   class="text-xs text-gray-500 mt-1"
                   style="font-family: var(--font-baumans)"
                 >
@@ -564,11 +568,13 @@
                     id="stickerResolution"
                     name="stickerResolution"
                     class="input mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    aria-describedby="resolution-helper"
                   >
                     <!-- Options will be populated by JavaScript -->
                   </select>
                 </div>
                 <p
+                  id="resolution-helper"
                   class="text-xs text-gray-500 mt-1"
                   style="font-family: var(--font-baumans)"
                 >
@@ -590,9 +596,11 @@
                   name="cutLineFile"
                   type="file"
                   accept=".ai,.svg,.eps,.pdf"
+                  aria-describedby="cutline-helper"
                 />
               </div>
               <p
+                id="cutline-helper"
                 class="text-xs text-gray-500 mt-1"
                 style="font-family: var(--font-baumans)"
               >
