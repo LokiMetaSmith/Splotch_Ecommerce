@@ -1,7 +1,11 @@
 
 export function calculatePerimeter(polygons) {
     let totalPerimeter = 0;
-    const distance = (p1, p2) => Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+    const distance = (p1, p2) => {
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    };
 
     polygons.forEach(poly => {
         for (let i = 0; i < poly.length; i++) {
@@ -13,7 +17,7 @@ export function calculatePerimeter(polygons) {
     return totalPerimeter;
 }
 
-export function calculateStickerPrice(pricingConfig, quantity, material, bounds, cutline, resolution) {
+export function calculateStickerPrice(pricingConfig, quantity, material, bounds, cutline, resolution, existingPerimeterPixels) {
     if (!pricingConfig) {
         console.error("Pricing config not loaded.");
         return { total: 0, complexityMultiplier: 1.0 };
@@ -32,7 +36,9 @@ export function calculateStickerPrice(pricingConfig, quantity, material, bounds,
     const materialMultiplier = materialInfo ? materialInfo.costMultiplier : 1.0;
 
     // Get complexity multiplier
-    const perimeterPixels = calculatePerimeter(cutline);
+    const perimeterPixels = (typeof existingPerimeterPixels === 'number')
+        ? existingPerimeterPixels
+        : calculatePerimeter(cutline);
     const perimeterInches = perimeterPixels / ppi;
     let complexityMultiplier = 1.0;
     // Sort tiers ascending to find the first one the perimeter is less than.
