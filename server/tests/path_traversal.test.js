@@ -74,9 +74,6 @@ describe('Path Traversal Vulnerability', () => {
     let userToken;
 
     beforeAll(async () => {
-        process.env.SESSION_SECRET = 'test_secret';
-        process.env.CSRF_SECRET = '12345678901234567890123456789012';
-
         const serverInstance = await startServer(
             mockDb,
             mockBot,
