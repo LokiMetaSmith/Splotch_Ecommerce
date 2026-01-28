@@ -1,5 +1,6 @@
 import { describe, beforeAll, beforeEach, afterAll, it, expect, jest } from '@jest/globals';
-import EasyPost from '@easypost/api';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // 1. Mock the module BEFORE importing the system under test
 // For ESM default exports, we often need to return an object with a default property.
@@ -11,6 +12,16 @@ const mockEasyPostInstance = {
 
 const mockEasyPostConstructor = jest.fn(() => mockEasyPostInstance);
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// The server resolves @easypost/api to the one in server/node_modules
+// We must mock that specific file for the mock to take effect when imported from server/tracker.js
+const easyPostServerPath = path.resolve(__dirname, '../server/node_modules/@easypost/api/dist/easypost.mjs');
+
+jest.unstable_mockModule(easyPostServerPath, () => ({
+    default: mockEasyPostConstructor,
+}));
+
+// Also mock the package name for completeness, in case module resolution changes
 jest.unstable_mockModule('@easypost/api', () => ({
     default: mockEasyPostConstructor,
 }));
