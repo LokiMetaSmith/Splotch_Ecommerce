@@ -274,9 +274,21 @@
               </svg>
             </button>
             <div class="flex flex-col col-span-2">
-              <label for="resizeSlider" class="text-sm text-center"
-                >Size: <span id="resizeValue">3.0 in</span></label
+              <label for="resizeInput" class="text-sm text-center block mb-1"
+                >Size:</label
               >
+              <div class="flex items-center justify-center gap-1 mb-2">
+                <input
+                  type="number"
+                  id="resizeInput"
+                  class="w-20 text-center border rounded p-1 text-sm"
+                  value="3.0"
+                  step="0.1"
+                  min="0.1"
+                  aria-label="Size value"
+                />
+                <span id="resizeUnitLabel" class="text-sm">in</span>
+              </div>
               <input
                 type="range"
                 id="resizeSlider"
@@ -285,6 +297,7 @@
                 value="3"
                 step="0.1"
                 class="w-full"
+                aria-label="Size slider"
               />
             </div>
             <div class="flex flex-col justify-center items-center col-span-2">
