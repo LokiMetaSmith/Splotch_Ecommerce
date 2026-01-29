@@ -536,6 +536,15 @@ async function startServer(
         next();
     });
 
+    // SECURITY: Add additional security headers not covered by lusca
+    app.use((req, res, next) => {
+        // Permissions-Policy: Disables powerful features that the app doesn't need
+        res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+        // Referrer-Policy: Controls how much referrer information is sent to other sites
+        res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+        next();
+    });
+
     app.use(lusca({
         csrf: true,
         xframe: 'SAMEORIGIN',
