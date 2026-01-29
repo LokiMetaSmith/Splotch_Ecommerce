@@ -119,7 +119,8 @@ async function BootStrap() {
   rotateLeftBtnEl = document.getElementById("rotateLeftBtn");
   rotateRightBtnEl = document.getElementById("rotateRightBtn");
   const resizeSliderEl = document.getElementById("resizeSlider");
-  const resizeValueEl = document.getElementById("resizeValue");
+  const resizeInputNumberEl = document.getElementById("resizeInput");
+  const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
   grayscaleBtnEl = document.getElementById("grayscaleBtn");
   sepiaBtnEl = document.getElementById("sepiaBtn");
 
@@ -198,17 +199,19 @@ async function BootStrap() {
   if (sepiaBtnEl) sepiaBtnEl.addEventListener("click", toggleSepiaFilter);
   if (resizeSliderEl) {
     let resizeRequest = null;
+    // Slider updates Input
     resizeSliderEl.addEventListener("input", (e) => {
       let value = parseFloat(e.target.value);
-      if (isMetric) {
-        if (resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} mm`;
-      } else {
-        if (resizeValueEl) resizeValueEl.textContent = `${value.toFixed(1)} in`;
-      }
-      if (resizeValueEl)
+      if (resizeInputNumberEl) resizeInputNumberEl.value = value.toFixed(1);
+
+      // Update unit label just in case
+      if (resizeUnitLabelEl)
+        resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
+
+      if (resizeInputNumberEl)
         resizeSliderEl.setAttribute(
           "aria-valuetext",
-          resizeValueEl.textContent,
+          `${resizeInputNumberEl.value} ${isMetric ? "mm" : "in"}`,
         );
 
       if (!resizeRequest) {
@@ -222,6 +225,20 @@ async function BootStrap() {
           }
           resizeRequest = null;
         });
+      }
+    });
+  }
+
+  // Input updates Slider
+  if (resizeInputNumberEl) {
+    resizeInputNumberEl.addEventListener("change", (e) => {
+      let val = parseFloat(e.target.value);
+      if (isNaN(val) || val <= 0) return;
+
+      if (resizeSliderEl) {
+        resizeSliderEl.value = val;
+        // Trigger slider input event to run resize logic
+        resizeSliderEl.dispatchEvent(new Event("input"));
       }
     });
   }
@@ -300,18 +317,18 @@ async function BootStrap() {
 
         // Also update the slider
         const resizeSliderEl = document.getElementById("resizeSlider");
-        const resizeValueEl = document.getElementById("resizeValue");
-        if (resizeSliderEl && resizeValueEl) {
+        const resizeInputNumberEl = document.getElementById("resizeInput");
+        if (resizeSliderEl && resizeInputNumberEl) {
           if (isMetric) {
             resizeSliderEl.value = targetInches * 25.4;
-            resizeValueEl.textContent = `${(targetInches * 25.4).toFixed(1)} mm`;
+            resizeInputNumberEl.value = (targetInches * 25.4).toFixed(1);
           } else {
             resizeSliderEl.value = targetInches;
-            resizeValueEl.textContent = `${targetInches.toFixed(1)} in`;
+            resizeInputNumberEl.value = targetInches.toFixed(1);
           }
           resizeSliderEl.setAttribute(
             "aria-valuetext",
-            resizeValueEl.textContent,
+            `${resizeInputNumberEl.value} ${isMetric ? "mm" : "in"}`,
           );
         }
       }
@@ -927,7 +944,8 @@ function updateUnitUI(isMetric) {
   const inchesToMm = 25.4;
   const sizeBtns = document.querySelectorAll(".size-btn");
   const resizeSliderEl = document.getElementById("resizeSlider");
-  const resizeValueEl = document.getElementById("resizeValue");
+  const resizeInputNumberEl = document.getElementById("resizeInput");
+  const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
   const designMarginNoteEl = document.getElementById("designMarginNote");
 
   sizeBtns.forEach((btn) => {
@@ -945,7 +963,7 @@ function updateUnitUI(isMetric) {
     }
   });
 
-  if (resizeSliderEl && resizeValueEl) {
+  if (resizeSliderEl && resizeInputNumberEl) {
     let currentValue = parseFloat(resizeSliderEl.value);
     if (isMetric) {
       if (!resizeSliderEl.dataset.originalMin) {
@@ -958,18 +976,25 @@ function updateUnitUI(isMetric) {
       resizeSliderEl.step =
         (resizeSliderEl.dataset.originalStep * inchesToMm) / 10;
       resizeSliderEl.value = currentValue * inchesToMm;
-      resizeValueEl.textContent = `${(currentValue * inchesToMm).toFixed(1)} mm`;
+      if (resizeInputNumberEl)
+        resizeInputNumberEl.value = (currentValue * inchesToMm).toFixed(1);
+      if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = "mm";
     } else {
       if (resizeSliderEl.dataset.originalMin) {
         resizeSliderEl.min = resizeSliderEl.dataset.originalMin;
         resizeSliderEl.max = resizeSliderEl.dataset.originalMax;
         resizeSliderEl.step = resizeSliderEl.dataset.originalStep;
         resizeSliderEl.value = currentValue / inchesToMm;
-        resizeValueEl.textContent = `${(currentValue / inchesToMm).toFixed(1)} in`;
+        if (resizeInputNumberEl)
+          resizeInputNumberEl.value = (currentValue / inchesToMm).toFixed(1);
+        if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = "in";
       }
     }
-    if (resizeValueEl) {
-      resizeSliderEl.setAttribute("aria-valuetext", resizeValueEl.textContent);
+    if (resizeInputNumberEl) {
+      resizeSliderEl.setAttribute(
+        "aria-valuetext",
+        `${resizeInputNumberEl.value} ${isMetric ? "mm" : "in"}`,
+      );
     }
   }
 

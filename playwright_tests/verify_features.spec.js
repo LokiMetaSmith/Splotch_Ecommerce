@@ -58,17 +58,20 @@ test.describe('Standard Size Buttons and Unit Selection', () => {
 
         // Check if slider value matches
         await expect(page.locator('#resizeSlider')).toHaveValue('2');
-        await expect(page.locator('#resizeValue')).toHaveText('2.0 in');
+        await expect(page.locator('#resizeInput')).toHaveValue('2.0');
+        await expect(page.locator('#resizeUnitLabel')).toHaveText('in');
 
         // Click 1" button
         await btn1.click();
         await expect(page.locator('#resizeSlider')).toHaveValue('1');
-        await expect(page.locator('#resizeValue')).toHaveText('1.0 in');
+        await expect(page.locator('#resizeInput')).toHaveValue('1.0');
+        await expect(page.locator('#resizeUnitLabel')).toHaveText('in');
 
         // Click 3" button
         await btn3.click();
         await expect(page.locator('#resizeSlider')).toHaveValue('3');
-        await expect(page.locator('#resizeValue')).toHaveText('3.0 in');
+        await expect(page.locator('#resizeInput')).toHaveValue('3.0');
+        await expect(page.locator('#resizeUnitLabel')).toHaveText('in');
     });
 
     test('Unit Selection toggle updates display', async ({ page }) => {
@@ -96,22 +99,22 @@ test.describe('Standard Size Buttons and Unit Selection', () => {
 
         const toggle = page.locator('#unitToggle');
         const btn1 = page.locator('button.size-btn[data-size="1"]');
-        const resizeValue = page.locator('#resizeValue');
+        const resizeUnitLabel = page.locator('#resizeUnitLabel');
 
         // Initial state (Inches)
         await expect(btn1).toHaveText('1"');
-        await expect(resizeValue).toContainText('in');
+        await expect(resizeUnitLabel).toHaveText('in');
 
         // Toggle to mm via JS evaluation to avoid viewport/interception issues
         await page.evaluate(() => document.querySelector('label[for="unitToggle"]').click());
 
         // 1 inch = 25.4 mm => approx 25mm
         await expect(btn1).toHaveText('25mm');
-        await expect(resizeValue).toContainText('mm');
+        await expect(resizeUnitLabel).toHaveText('mm');
 
         // Toggle back to inches via JS evaluation
         await page.evaluate(() => document.querySelector('label[for="unitToggle"]').click());
         await expect(btn1).toHaveText('1"');
-        await expect(resizeValue).toContainText('in');
+        await expect(resizeUnitLabel).toHaveText('in');
     });
 });
