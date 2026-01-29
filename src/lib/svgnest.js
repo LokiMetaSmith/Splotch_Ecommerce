@@ -215,7 +215,10 @@ export class SvgNest {
         const adam = this.tree.slice(0);
         adam.sort((a, b) => Math.abs(GeometryUtil.polygonArea(b)) - Math.abs(GeometryUtil.polygonArea(a)));
 
-        this.GA = new GeneticAlgorithm(adam, this.binPolygon, this.config);
+        // Bolt Optimization: Since we only use the first individual in this synchronous implementation,
+        // force populationSize to 1 to avoid generating unused mutants in the GA constructor.
+        const runConfig = { ...this.config, populationSize: 1 };
+        this.GA = new GeneticAlgorithm(adam, this.binPolygon, runConfig);
         const individual = this.GA.population[0];
         
         const worker = new PlacementWorker(this.binPolygon, this.tree, individual.placement.map(p => p.id), individual.rotation, this.config, {});
