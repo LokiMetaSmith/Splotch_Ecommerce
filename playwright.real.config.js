@@ -19,6 +19,7 @@ export default defineConfig({
         NODE_ENV: 'test',
         PORT: '3000',
         SQUARE_ACCESS_TOKEN: 'dummy-token-for-testing', // We still need this to pass server start checks
+        SESSION_SECRET: 'test-session-secret-1234567890',
       },
     },
   ],
