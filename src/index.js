@@ -570,10 +570,19 @@ function calculateAndUpdatePrice() {
     markupHtml = `<span class="text-xs text-green-600 block">Includes Creator Support: ${formatPrice(totalMarkup)}</span>`;
   }
 
+  const unitPriceCents = quantity > 0 ? currentOrderAmountCents / quantity : 0;
+  const unitPriceDisplay =
+    quantity > 1 && unitPriceCents > 0
+      ? `<span class="text-sm text-gray-500 font-medium ml-2">(${formatPrice(unitPriceCents)} each)</span>`
+      : "";
+
   calculatedPriceDisplay.innerHTML = `
-        <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
+        <div class="flex items-baseline">
+            <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
+            ${unitPriceDisplay}
+        </div>
         ${markupHtml}
-        <span class="text-sm text-gray-600 block">
+        <span class="text-sm text-gray-600 block mt-1">
             Size: ${width.toFixed(1)}${unit} x ${height.toFixed(1)}${unit}
         </span>
         <span class="text-xs text-gray-500 block">
