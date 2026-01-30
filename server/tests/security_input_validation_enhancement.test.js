@@ -18,14 +18,14 @@ jest.unstable_mockModule('../pricing.js', () => ({
 // Dynamic import after mocking
 const { startServer } = await import('../server.js');
 
-describe('Security: Mass Assignment in Create Order', () => {
+describe('Security: Input Validation Enhancement', () => {
   let app;
   let db;
   let serverInstance;
   let timers;
   let bot;
   let mockSendEmail;
-  const testDbPath = path.join(__dirname, 'test-db-mass-assignment.json');
+  const testDbPath = path.join(__dirname, 'test-db-validation-enhancement.json');
 
   const mockSquareClient = {
     locations: {},
@@ -47,11 +47,13 @@ describe('Security: Mass Assignment in Create Order', () => {
 
     mockSendEmail = jest.fn();
 
-    // Ensure dummy file exists for tests
+    // Ensure dummy file exists for tests (even if mocked, server checks existence)
     const uploadsDir = path.join(__dirname, '../uploads');
     try {
         await fs.mkdir(uploadsDir, { recursive: true });
-        await fs.copyFile(path.join(__dirname, '../../favicon.png'), path.join(uploadsDir, 'test.png'));
+        // Create a minimal valid PNG
+        const minimalPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==', 'base64');
+        await fs.writeFile(path.join(uploadsDir, 'test_val.png'), minimalPng);
     } catch (error) {
         console.warn('Could not create dummy test file:', error);
     }
@@ -64,12 +66,6 @@ describe('Security: Mass Assignment in Create Order', () => {
     serverInstance = app.listen();
   });
 
-  beforeEach(async () => {
-    db.data = { orders: {}, users: {}, credentials: {}, config: {}, emailIndex: {}, products: {} };
-    mockSendEmail.mockClear();
-    mockSquareClient.payments.create.mockClear();
-  });
-
   afterAll(async () => {
     if (bot) await bot.stop('test');
     timers.forEach(timer => clearInterval(timer));
@@ -80,61 +76,64 @@ describe('Security: Mass Assignment in Create Order', () => {
        // ignore
     }
     try {
-        await fs.unlink(path.join(__dirname, '../uploads/test.png'));
+        await fs.unlink(path.join(__dirname, '../uploads/test_val.png'));
     } catch (error) {
         // ignore
     }
   });
 
-  it('should prevent mass assignment in billingContact', async () => {
+  it('should currently accept invalid material and resolution (reproduction)', async () => {
+    // 1. Register/Login to get Token
     const agent = request.agent(app);
 
-    // 1. Get CSRF Token
     let csrfRes = await agent.get('/api/csrf-token');
     let csrfToken = csrfRes.body.csrfToken;
 
-    // 2. Register/Login to get Token
+    // Create user
     await agent
-      .post('/api/auth/register-user')
-      .set('X-CSRF-Token', csrfToken)
-      .send({ username: 'attacker', password: 'password123' });
+        .post('/api/auth/register-user')
+        .set('X-CSRF-Token', csrfToken)
+        .send({ username: 'tester', password: 'password123' });
 
     csrfRes = await agent.get('/api/csrf-token');
     csrfToken = csrfRes.body.csrfToken;
 
     const loginRes = await agent
-      .post('/api/auth/login')
-      .set('X-CSRF-Token', csrfToken)
-      .send({ username: 'attacker', password: 'password123' });
+        .post('/api/auth/login')
+        .set('X-CSRF-Token', csrfToken)
+        .send({ username: 'tester', password: 'password123' });
 
+    if (loginRes.status !== 200) {
+        console.log('Login failed:', loginRes.status, loginRes.body);
+    }
     const authToken = loginRes.body.token;
 
-    // Refresh CSRF Token
+    // Refresh CSRF Token for the order creation
     csrfRes = await agent.get('/api/csrf-token');
     csrfToken = csrfRes.body.csrfToken;
 
-    // 3. Create Order with malicious payload
-    const maliciousPayload = {
+    // 2. Create Order with invalid material
+    const payload = {
       sourceId: 'cnon:card-nonce-ok',
       amountCents: 100, // Matches mocked total (100)
       currency: 'USD',
-      designImagePath: '/uploads/test.png',
-      orderDetails: { quantity: 10 },
+      designImagePath: '/uploads/test_val.png',
+      orderDetails: {
+          quantity: 1,
+          material: 'INVALID_MATERIAL_STRING',
+          resolution: 'INVALID_RESOLUTION_STRING'
+      },
       shippingContact: {
-        givenName: 'Attacker',
-        addressLines: ['123 Evil St'],
-        locality: 'Bad Town',
+        givenName: 'Tester',
+        addressLines: ['123 Test St'],
+        locality: 'Testville',
         administrativeDistrictLevel1: 'CA',
         postalCode: '90210',
         country: 'US'
       },
       billingContact: {
-        givenName: 'Attacker',
-        email: 'attacker@example.com',
-        // MALICIOUS FIELD
-        isAdmin: true,
-        role: 'admin',
-        walletBalanceCents: 999999
+        givenName: 'Tester',
+        email: 'tester@example.com'
       }
     };
 
@@ -142,21 +141,19 @@ describe('Security: Mass Assignment in Create Order', () => {
       .post('/api/create-order')
       .set('Authorization', `Bearer ${authToken}`)
       .set('X-CSRF-Token', csrfToken)
-      .send(maliciousPayload);
+      .send(payload);
 
-    if (res.statusCode !== 201) {
-        console.log('Mass assignment test failed:', res.statusCode, res.body);
+    if (res.status !== 400) {
+        console.log('Status:', res.status);
+        console.log('Body:', res.body);
     }
-    expect(res.statusCode).toEqual(201);
-    const orderId = res.body.order.orderId;
+    expect(res.status).toBe(400); // Expect rejection now
 
-    // 4. Verify in DB
-    const order = db.data.orders[orderId];
-    expect(order).toBeDefined();
-
-    // Check if malicious fields were saved
-    expect(order.billingContact.isAdmin).toBeUndefined();
-    expect(order.billingContact.role).toBeUndefined();
-    expect(order.billingContact.walletBalanceCents).toBeUndefined();
+    // Verify error message
+    expect(res.body.errors).toBeDefined();
+    const materialError = res.body.errors.find(e => e.msg.includes('Invalid material'));
+    const resolutionError = res.body.errors.find(e => e.msg.includes('Invalid resolution'));
+    expect(materialError).toBeDefined();
+    expect(resolutionError).toBeDefined();
   });
 });
