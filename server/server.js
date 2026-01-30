@@ -823,6 +823,21 @@ async function startServer(
       // Security Fix: Validate orderDetails structure
       body('orderDetails').isObject().withMessage('orderDetails must be an object'),
       body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),
+      // Security: Validate material and resolution against allowed values to prevent injection
+      body('orderDetails.material').optional().isString().withMessage('Material must be a string').custom(value => {
+            const validMaterials = pricingConfig.materials.map(m => m.id);
+            if (!validMaterials.includes(value)) {
+                throw new Error(`Invalid material. Must be one of: ${validMaterials.join(', ')}`);
+            }
+            return true;
+      }),
+      body('orderDetails.resolution').optional().isString().withMessage('Resolution must be a string').custom(value => {
+            const validResolutions = pricingConfig.resolutions.map(r => r.id);
+            if (!validResolutions.includes(value)) {
+                throw new Error(`Invalid resolution. Must be one of: ${validResolutions.join(', ')}`);
+            }
+            return true;
+      }),
       body('orderDetails.cutLinePath').optional().isString().withMessage('cutLinePath must be a string').custom(value => {
             if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
             if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
