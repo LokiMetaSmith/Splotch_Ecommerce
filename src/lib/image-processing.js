@@ -5,6 +5,18 @@
  * @param {ImageData} imageData - The image data from canvas context.
  * @returns {boolean} - True if the border is transparent or white.
  */
+// Bolt Optimization: Defined outside traceContour to avoid reallocation
+const MOORE_NEIGHBORS = [
+    { x: 1, y: 0 },   // 0: E
+    { x: 1, y: -1 },  // 1: NE
+    { x: 0, y: -1 },  // 2: N
+    { x: -1, y: -1 }, // 3: NW
+    { x: -1, y: 0 },  // 4: W
+    { x: -1, y: 1 },  // 5: SW
+    { x: 0, y: 1 },   // 6: S
+    { x: 1, y: 1 },   // 7: SE
+];
+
 export function imageHasTransparentBorder(imageData) {
     const { data, width, height } = imageData;
     const borderSampleSize = 10; // Check this many pixels on each edge
@@ -88,35 +100,27 @@ export function traceContour(imageData) {
     }
 
     const contour = [];
-    let currentPos = startPos;
+    // Bolt Optimization: Use local variables for coordinates to avoid object allocation in the loop
+    let cx = startPos.x;
+    let cy = startPos.y;
     let lastDirection = 6; // Start by checking the pixel to the left
 
-    // Moore-Neighbor tracing algorithm
-    const neighbors = [
-        { x: 1, y: 0 },   // 0: E
-        { x: 1, y: -1 },  // 1: NE
-        { x: 0, y: -1 },  // 2: N
-        { x: -1, y: -1 }, // 3: NW
-        { x: -1, y: 0 },  // 4: W
-        { x: -1, y: 1 },  // 5: SW
-        { x: 0, y: 1 },   // 6: S
-        { x: 1, y: 1 },   // 7: SE
-    ];
-
     do {
-        contour.push({ x: currentPos.x, y: currentPos.y });
+        contour.push({ x: cx, y: cy });
 
         // Start checking neighbors from the one after the direction we came from
         let checkDirection = (lastDirection + 5) % 8;
-        let nextPos = null;
         let foundNext = false;
 
         for (let i = 0; i < 8; i++) {
-            const neighborOffset = neighbors[checkDirection];
-            const neighborPos = { x: currentPos.x + neighborOffset.x, y: currentPos.y + neighborOffset.y };
+            const neighborOffset = MOORE_NEIGHBORS[checkDirection];
+            // Bolt Optimization: Compute coordinates directly, avoiding {x,y} object allocation
+            const nx = cx + neighborOffset.x;
+            const ny = cy + neighborOffset.y;
 
-            if (isOpaque(neighborPos.x, neighborPos.y)) {
-                nextPos = neighborPos;
+            if (isOpaque(nx, ny)) {
+                cx = nx;
+                cy = ny;
                 lastDirection = checkDirection;
                 foundNext = true;
                 break;
@@ -129,9 +133,7 @@ export function traceContour(imageData) {
             break;
         }
 
-        currentPos = nextPos;
-
-    } while (currentPos.x !== startPos.x || currentPos.y !== startPos.y);
+    } while (cx !== startPos.x || cy !== startPos.y);
 
     return contour;
 }
