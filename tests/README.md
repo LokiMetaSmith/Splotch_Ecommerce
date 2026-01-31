@@ -29,8 +29,17 @@ This directory contains the unit tests for the Print Shop application.
 *   Tests the file upload endpoint:
     *   `/api/upload-design` (Including validation, file type checks, and SVG sanitization)
 
+### `telegram_bot.test.js`
+
+*   Tests the Telegram bot commands and interactions:
+    *   `/jobs`, `/new_orders` and other list commands.
+    *   Callback query handling for order status updates.
+
+### `telegram_stalled_message.test.js`
+
+*   Tests that the "Order Stalled" message is deleted when order status changes.
+
 ## Future Tests
 
 *   Add tests for the encryption/decryption of the client JSON file.
-*   Add tests for the Telegram bot.
 *   Add tests for the `generateCutFile` function.
