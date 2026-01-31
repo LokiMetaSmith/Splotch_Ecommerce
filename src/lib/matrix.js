@@ -151,19 +151,21 @@ export class Matrix {
      * @param {number} x - The x-coordinate of the point.
      * @param {number} y - The y-coordinate of the point.
      * @param {boolean} [isRelative=false] - If true, the translate component is skipped.
-     * @returns {number[]} The transformed point as [x, y].
+     * @returns {{x: number, y: number}} The transformed point as {x, y}.
      */
     calc(x, y, isRelative = false) {
+        // Optimization: Return object instead of array to reduce memory allocation
+        // and GC overhead during heavy matrix operations (e.g. iterating over SVG points).
         if (!this.queue.length) {
-            return [x, y];
+            return { x, y };
         }
         if (!this.cache) {
             this.cache = this.toArray();
         }
         const m = this.cache;
-        return [
-            x * m[0] + y * m[2] + (isRelative ? 0 : m[4]),
-            x * m[1] + y * m[3] + (isRelative ? 0 : m[5])
-        ];
+        return {
+            x: x * m[0] + y * m[2] + (isRelative ? 0 : m[4]),
+            y: x * m[1] + y * m[3] + (isRelative ? 0 : m[5])
+        };
     }
 }
