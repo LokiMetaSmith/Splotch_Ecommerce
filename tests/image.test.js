@@ -39,7 +39,7 @@ describe('Image Transformation and Editing', () => {
         it('should translate a point', () => {
             const matrix = new Matrix();
             matrix.translate(5, 10);
-            const [x, y] = matrix.calc(10, 10);
+            const { x, y } = matrix.calc(10, 10);
             expect(x).toBe(15);
             expect(y).toBe(20);
         });
@@ -47,7 +47,7 @@ describe('Image Transformation and Editing', () => {
         it('should scale a point', () => {
             const matrix = new Matrix();
             matrix.scale(2, 3);
-            const [x, y] = matrix.calc(10, 10);
+            const { x, y } = matrix.calc(10, 10);
             expect(x).toBe(20);
             expect(y).toBe(30);
         });
@@ -55,7 +55,7 @@ describe('Image Transformation and Editing', () => {
         it('should rotate a point', () => {
             const matrix = new Matrix();
             matrix.rotate(90, 0, 0);
-            const [x, y] = matrix.calc(10, 0);
+            const { x, y } = matrix.calc(10, 0);
             expect(x).toBeCloseTo(0);
             expect(y).toBeCloseTo(10);
         });
@@ -63,7 +63,7 @@ describe('Image Transformation and Editing', () => {
         it('should skew a point in the x-direction', () => {
             const matrix = new Matrix();
             matrix.skewX(45);
-            const [x, y] = matrix.calc(10, 10);
+            const { x, y } = matrix.calc(10, 10);
             expect(x).toBeCloseTo(20);
             expect(y).toBeCloseTo(10);
         });
@@ -71,7 +71,7 @@ describe('Image Transformation and Editing', () => {
         it('should skew a point in the y-direction', () => {
             const matrix = new Matrix();
             matrix.skewY(45);
-            const [x, y] = matrix.calc(10, 10);
+            const { x, y } = matrix.calc(10, 10);
             expect(x).toBeCloseTo(10);
             expect(y).toBeCloseTo(20);
         });
@@ -79,7 +79,7 @@ describe('Image Transformation and Editing', () => {
         it('should combine transformations', () => {
             const matrix = new Matrix();
             matrix.translate(5, 10).scale(2, 3);
-            const [x, y] = matrix.calc(10, 10);
+            const { x, y } = matrix.calc(10, 10);
             expect(x).toBe(25);
             expect(y).toBe(40);
         });

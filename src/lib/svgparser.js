@@ -107,8 +107,7 @@ export class SVGParser {
         } else if (!currentMatrix.isIdentity() && this.allowedElements.includes(element.tagName) && element.tagName !== 'svg') {
             const poly = this.polygonify(element);
             const transformedPoly = poly.map(p => {
-                const [x, y] = currentMatrix.calc(p.x, p.y);
-                return { x, y };
+                return currentMatrix.calc(p.x, p.y);
             });
 
             if (transformedPoly.length > 0) {
