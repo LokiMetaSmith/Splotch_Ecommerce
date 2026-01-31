@@ -436,14 +436,25 @@
                   style="font-family: var(--font-baumans)"
                   >Size (px):</label
                 >
-                <input
-                  type="number"
-                  id="textSizeInput"
-                  value="30"
-                  min="8"
-                  max="200"
-                  class="input mt-1 w-full"
-                />
+                <div class="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    id="textSizeInput"
+                    value="30"
+                    min="8"
+                    max="200"
+                    class="input w-20 text-center"
+                  />
+                  <input
+                    type="range"
+                    id="textSizeSlider"
+                    min="8"
+                    max="200"
+                    value="30"
+                    class="flex-grow cursor-pointer"
+                    aria-label="Text size slider"
+                  />
+                </div>
               </div>
               <div>
                 <label
