@@ -267,7 +267,7 @@ async function startServer(
   }
 
   // --- Google OAuth2 Client ---
-
+  let oauth2Client;
 
   async function logAndEmailError(error, context = 'General Error') {
     // Sanitize error logging to avoid leaking sensitive information in logs/emails.
@@ -279,7 +279,7 @@ async function startServer(
     }
     // The full error (including stack) is still logged to the console for debugging.
     console.error(`[${context}]`, error);
-    if (getSecret('ADMIN_EMAIL') && oauth2Client.credentials.access_token) {
+    if (getSecret('ADMIN_EMAIL') && oauth2Client && oauth2Client.credentials && oauth2Client.credentials.access_token) {
       try {
         await sendEmail({
           to: getSecret('ADMIN_EMAIL'),
@@ -302,7 +302,7 @@ async function startServer(
     const expectedOrigin = getSecret('EXPECTED_ORIGIN');
 
     // --- Google OAuth2 Client ---
-    const oauth2Client = new injectedGoogle.auth.OAuth2(
+    oauth2Client = new injectedGoogle.auth.OAuth2(
       getSecret('GOOGLE_CLIENT_ID'),
       getSecret('GOOGLE_CLIENT_SECRET'),
       `${getSecret('BASE_URL')}/oauth2callback`
@@ -1699,16 +1699,34 @@ ${statusChecklist}
         'https://www.googleapis.com/auth/userinfo.email',
       ];
 
+      // SECURITY: Generate a random state to prevent CSRF
+      const state = randomBytes(16).toString('hex');
+      res.cookie('oauth_state', state, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 600000, // 10 minutes
+        signed: true
+      });
+
       const url = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: scopes,
+        state: state
       });
 
       res.redirect(url);
     });
 
     app.get('/oauth2callback', async (req, res) => {
-      const { code } = req.query;
+      const { code, state } = req.query;
+
+      // SECURITY: Verify state parameter to prevent CSRF
+      const storedState = req.signedCookies.oauth_state;
+      if (!state || !storedState || state !== storedState) {
+          return res.status(403).send('Authentication failed: Invalid state parameter.');
+      }
+      res.clearCookie('oauth_state');
+
       try {
         const { tokens } = await oauth2Client.getToken(code);
         oauth2Client.setCredentials(tokens);
