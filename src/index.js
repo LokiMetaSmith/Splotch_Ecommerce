@@ -33,6 +33,7 @@ let isSepia = false;
 
 let textInput,
   textSizeInput,
+  textSizeSlider,
   textColorInput,
   addTextBtn,
   textFontFamilySelect,
@@ -94,6 +95,7 @@ async function BootStrap() {
 
   textInput = document.getElementById("textInput");
   textSizeInput = document.getElementById("textSizeInput");
+  textSizeSlider = document.getElementById("textSizeSlider");
   textColorInput = document.getElementById("textColorInput");
   addTextBtn = document.getElementById("addTextBtn");
   textFontFamilySelect = document.getElementById("textFontFamily");
@@ -185,6 +187,16 @@ async function BootStrap() {
   }
   if (addTextBtn) {
     addTextBtn.addEventListener("click", handleAddText);
+  }
+
+  // Sync text size slider and input
+  if (textSizeSlider && textSizeInput) {
+    textSizeSlider.addEventListener("input", (e) => {
+      textSizeInput.value = e.target.value;
+    });
+    textSizeInput.addEventListener("input", (e) => {
+      textSizeSlider.value = e.target.value;
+    });
   }
   if (rotateLeftBtnEl)
     rotateLeftBtnEl.addEventListener("click", () =>
@@ -1028,6 +1040,7 @@ function updateEditingButtonsState(disabled) {
     document.getElementById("generateCutlineBtn"),
     textInput,
     textSizeInput,
+    textSizeSlider,
     textColorInput,
     addTextBtn,
     textFontFamilySelect,
