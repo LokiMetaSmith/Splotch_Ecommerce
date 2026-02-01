@@ -153,9 +153,25 @@ export class Matrix {
      * @param {boolean} [isRelative=false] - If true, the translate component is skipped.
      * @returns {{x: number, y: number}} The transformed point as {x, y}.
      */
-    calc(x, y, isRelative = false) {
+    calc(x, y, isRelative = false, target) {
         // Optimization: Return object instead of array to reduce memory allocation
         // and GC overhead during heavy matrix operations (e.g. iterating over SVG points).
+        // Bolt Optimization: Allow writing to an existing object to avoid allocation
+        if (target) {
+            if (!this.queue.length) {
+                target.x = x;
+                target.y = y;
+                return target;
+            }
+            if (!this.cache) {
+                this.cache = this.toArray();
+            }
+            const m = this.cache;
+            target.x = x * m[0] + y * m[2] + (isRelative ? 0 : m[4]);
+            target.y = x * m[1] + y * m[3] + (isRelative ? 0 : m[5]);
+            return target;
+        }
+
         if (!this.queue.length) {
             return { x, y };
         }
