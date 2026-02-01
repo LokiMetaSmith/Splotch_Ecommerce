@@ -23,3 +23,7 @@
 ## 2025-02-24 - Modal Focus Management
 **Learning:** Modals implemented with simple visibility toggles (like `.hidden`) often trap focus or fail to restore it, leaving keyboard users lost.
 **Action:** When opening a modal, save `document.activeElement` and move focus to the modal's first input. When closing, restore focus to the saved element. Always map `Escape` to close.
+
+## 2025-05-21 - Skip Link Targets
+**Learning:** Anchor links (skip links) targeting non-interactive elements (like divs/sections) do not move keyboard focus unless the target has `tabindex="-1"`.
+**Action:** Always add `tabindex="-1"` and `outline-none` (if visual ring is unwanted) to container elements targeted by skip links.
