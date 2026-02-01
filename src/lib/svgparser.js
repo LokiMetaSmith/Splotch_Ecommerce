@@ -106,9 +106,11 @@ export class SVGParser {
             }
         } else if (!currentMatrix.isIdentity() && this.allowedElements.includes(element.tagName) && element.tagName !== 'svg') {
             const poly = this.polygonify(element);
-            const transformedPoly = poly.map(p => {
-                return currentMatrix.calc(p.x, p.y);
-            });
+            // Bolt Optimization: Transform points in-place to avoid object allocation
+            const transformedPoly = poly;
+            for (let i = 0; i < poly.length; i++) {
+                currentMatrix.calc(poly[i].x, poly[i].y, false, poly[i]);
+            }
 
             if (transformedPoly.length > 0) {
                 let d = transformedPoly.map((p, i) => (i === 0 ? 'M ' : 'L ') + p.x + ' ' + p.y).join(' ');

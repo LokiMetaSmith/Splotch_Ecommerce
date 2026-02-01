@@ -1,0 +1,26 @@
+
+> server@1.0.0 start
+> node index.js
+
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 📡 observe env with Radar: https://dotenvx.com/radar
+[SERVER] Pricing configuration loaded.
+[TELEGRAM] Bot token not found. Bot is disabled.
+[SERVER] Initialized caches (O(N) optimized). Active: 0, Shipped: 0, Users Indexed: 0
+[SERVER] LowDB database initialized at: /app/server/db.json
+[SERVER] Multer configured for file uploads.
+[SERVER] Initializing Square client...
+[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.
+[SERVER] Verifying connection to Square servers...
+[SERVER] Square client initialized.
+[SERVER] Performing sanity check on Square client...
+✅ [SERVER] Sanity check passed. Client has required API properties.
+⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.
+   Do not use this configuration in production.
+[SERVER] Middleware (CORS, JSON, static file serving) enabled.
+[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.
+[KEY_MANAGER] Rotating keys...
+[KEY_MANAGER] Now managing 1 active keys.
+[SERVER] Signed new session token with key ID: bb0a3421fd0e6143
+[SERVER] Server listening at http://localhost:3000
+Terminated
