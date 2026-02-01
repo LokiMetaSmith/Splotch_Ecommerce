@@ -38,6 +38,8 @@ export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
 
 const allowedMimeTypes = ['image/svg+xml', 'application/xml', 'image/png', 'image/jpeg', 'image/webp'];
+// Pre-computed valid bcrypt hash for timing-safe comparison
+const DUMMY_HASH = '$2b$10$e8ypvsBL/MxhtxIydLPU2eoLd4IVyOy0MhGvCRL3DC/xUpoznhhHi';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
@@ -1561,11 +1563,14 @@ ${statusChecklist}
         return res.status(400).json({ error: 'Invalid username or password' });
       }
       const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
-      if (!user || !user.password) {
-        return res.status(400).json({ error: 'Invalid username or password' });
-      }
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
+
+      // Sentinel: Timing attack mitigation.
+      // Always perform bcrypt comparison to prevent username enumeration via timing analysis.
+      // If user is not found or has no password, compare against a dummy hash.
+      const targetHash = (user && user.password) ? user.password : DUMMY_HASH;
+      const validPassword = await bcrypt.compare(password, targetHash);
+
+      if (!user || !user.password || !validPassword) {
         return res.status(400).json({ error: 'Invalid username or password' });
       }
       const { privateKey, kid } = getCurrentSigningKey();

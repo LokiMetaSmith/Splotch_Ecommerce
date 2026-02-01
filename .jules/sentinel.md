@@ -17,3 +17,8 @@
 **Vulnerability:** The server rotated signing keys every hour and strictly removed keys older than 1 hour. However, JWTs were also issued with a 1-hour lifetime. This created a race condition where a token signed late in a key's lifecycle (e.g., at 50 minutes) would be valid for another hour, but the key to verify it would be deleted 10 minutes later. This caused intermittent authentication failures for valid users.
 **Learning:** Key retention policies must always exceed the maximum lifetime of any artifact signed by those keys. If a token lives for X, the key must live for X + Rotation_Interval + Buffer.
 **Prevention:** Decouple `ROTATION_INTERVAL` from `RETENTION_PERIOD`. Ensure `RETENTION_PERIOD >= ROTATION_INTERVAL + TOKEN_LIFETIME`.
+
+## 2026-02-01 - Username Enumeration via Timing Attack
+**Vulnerability:** The login endpoint (`/api/auth/login`) returned significantly faster when a username did not exist compared to when a valid username was provided with an incorrect password. This was caused by conditionally executing the slow `bcrypt.compare` function only after confirming the user existed.
+**Learning:** Logic optimization (failing fast) is often the enemy of privacy. In authentication flows, "fail fast" leaks existence information. Developers prioritize performance over constant-time execution without realizing the privacy impact.
+**Prevention:** Implement "Timing Safe" logic by ensuring that computationally expensive operations (like password hashing) are performed in all paths. Use a pre-computed "dummy hash" to perform a comparison even when the user is not found, ensuring the response time is indistinguishable (constant time) regardless of user existence.
