@@ -1,6 +1,7 @@
 import { describe, beforeAll, afterAll, it, expect, jest } from '@jest/globals';
 import { initializeBot } from '../server/bot.js';
-import { Context } from 'telegraf';
+// Import Context from server's node_modules to ensure instance compatibility with Telegraf instance created in server/bot.js
+import { Context } from '../server/node_modules/telegraf/lib/index.js';
 import { JSONFilePreset } from 'lowdb/node';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -50,6 +51,7 @@ describe('Telegram Bot Commands', () => {
         bot.telegram.sendMessage = jest.fn().mockResolvedValue({ message_id: 123 });
         bot.telegram.editMessageText = jest.fn().mockResolvedValue(true);
         bot.telegram.answerCbQuery = jest.fn().mockResolvedValue(true);
+
     });
 
     afterAll(() => {

@@ -18,6 +18,7 @@ These issues represent the most severe risks to the application's functionality 
     -   [x] `playwright_tests/image-upload.spec.js`
 -   **[x] Fix failing security tests due to missing test files:** The security tests `tests/security_xss.test.js` and `server/tests/security_mass_assignment.test.js` were failing because they relied on non-existent dummy files. They have been updated to dynamically create and clean up these files.
 -   **[x] Fix failing tracker tests:** The test `tests/tracker.test.js` was failing because the `EasyPost` mock was not being applied correctly due to module resolution issues between the root and server `node_modules`. This has been fixed by mocking the specific resolved path.
+-   **[x] Fix failing Telegram Bot unit tests:** The tests in `tests/telegram_bot.test.js` are failing with "next(ctx) called with invalid context" due to improper mocking of the `Telegraf` bot instance in the test environment.
 
 ---
 
