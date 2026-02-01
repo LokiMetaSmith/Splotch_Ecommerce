@@ -163,6 +163,8 @@ ${statusChecklist}
         setMyCommands: () => Promise.resolve(),
         getMe: () => Promise.resolve({ id: 123456, is_bot: true, first_name: 'TestBot', username: 'TestBot' }),
       };
+      // Manually set botInfo in test environment to satisfy Context constructor requirements
+      bot.botInfo = { id: 123456, is_bot: true, first_name: 'TestBot', username: 'TestBot' };
     }
 
   } else {
