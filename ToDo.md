@@ -156,3 +156,33 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 
 -   **[x] Improve Example Secrets:** Update `server/env.example` to remove weak example secrets and replace them with clear instructions for generating strong, random values.
 -   **[x] Use Environment Variables for Test Passwords:** Refactor tests to pull sensitive data like passwords from environment variables instead of hardcoding them, especially for CI/CD environments.
+
+---
+<br>
+
+# Mass Deployment & Scaling
+
+**Readiness Score for Mass Scale (>1000 concurrent users): 5/10**
+
+The current architecture is suitable for an initial MVP or beta release (< 50 concurrent users) but requires significant infrastructure upgrades to handle thousands of users reliably.
+
+## Critical Infrastructure Upgrades (Required for Scale)
+
+- [ ] **Migrate Database:** Migrate from `lowdb` (JSON file) to a robust relational database (PostgreSQL) or document store (MongoDB). `lowdb` is not ACID-compliant and will lock or corrupt under high concurrent write load.
+- [ ] **Stateless File Storage:** Move user uploads from the local filesystem (`server/uploads`) to an S3-compatible object storage service (AWS S3, DigitalOcean Spaces). This is a prerequisite for horizontal scaling.
+- [ ] **Distributed Session Store:** Replace the default in-memory/file session store with Redis. This allows user sessions to persist across server restarts and enables load balancing.
+- [ ] **Horizontal Scaling:** Deploy the application across multiple server instances (containers) behind a Load Balancer (Nginx or DigitalOcean LB) to handle increased traffic.
+- [ ] **Job Queue System:** Implement a background job queue (e.g., BullMQ with Redis) for resource-intensive tasks like image processing, email sending, and order fulfillment to prevent blocking the main event loop.
+
+## Operational Excellence
+
+- [ ] **Centralized Logging:** Replace `console.log` and file logging with a structured logging service (e.g., Datadog, LogDNA, or ELK Stack) for real-time monitoring and alerting.
+- [ ] **Error Monitoring:** Integrate an error tracking service (e.g., Sentry, Honeybadger) to capture and analyze runtime exceptions instead of relying on email notifications.
+- [ ] **Performance Monitoring:** Set up Application Performance Monitoring (APM) to track API latency, database query performance, and resource usage.
+- [ ] **Automated Backups:** Configure automated, scheduled backups for the database and object storage with a clearly defined retention policy and tested restoration procedure.
+
+## Security & Compliance
+
+- [ ] **Distributed Rate Limiting:** Move rate limiting state to Redis to enforce limits across all server instances.
+- [ ] **Web Application Firewall (WAF):** Deploy a WAF (e.g., Cloudflare) to protect against DDoS attacks, SQL injection, and other common web threats.
+- [ ] **Data Compliance:** Ensure all data storage and processing practices comply with relevant regulations (GDPR, CCPA) as the user base grows.
