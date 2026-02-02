@@ -283,7 +283,7 @@ async function startServer(
           to: getSecret('ADMIN_EMAIL'),
           subject: `Print Shop Server Error: ${context}`,
           text: `An error occurred in the Print Shop server.\n\nContext: ${context}\n\nError: ${error.message}`,
-          html: `<p>An error occurred in the Print Shop server.</p><p><b>Context:</b> ${context}</p><pre>${error.message}</pre>`,
+          html: `<p>An error occurred in the Print Shop server.</p><p><b>Context:</b> ${escapeHtml(context)}</p><pre>${escapeHtml(error.message)}</pre>`,
           oauth2Client,
         });
       } catch (emailError) {
