@@ -386,6 +386,30 @@ export const GeometryUtil = {
         if (polygon.source) rotated.source = polygon.source;
         return rotated;
     },
+
+    getRotatedPolygonBounds: function(polygon, angle) {
+        if (!polygon || polygon.length === 0) return null;
+        if (Math.abs(angle) < TOL) return this.getPolygonBounds(polygon);
+
+        const angleRad = _degreesToRadians(angle);
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        for (let i = 0; i < polygon.length; i++) {
+            const p = polygon[i];
+            const rx = p.x * cos - p.y * sin;
+            const ry = p.x * sin + p.y * cos;
+
+            if (rx < minX) minX = rx;
+            if (rx > maxX) maxX = rx;
+            if (ry < minY) minY = ry;
+            if (ry > maxY) maxY = ry;
+        }
+
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    },
     
     // ... other methods from original file can be added here ...
 };

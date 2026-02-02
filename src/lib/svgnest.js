@@ -27,8 +27,7 @@ export class GeneticAlgorithm {
         for (const part of adam) {
             const valid = [];
             for (const angle of allAngles) {
-                const rotatedPart = GeometryUtil.rotatePolygon(part, angle);
-                const rotatedBounds = GeometryUtil.getPolygonBounds(rotatedPart);
+                const rotatedBounds = GeometryUtil.getRotatedPolygonBounds(part, angle);
                 if (rotatedBounds.width < this.binBounds.width && rotatedBounds.height < this.binBounds.height) {
                     valid.push(angle);
                 }
@@ -253,8 +252,8 @@ export class SvgNest {
             placedGroup.forEach(p => {
                 const originalPart = this.tree.find(part => part.id === p.id);
                 // We need to rotate the polygon to get accurate bounds
-                const rotatedPart = GeometryUtil.rotatePolygon(originalPart, p.rotation);
-                const partBounds = GeometryUtil.getPolygonBounds(rotatedPart);
+                // Bolt Optimization: Use getRotatedPolygonBounds to avoid allocating new polygon points
+                const partBounds = GeometryUtil.getRotatedPolygonBounds(originalPart, p.rotation);
 
                 // Placement x, y corresponds to the origin (0,0) of the part's coordinate system.
                 // We need to add the rotated part's bounds offset (which might be negative) to get the visual edges.
