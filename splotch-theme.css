@@ -398,8 +398,17 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
     text-align: center;
 }
 
-#mascot-container:hover .speech-bubble {
+#mascot-container:hover .speech-bubble,
+#mascot-container:focus-visible .speech-bubble {
     display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #mascot-container,
+    #mascot-container.wiggle {
+        animation: none !important;
+        transition: none !important;
+    }
 }
 
 .speech-bubble:after {
