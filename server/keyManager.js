@@ -2,6 +2,7 @@
 import crypto from 'crypto';
 import { exportJWK } from 'jose';
 import { getSecret } from './secretManager.js';
+import logger from './logger.js';
 
 let activeKeys = [];
 // Retention period must exceed token lifetime (1h) + rotation buffer.
@@ -28,13 +29,13 @@ export const getCurrentSigningKey = () => {
         const jwtPublicKey = getSecret('JWT_PUBLIC_KEY');
 
         if (jwtPrivateKey && jwtPublicKey) {
-            console.log('[KEY_MANAGER] Loading keys from environment variables.');
+            logger.info('[KEY_MANAGER] Loading keys from environment variables.');
             const kid = 'env_key';
             const privateKey = jwtPrivateKey.replace(/\\n/g, '\n');
             const publicKey = jwtPublicKey.replace(/\\n/g, '\n');
             activeKeys.push({ kid, privateKey, publicKey, createdAt: Date.now() });
         } else {
-            console.log('[KEY_MANAGER] No environment keys found, generating new key pair.');
+            logger.info('[KEY_MANAGER] No environment keys found, generating new key pair.');
             activeKeys.push(generateKeyPair());
         }
     }
@@ -48,13 +49,13 @@ export const getKey = (kid) => {
 
 // Rotate keys: Add a new one and remove expired ones
 export const rotateKeys = () => {
-    console.log('[KEY_MANAGER] Rotating keys...');
+    logger.info('[KEY_MANAGER] Rotating keys...');
     const now = Date.now();
     // Add a new key
     activeKeys.push(generateKeyPair());
     // Filter out old keys (older than retention period)
     activeKeys = activeKeys.filter(key => now - key.createdAt < KEY_RETENTION_MS);
-    console.log(`[KEY_MANAGER] Now managing ${activeKeys.length} active keys.`);
+    logger.info(`[KEY_MANAGER] Now managing ${activeKeys.length} active keys.`);
 };
 
 // Generate the public JWKS document
@@ -68,7 +69,7 @@ export const getJwks = async () => {
         );
         return { keys };
     } catch (error) {
-        console.error('❌ [KEY_MANAGER] Error generating JWKS:', error);
+        logger.error('❌ [KEY_MANAGER] Error generating JWKS:', error);
         // Return an empty JWKS document in case of an error
         return { keys: [] };
     }

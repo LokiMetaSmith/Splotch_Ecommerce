@@ -1,5 +1,6 @@
 import EasyPost from '@easypost/api';
 import { getSecret } from './secretManager.js';
+import logger from './logger.js';
 
 let db;
 let api;
@@ -14,9 +15,9 @@ function initializeTracker(database) {
         if (updateInterval) clearInterval(updateInterval);
         // Check for updates every 5 minutes
         updateInterval = setInterval(updateTrackingData, 5 * 60 * 1000);
-        console.log('[TRACKER] EasyPost shipment tracker initialized.');
+        logger.info('[TRACKER] EasyPost shipment tracker initialized.');
     } else {
-        console.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
+        logger.warn('[TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled.');
     }
 }
 
@@ -44,7 +45,7 @@ async function updateTrackingData() {
         return;
     }
 
-    console.log(`[TRACKER] Checking status for ${shippedOrders.length} shipped orders...`);
+    logger.info(`[TRACKER] Checking status for ${shippedOrders.length} shipped orders...`);
 
     // Bolt Optimization: Parallelize API requests and batch DB writes
     let hasUpdates = false;
@@ -56,7 +57,7 @@ async function updateTrackingData() {
             });
             return { order, tracker };
         } catch (error) {
-            console.error(`[TRACKER] Failed to track order ${order.orderId}:`, error);
+            logger.error(`[TRACKER] Failed to track order ${order.orderId}:`, error);
             return null;
         }
     });
@@ -67,7 +68,7 @@ async function updateTrackingData() {
         if (result.status === 'fulfilled' && result.value) {
             const { order, tracker } = result.value;
             if (tracker.status && tracker.status.toLowerCase() === 'delivered') {
-                console.log(`[TRACKER] Order ${order.orderId} has been delivered. Updating status.`);
+                logger.info(`[TRACKER] Order ${order.orderId} has been delivered. Updating status.`);
                 const orderToUpdate = db.data.orders[order.orderId];
                 if (orderToUpdate) {
                     orderToUpdate.status = 'DELIVERED';

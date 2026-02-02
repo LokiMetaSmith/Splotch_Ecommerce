@@ -1,12 +1,14 @@
+import logger from './logger.js';
+
 // --- Global Error Handlers ---
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ [FATAL] Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('❌ [FATAL] Unhandled Rejection at:', { promise, reason });
   // Optional: exit process, but it's often better to log and monitor
   // process.exit(1);
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('❌ [FATAL] Uncaught Exception:', error);
+  logger.error('❌ [FATAL] Uncaught Exception:', error);
   // It's generally recommended to exit after an uncaught exception
   process.exit(1);
 });
@@ -78,16 +80,16 @@ async function main() {
   const port = getSecret('PORT') || 3000;
 
   const server = app.listen(port, () => {
-    console.log(`[SERVER] Server listening at http://localhost:${port}`);
+    logger.info(`[SERVER] Server listening at http://localhost:${port}`);
   });
 
   server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
-      console.error(`❌ [FATAL] Port ${port} is already in use.`);
-      console.error('Please close the other process or specify a different port in your .env file.');
+      logger.error(`❌ [FATAL] Port ${port} is already in use.`);
+      logger.error('Please close the other process or specify a different port in your .env file.');
       process.exit(1);
     } else {
-      console.error(`❌ [FATAL] An unexpected error occurred:`, error);
+      logger.error(`❌ [FATAL] An unexpected error occurred:`, error);
       process.exit(1);
     }
   });
@@ -124,7 +126,7 @@ async function main() {
             await db.write();
         }
       } catch (error) {
-        console.error('[TELEGRAM] Failed to send stalled order notification:', error);
+        logger.error('[TELEGRAM] Failed to send stalled order notification:', error);
       }
     }
   }, 1000 * 60 * 60);

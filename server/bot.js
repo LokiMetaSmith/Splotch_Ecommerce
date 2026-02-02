@@ -2,6 +2,7 @@ import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { getSecret } from './secretManager.js';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
+import logger from './logger.js';
 
 let bot;
 
@@ -18,7 +19,7 @@ function initializeBot(db) {
 
         if (orders.length === 0) {
           ctx.reply(`No orders with status: ${statuses.join(', ')}`)
-            .catch(err => console.error('[TELEGRAM] Error sending message:', err));
+            .catch(err => logger.error('[TELEGRAM] Error sending message:', err));
           return;
         }
 
@@ -34,11 +35,11 @@ function initializeBot(db) {
         });
 
         ctx.replyWithHTML(list)
-           .catch(err => console.error('[TELEGRAM] Error sending message:', err));
+           .catch(err => logger.error('[TELEGRAM] Error sending message:', err));
       } catch (error) {
-        console.error('[TELEGRAM] A critical error occurred in listOrdersByStatus:', error);
+        logger.error('[TELEGRAM] A critical error occurred in listOrdersByStatus:', error);
         ctx.reply('Sorry, an internal error occurred while fetching the order list.')
-           .catch(err => console.error('[TELEGRAM] Error sending critical error message:', err));
+           .catch(err => logger.error('[TELEGRAM] Error sending critical error message:', err));
       }
     };
 
@@ -70,7 +71,7 @@ function initializeBot(db) {
 
           ctx.reply("Note added successfully!", {
             reply_to_message_id: ctx.message.message_id
-          }).catch(err => console.error('[TELEGRAM] Error sending confirmation message:', err));
+          }).catch(err => logger.error('[TELEGRAM] Error sending confirmation message:', err));
         }
       }
     });
@@ -149,7 +150,7 @@ ${statusChecklist}
       ];
       bot.telegram.setMyCommands(commands);
       bot.launch();
-      console.log('[BOT] Telegraf bot launched.');
+      logger.info('[BOT] Telegraf bot launched.');
     } else {
       // In a test environment, we don't launch the bot, but we need to mock the telegram object.
       // Use no-op functions instead of assuming jest.fn() is available, since this code runs in the server process
@@ -168,7 +169,7 @@ ${statusChecklist}
     }
 
   } else {
-    console.warn('[TELEGRAM] Bot token not found. Bot is disabled.');
+    logger.warn('[TELEGRAM] Bot token not found. Bot is disabled.');
     // Create a mock bot to avoid errors when the token is not set
     bot = {
       telegram: {

@@ -33,6 +33,7 @@ import { Markup } from 'telegraf';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
+import logger from './logger.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -69,7 +70,7 @@ async function enforceCorrectExtension(fileObj, detectedType) {
         // Update file object
         fileObj.filename = newFilename;
         fileObj.path = newPath;
-        console.log(`[SECURITY] Renamed uploaded file to enforce extension: ${newFilename}`);
+        logger.info(`[SECURITY] Renamed uploaded file to enforce extension: ${newFilename}`);
     }
 }
 
@@ -92,20 +93,20 @@ async function sanitizeSVGFile(filePath) {
         // We also check if the original content was not empty to avoid false positives.
         if (!sanitized && fileContent.trim() !== '') {
             await fs.promises.writeFile(filePath, ''); // Overwrite with empty string to reject.
-            console.warn(`[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`);
+            logger.warn(`[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`);
             return false;
         }
 
         await fs.promises.writeFile(filePath, sanitized);
-        console.log(`[SECURITY] SVG file sanitized successfully: ${filePath}`);
+        logger.info(`[SECURITY] SVG file sanitized successfully: ${filePath}`);
         return true;
     } catch (error) {
-        console.error(`[ERROR] Could not sanitize SVG file: ${filePath}`, error);
+        logger.error(`[ERROR] Could not sanitize SVG file: ${filePath}`, error);
         // In case of an error, we should not keep the potentially harmful file.
         try {
             await fs.promises.unlink(filePath);
         } catch (unlinkError) {
-            console.error(`[ERROR] Failed to delete file after sanitization error: ${filePath}`, unlinkError);
+            logger.error(`[ERROR] Failed to delete file after sanitization error: ${filePath}`, unlinkError);
         }
         return false;
     }
@@ -116,9 +117,9 @@ let pricingConfig = {};
 try {
     const pricingData = fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8');
     pricingConfig = JSON.parse(pricingData);
-    console.log('[SERVER] Pricing configuration loaded.');
+    logger.info('[SERVER] Pricing configuration loaded.');
 } catch (error) {
-    console.error('[SERVER] FATAL: Could not load pricing.json.', error);
+    logger.error('[SERVER] FATAL: Could not load pricing.json.', error);
     process.exit(1);
 }
 
@@ -135,7 +136,7 @@ const signInstanceToken = () => {
         privateKey,
         { algorithm: 'RS256', expiresIn: '1h', header: { kid } }
     );
-    console.log(`[SERVER] Signed new session token with key ID: ${kid}`);
+    logger.info(`[SERVER] Signed new session token with key ID: ${kid}`);
 };
 let db;
 let app;
@@ -193,7 +194,7 @@ async function startServer(
               }
           }
       }
-      console.log(`[SERVER] Initialized caches (O(N) optimized). Active: ${db.activeOrders?.length}, Shipped: ${db.shippedOrders?.length}, Users Indexed: ${db.userOrderIndex ? Object.keys(db.userOrderIndex).length : 0}`);
+      logger.info(`[SERVER] Initialized caches (O(N) optimized). Active: ${db.activeOrders?.length}, Shipped: ${db.shippedOrders?.length}, Users Indexed: ${db.userOrderIndex ? Object.keys(db.userOrderIndex).length : 0}`);
   }
 
   // Ensure products collection exists
@@ -204,19 +205,19 @@ async function startServer(
 
   // --- MIGRATION LOGIC: Convert orders array to object if necessary ---
   if (Array.isArray(db.data.orders)) {
-    console.log('[SERVER] Migrating orders from Array to Object...');
+    logger.info('[SERVER] Migrating orders from Array to Object...');
     const ordersArray = db.data.orders;
     const ordersObject = {};
     ordersArray.forEach(order => {
       if (order.orderId) {
         ordersObject[order.orderId] = order;
       } else {
-        console.warn('[SERVER] Found order without orderId during migration, skipping:', order);
+        logger.warn('[SERVER] Found order without orderId during migration, skipping:', order);
       }
     });
     db.data.orders = ordersObject;
     await db.write();
-    console.log('[SERVER] Migration complete.');
+    logger.info('[SERVER] Migration complete.');
   }
 
   // --- MIGRATION LOGIC: Ensure users have walletBalanceCents ---
@@ -228,9 +229,9 @@ async function startServer(
     }
   });
   if (userMigrationNeeded) {
-    console.log('[SERVER] Migrating users to include walletBalanceCents...');
+    logger.info('[SERVER] Migrating users to include walletBalanceCents...');
     await db.write();
-    console.log('[SERVER] User wallet migration complete.');
+    logger.info('[SERVER] User wallet migration complete.');
   }
 
   // --- MIGRATION LOGIC: Ensure users have role ---
@@ -242,9 +243,9 @@ async function startServer(
     }
   });
   if (userRoleMigrationNeeded) {
-    console.log('[SERVER] Migrating users to include role...');
+    logger.info('[SERVER] Migrating users to include role...');
     await db.write();
-    console.log('[SERVER] User role migration complete.');
+    logger.info('[SERVER] User role migration complete.');
   }
 
   // --- MIGRATION LOGIC: Build Email Index ---
@@ -258,14 +259,14 @@ async function startServer(
   const hasIndex = Object.keys(db.data.emailIndex).length > 0;
 
   if (hasUsers && !hasIndex) {
-      console.log('[SERVER] Building email index...');
+      logger.info('[SERVER] Building email index...');
       Object.entries(db.data.users).forEach(([key, user]) => {
           if (user.email) {
               db.data.emailIndex[user.email] = key;
           }
       });
       await db.write();
-      console.log('[SERVER] Email index built.');
+      logger.info('[SERVER] Email index built.');
   }
 
   // --- Google OAuth2 Client ---
@@ -273,14 +274,9 @@ async function startServer(
 
   async function logAndEmailError(error, context = 'General Error') {
     // Sanitize error logging to avoid leaking sensitive information in logs/emails.
-    const sanitizedErrorMessage = `[${new Date().toISOString()}] [${context}] ${error.message}\n`;
-    try {
-      await fs.promises.appendFile(path.join(__dirname, 'error.log'), sanitizedErrorMessage);
-    } catch (logError) {
-      console.error('CRITICAL: Failed to write to error log:', logError);
-    }
-    // The full error (including stack) is still logged to the console for debugging.
-    console.error(`[${context}]`, error);
+    // Winston handles file logging and console output.
+    logger.error(`[${context}] ${error.message}`, { error, context });
+
     if (getSecret('ADMIN_EMAIL') && oauth2Client && oauth2Client.credentials && oauth2Client.credentials.access_token) {
       try {
         await sendEmail({
@@ -291,7 +287,7 @@ async function startServer(
           oauth2Client,
         });
       } catch (emailError) {
-        console.error('CRITICAL: Failed to send error notification email:', emailError);
+        logger.error('CRITICAL: Failed to send error notification email:', emailError);
       }
     }
   }
@@ -317,14 +313,14 @@ async function startServer(
     }
 
     // --- Database Setup ---
-    console.log('[SERVER] LowDB database initialized at:', dbPath);
+    logger.info('[SERVER] LowDB database initialized at:', dbPath);
 
     // Load the refresh token from the database if it exists
     if (db.data.config?.google_refresh_token) {
       oauth2Client.setCredentials({
         refresh_token: db.data.config.google_refresh_token,
       });
-      console.log('[SERVER] Google OAuth2 client configured with stored refresh token.');
+      logger.info('[SERVER] Google OAuth2 client configured with stored refresh token.');
     }
 
     // --- Multer Configuration for File Uploads ---
@@ -340,15 +336,15 @@ async function startServer(
       storage: storage,
       limits: { fileSize: 10 * 1024 * 1024 } // 10 MB limit
     });
-    console.log('[SERVER] Multer configured for file uploads.');
+    logger.info('[SERVER] Multer configured for file uploads.');
     
     // --- Square Client Initialization ---
-    console.log('[SERVER] Initializing Square client...');
+    logger.info('[SERVER] Initializing Square client...');
     let squareClient = injectedSquareClient;
 
     if (!squareClient) {
       if (!getSecret('SQUARE_ACCESS_TOKEN')) {
-        console.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+        logger.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
         // In a test environment, we don't want to kill the test runner.
         if (process.env.NODE_ENV !== 'test') {
           process.exit(1);
@@ -359,9 +355,9 @@ async function startServer(
         token: getSecret('SQUARE_ACCESS_TOKEN'),
         environment: SquareEnvironment.Sandbox,
       });
-      console.log('[SERVER] Verifying connection to Square servers...');
+      logger.info('[SERVER] Verifying connection to Square servers...');
     } else {
-      console.log('[SERVER] Using injected Square client.');
+      logger.info('[SERVER] Using injected Square client.');
     }
     if (process.env.NODE_ENV !== 'test') {
         try {
@@ -371,23 +367,23 @@ async function startServer(
                     resolve();
                 });
             });
-            console.log('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
+            logger.info('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
         } catch (error) {
-            console.error('❌ [FATAL] Could not resolve Square API domain.');
-            console.error('   This is likely a network, DNS, or firewall issue on the server.');
-            console.error('   Full Error:', error.message);
+            logger.error('❌ [FATAL] Could not resolve Square API domain.');
+            logger.error('   This is likely a network, DNS, or firewall issue on the server.');
+            logger.error('   Full Error:', error.message);
             process.exit(1);
         }
     }
-    console.log('[SERVER] Square client initialized.');
+    logger.info('[SERVER] Square client initialized.');
   // --- NEW: Local Sanity Check for API properties ---
-    console.log('[SERVER] Performing sanity check on Square client...');
+    logger.info('[SERVER] Performing sanity check on Square client...');
     if (!squareClient.locations || !squareClient.payments) {
-        console.error('❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).');
-        console.error('   This may indicate an issue with the installed Square SDK package.');
+        logger.error('❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).');
+        logger.error('   This may indicate an issue with the installed Square SDK package.');
         process.exit(1);
     }
-    console.log('✅ [SERVER] Sanity check passed. Client has required API properties.');
+    logger.info('✅ [SERVER] Sanity check passed. Client has required API properties.');
 
    
 
@@ -445,7 +441,7 @@ async function startServer(
     // This is required for rate limiting and other security features to work correctly.
     if (getSecret('TRUST_PROXY') === 'true') {
         app.set('trust proxy', 1);
-        console.log('[SERVER] Trusting reverse proxy headers.');
+        logger.info('[SERVER] Trusting reverse proxy headers.');
     }
 
     // --- CSRF Secret Management ---
@@ -454,18 +450,18 @@ async function startServer(
 
     if (!csrfSecret || csrfSecret === weakDefaultCsrfSecret) {
         if (process.env.NODE_ENV === 'production') {
-            console.error('❌ [FATAL] CSRF_SECRET is not set or is set to the weak default in a production environment.');
-            console.error('   Please set a strong, unique CSRF_SECRET environment variable.');
+            logger.error('❌ [FATAL] CSRF_SECRET is not set or is set to the weak default in a production environment.');
+            logger.error('   Please set a strong, unique CSRF_SECRET environment variable.');
             process.exit(1);
         } else {
             // In non-production environments, we can fall back to the weak secret for convenience,
             // but we should log a clear warning.
             csrfSecret = weakDefaultCsrfSecret;
-            console.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
-            console.warn('   Do not use this configuration in production.');
+            logger.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
+            logger.warn('   Do not use this configuration in production.');
         }
     } else {
-        console.log('✅ [SERVER] Custom CSRF_SECRET is set.');
+        logger.info('✅ [SERVER] Custom CSRF_SECRET is set.');
     }
 
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
@@ -473,8 +469,8 @@ async function startServer(
 
     let sessionSecret = getSecret('SESSION_SECRET');
     if (!sessionSecret) {
-        console.error('❌ [FATAL] SESSION_SECRET is not set in environment variables.');
-        console.error('   This is required for security in all environments. The application will now exit.');
+        logger.error('❌ [FATAL] SESSION_SECRET is not set in environment variables.');
+        logger.error('   This is required for security in all environments. The application will now exit.');
         process.exit(1);
     }
 
@@ -532,7 +528,7 @@ async function startServer(
         const isBlockedExtension = blockedExtensions.some(ext => reqPath.endsWith(ext));
 
         if (isBlockedPrefix || isBlockedExact || isBlockedExtension) {
-            console.warn(`[SECURITY] Blocked access to sensitive path: ${reqPath}`);
+            logger.warn(`[SECURITY] Blocked access to sensitive path: ${reqPath}`);
             return res.status(403).send('Forbidden');
         }
         next();
@@ -573,7 +569,7 @@ async function startServer(
         res.setHeader('X-Server-Session-Token', serverSessionToken);
         next();
     });
-    console.log('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
+    logger.info('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
     // --- Helper Functions ---
     function getUserByEmail(email) {
@@ -584,7 +580,7 @@ async function startServer(
             const user = db.data.users[key];
             if (user) return user;
             // Index is stale?
-            console.warn(`[SERVER] Email index inconsistency: ${email} -> ${key} but user not found. Cleaning up.`);
+            logger.warn(`[SERVER] Email index inconsistency: ${email} -> ${key} but user not found. Cleaning up.`);
             delete db.data.emailIndex[email];
         }
         // Fallback to scan (should not happen if index is healthy)
@@ -668,11 +664,11 @@ async function startServer(
 
         const designImageFile = req.files.designImage[0];
         const designFileType = await fileTypeFromFile(designImageFile.path);
-        console.log(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
+        logger.info(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
         if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
             // It's good practice to remove the invalid file
             fs.unlink(designImageFile.path, (err) => {
-                if (err) console.error("Error deleting invalid file:", err);
+                if (err) logger.error("Error deleting invalid file:", err);
             });
             return res.status(400).json({ error: `Invalid file type. Only ${allowedMimeTypes.join(', ')} are allowed.` });
         }
@@ -699,7 +695,7 @@ async function startServer(
             if (!isValidCutLine) {
                 // It's good practice to remove the invalid file
                 fs.unlink(edgecutLineFile.path, (err) => {
-                    if (err) console.error("Error deleting invalid file:", err);
+                    if (err) logger.error("Error deleting invalid file:", err);
                 });
                 return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the edgecut line.' });
             }
@@ -708,7 +704,7 @@ async function startServer(
             const isSafe = await sanitizeSVGFile(edgecutLineFile.path);
             if (!isSafe) {
                 // Also delete the already processed design image to avoid orphaned files
-                fs.unlink(designImageFile.path, (err) => { if (err) console.error("Error deleting orphaned design file:", err); });
+                fs.unlink(designImageFile.path, (err) => { if (err) logger.error("Error deleting orphaned design file:", err); });
                 return res.status(400).json({ error: 'The uploaded cut line file contains potentially malicious content and was rejected.' });
             }
 
@@ -782,7 +778,7 @@ async function startServer(
             db.data.products[productId] = newProduct;
             await db.write();
 
-            console.log(`[SERVER] New product created: ${productId} by ${newProduct.creatorName}`);
+            logger.info(`[SERVER] New product created: ${productId} by ${newProduct.creatorName}`);
             res.status(201).json({ success: true, product: newProduct });
 
         } catch (error) {
@@ -934,7 +930,7 @@ async function startServer(
             const globalMin = 1 * quantity;
 
             if (amountCents < minRequiredAmount || amountCents < globalMin) {
-                console.warn(`[SECURITY] Price manipulation attempt detected. Order amount: ${amountCents}, Min Required: ${minRequiredAmount}`);
+                logger.warn(`[SECURITY] Price manipulation attempt detected. Order amount: ${amountCents}, Min Required: ${minRequiredAmount}`);
                 return res.status(400).json({ error: 'Order amount is too low.' });
             }
         }
@@ -989,20 +985,20 @@ async function startServer(
 
                 // Allow a small tolerance (e.g., 5 cents) for rounding differences
                 if (Math.abs(expectedTotal - submittedTotal) > 5) {
-                    console.warn(`[SECURITY] Price mismatch for Order. Expected: ${expectedTotal}, Received: ${submittedTotal}. Diff: ${expectedTotal - submittedTotal}`);
+                    logger.warn(`[SECURITY] Price mismatch for Order. Expected: ${expectedTotal}, Received: ${submittedTotal}. Diff: ${expectedTotal - submittedTotal}`);
                     return res.status(400).json({ error: 'Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.' });
                 } else {
-                    console.log(`[SECURITY] Price validated. Expected: ${expectedTotal}, Received: ${submittedTotal}`);
+                    logger.info(`[SECURITY] Price validated. Expected: ${expectedTotal}, Received: ${submittedTotal}`);
                 }
             } else {
-                console.warn(`[SECURITY] Could not validate price because file not found: ${fullPath}`);
+                logger.warn(`[SECURITY] Could not validate price because file not found: ${fullPath}`);
                 // Proceeding cautiously - or should we fail?
                 // If it's a fresh upload, it should be there.
                 // Failsafe: Reject.
                 return res.status(400).json({ error: 'Validation failed: Design file not found.' });
             }
         } catch (validationError) {
-            console.error('[SECURITY] Error during price validation:', validationError);
+            logger.error('[SECURITY] Error during price validation:', validationError);
             return res.status(400).json({ error: 'Order validation failed.' });
         }
         // --------------------------------------
@@ -1023,13 +1019,13 @@ async function startServer(
           referenceId: randomUUID(),
           note: "STICKERS!!!",
         };
-        console.log('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
+        logger.info('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
         const paymentResult = await squareClient.payments.create(paymentPayload);
         if ( paymentResult.errors ) {
-          console.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
+          logger.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
           return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
         }
-        console.log('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
+        logger.info('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
 
         // Explicitly construct safe billingContact to prevent Mass Assignment
         // Use input variable names (renamed above) to construct output variables
@@ -1096,12 +1092,12 @@ async function startServer(
             if (payoutAmount > 0) {
                 if (typeof creator.walletBalanceCents === 'undefined') creator.walletBalanceCents = 0;
                 creator.walletBalanceCents += payoutAmount;
-                console.log(`[SERVER] Added ${payoutAmount} cents to wallet of ${creator.username}. New balance: ${creator.walletBalanceCents}`);
+                logger.info(`[SERVER] Added ${payoutAmount} cents to wallet of ${creator.username}. New balance: ${creator.walletBalanceCents}`);
             }
         }
 
         await db.write();
-        console.log(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
+        logger.info(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
 
         // Send Telegram notification
         if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
@@ -1152,7 +1148,7 @@ ${statusChecklist}
               await db.write();
             }
           } catch (error) {
-            console.error('[TELEGRAM] Failed to send message or files:', error);
+            logger.error('[TELEGRAM] Failed to send message or files:', error);
           }
         }
 
@@ -1160,9 +1156,9 @@ ${statusChecklist}
       } catch (error) {
         await logAndEmailError(error, 'Critical error in /api/create-order');
         if (error instanceof SquareError) {
-            console.log(error.statusCode);
-            console.log(error.message);
-            console.log(error.body);
+            logger.error(error.statusCode);
+            logger.error(error.message);
+            logger.error(error.body);
         }
         // Handle mocked Square errors or real Square errors that expose status code directly
         // Also handle explicit "Card declined" error from tests as 400 if statusCode is missing/invalid
@@ -1293,9 +1289,9 @@ ${statusChecklist}
           if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
              try {
                  await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.stalledMessageId);
-                 console.log(`[TELEGRAM] Deleted stalled message for order ${orderId}`);
+                 logger.info(`[TELEGRAM] Deleted stalled message for order ${orderId}`);
              } catch (err) {
-                 console.error('[TELEGRAM] Failed to delete stalled message:', err);
+                 logger.error('[TELEGRAM] Failed to delete stalled message:', err);
              }
           }
           delete order.stalledMessageId;
@@ -1337,7 +1333,7 @@ ${statusChecklist}
       }
 
       await db.write();
-      console.log(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
+      logger.info(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
       try {
           // Update Telegram message
@@ -1389,7 +1385,7 @@ ${statusChecklist}
                 }
               }
             } catch (error) {
-              console.error('[TELEGRAM] Failed to edit or delete message:', error);
+              logger.error('[TELEGRAM] Failed to edit or delete message:', error);
             }
           }
 
@@ -1436,7 +1432,7 @@ ${statusChecklist}
         }
 
         await db.write();
-        console.log(`[SERVER] Tracking info added to order ID ${orderId}.`);
+        logger.info(`[SERVER] Tracking info added to order ID ${orderId}.`);
 
         // Send shipment notification email
         if (order.billingContact && order.billingContact.email) {
@@ -1495,7 +1491,7 @@ ${statusChecklist}
                     `,
                     oauth2Client,
                 });
-                console.log(`[SERVER] Shipment notification email sent for order ID ${orderId}.`);
+                logger.info(`[SERVER] Shipment notification email sent for order ID ${orderId}.`);
             } catch (emailError) {
                 // Log the error, but don't block the API response since the tracking info was saved.
                 await logAndEmailError(emailError, `Failed to send shipment notification for order ${orderId}`);
@@ -1542,7 +1538,7 @@ ${statusChecklist}
             oauth2Client,
           });
         } catch (emailError) {
-          console.error('Failed to send new user notification email:', emailError);
+          logger.error('Failed to send new user notification email:', emailError);
         }
       }
 
@@ -1617,14 +1613,14 @@ ${statusChecklist}
         const magicLink = `${getSecret('BASE_URL')}/magic-login.html?token=${token}`;
 
         // The magic link is sensitive and should not be logged.
-        // console.log('Magic Link (for testing):', magicLink);
+        // logger.info('Magic Link (for testing):', magicLink);
 
-        console.log('[magic-login] Checking OAuth2 client state before sending email:');
-        console.log(oauth2Client.credentials);
+        logger.info('[magic-login] Checking OAuth2 client state before sending email:');
+        logger.info(oauth2Client.credentials);
 
         try {
             if (process.env.NODE_ENV === 'test' && sendEmail === defaultSendEmail) {
-                console.log('[TEST] Skipping email send. Magic Link:', magicLink);
+                logger.info('[TEST] Skipping email send. Magic Link:', magicLink);
             } else {
                 await sendEmail({
                     to: email,
@@ -1693,7 +1689,7 @@ ${statusChecklist}
       const { privateKey, kid } = getCurrentSigningKey();
       const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '5m', header: { kid } });
 
-      console.log(`[SERVER] Issued temporary token for email: ${email}`);
+      logger.info(`[SERVER] Issued temporary token for email: ${email}`);
       res.json({ success: true, token });
     });
 
@@ -1740,14 +1736,14 @@ ${statusChecklist}
         if (tokens.refresh_token) {
           db.data.config.google_refresh_token = tokens.refresh_token;
           await db.write();
-          console.log('[SERVER] Google OAuth2 refresh token stored.');
+          logger.info('[SERVER] Google OAuth2 refresh token stored.');
         }
 
         // The user is authenticated with Google, now get their profile info
         const oauth2 = injectedGoogle.oauth2({ version: 'v2', auth: oauth2Client });
         const userInfo = await oauth2.userinfo.get();
         const userEmail = userInfo.data.email;
-        console.log('Google authentication successful for:', userEmail);
+        logger.info('Google authentication successful for:', userEmail);
 
         // Find or create a user in our database
         let user = getUserByEmail(userEmail);
@@ -1766,7 +1762,7 @@ ${statusChecklist}
           // Update Index
           db.data.emailIndex[userEmail] = user.id;
           await db.write();
-          console.log(`New user created for ${userEmail}`);
+          logger.info(`New user created for ${userEmail}`);
 
           // Send notification email to admin
           if (getSecret('ADMIN_EMAIL')) {
@@ -1779,7 +1775,7 @@ ${statusChecklist}
                 oauth2Client,
               });
             } catch (emailError) {
-              console.error('Failed to send new user notification email:', emailError);
+              logger.error('Failed to send new user notification email:', emailError);
             }
           }
 
@@ -1825,7 +1821,7 @@ ${statusChecklist}
         };
         db.data.users[username] = user;
         await db.write();
-        console.log(`New user created for WebAuthn pre-registration: ${username}`);
+        logger.info(`New user created for WebAuthn pre-registration: ${username}`);
       }
 
       const options = await injectedWebAuthn.generateRegistrationOptions({
