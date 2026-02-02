@@ -2,13 +2,14 @@ import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import { getSecret } from './secretManager.js';
+import logger from './logger.js';
 
 async function sendEmail({ to, subject, text, html, oauth2Client }) {
   // If SMTP_HOST is defined, use SMTP transport (Nodemailer)
   const smtpHost = getSecret('SMTP_HOST');
   if (smtpHost) {
     const smtpPort = getSecret('SMTP_PORT');
-    console.log(`[sendEmail] Using SMTP config: Host=${smtpHost} Port=${smtpPort}`);
+    logger.info(`[sendEmail] Using SMTP config: Host=${smtpHost} Port=${smtpPort}`);
 
     const transporter = nodemailer.createTransport({
       host: smtpHost,
@@ -32,16 +33,16 @@ async function sendEmail({ to, subject, text, html, oauth2Client }) {
         text,
         html,
       });
-      console.log('Email sent via SMTP:', info.messageId);
+      logger.info('Email sent via SMTP:', info.messageId);
       return info;
     } catch (error) {
-      console.error('Error sending email via SMTP:', error);
+      logger.error('Error sending email via SMTP:', error);
       throw error;
     }
   }
 
   // Fallback to Gmail API (Legacy)
-  console.log('[sendEmail] OAuth2 Client Credentials:', oauth2Client ? 'Present' : 'Missing');
+  logger.info('[sendEmail] OAuth2 Client Credentials:', oauth2Client ? 'Present' : 'Missing');
 
   if (!oauth2Client) {
       throw new Error('No email configuration found (SMTP_HOST is missing and oauth2Client is null)');
@@ -72,10 +73,10 @@ async function sendEmail({ to, subject, text, html, oauth2Client }) {
       },
     });
 
-    console.log('Email sent via Gmail API:', res.data);
+    logger.info('Email sent via Gmail API:', res.data);
     return res.data;
   } catch (error) {
-    console.error('Error sending email via Gmail API:', error);
+    logger.error('Error sending email via Gmail API:', error);
     throw error;
   }
 }

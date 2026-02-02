@@ -37,7 +37,7 @@ function calculateStickerPrice(
     resolution,
 ) {
     if (!pricingConfig) {
-        console.error("Pricing config not loaded.");
+        logger.error("Pricing config not loaded.");
         return { total: 0, complexityMultiplier: 1.0 };
     }
     if (quantity <= 0) return { total: 0, complexityMultiplier: 1.0 };
@@ -109,6 +109,7 @@ import { parse } from "svg-parser";
 import { svgPathProperties } from "svg-path-properties";
 import fs from "fs";
 import { promisify } from "util";
+import logger from "./logger.js";
 
 function getPathPerimeter(pathNode) {
     let perimeter = 0;
@@ -117,7 +118,7 @@ function getPathPerimeter(pathNode) {
             const properties = new svgPathProperties(pathNode.properties.d);
             perimeter = properties.getTotalLength();
         } catch (e) {
-            console.error("Error calculating path length:", e);
+            logger.error("Error calculating path length:", e);
         }
     }
     return perimeter;
