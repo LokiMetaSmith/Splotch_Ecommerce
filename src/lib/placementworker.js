@@ -219,8 +219,8 @@ export class PlacementWorker {
 
         placements.forEach(p => {
             const part = this.parts[p.id];
-            const rotatedPart = GeometryUtil.rotatePolygon(part, p.rotation);
-            const bounds = GeometryUtil.getPolygonBounds(rotatedPart);
+            // Bolt Optimization: Use getRotatedPolygonBounds to avoid allocating new polygon points
+            const bounds = GeometryUtil.getRotatedPolygonBounds(part, p.rotation);
 
             const partMinX = p.x + bounds.x;
             const partMinY = p.y + bounds.y;
