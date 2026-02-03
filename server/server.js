@@ -34,6 +34,7 @@ import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 import logger from './logger.js';
+import { performanceLogger } from './performanceLogger.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -294,6 +295,7 @@ async function startServer(
 
   try {
     app = express();
+    app.use(performanceLogger);
     const port = process.env.PORT || 3000;
 
     const rpID = getSecret('RP_ID');
