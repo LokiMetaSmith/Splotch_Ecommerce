@@ -62,16 +62,16 @@ export class PlacementWorker {
             // Grid Search
             const potentialColliders = [];
 
-            for (let y = binBounds.y; y < binBounds.y + binBounds.height; y += step) {
-                // Optimization: Check if part fits vertically
-                if (y + partBounds.height > binBounds.y + binBounds.height) continue;
+            // Bolt Optimization: Calculate loop limits once to avoid checking inside the loop and avoid iterating over impossible positions.
+            // If the part is larger than the bin, these loops will simply not execute.
+            const maxY = binBounds.y + binBounds.height - partBounds.height;
+            const maxX = binBounds.x + binBounds.width - partBounds.width;
 
+            for (let y = binBounds.y; y <= maxY; y += step) {
                 const startY = Math.round(y * scale);
 
-                for (let x = binBounds.x; x < binBounds.x + binBounds.width; x += step) {
+                for (let x = binBounds.x; x <= maxX; x += step) {
                     counter++;
-                    // Optimization: Check if part fits horizontally
-                    if (x + partBounds.width > binBounds.x + binBounds.width) continue;
 
                     // Update candidateClipper in-place with the current grid position
                     const startX = Math.round(x * scale);
