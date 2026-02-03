@@ -1677,7 +1677,7 @@ ${statusChecklist}
       });
     });
     
-    app.post('/api/auth/issue-temp-token', [
+    app.post('/api/auth/issue-temp-token', authLimiter, [
       body('email').isEmail().withMessage('A valid email is required'),
     ], (req, res) => {
       const errors = validationResult(req);
@@ -1801,7 +1801,7 @@ ${statusChecklist}
 
 
     // --- WebAuthn (Passkey) Endpoints ---
-    app.post('/api/auth/pre-register', validateUsername, async (req, res) => {
+    app.post('/api/auth/pre-register', authLimiter, validateUsername, async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -1841,7 +1841,7 @@ ${statusChecklist}
       res.json(options);
     });
 
-    app.post('/api/auth/register-verify', validateUsername, async (req, res) => {
+    app.post('/api/auth/register-verify', authLimiter, validateUsername, async (req, res) => {
       const { body } = req;
       const { username } = req.query;
       // Prevent prototype pollution
@@ -1870,7 +1870,7 @@ ${statusChecklist}
       }
     });
 
-    app.get('/api/auth/login-options', validateUsername, async (req, res) => {
+    app.get('/api/auth/login-options', authLimiter, validateUsername, async (req, res) => {
       const { username } = req.query;
       // Prevent prototype pollution
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
@@ -1892,7 +1892,7 @@ ${statusChecklist}
       res.json(options);
     });
 
-    app.post('/api/auth/login-verify', validateUsername, async (req, res) => {
+    app.post('/api/auth/login-verify', authLimiter, validateUsername, async (req, res) => {
       const { body } = req;
       const { username } = req.query;
       // Prevent prototype pollution
