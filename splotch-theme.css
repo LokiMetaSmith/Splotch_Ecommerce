@@ -122,6 +122,11 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
     box-shadow: 0 5px 8px rgba(0,0,0,0.2) !important;
 }
 
+#editing-controls button:focus-visible {
+    outline: 3px solid var(--splotch-navy) !important;
+    outline-offset: 2px !important;
+}
+
 /* Specific button colors (Splotch palette) */
 #rotateLeftBtn, #rotateRightBtn { /* Original: purple */
     background-color: var(--splotch-red) !important;
