@@ -27,3 +27,7 @@
 ## 2025-05-21 - Skip Link Targets
 **Learning:** Anchor links (skip links) targeting non-interactive elements (like divs/sections) do not move keyboard focus unless the target has `tabindex="-1"`.
 **Action:** Always add `tabindex="-1"` and `outline-none` (if visual ring is unwanted) to container elements targeted by skip links.
+
+## 2026-02-03 - Restoring Focus to Unstyled Buttons
+**Learning:** Buttons with `border: none` (often used in custom themes) can lose their default focus indicators in some browsers or when used with reset stylesheets (like Tailwind's preflight), making them inaccessible to keyboard users.
+**Action:** Always verify keyboard focus visibility on custom buttons and explicitly add `:focus-visible` styles (using `outline` and `outline-offset`) to ensure they are perceivable.
