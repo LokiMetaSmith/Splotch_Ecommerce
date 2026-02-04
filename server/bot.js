@@ -3,6 +3,7 @@ import { message } from 'telegraf/filters';
 import { getSecret } from './secretManager.js';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import logger from './logger.js';
+import { escapeHtml } from './utils.js';
 
 let bot;
 
@@ -62,8 +63,8 @@ function initializeBot(db) {
             order.notes = [];
           }
           const note = {
-            text: ctx.message.text,
-            from: ctx.from.username || `${ctx.from.first_name} ${ctx.from.last_name || ''}`.trim(),
+            text: escapeHtml(ctx.message.text),
+            from: escapeHtml(ctx.from.username || `${ctx.from.first_name} ${ctx.from.last_name || ''}`.trim()),
             date: new Date(ctx.message.date * 1000).toISOString(),
           };
           order.notes.push(note);

@@ -36,6 +36,7 @@ import { JSDOM } from 'jsdom';
 import logger from './logger.js';
 import { performanceLogger } from './performanceLogger.js';
 import Metrics from './metrics.js';
+import { escapeHtml } from './utils.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -74,16 +75,6 @@ async function enforceCorrectExtension(fileObj, detectedType) {
         fileObj.path = newPath;
         logger.info(`[SECURITY] Renamed uploaded file to enforce extension: ${newFilename}`);
     }
-}
-
-function escapeHtml(unsafe) {
-    if (unsafe == null) return '';
-    return String(unsafe)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
 }
 
 async function sanitizeSVGFile(filePath) {
