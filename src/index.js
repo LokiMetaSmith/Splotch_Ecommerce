@@ -50,6 +50,7 @@ let paymentStatusContainer,
   fileNameDisplayEl;
 let rotateLeftBtnEl,
   rotateRightBtnEl,
+  resetBtnEl,
   resizeInputEl,
   resizeBtnEl,
   grayscaleBtnEl,
@@ -120,6 +121,7 @@ async function BootStrap() {
 
   rotateLeftBtnEl = document.getElementById("rotateLeftBtn");
   rotateRightBtnEl = document.getElementById("rotateRightBtn");
+  resetBtnEl = document.getElementById("resetBtn");
   const resizeSliderEl = document.getElementById("resizeSlider");
   const resizeInputNumberEl = document.getElementById("resizeInput");
   const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
@@ -206,6 +208,7 @@ async function BootStrap() {
     rotateRightBtnEl.addEventListener("click", () =>
       rotateCanvasContentFixedBounds(90),
     );
+  if (resetBtnEl) resetBtnEl.addEventListener("click", handleResetImage);
   if (grayscaleBtnEl)
     grayscaleBtnEl.addEventListener("click", toggleGrayscaleFilter);
   if (sepiaBtnEl) sepiaBtnEl.addEventListener("click", toggleSepiaFilter);
@@ -1429,6 +1432,101 @@ function handleAddText() {
   ctx.textBaseline = "middle";
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
   showPaymentStatus(`Text "${text}" added.`, "success");
+}
+
+function handleResetImage() {
+  if (originalImage) {
+    // Raster Image Reset
+    isGrayscale = false;
+    isSepia = false;
+    basePolygons = [];
+    currentPolygons = [];
+    currentCutline = [];
+
+    const maxWidth = 500,
+      maxHeight = 400;
+    let newWidth = originalImage.width,
+      newHeight = originalImage.height;
+    if (newWidth > maxWidth) {
+      const r = maxWidth / newWidth;
+      newWidth = maxWidth;
+      newHeight *= r;
+    }
+    if (newHeight > maxHeight) {
+      const r = maxHeight / newHeight;
+      newHeight = maxHeight;
+      newWidth *= r;
+    }
+
+    if (canvas && ctx) {
+      setCanvasSize(newWidth, newHeight);
+      ctx.clearRect(0, 0, newWidth, newHeight);
+      ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+      currentBounds = {
+        left: 0,
+        top: 0,
+        right: newWidth,
+        bottom: newHeight,
+        width: newWidth,
+        height: newHeight,
+      };
+      currentCutline = [
+        [
+          { x: 0, y: 0 },
+          { x: newWidth, y: 0 },
+          { x: newWidth, y: newHeight },
+          { x: 0, y: newHeight },
+        ],
+      ];
+
+      updateFilterButtonVisuals();
+
+      // Reset Slider
+      const resizeSliderEl = document.getElementById("resizeSlider");
+      const resizeInputNumberEl = document.getElementById("resizeInput");
+      const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
+      if (resizeSliderEl) {
+        if (pricingConfig && stickerResolutionSelect) {
+          const selectedResolution = pricingConfig.resolutions.find(
+            (r) => r.id === stickerResolutionSelect.value,
+          );
+          const ppi = selectedResolution ? selectedResolution.ppi : 96;
+          let maxDimPixels = Math.max(newWidth, newHeight);
+          let maxDimInches = maxDimPixels / ppi;
+
+          if (isMetric) {
+            resizeSliderEl.value = maxDimInches * 25.4;
+            if (resizeInputNumberEl)
+              resizeInputNumberEl.value = (maxDimInches * 25.4).toFixed(1);
+            if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = "mm";
+          } else {
+            resizeSliderEl.value = maxDimInches;
+            if (resizeInputNumberEl)
+              resizeInputNumberEl.value = maxDimInches.toFixed(1);
+            if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = "in";
+          }
+          if (resizeInputNumberEl) {
+            resizeSliderEl.setAttribute(
+              "aria-valuetext",
+              `${resizeInputNumberEl.value} ${isMetric ? "mm" : "in"}`,
+            );
+          }
+        }
+      }
+
+      calculateAndUpdatePrice();
+      drawCanvasDecorations(currentBounds);
+      showPaymentStatus("Image reset to original.", "success");
+    }
+  } else if (basePolygons.length > 0) {
+    // SVG Reset
+    currentPolygons = basePolygons;
+    redrawAll();
+    showPaymentStatus("Image reset to original.", "success");
+  } else {
+    showPaymentStatus("Nothing to reset.", "info");
+  }
 }
 
 function rotateCanvasContentFixedBounds(angleDegrees) {
