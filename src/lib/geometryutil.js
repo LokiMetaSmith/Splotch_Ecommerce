@@ -41,10 +41,10 @@ function _normalizeVector(v) {
     };
 }
 
-function _onSegment(A, B, p) {
+function _onSegment(Ax, Ay, Bx, By, px, py) {
     // vertical line
-    if (_almostEqual(A.x, B.x) && _almostEqual(p.x, A.x)) {
-        if (!_almostEqual(p.y, B.y) && !_almostEqual(p.y, A.y) && p.y < Math.max(B.y, A.y) && p.y > Math.min(B.y, A.y)) {
+    if (_almostEqual(Ax, Bx) && _almostEqual(px, Ax)) {
+        if (!_almostEqual(py, By) && !_almostEqual(py, Ay) && py < Math.max(By, Ay) && py > Math.min(By, Ay)) {
             return true;
         } else {
             return false;
@@ -52,8 +52,8 @@ function _onSegment(A, B, p) {
     }
 
     // horizontal line
-    if (_almostEqual(A.y, B.y) && _almostEqual(p.y, A.y)) {
-        if (!_almostEqual(p.x, B.x) && !_almostEqual(p.x, A.x) && p.x < Math.max(B.x, A.x) && p.x > Math.min(B.x, A.x)) {
+    if (_almostEqual(Ay, By) && _almostEqual(py, Ay)) {
+        if (!_almostEqual(px, Bx) && !_almostEqual(px, Ax) && px < Math.max(Bx, Ax) && px > Math.min(Bx, Ax)) {
             return true;
         } else {
             return false;
@@ -61,26 +61,26 @@ function _onSegment(A, B, p) {
     }
 
     // range check
-    if ((p.x < A.x && p.x < B.x) || (p.x > A.x && p.x > B.x) || (p.y < A.y && p.y < B.y) || (p.y > A.y && p.y > B.y)) {
+    if ((px < Ax && px < Bx) || (px > Ax && px > Bx) || (py < Ay && py < By) || (py > Ay && py > By)) {
         return false;
     }
 
     // exclude end points
-    if ((_almostEqual(p.x, A.x) && _almostEqual(p.y, A.y)) || (_almostEqual(p.x, B.x) && _almostEqual(p.y, B.y))) {
+    if ((_almostEqual(px, Ax) && _almostEqual(py, Ay)) || (_almostEqual(px, Bx) && _almostEqual(py, By))) {
         return false;
     }
 
-    const cross = (p.y - A.y) * (B.x - A.x) - (p.x - A.x) * (B.y - A.y);
+    const cross = (py - Ay) * (Bx - Ax) - (px - Ax) * (By - Ay);
     if (Math.abs(cross) > TOL) {
         return false;
     }
 
-    const dot = (p.x - A.x) * (B.x - A.x) + (p.y - A.y) * (B.y - A.y);
+    const dot = (px - Ax) * (Bx - Ax) + (py - Ay) * (By - Ay);
     if (dot < 0 || _almostEqual(dot, 0)) {
         return false;
     }
 
-    const len2 = (B.x - A.x) * (B.x - A.x) + (B.y - A.y) * (B.y - A.y);
+    const len2 = (Bx - Ax) * (Bx - Ax) + (By - Ay) * (By - Ay);
     if (dot > len2 || _almostEqual(dot, len2)) {
         return false;
     }
@@ -354,7 +354,8 @@ export const GeometryUtil = {
             const xi = polygon[i].x + offsetx, yi = polygon[i].y + offsety;
             const xj = polygon[j].x + offsetx, yj = polygon[j].y + offsety;
             if (_almostEqual(xi, point.x) && _almostEqual(yi, point.y)) return null;
-            if (_onSegment({ x: xi, y: yi }, { x: xj, y: yj }, point)) return null;
+            // Bolt Optimization: Pass scalar coordinates to avoid creating {x,y} objects in this hot loop
+            if (_onSegment(xi, yi, xj, yj, point.x, point.y)) return null;
             if (_almostEqual(xi, xj) && _almostEqual(yi, yj)) continue;
             const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
             if (intersect) inside = !inside;
