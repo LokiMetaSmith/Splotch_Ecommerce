@@ -35,6 +35,7 @@ import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 import logger from './logger.js';
 import { performanceLogger } from './performanceLogger.js';
+import Metrics from './metrics.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -159,6 +160,25 @@ async function startServer(
   if (!db) {
     db = await JSONFilePreset(dbPath, defaultData);
   }
+
+  // --- Metrics: Instrument DB writes ---
+  // Ensure we don't wrap it multiple times if startServer is called with same db instance
+  if (!db.write._instrumented) {
+      const originalWrite = db.write;
+      db.write = async function() {
+          const start = process.hrtime();
+          await originalWrite.apply(this, arguments);
+          const diff = process.hrtime(start);
+          const durationMs = (diff[0] * 1e9 + diff[1]) / 1e6;
+          Metrics.trackDbOperation('write', durationMs);
+      };
+      db.write._instrumented = true;
+  }
+
+  // --- Metrics: System Monitor ---
+  const metricsTimer = setInterval(() => {
+      Metrics.updateSystemMetrics();
+  }, 10000); // 10 seconds
 
   // Initialize Caches and Indices
   // Bolt Optimization: Consolidated separate loops into a single O(N) pass over orders
@@ -654,6 +674,13 @@ async function startServer(
 
     app.get('/api/pricing-info', (req, res) => {
         res.json(pricingConfig);
+    });
+
+    app.get('/api/metrics', authenticateToken, (req, res) => {
+        if (!isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        res.json(Metrics.getMetrics());
     });
 
     app.post('/api/upload-design', authenticateToken, upload.fields([
@@ -1941,10 +1968,11 @@ ${statusChecklist}
     if (process.env.NODE_ENV === 'test') {
       sessionTokenTimer.unref();
       keyRotationTimer.unref();
+      metricsTimer.unref();
     }
     
     // Return the app and the timers so they can be managed by the caller
-    return { app, timers: [sessionTokenTimer, keyRotationTimer], bot };
+    return { app, timers: [sessionTokenTimer, keyRotationTimer, metricsTimer], bot };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');
