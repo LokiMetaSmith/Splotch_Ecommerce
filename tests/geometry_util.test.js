@@ -73,3 +73,58 @@ describe('GeometryUtil.getRotatedPolygonBounds', () => {
         expect(bounds).toEqual({x:0, y:0, width:100, height:50});
     });
 });
+
+describe('GeometryUtil.pointInPolygon', () => {
+    const square = [{x:0, y:0}, {x:10, y:0}, {x:10, y:10}, {x:0, y:10}];
+
+    it('should return true for point inside square', () => {
+        expect(GeometryUtil.pointInPolygon({x: 5, y: 5}, square)).toBe(true);
+    });
+
+    it('should return false for point outside square', () => {
+        expect(GeometryUtil.pointInPolygon({x: 15, y: 5}, square)).toBe(false);
+        expect(GeometryUtil.pointInPolygon({x: 5, y: 15}, square)).toBe(false);
+        expect(GeometryUtil.pointInPolygon({x: -5, y: 5}, square)).toBe(false);
+    });
+
+    it('should return null (or handle) for point on vertex', () => {
+        // Implementation detail: typically PIP algorithms have specific behavior for vertices
+        // The current implementation returns null for vertices
+        expect(GeometryUtil.pointInPolygon({x: 0, y: 0}, square)).toBe(null);
+        expect(GeometryUtil.pointInPolygon({x: 10, y: 10}, square)).toBe(null);
+    });
+
+    it('should return null (or handle) for point on edge', () => {
+         // The current implementation uses _onSegment to return null
+        expect(GeometryUtil.pointInPolygon({x: 5, y: 0}, square)).toBe(null);
+        expect(GeometryUtil.pointInPolygon({x: 10, y: 5}, square)).toBe(null);
+    });
+
+    it('should handle concave polygons', () => {
+        // U shape
+        const uShape = [
+            {x:0, y:0}, {x:10, y:0}, {x:10, y:10}, {x:8, y:10},
+            {x:8, y:2}, {x:2, y:2}, {x:2, y:10}, {x:0, y:10}
+        ];
+
+        expect(GeometryUtil.pointInPolygon({x: 1, y: 1}, uShape)).toBe(true); // Left leg
+        expect(GeometryUtil.pointInPolygon({x: 9, y: 1}, uShape)).toBe(true); // Right leg
+        expect(GeometryUtil.pointInPolygon({x: 5, y: 1}, uShape)).toBe(true); // Bottom part
+
+        expect(GeometryUtil.pointInPolygon({x: 5, y: 5}, uShape)).toBe(false); // In the "hole" of the U
+        expect(GeometryUtil.pointInPolygon({x: 5, y: 11}, uShape)).toBe(false); // Above
+    });
+
+    it('should use bounding box optimization', () => {
+        // This test is to ensure logic doesn't break with the optimization
+        // The optimization caches bounds on the polygon object
+        const poly = [{x:0, y:0}, {x:100, y:0}, {x:50, y:50}];
+
+        // First call calculates and caches
+        expect(GeometryUtil.pointInPolygon({x: 50, y: 25}, poly)).toBe(true);
+        expect(poly._bounds).toBeDefined();
+
+        // Second call uses cache
+        expect(GeometryUtil.pointInPolygon({x: 200, y: 200}, poly)).toBe(false);
+    });
+});
