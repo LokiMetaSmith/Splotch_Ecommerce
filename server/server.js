@@ -37,7 +37,7 @@ import logger from './logger.js';
 import { performanceLogger } from './performanceLogger.js';
 import Metrics from './metrics.js';
 import { escapeHtml } from './utils.js';
-import { LocalStorageProvider } from './storage.js';
+import { LocalStorageProvider, S3StorageProvider } from './storage.js';
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
@@ -51,7 +51,25 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-const storageProvider = new LocalStorageProvider(path.join(__dirname, 'uploads'));
+let storageProvider;
+const storageProviderType = process.env.STORAGE_PROVIDER;
+// Default to S3 if credentials exist AND not explicitly set to 'local' (or anything else)
+// If STORAGE_PROVIDER is 'local', this will be false even if credentials exist.
+const shouldDefaultToS3 = !storageProviderType && getSecret('S3_BUCKET') && getSecret('AWS_ACCESS_KEY_ID');
+
+if (storageProviderType === 's3' || shouldDefaultToS3) {
+    logger.info('[SERVER] Using S3 Storage Provider.');
+    storageProvider = new S3StorageProvider({
+        bucket: getSecret('S3_BUCKET'),
+        region: getSecret('S3_REGION') || 'us-east-1',
+        endpoint: getSecret('S3_ENDPOINT'),
+        accessKeyId: getSecret('AWS_ACCESS_KEY_ID'),
+        secretAccessKey: getSecret('AWS_SECRET_ACCESS_KEY')
+    });
+} else {
+    logger.info('[SERVER] Using Local Storage Provider.');
+    storageProvider = new LocalStorageProvider(path.join(__dirname, 'uploads'));
+}
 
 // JSDOM window is needed for server-side SVG sanitization
 const { window } = new JSDOM('');
@@ -761,10 +779,11 @@ async function startServer(
             // --- SECURITY: Enforce correct extension ---
             await enforceCorrectExtension(edgecutLineFile, edgecutLineFileType);
 
-            cutLinePath = `/uploads/${edgecutLineFile.filename}`;
+            // Finalize upload for cut line
+            cutLinePath = await storageProvider.finalizeUpload(edgecutLineFile);
         }
 
-        const designImagePath = `/uploads/${designImageFile.filename}`;
+        const designImagePath = await storageProvider.finalizeUpload(designImageFile);
 
         res.json({
             success: true,
@@ -777,14 +796,14 @@ async function startServer(
     app.post('/api/products', authenticateToken, [
         body('name').notEmpty().withMessage('Product name is required').isString().trim().escape(),
         body('designImagePath').notEmpty().withMessage('Design image is required').isString().custom(value => {
-            if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
-            if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
-            return true;
+            if (value.startsWith('/uploads/')) return true;
+            if (value.startsWith('http')) return true; // Allow URLs
+            throw new Error('Path must start with /uploads/ or be a valid URL');
         }),
         body('cutLinePath').optional().isString().custom(value => {
-            if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
-            if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
-            return true;
+            if (value.startsWith('/uploads/')) return true;
+            if (value.startsWith('http')) return true; // Allow URLs
+            throw new Error('Path must start with /uploads/ or be a valid URL');
         }),
         body('defaults').optional().isObject(),
         body('creatorProfitCents').isInt({ min: 0 }).withMessage('Creator profit must be a non-negative integer'),
@@ -864,9 +883,9 @@ async function startServer(
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isString().withMessage('currency must be a string').isAlpha().withMessage('currency must be alphabetic'),
       body('designImagePath').notEmpty().withMessage('designImagePath is required').custom(value => {
-            if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
-            if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
-            return true;
+            if (value.startsWith('/uploads/')) return true;
+            if (value.startsWith('http')) return true; // Allow URLs
+            throw new Error('Path must start with /uploads/ or be a valid URL');
       }),
       // Security Fix: Validate orderDetails structure
       body('orderDetails').isObject().withMessage('orderDetails must be an object'),
@@ -887,9 +906,9 @@ async function startServer(
             return true;
       }),
       body('orderDetails.cutLinePath').optional().isString().withMessage('cutLinePath must be a string').custom(value => {
-            if (!value.startsWith('/uploads/')) throw new Error('Path must start with /uploads/');
-            if (value.includes('..')) throw new Error('Invalid path: directory traversal not allowed');
-            return true;
+            if (value.startsWith('/uploads/')) return true;
+            if (value.startsWith('http')) return true; // Allow URLs
+            throw new Error('Path must start with /uploads/ or be a valid URL');
       }),
 
       // Security & Integrity: Validate Billing Contact
@@ -997,15 +1016,14 @@ async function startServer(
                 validationPath = product.cutLinePath;
             }
 
-            // Construct local file path (strip leading slash to join correctly with __dirname)
-            const relativePath = validationPath.startsWith('/') ? validationPath.slice(1) : validationPath;
-            const fullPath = path.join(__dirname, relativePath);
+            // Ensure the file is available locally for measuring
+            const localPath = await storageProvider.getLocalCopy(validationPath);
 
             // Get dimensions/complexity
             // We use the validationPath file to calculate bounds and perimeter.
             // Note: If the file is missing (deleted?), this will throw, which is good (fail secure).
-            if (fs.existsSync(fullPath)) {
-                const dimensions = await getDesignDimensions(fullPath);
+            if (fs.existsSync(localPath)) {
+                const dimensions = await getDesignDimensions(localPath);
 
                 const quantity = orderDetails.quantity || 1;
                 // Use default material if not specified
@@ -1041,7 +1059,7 @@ async function startServer(
                     logger.info(`[SECURITY] Price validated. Expected: ${expectedTotal}, Received: ${submittedTotal}`);
                 }
             } else {
-                logger.warn(`[SECURITY] Could not validate price because file not found: ${fullPath}`);
+                logger.warn(`[SECURITY] Could not validate price because file not found: ${localPath}`);
                 // Proceeding cautiously - or should we fail?
                 // If it's a fresh upload, it should be there.
                 // Failsafe: Reject.
