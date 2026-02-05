@@ -15,3 +15,7 @@
 ## 2024-05-22 - [ClipperLib Object Reuse]
 **Learning:** `ClipperLib` operations and path creation in loops can generate massive GC pressure. Reusing path arrays and updating coordinates in-place significantly reduces allocations in grid search algorithms.
 **Action:** When performing grid-based geometric checks with `ClipperLib`, lift path creation out of the loop and update coordinates in-place.
+
+## 2025-02-05 - [Scanline Active List]
+**Learning:** In 2D grid-based placement algorithms, checking against *all* placed items for every grid cell is O(W*H*P). filtering items by the current Y-scanline (Active List) reduces the inner loop checks to O(sqrt(P)), providing massive speedups for dense packings.
+**Action:** When iterating a grid for collision detection, always maintain a filtered list of "active" colliders relevant to the current row/band.

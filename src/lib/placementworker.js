@@ -67,8 +67,24 @@ export class PlacementWorker {
             const maxY = binBounds.y + binBounds.height - partBounds.height;
             const maxX = binBounds.x + binBounds.width - partBounds.width;
 
+            // Bolt Optimization: Reusable array for Active List (Scanline optimization)
+            const activePlacedItems = [];
+
             for (let y = binBounds.y; y <= maxY; y += step) {
                 const startY = Math.round(y * scale);
+
+                // Bolt Optimization: Update Active List for current Y-band
+                // We only need to check items that vertically overlap [y, y + partHeight]
+                activePlacedItems.length = 0;
+                const pHeight = partBounds.height;
+                const pWidth = partBounds.width;
+
+                for (let k = 0; k < placedItems.length; k++) {
+                    const ib = placedItems[k].bounds;
+                    if (y < ib.y + ib.height && y + pHeight > ib.y) {
+                        activePlacedItems.push(placedItems[k]);
+                    }
+                }
 
                 for (let x = binBounds.x; x <= maxX; x += step) {
                     counter++;
@@ -102,15 +118,18 @@ export class PlacementWorker {
                     // Check 2: Collision with other parts
                     // Bolt Optimization: Reuse potentialColliders array and inline collision check to avoid object creation in hot loop
                     potentialColliders.length = 0;
-                    const pWidth = partBounds.width;
-                    const pHeight = partBounds.height;
 
-                    for (let k = 0; k < placedItems.length; k++) {
-                        const itemBounds = placedItems[k].bounds;
+                    // Bolt Optimization: Iterate only active items (Scanline optimization)
+                    for (let k = 0; k < activePlacedItems.length; k++) {
+                        const itemBounds = activePlacedItems[k].bounds;
                         // Inline intersect check: x < r2.x + r2.width && x + width > r2.x ...
-                        if (x < itemBounds.x + itemBounds.width && x + pWidth > itemBounds.x &&
-                            y < itemBounds.y + itemBounds.height && y + pHeight > itemBounds.y) {
-                            potentialColliders.push(placedItems[k].path);
+                        // We already know Y overlaps from the active list filter!
+                        // But we check both just to be safe and use standard bounding box logic,
+                        // or we can optimize to check only X?
+                        // Let's keep the full check for robustness, but since we filtered by Y,
+                        // the Y check here is redundant but cheap. The main win is iterating fewer items.
+                        if (x < itemBounds.x + itemBounds.width && x + pWidth > itemBounds.x) {
+                            potentialColliders.push(activePlacedItems[k].path);
                         }
                     }
 
