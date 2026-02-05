@@ -41,7 +41,8 @@ import { LocalStorageProvider, S3StorageProvider } from './storage.js';
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
 import { createClient } from 'redis';
-import { RedisStore } from 'connect-redis';
+import { RedisStore as ConnectRedisStore } from 'connect-redis';
+import { RedisStore as RateLimitRedisStore } from 'rate-limit-redis';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -444,13 +445,42 @@ async function startServer(
     }
     logger.info('✅ [SERVER] Sanity check passed. Client has required API properties.');
 
-   
+    let sessionStore;
+    let redisClient;
+    const redisUrl = getSecret('REDIS_URL');
+
+    if (redisUrl) {
+        try {
+            const client = createClient({ url: redisUrl });
+            client.on('error', (err) => logger.error('Redis Client Error', err));
+            await client.connect();
+            redisClient = client;
+            logger.info('[SERVER] Connected to Redis.');
+        } catch (error) {
+            logger.error('[SERVER] Failed to connect to Redis.', error);
+            // redisClient remains undefined, fallback to memory
+        }
+    }
+
+    if (redisClient) {
+         sessionStore = new ConnectRedisStore({
+            client: redisClient,
+            prefix: "splotch:",
+        });
+        logger.info('[SERVER] Using Redis for session storage.');
+    } else {
+         logger.info('[SERVER] Using MemoryStore for session storage.');
+    }
 
     // --- Middleware ---
     const apiLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
       max: 100, // Limit each IP to 100 requests per windowMs
       message: 'Too many requests from this IP, please try again after 15 minutes',
+      store: redisClient ? new RateLimitRedisStore({
+          sendCommand: (...args) => redisClient.sendCommand(args),
+          prefix: 'rl:api:',
+      }) : undefined,
     });
 
     const authLimiter = rateLimit({
@@ -460,6 +490,10 @@ async function startServer(
       message: 'Too many login attempts from this IP, please try again after 15 minutes',
       standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
       legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+      store: redisClient ? new RateLimitRedisStore({
+          sendCommand: (...args) => redisClient.sendCommand(args),
+          prefix: 'rl:auth:',
+      }) : undefined,
     });
     
     const allowedOrigins = [
@@ -533,24 +567,6 @@ async function startServer(
         process.exit(1);
     }
 
-    let sessionStore;
-    const redisUrl = getSecret('REDIS_URL');
-    if (redisUrl) {
-        try {
-            const redisClient = createClient({ url: redisUrl });
-            redisClient.on('error', (err) => logger.error('Redis Client Error', err));
-            await redisClient.connect();
-            sessionStore = new RedisStore({
-                client: redisClient,
-                prefix: "splotch:",
-            });
-            logger.info('[SERVER] Using Redis for session storage.');
-        } catch (error) {
-            logger.error('[SERVER] Failed to connect to Redis, falling back to MemoryStore.', error);
-        }
-    } else {
-         logger.info('[SERVER] Using MemoryStore for session storage.');
-    }
 
     app.use(session({
       store: sessionStore,
