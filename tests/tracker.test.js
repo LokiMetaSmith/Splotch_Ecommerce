@@ -12,6 +12,12 @@ const mockEasyPostInstance = {
 
 const mockEasyPostConstructor = jest.fn(() => mockEasyPostInstance);
 
+const mockLogger = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+};
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // The server resolves @easypost/api to the one in server/node_modules
 // We must mock that specific file for the mock to take effect when imported from server/tracker.js
@@ -24,6 +30,10 @@ jest.unstable_mockModule(easyPostServerPath, () => ({
 // Also mock the package name for completeness, in case module resolution changes
 jest.unstable_mockModule('@easypost/api', () => ({
     default: mockEasyPostConstructor,
+}));
+
+jest.unstable_mockModule('../server/logger.js', () => ({
+    default: mockLogger,
 }));
 
 // 2. Import the system under test AFTER mocking
@@ -58,11 +68,9 @@ describe('Shipment Tracker', () => {
     });
 
     it('should not initialize if EASYPOST_API_KEY is missing', () => {
-        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
         initializeTracker(mockDb);
         expect(mockEasyPostConstructor).not.toHaveBeenCalled();
-        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('EASYPOST_API_KEY is not set'));
-        consoleSpy.mockRestore();
+        expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('EASYPOST_API_KEY is not set'));
     });
 
     it('should initialize if EASYPOST_API_KEY is set', () => {
@@ -130,7 +138,6 @@ describe('Shipment Tracker', () => {
 
     it('should handle EasyPost errors gracefully', async () => {
         process.env.EASYPOST_API_KEY = 'test_key';
-        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
         const orderId = 'order_3';
         const order = {
@@ -148,9 +155,7 @@ describe('Shipment Tracker', () => {
         await updateTrackingData();
 
         expect(order.status).toBe('SHIPPED');
-        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to track order'), expect.any(Error));
-
-        consoleSpy.mockRestore();
+        expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Failed to track order'), expect.any(Error));
     });
 
     it('should use fallback if shippedOrders cache is missing', async () => {
