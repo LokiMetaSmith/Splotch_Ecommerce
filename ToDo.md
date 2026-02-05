@@ -172,7 +172,7 @@ The current architecture is suitable for an initial MVP or beta release (< 50 co
 
 - [ ] **Migrate Database:** Migrate from `lowdb` (JSON file) to a robust relational database (PostgreSQL) or document store (MongoDB). `lowdb` is not ACID-compliant and will lock or corrupt under high concurrent write load.
 - [x] **Stateless File Storage:** Move user uploads from the local filesystem (`server/uploads`) to an S3-compatible object storage service (AWS S3, DigitalOcean Spaces). (Implemented `S3StorageProvider` using `@aws-sdk/client-s3`).
-- [ ] **Distributed Session Store:** Replace the default in-memory/file session store with Redis. This allows user sessions to persist across server restarts and enables load balancing.
+- [x] **Distributed Session Store:** Replace the default in-memory/file session store with Redis. This allows user sessions to persist across server restarts and enables load balancing.
 - [ ] **Horizontal Scaling:** Deploy the application across multiple server instances (containers) behind a Load Balancer (Nginx or DigitalOcean LB) to handle increased traffic.
 - [ ] **Job Queue System:** Implement a background job queue (e.g., BullMQ with Redis) for resource-intensive tasks like image processing, email sending, and order fulfillment to prevent blocking the main event loop.
 
