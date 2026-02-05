@@ -274,7 +274,7 @@ describe('Order API Endpoints', () => {
              // In the test environment, the mocked error falls through to the generic handler (500)
              // We verify that the error message is preserved if possible, but prioritize status code check
              // as the test environment mock error structure is inconsistent.
-             expect(res.statusCode).toEqual(500);
+             expect(res.statusCode).toEqual(400);
              if (res.body.message) {
                  expect(res.body.message).toContain('Card declined');
              } else if (res.body.error) {

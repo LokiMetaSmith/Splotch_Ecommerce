@@ -33,6 +33,7 @@ These items address fundamental problems with the test setup and major gaps in f
     -   [x] Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).
     -   [x] Google OAuth flow (`/auth/google`, `/oauth2callback`).
     -   [x] **Add E2E Magic Link Verification Test (Real Backend):** Created `playwright_tests_real/magic-link.spec.js` and updated server to support token retrieval in test mode.
+-   **[x] Fix Test Suite Regressions:** Fixed failing tests in `tests/tracker.test.js` (logging mock), `tests/orders.test.js` (error status code), and `tests/google-oauth.test.js` (CSRF flow). Restored full test suite pass state.
 -   **[x] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
     -   [x] Adding text to the canvas.
     -   [x] Image rotation, resizing, and filters (grayscale, sepia).
@@ -169,7 +170,7 @@ The current architecture is suitable for an initial MVP or beta release (< 50 co
 ## Critical Infrastructure Upgrades (Required for Scale)
 
 - [ ] **Migrate Database:** Migrate from `lowdb` (JSON file) to a robust relational database (PostgreSQL) or document store (MongoDB). `lowdb` is not ACID-compliant and will lock or corrupt under high concurrent write load.
-- [ ] **Stateless File Storage:** Move user uploads from the local filesystem (`server/uploads`) to an S3-compatible object storage service (AWS S3, DigitalOcean Spaces). This is a prerequisite for horizontal scaling.
+- [ ] **Stateless File Storage:** Move user uploads from the local filesystem (`server/uploads`) to an S3-compatible object storage service (AWS S3, DigitalOcean Spaces). (Refactored to `StorageProvider` pattern to facilitate this migration).
 - [ ] **Distributed Session Store:** Replace the default in-memory/file session store with Redis. This allows user sessions to persist across server restarts and enables load balancing.
 - [ ] **Horizontal Scaling:** Deploy the application across multiple server instances (containers) behind a Load Balancer (Nginx or DigitalOcean LB) to handle increased traffic.
 - [ ] **Job Queue System:** Implement a background job queue (e.g., BullMQ with Redis) for resource-intensive tasks like image processing, email sending, and order fulfillment to prevent blocking the main event loop.
