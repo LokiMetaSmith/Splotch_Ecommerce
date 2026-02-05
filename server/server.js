@@ -38,6 +38,8 @@ import { performanceLogger } from './performanceLogger.js';
 import Metrics from './metrics.js';
 import { escapeHtml } from './utils.js';
 import { LocalStorageProvider } from './storage.js';
+import * as Sentry from "@sentry/node";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -287,10 +289,32 @@ async function startServer(
   // --- Google OAuth2 Client ---
   let oauth2Client;
 
+  // Initialize Sentry if DSN is provided
+  if (getSecret('SENTRY_DSN')) {
+      Sentry.init({
+          dsn: getSecret('SENTRY_DSN'),
+          integrations: [
+              nodeProfilingIntegration(),
+          ],
+          // Tracing
+          tracesSampleRate: 1.0, //  Capture 100% of the transactions
+          // Set sampling rate for profiling - this is relative to tracesSampleRate
+          profilesSampleRate: 1.0,
+      });
+      logger.info('[SERVER] Sentry initialized.');
+  }
+
   async function logAndEmailError(error, context = 'General Error') {
     // Sanitize error logging to avoid leaking sensitive information in logs/emails.
     // Winston handles file logging and console output.
     logger.error(`[${context}] ${error.message}`, { error, context });
+
+    // Capture exception in Sentry
+    if (getSecret('SENTRY_DSN')) {
+        Sentry.captureException(error, {
+            tags: { context }
+        });
+    }
 
     if (getSecret('ADMIN_EMAIL') && oauth2Client && oauth2Client.credentials && oauth2Client.credentials.access_token) {
       try {
@@ -309,6 +333,12 @@ async function startServer(
 
   try {
     app = express();
+
+    // Sentry Request Handler must be the first middleware on the app
+    if (getSecret('SENTRY_DSN')) {
+        Sentry.setupExpressErrorHandler(app);
+    }
+
     app.use(performanceLogger);
     const port = process.env.PORT || 3000;
 

@@ -140,7 +140,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 
 ## High-Priority
 
--   **[ ] Fix critical security vulnerabilities in dependencies:** Address high-severity/critical vulnerabilities in `jspdf` (Path Traversal/RCE), `validator`, `body-parser`, `qs`, `tar`, and `jws`.
+-   **[x] Fix critical security vulnerabilities in dependencies:** Address high-severity/critical vulnerabilities in `jspdf` (Path Traversal/RCE), `validator`, `body-parser`, `qs`, `tar`, and `jws`.
 -   **[x] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[x] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
 -   **[x] Validate Order Amount on Server:** Ensure the order amount sent by the client matches the calculated price based on product dimensions and configuration to prevent price tampering.
@@ -179,7 +179,7 @@ The current architecture is suitable for an initial MVP or beta release (< 50 co
 ## Operational Excellence
 
 - [x] **Centralized Logging:** Replace `console.log` and file logging with a structured logging service (e.g., Datadog, LogDNA, or ELK Stack) for real-time monitoring and alerting.
-- [ ] **Error Monitoring:** Integrate an error tracking service (e.g., Sentry, Honeybadger) to capture and analyze runtime exceptions instead of relying on email notifications.
+- [x] **Error Monitoring:** Integrate an error tracking service (e.g., Sentry, Honeybadger) to capture and analyze runtime exceptions instead of relying on email notifications.
 - [x] **Performance Monitoring:** Set up Application Performance Monitoring (APM) to track API latency, database query performance, and resource usage. (Enhanced: Implemented local metrics collection for API, DB, and System resources, exposed via /api/metrics)
 - [ ] **Automated Backups:** Configure automated, scheduled backups for the database and object storage with a clearly defined retention policy and tested restoration procedure.
 
