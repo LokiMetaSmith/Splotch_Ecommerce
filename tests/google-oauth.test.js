@@ -123,7 +123,17 @@ describe('Google OAuth Endpoints', () => {
         db.data.emailIndex['googleuser@example.com'] = existingUser.id;
         // db.write is mocked to no-op
 
-        const res = await request(app).get('/oauth2callback?code=test-code');
+        // 1. Initiate flow to get state and cookie
+        const agent = request.agent(app);
+        await agent.get('/auth/google');
+
+        // Capture the state passed to generateAuthUrl
+        const generateAuthUrlArgs = mockOAuth2Instance.generateAuthUrl.mock.calls[0][0];
+        const state = generateAuthUrlArgs.state;
+        expect(state).toBeDefined();
+
+        // 2. Callback with correct state
+        const res = await agent.get(`/oauth2callback?code=test-code&state=${state}`);
 
         expect(res.statusCode).toEqual(302);
         expect(res.headers.location).toMatch(/\/printshop\.html\?token=/);
@@ -150,7 +160,17 @@ describe('Google OAuth Endpoints', () => {
     });
 
     it('should handle OAuth2 callback and register new user', async () => {
-        const res = await request(app).get('/oauth2callback?code=new-user-code');
+        // 1. Initiate flow to get state and cookie
+        const agent = request.agent(app);
+        await agent.get('/auth/google');
+
+        // Capture the state passed to generateAuthUrl
+        const generateAuthUrlArgs = mockOAuth2Instance.generateAuthUrl.mock.calls[0][0];
+        const state = generateAuthUrlArgs.state;
+        expect(state).toBeDefined();
+
+        // 2. Callback with correct state
+        const res = await agent.get(`/oauth2callback?code=new-user-code&state=${state}`);
 
         expect(res.statusCode).toEqual(302);
         expect(res.headers.location).toMatch(/\/printshop\.html\?token=/);
@@ -172,5 +192,15 @@ describe('Google OAuth Endpoints', () => {
              const emailArgs = mockSendEmail.mock.calls[0][0];
              expect(emailArgs.subject).toContain('New User Account Created');
         }
+    });
+
+    it('should reject callback with invalid state', async () => {
+        const agent = request.agent(app);
+        await agent.get('/auth/google');
+        // Ignore the valid state, use a fake one
+
+        const res = await agent.get('/oauth2callback?code=test-code&state=invalid-state');
+        expect(res.statusCode).toEqual(403);
+        expect(res.text).toContain('Invalid state parameter');
     });
 });

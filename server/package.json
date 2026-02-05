@@ -35,7 +35,7 @@
     "lowdb": "^7.0.1",
     "lusca": "^1.7.0",
     "multer": "^2.0.2",
-    "nodemailer": "^6.9.14",
+    "nodemailer": "^8.0.0",
     "square": "^43.0.1",
     "svg-parser": "^2.0.4",
     "svg-path-properties": "^2.0.0",

@@ -33,6 +33,7 @@ These items address fundamental problems with the test setup and major gaps in f
     -   [x] Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).
     -   [x] Google OAuth flow (`/auth/google`, `/oauth2callback`).
     -   [x] **Add E2E Magic Link Verification Test (Real Backend):** Created `playwright_tests_real/magic-link.spec.js` and updated server to support token retrieval in test mode.
+-   **[x] Fix Test Suite Regressions:** Fixed failing tests in `tests/tracker.test.js` (logging mock), `tests/orders.test.js` (error status code), and `tests/google-oauth.test.js` (CSRF flow). Restored full test suite pass state.
 -   **[x] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
     -   [x] Adding text to the canvas.
     -   [x] Image rotation, resizing, and filters (grayscale, sepia).
@@ -139,6 +140,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 
 ## High-Priority
 
+-   **[ ] Fix critical security vulnerabilities in dependencies:** Address high-severity/critical vulnerabilities in `jspdf` (Path Traversal/RCE), `validator`, `body-parser`, `qs`, `tar`, and `jws`.
 -   **[x] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[x] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
 -   **[x] Validate Order Amount on Server:** Ensure the order amount sent by the client matches the calculated price based on product dimensions and configuration to prevent price tampering.
@@ -169,7 +171,7 @@ The current architecture is suitable for an initial MVP or beta release (< 50 co
 ## Critical Infrastructure Upgrades (Required for Scale)
 
 - [ ] **Migrate Database:** Migrate from `lowdb` (JSON file) to a robust relational database (PostgreSQL) or document store (MongoDB). `lowdb` is not ACID-compliant and will lock or corrupt under high concurrent write load.
-- [ ] **Stateless File Storage:** Move user uploads from the local filesystem (`server/uploads`) to an S3-compatible object storage service (AWS S3, DigitalOcean Spaces). This is a prerequisite for horizontal scaling.
+- [ ] **Stateless File Storage:** Move user uploads from the local filesystem (`server/uploads`) to an S3-compatible object storage service (AWS S3, DigitalOcean Spaces). (Refactored to `StorageProvider` pattern to facilitate this migration).
 - [ ] **Distributed Session Store:** Replace the default in-memory/file session store with Redis. This allows user sessions to persist across server restarts and enables load balancing.
 - [ ] **Horizontal Scaling:** Deploy the application across multiple server instances (containers) behind a Load Balancer (Nginx or DigitalOcean LB) to handle increased traffic.
 - [ ] **Job Queue System:** Implement a background job queue (e.g., BullMQ with Redis) for resource-intensive tasks like image processing, email sending, and order fulfillment to prevent blocking the main event loop.

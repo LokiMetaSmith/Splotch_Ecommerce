@@ -37,6 +37,7 @@ import logger from './logger.js';
 import { performanceLogger } from './performanceLogger.js';
 import Metrics from './metrics.js';
 import { escapeHtml } from './utils.js';
+import { LocalStorageProvider } from './storage.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -47,6 +48,8 @@ const DUMMY_HASH = '$2b$10$e8ypvsBL/MxhtxIydLPU2eoLd4IVyOy0MhGvCRL3DC/xUpoznhhHi
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+const storageProvider = new LocalStorageProvider(path.join(__dirname, 'uploads'));
 
 // JSDOM window is needed for server-side SVG sanitization
 const { window } = new JSDOM('');
@@ -97,7 +100,7 @@ async function sanitizeSVGFile(filePath) {
         logger.error(`[ERROR] Could not sanitize SVG file: ${filePath}`, error);
         // In case of an error, we should not keep the potentially harmful file.
         try {
-            await fs.promises.unlink(filePath);
+            await storageProvider.deleteFile(filePath);
         } catch (unlinkError) {
             logger.error(`[ERROR] Failed to delete file after sanitization error: ${filePath}`, unlinkError);
         }
@@ -337,14 +340,7 @@ async function startServer(
     }
 
     // --- Multer Configuration for File Uploads ---
-    const storage = multer.diskStorage({
-      destination: function (req, file, cb) {
-        cb(null, uploadDir);
-      },
-      filename: function (req, file, cb) {
-        cb(null, randomUUID() + path.extname(file.originalname));
-      }
-    });
+    const storage = storageProvider.getMulterStorage();
     const upload = multer({
       storage: storage,
       limits: { fileSize: 10 * 1024 * 1024 } // 10 MB limit
@@ -687,7 +683,7 @@ async function startServer(
         logger.info(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
         if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
             // It's good practice to remove the invalid file
-            fs.unlink(designImageFile.path, (err) => {
+            storageProvider.deleteFile(designImageFile.path).catch((err) => {
                 if (err) logger.error("Error deleting invalid file:", err);
             });
             return res.status(400).json({ error: `Invalid file type. Only ${allowedMimeTypes.join(', ')} are allowed.` });
@@ -714,7 +710,7 @@ async function startServer(
 
             if (!isValidCutLine) {
                 // It's good practice to remove the invalid file
-                fs.unlink(edgecutLineFile.path, (err) => {
+                storageProvider.deleteFile(edgecutLineFile.path).catch((err) => {
                     if (err) logger.error("Error deleting invalid file:", err);
                 });
                 return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the edgecut line.' });
@@ -724,7 +720,7 @@ async function startServer(
             const isSafe = await sanitizeSVGFile(edgecutLineFile.path);
             if (!isSafe) {
                 // Also delete the already processed design image to avoid orphaned files
-                fs.unlink(designImageFile.path, (err) => { if (err) logger.error("Error deleting orphaned design file:", err); });
+                storageProvider.deleteFile(designImageFile.path).catch((err) => { if (err) logger.error("Error deleting orphaned design file:", err); });
                 return res.status(400).json({ error: 'The uploaded cut line file contains potentially malicious content and was rejected.' });
             }
 
