@@ -40,6 +40,8 @@ import { escapeHtml } from './utils.js';
 import { LocalStorageProvider, S3StorageProvider } from './storage.js';
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import { createClient } from 'redis';
+import { RedisStore } from 'connect-redis';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -531,7 +533,27 @@ async function startServer(
         process.exit(1);
     }
 
+    let sessionStore;
+    const redisUrl = getSecret('REDIS_URL');
+    if (redisUrl) {
+        try {
+            const redisClient = createClient({ url: redisUrl });
+            redisClient.on('error', (err) => logger.error('Redis Client Error', err));
+            await redisClient.connect();
+            sessionStore = new RedisStore({
+                client: redisClient,
+                prefix: "splotch:",
+            });
+            logger.info('[SERVER] Using Redis for session storage.');
+        } catch (error) {
+            logger.error('[SERVER] Failed to connect to Redis, falling back to MemoryStore.', error);
+        }
+    } else {
+         logger.info('[SERVER] Using MemoryStore for session storage.');
+    }
+
     app.use(session({
+      store: sessionStore,
       secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
