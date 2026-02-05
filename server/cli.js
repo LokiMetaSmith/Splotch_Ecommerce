@@ -7,14 +7,34 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getSecret } from './secretManager.js';
+import { getDatabaseAdapter } from './database/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const program = new Command();
 
-const defaultData = { orders: [], users: {}, credentials: {} };
-const dbPath = getSecret('DB_PATH') || path.join(__dirname, 'db.json');
-const db = await JSONFilePreset(dbPath, defaultData);
+const defaultData = { orders: {}, users: {}, credentials: {}, config: {}, products: {} };
+
+let db;
+// Initialization logic similar to server/index.js
+// Note: We don't handle encryption here for simplicity in this refactor,
+// assuming CLI usage is for admin tasks often with unencrypted local DB or Mongo.
+// If encryption is needed for CLI, we should duplicate logic or extract it.
+// For now, let's support Mongo/LowDb switching.
+
+if (getSecret('DB_PROVIDER') === 'mongo' || getSecret('MONGO_URL')) {
+    const mongoUrl = getSecret('MONGO_URL');
+    if (!mongoUrl) {
+         console.error('MONGO_URL must be set when DB_PROVIDER is mongo.');
+         process.exit(1);
+    }
+    db = getDatabaseAdapter(mongoUrl);
+    await db.connect();
+} else {
+    const dbPath = getSecret('DB_PATH') || path.join(__dirname, 'db.json');
+    const lowdb = await JSONFilePreset(dbPath, defaultData);
+    db = getDatabaseAdapter(lowdb);
+}
 
 program
     .name('printshop-cli')
@@ -27,7 +47,8 @@ program
     .argument('<username>', 'username')
     .argument('<password>', 'password')
     .action(async (username, password) => {
-        if (db.data.users[username]) {
+        const existing = await db.getUser(username);
+        if (existing) {
             console.log('User already exists');
             return;
         }
@@ -41,8 +62,7 @@ program
             credentials: [],
         };
 
-        db.data.users[username] = user;
-        await db.write();
+        await db.createUser(user);
 
         console.log(`User ${username} added successfully`);
     });
@@ -52,13 +72,11 @@ program
     .description('Remove a user')
     .argument('<username>', 'username')
     .action(async (username) => {
-        if (!db.data.users[username]) {
+        const deleted = await db.deleteUser(username);
+        if (!deleted) {
             console.log('User not found');
             return;
         }
-
-        delete db.data.users[username];
-        await db.write();
 
         console.log(`User ${username} removed successfully`);
     });
@@ -66,8 +84,9 @@ program
 program
     .command('list-users')
     .description('List all users')
-    .action(() => {
-        console.log(Object.keys(db.data.users));
+    .action(async () => {
+        const usernames = await db.listUsernames();
+        console.log(usernames);
     });
 
 program
@@ -85,22 +104,11 @@ program
     .argument('<username>', 'username')
     .argument('<credentialID>', 'credentialID')
     .action(async (username, credentialID) => {
-        if (!db.data.users[username]) {
-            console.log('User not found');
+        const removed = await db.removeCredential(username, credentialID);
+        if (!removed) {
+            console.log('User or credential not found/failed to remove');
             return;
         }
-
-        const user = db.data.users[username];
-        const credentialIndex = user.credentials.findIndex(c => c.credentialID === credentialID);
-
-        if (credentialIndex === -1) {
-            console.log('Credential not found');
-            return;
-        }
-
-        user.credentials.splice(credentialIndex, 1);
-        delete db.data.credentials[credentialID];
-        await db.write();
 
         console.log(`Credential ${credentialID} removed successfully for user ${username}`);
     });

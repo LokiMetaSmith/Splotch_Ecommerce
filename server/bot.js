@@ -4,19 +4,24 @@ import { getSecret } from './secretManager.js';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import logger from './logger.js';
 import { escapeHtml } from './utils.js';
+import { LowDbAdapter } from './database/lowdb_adapter.js';
 
 let bot;
 
 function initializeBot(db) {
+  if (db && !db.getOrder) {
+      db = new LowDbAdapter(db);
+  }
+
   const token = getSecret('TELEGRAM_BOT_TOKEN');
 
   if (token) {
     const isTestEnv = process.env.NODE_ENV === 'test';
     bot = new Telegraf(token);
 
-    const listOrdersByStatus = (ctx, statuses, title) => {
+    const listOrdersByStatus = async (ctx, statuses, title) => {
       try {
-        const orders = Object.values(db.data.orders).filter(o => statuses.includes(o.status));
+        const orders = await db.getOrdersByStatus(statuses);
 
         if (orders.length === 0) {
           ctx.reply(`No orders with status: ${statuses.join(', ')}`)
@@ -56,7 +61,10 @@ function initializeBot(db) {
     bot.on(message('text'), async (ctx) => {
       if (ctx.message.reply_to_message) {
         const originalMessageId = ctx.message.reply_to_message.message_id;
-        const order = Object.values(db.data.orders).find(o => o.telegramMessageId === originalMessageId || o.telegramPhotoMessageId === originalMessageId);
+        let order = await db.getOrderByTelegramMessageId(originalMessageId);
+        if (!order) {
+            order = await db.getOrderByTelegramPhotoMessageId(originalMessageId);
+        }
 
         if (order) {
           if (!order.notes) {
@@ -68,7 +76,7 @@ function initializeBot(db) {
             date: new Date(ctx.message.date * 1000).toISOString(),
           };
           order.notes.push(note);
-          await db.write();
+          await db.updateOrder(order);
 
           ctx.reply("Note added successfully!", {
             reply_to_message_id: ctx.message.message_id
@@ -79,7 +87,7 @@ function initializeBot(db) {
 
     bot.on('callback_query', async (ctx) => {
       const [action, orderId] = ctx.callbackQuery.data.split('_');
-      const order = db.data.orders[orderId];
+      const order = await db.getOrder(orderId);
 
       if (order) {
         let newStatus;
@@ -106,7 +114,7 @@ function initializeBot(db) {
 
         if (newStatus) {
           order.status = newStatus;
-          await db.write();
+          await db.updateOrder(order);
 
           const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
           const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];

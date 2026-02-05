@@ -17,7 +17,7 @@ describe('server/index.js db.write override', () => {
         const overrideBlockRegex = /db\.write\s*=\s*async\s*function\(\)\s*\{([\s\S]*?)\n\s* \}/;
 
         // Alternative: Just check if the file contains the pattern where db.write is assigned an async function that uses fs.promises.writeFile
-        const hasAsyncWriteOverride = /db\.write\s*=\s*async\s*function\(\)\s*\{[\s\S]*?await\s+fs\.promises\.writeFile/.test(content);
+        const hasAsyncWriteOverride = /(?:db|lowDbInstance)\.write\s*=\s*async\s*function\(\)\s*\{[\s\S]*?await\s+fs\.promises\.writeFile/.test(content);
 
         expect(hasAsyncWriteOverride).toBe(true);
 
@@ -31,7 +31,7 @@ describe('server/index.js db.write override', () => {
         let overrideBody = '';
 
         for (const line of lines) {
-            if (line.includes('db.write = async function() {')) {
+            if (line.match(/(?:db|lowDbInstance)\.write\s*=\s*async\s*function\(\)\s*\{/)) {
                 insideOverride = true;
                 braceCount = 1; // Assuming the opening brace is on this line
                 continue;

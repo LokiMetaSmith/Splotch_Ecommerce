@@ -83,7 +83,8 @@ describe('GET /api/metrics', () => {
         .send({ username: 'metric_admin', password: 'password123' });
 
     // Elevate to admin in DB
-    db.data.users['metric_admin'].role = 'admin';
+    const user = Object.values(db.data.users).find(u => u.username === 'metric_admin');
+    user.role = 'admin';
 
     // Login
     csrfRes = await agent.get('/api/csrf-token');

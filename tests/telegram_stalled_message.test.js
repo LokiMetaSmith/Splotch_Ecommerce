@@ -67,7 +67,7 @@ describe('Telegram Stalled Message Deletion', () => {
 
         // 2. Elevate to admin in DB
         await db.read(); // Ensure we have latest data
-        const user = db.data.users['admin'];
+        const user = Object.values(db.data.users).find(u => u.username === 'admin');
         user.role = 'admin';
         // Add email manually as register-user doesn't require it but isAdmin checks it or username
         user.email = 'admin@example.com';

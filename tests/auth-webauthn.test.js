@@ -103,7 +103,7 @@ describe('WebAuthn Endpoints', () => {
         expect(res.body.verified).toBe(true);
 
         await db.read();
-        const user = db.data.users[username];
+        const user = Object.values(db.data.users).find(u => u.username === username);
         expect(user.credentials).toHaveLength(1);
         expect(db.data.credentials['cred-id-123']).toBeDefined();
     });
