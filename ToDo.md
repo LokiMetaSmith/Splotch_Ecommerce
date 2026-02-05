@@ -140,6 +140,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 
 ## High-Priority
 
+-   **[ ] Fix critical security vulnerabilities in dependencies:** Address high-severity/critical vulnerabilities in `jspdf` (Path Traversal/RCE), `validator`, `body-parser`, `qs`, `tar`, and `jws`.
 -   **[x] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[x] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
 -   **[x] Validate Order Amount on Server:** Ensure the order amount sent by the client matches the calculated price based on product dimensions and configuration to prevent price tampering.
