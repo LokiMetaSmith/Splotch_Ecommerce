@@ -73,7 +73,8 @@ describe('Auth Endpoints', () => {
     expect(res.body.challenge).toBeDefined();
 
     await db.read();
-    expect(db.data.users['testuser']).toBeDefined();
+    const user = Object.values(db.data.users).find(u => u.username === 'testuser');
+    expect(user).toBeDefined();
   });
 
   it('should login an existing user with correct credentials', async () => {

@@ -19,6 +19,7 @@ import { initializeBot } from './bot.js';
 import { sendEmail } from './email.js';
 import { getSecret } from './secretManager.js';
 import { JSONFilePreset } from 'lowdb/node';
+import { getDatabaseAdapter } from './database/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
@@ -49,28 +50,42 @@ function decrypt(text) {
 }
 
 async function main() {
-    const dbPath = path.join(__dirname, 'db.json');
     let db;
 
-    if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
-        if (fs.existsSync(dbPath)) {
-            const encryptedData = fs.readFileSync(dbPath, 'utf8');
-            const decryptedData = decrypt(encryptedData);
-            fs.writeFileSync(dbPath, decryptedData);
+    if (getSecret('DB_PROVIDER') === 'mongo' || getSecret('MONGO_URL')) {
+        const mongoUrl = getSecret('MONGO_URL');
+        if (!mongoUrl) {
+             logger.error('MONGO_URL must be set when DB_PROVIDER is mongo.');
+             process.exit(1);
         }
-    }
+        db = getDatabaseAdapter(mongoUrl);
+        await db.connect();
+        logger.info('[SERVER] Connected to MongoDB.');
+    } else {
+        const dbPath = path.join(__dirname, 'db.json');
 
-    db = await JSONFilePreset(dbPath, { orders: {}, users: {}, credentials: {}, config: {} });
-
-    if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
-        const originalWrite = db.write;
-        db.write = async function() {
-            const data = JSON.stringify(this.data);
-            const encryptedData = encrypt(data);
-            const tempPath = `${dbPath}.tmp`;
-            await fs.promises.writeFile(tempPath, encryptedData);
-            await fs.promises.rename(tempPath, dbPath);
+        if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
+            if (fs.existsSync(dbPath)) {
+                const encryptedData = fs.readFileSync(dbPath, 'utf8');
+                const decryptedData = decrypt(encryptedData);
+                fs.writeFileSync(dbPath, decryptedData);
+            }
         }
+
+        const lowDbInstance = await JSONFilePreset(dbPath, { orders: {}, users: {}, credentials: {}, config: {} });
+
+        if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
+            const originalWrite = lowDbInstance.write;
+            lowDbInstance.write = async function() {
+                const data = JSON.stringify(this.data);
+                const encryptedData = encrypt(data);
+                const tempPath = `${dbPath}.tmp`;
+                await fs.promises.writeFile(tempPath, encryptedData);
+                await fs.promises.rename(tempPath, dbPath);
+            }
+        }
+
+        db = getDatabaseAdapter(lowDbInstance);
     }
 
     const bot = initializeBot(db);
@@ -97,8 +112,7 @@ async function main() {
   // Check for stalled orders every hour
   setInterval(async () => {
     const now = new Date();
-    // Use activeOrders cache if available to avoid O(N) scan of history
-    const ordersToCheck = db.activeOrders || Object.values(db.data.orders);
+    const ordersToCheck = await db.getActiveOrders();
 
     const stalledOrders = ordersToCheck.filter(order => {
       if (FINAL_STATUSES.includes(order.status)) {
@@ -120,10 +134,10 @@ async function main() {
           reply_to_message_id: order.telegramMessageId,
         });
         // Store the message ID so we can delete it later
-        const orderInDb = db.data.orders[order.orderId];
+        const orderInDb = await db.getOrder(order.orderId);
         if (orderInDb) {
             orderInDb.stalledMessageId = sentMessage.message_id;
-            await db.write();
+            await db.updateOrder(orderInDb);
         }
       } catch (error) {
         logger.error('[TELEGRAM] Failed to send stalled order notification:', error);

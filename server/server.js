@@ -43,6 +43,7 @@ import { nodeProfilingIntegration } from "@sentry/profiling-node";
 import { createClient } from 'redis';
 import { RedisStore as ConnectRedisStore } from 'connect-redis';
 import { RedisStore as RateLimitRedisStore } from 'rate-limit-redis';
+import { LowDbAdapter } from './database/lowdb_adapter.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -175,7 +176,13 @@ async function startServer(
   let lastMagicLinkToken = null;
 
   if (!db) {
-    db = await JSONFilePreset(dbPath, defaultData);
+    // If no db provided, load default LowDb
+    const lowDbInstance = await JSONFilePreset(dbPath, defaultData);
+    db = new LowDbAdapter(lowDbInstance);
+  } else if (!db.getOrder) {
+     // If db is provided but doesn't look like an adapter (checking for getOrder method), wrap it.
+     // This handles legacy tests passing a lowdb instance or mock.
+     db = new LowDbAdapter(db);
   }
 
   // --- Metrics: Instrument DB writes ---
@@ -197,115 +204,7 @@ async function startServer(
       Metrics.updateSystemMetrics();
   }, 10000); // 10 seconds
 
-  // Initialize Caches and Indices
-  // Bolt Optimization: Consolidated separate loops into a single O(N) pass over orders
-  const needsActive = !db.activeOrders;
-  const needsShipped = !db.shippedOrders;
-  const needsUserIndex = !db.userOrderIndex;
-
-  if (needsActive || needsShipped || needsUserIndex) {
-      if (needsActive) db.activeOrders = [];
-      if (needsShipped) db.shippedOrders = [];
-      if (needsUserIndex) db.userOrderIndex = {};
-
-      const allOrders = Object.values(db.data.orders);
-
-      for (const order of allOrders) {
-          // 1. Active Orders
-          if (needsActive && !FINAL_STATUSES.includes(order.status)) {
-              db.activeOrders.push(order);
-          }
-
-          // 2. Shipped Orders
-          if (needsShipped && order.status === 'SHIPPED') {
-              db.shippedOrders.push(order);
-          }
-
-          // 3. User Order Index
-          if (needsUserIndex) {
-              const email = order.billingContact?.email;
-              if (email) {
-                  if (!db.userOrderIndex[email]) {
-                      db.userOrderIndex[email] = [];
-                  }
-                  db.userOrderIndex[email].push(order);
-              }
-          }
-      }
-      logger.info(`[SERVER] Initialized caches (O(N) optimized). Active: ${db.activeOrders?.length}, Shipped: ${db.shippedOrders?.length}, Users Indexed: ${db.userOrderIndex ? Object.keys(db.userOrderIndex).length : 0}`);
-  }
-
-  // Ensure products collection exists
-  if (!db.data.products) {
-    db.data.products = {};
-    await db.write();
-  }
-
-  // --- MIGRATION LOGIC: Convert orders array to object if necessary ---
-  if (Array.isArray(db.data.orders)) {
-    logger.info('[SERVER] Migrating orders from Array to Object...');
-    const ordersArray = db.data.orders;
-    const ordersObject = {};
-    ordersArray.forEach(order => {
-      if (order.orderId) {
-        ordersObject[order.orderId] = order;
-      } else {
-        logger.warn('[SERVER] Found order without orderId during migration, skipping:', order);
-      }
-    });
-    db.data.orders = ordersObject;
-    await db.write();
-    logger.info('[SERVER] Migration complete.');
-  }
-
-  // --- MIGRATION LOGIC: Ensure users have walletBalanceCents ---
-  let userMigrationNeeded = false;
-  Object.values(db.data.users).forEach(user => {
-    if (typeof user.walletBalanceCents === 'undefined') {
-      user.walletBalanceCents = 0;
-      userMigrationNeeded = true;
-    }
-  });
-  if (userMigrationNeeded) {
-    logger.info('[SERVER] Migrating users to include walletBalanceCents...');
-    await db.write();
-    logger.info('[SERVER] User wallet migration complete.');
-  }
-
-  // --- MIGRATION LOGIC: Ensure users have role ---
-  let userRoleMigrationNeeded = false;
-  Object.values(db.data.users).forEach(user => {
-    if (!user.role) {
-      user.role = 'user'; // Default to user
-      userRoleMigrationNeeded = true;
-    }
-  });
-  if (userRoleMigrationNeeded) {
-    logger.info('[SERVER] Migrating users to include role...');
-    await db.write();
-    logger.info('[SERVER] User role migration complete.');
-  }
-
-  // --- MIGRATION LOGIC: Build Email Index ---
-  if (!db.data.emailIndex) {
-      db.data.emailIndex = {};
-  }
-
-  // Rebuild index if empty (or always check consistency on startup? explicit rebuild is safer for now)
-  // We check if we have users but no index entries
-  const hasUsers = Object.keys(db.data.users).length > 0;
-  const hasIndex = Object.keys(db.data.emailIndex).length > 0;
-
-  if (hasUsers && !hasIndex) {
-      logger.info('[SERVER] Building email index...');
-      Object.entries(db.data.users).forEach(([key, user]) => {
-          if (user.email) {
-              db.data.emailIndex[user.email] = key;
-          }
-      });
-      await db.write();
-      logger.info('[SERVER] Email index built.');
-  }
+  // Cache initialization and migration logic removed as it's handled by the DB Adapter
 
   // --- Google OAuth2 Client ---
   let oauth2Client;
@@ -383,9 +282,10 @@ async function startServer(
     logger.info('[SERVER] LowDB database initialized at:', dbPath);
 
     // Load the refresh token from the database if it exists
-    if (db.data.config?.google_refresh_token) {
+    const config = await db.getConfig();
+    if (config?.google_refresh_token) {
       oauth2Client.setCredentials({
-        refresh_token: db.data.config.google_refresh_token,
+        refresh_token: config.google_refresh_token,
       });
       logger.info('[SERVER] Google OAuth2 client configured with stored refresh token.');
     }
@@ -671,22 +571,9 @@ async function startServer(
     logger.info('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
 
     // --- Helper Functions ---
-    function getUserByEmail(email) {
+    async function getUserByEmail(email) {
         if (!email) return undefined;
-        // Check index first
-        if (db.data.emailIndex && db.data.emailIndex[email]) {
-            const key = db.data.emailIndex[email];
-            const user = db.data.users[key];
-            if (user) return user;
-            // Index is stale?
-            logger.warn(`[SERVER] Email index inconsistency: ${email} -> ${key} but user not found. Cleaning up.`);
-            delete db.data.emailIndex[email];
-        }
-        // Fallback to scan (should not happen if index is healthy)
-        // But for safety during rollout, we can do a scan or just return undefined.
-        // Returning undefined is strictly O(1) assuming index is authority.
-        // Let's stick to the plan: if not in index, it's not there.
-        return undefined;
+        return await db.getUserByEmail(email);
     }
 
     function authenticateToken(req, res, next) {
@@ -712,14 +599,14 @@ async function startServer(
       });
     }
 
-    const isAdmin = (userPayload) => {
+    const isAdmin = async (userPayload) => {
       if (!userPayload) return false;
       // Check env var fallback first (fastest)
       // FIX: Ensure ADMIN_EMAIL is set and not empty before comparing
       if (getSecret('ADMIN_EMAIL') && userPayload.email === getSecret('ADMIN_EMAIL')) return true;
 
       // Look up full user object
-      const user = getUserByEmail(userPayload.email) || (userPayload.username ? db.data.users[userPayload.username] : undefined);
+      const user = (await getUserByEmail(userPayload.email)) || (userPayload.username ? await db.getUser(userPayload.username) : undefined);
 
       if (user && user.role === 'admin') return true;
 
@@ -753,8 +640,8 @@ async function startServer(
         res.json(pricingConfig);
     });
 
-    app.get('/api/metrics', authenticateToken, (req, res) => {
-        if (!isAdmin(req.user)) {
+    app.get('/api/metrics', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) {
             return res.status(403).json({ error: 'Forbidden' });
         }
         res.json(Metrics.getMetrics());
@@ -858,10 +745,10 @@ async function startServer(
             let creator = null;
             // The token payload from authenticateToken is in req.user
             if (req.user.email) {
-                creator = getUserByEmail(req.user.email);
+                creator = await getUserByEmail(req.user.email);
             } else if (req.user.username) {
                 // Check both direct access and scan
-                creator = db.data.users[req.user.username] || Object.values(db.data.users).find(u => u.username === req.user.username);
+                creator = await db.getUser(req.user.username);
             }
 
             if (!creator) {
@@ -882,8 +769,7 @@ async function startServer(
                 status: 'active'
             };
 
-            db.data.products[productId] = newProduct;
-            await db.write();
+            await db.createProduct(newProduct);
 
             logger.info(`[SERVER] New product created: ${productId} by ${newProduct.creatorName}`);
             res.status(201).json({ success: true, product: newProduct });
@@ -894,13 +780,13 @@ async function startServer(
         }
     });
 
-    app.get('/api/products/:productId', validateId('productId'), (req, res) => {
+    app.get('/api/products/:productId', validateId('productId'), async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ errors: errors.array() });
         }
         const { productId } = req.params;
-        const product = db.data.products[productId];
+        const product = await db.getProduct(productId);
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
@@ -1009,7 +895,7 @@ async function startServer(
         let creator = null;
 
         if (productId) {
-            product = db.data.products[productId];
+            product = await db.getProduct(productId);
             if (!product) {
                 return res.status(400).json({ error: 'Invalid productId. Product not found.' });
             }
@@ -1026,7 +912,7 @@ async function startServer(
             const creatorId = product.creatorId;
             // CreatorId might be username or ID.
             if (creatorId) {
-                creator = db.data.users[creatorId] || Object.values(db.data.users).find(u => u.username === creatorId || u.id === creatorId);
+                creator = await db.getUserById(creatorId) || await db.getUser(creatorId);
             }
 
             // SECURITY: Verify that the payment covers at least the creator's profit margin.
@@ -1172,23 +1058,6 @@ async function startServer(
           productId: productId || null,
           creatorId: creator ? (creator.id || creator.username) : null
         };
-        db.data.orders[newOrder.orderId] = newOrder;
-
-        // Add to active orders cache
-        if (db.activeOrders) {
-            db.activeOrders.push(newOrder);
-        }
-
-        // Bolt Optimization: Update user orders index
-        if (db.userOrderIndex) {
-            const email = newOrder.billingContact?.email;
-            if (email) {
-                if (!db.userOrderIndex[email]) {
-                    db.userOrderIndex[email] = [];
-                }
-                db.userOrderIndex[email].push(newOrder);
-            }
-        }
 
         // --- Process Payout ---
         if (product && creator) {
@@ -1199,10 +1068,11 @@ async function startServer(
                 if (typeof creator.walletBalanceCents === 'undefined') creator.walletBalanceCents = 0;
                 creator.walletBalanceCents += payoutAmount;
                 logger.info(`[SERVER] Added ${payoutAmount} cents to wallet of ${creator.username}. New balance: ${creator.walletBalanceCents}`);
+                await db.updateUser(creator);
             }
         }
 
-        await db.write();
+        await db.createOrder(newOrder);
         logger.info(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
 
         // Send Telegram notification
@@ -1234,24 +1104,24 @@ ${statusChecklist}
           try {
             const keyboard = getOrderStatusKeyboard(newOrder);
             const sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, { reply_markup: keyboard });
-            // db.data.orders is an object, so we access directly by ID
-            if (db.data.orders[newOrder.orderId]) {
-              db.data.orders[newOrder.orderId].telegramMessageId = sentMessage.message_id;
+
+            if (newOrder) {
+              newOrder.telegramMessageId = sentMessage.message_id;
 
               // Send the design image
               if (newOrder.designImagePath) {
                 const imagePath = path.join(__dirname, newOrder.designImagePath);
                 const sentPhoto = await bot.telegram.sendPhoto(getSecret('TELEGRAM_CHANNEL_ID'), { source: imagePath });
-                db.data.orders[newOrder.orderId].telegramPhotoMessageId = sentPhoto.message_id;
+                newOrder.telegramPhotoMessageId = sentPhoto.message_id;
               }
 
               // Send the cut line file
-              const cutLinePath = db.data.orders[newOrder.orderId].cutLinePath;
+              const cutLinePath = newOrder.cutLinePath || (newOrder.orderDetails && newOrder.orderDetails.cutLinePath);
               if (cutLinePath) {
                 const docPath = path.join(__dirname, cutLinePath);
                 await bot.telegram.sendDocument(getSecret('TELEGRAM_CHANNEL_ID'), { source: docPath });
               }
-              await db.write();
+              await db.updateOrder(newOrder);
             }
           } catch (error) {
             logger.error('[TELEGRAM] Failed to send message or files:', error);
@@ -1296,68 +1166,60 @@ ${statusChecklist}
     ...userPayload
   });
     });
-    app.get('/api/orders', authenticateToken, (req, res) => {
+    app.get('/api/orders', authenticateToken, async (req, res) => {
       // This endpoint is for the print shop dashboard and should only be accessible by admins.
-      if (!isAdmin(req.user)) {
+      if (!await isAdmin(req.user)) {
         return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
       }
-      const allOrders = Object.values(db.data.orders);
+      const allOrders = await db.getAllOrders();
       res.status(200).json(allOrders.slice().reverse());
     });
 
     app.get('/api/orders/search', authenticateToken, [
         query('q').notEmpty().withMessage('Query is required').isString().trim(),
-    ], (req, res) => {
+    ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
       const { q } = req.query;
-      const user = getUserByEmail(req.user.email);
+      const user = await getUserByEmail(req.user.email);
       if (!user) {
         return res.status(401).json({ error: 'User not found' });
       }
 
-      // Bolt Optimization: Use cached index
-      const userOrders = (db.userOrderIndex && db.userOrderIndex[user.email])
-          ? db.userOrderIndex[user.email]
-          : [];
-
-      const filteredOrders = userOrders.filter(order => order.orderId.includes(q));
+      const filteredOrders = await db.searchOrders(q, user.email);
       if (filteredOrders.length === 0) {
         return res.status(404).json({ error: 'Order not found' });
       }
       res.status(200).json(filteredOrders.slice().reverse());
     });
 
-    app.get('/api/orders/my-orders', authenticateToken, (req, res) => {
+    app.get('/api/orders/my-orders', authenticateToken, async (req, res) => {
       if (!req.user || !req.user.email) {
         return res.status(401).json({ error: 'Authentication token is invalid or missing email.' });
       }
       const userEmail = req.user.email;
 
-      // Bolt Optimization: Use cached index instead of full table scan
-      const userOrders = (db.userOrderIndex && db.userOrderIndex[userEmail])
-          ? db.userOrderIndex[userEmail]
-          : [];
+      const userOrders = await db.getUserOrders(userEmail);
 
       res.status(200).json(userOrders.slice().reverse());
     });
 
-    app.get('/api/orders/:orderId', authenticateToken, validateId('orderId'), (req, res) => {
+    app.get('/api/orders/:orderId', authenticateToken, validateId('orderId'), async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
           return res.status(400).json({ errors: errors.array() });
       }
       const { orderId } = req.params;
-      const order = db.data.orders[orderId];
+      const order = await db.getOrder(orderId);
 
       if (!order) {
         return res.status(404).json({ error: 'Order not found' });
       }
 
       // Check if the user is an admin or the owner of the order.
-      if (isAdmin(req.user) || (req.user.email && req.user.email === order.billingContact.email)) {
+      if (await isAdmin(req.user) || (req.user.email && req.user.email === order.billingContact.email)) {
         return res.json(order);
       }
 
@@ -1375,14 +1237,14 @@ ${statusChecklist}
       }
       const { orderId } = req.params;
       const { status } = req.body;
-      const order = db.data.orders[orderId]; // Optimized: O(1) lookup
+      const order = await db.getOrder(orderId);
 
       if (!order) {
         return res.status(404).json({ error: 'Order not found.' });
       }
 
       // Check for admin role
-      if (!isAdmin(req.user)) {
+      if (!await isAdmin(req.user)) {
           return res.status(403).json({ error: 'Forbidden: Admin access required.' });
       }
 
@@ -1403,42 +1265,7 @@ ${statusChecklist}
           delete order.stalledMessageId;
       }
 
-      // Update active orders cache
-      const isFinal = FINAL_STATUSES.includes(status);
-
-      // Update Active Orders
-      if (db.activeOrders) {
-          const activeIndex = db.activeOrders.findIndex(o => o.orderId === orderId);
-          if (isFinal) {
-            if (activeIndex !== -1) {
-              db.activeOrders.splice(activeIndex, 1);
-            }
-          } else {
-            if (activeIndex === -1) {
-              db.activeOrders.push(order);
-            }
-          }
-      }
-
-      // Update Shipped Orders Cache
-      if (db.shippedOrders) {
-          // If status BECOMES 'SHIPPED'
-          if (status === 'SHIPPED') {
-              const exists = db.shippedOrders.find(o => o.orderId === orderId);
-              if (!exists) {
-                  db.shippedOrders.push(order);
-              }
-          }
-          // If status WAS 'SHIPPED' but CHANGED
-          else if (oldStatus === 'SHIPPED' && status !== 'SHIPPED') {
-              const idx = db.shippedOrders.findIndex(o => o.orderId === orderId);
-              if (idx !== -1) {
-                  db.shippedOrders.splice(idx, 1);
-              }
-          }
-      }
-
-      await db.write();
+      await db.updateOrder(order);
       logger.info(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
 
       try {
@@ -1513,31 +1340,20 @@ ${statusChecklist}
         }
 
         // Check for admin role
-        if (!isAdmin(req.user)) {
+        if (!await isAdmin(req.user)) {
             return res.status(403).json({ error: 'Forbidden: Admin access required.' });
         }
 
         const { orderId } = req.params;
         const { trackingNumber, courier } = req.body;
-        const order = db.data.orders[orderId];
+        const order = await db.getOrder(orderId);
         if (!order) {
             return res.status(404).json({ error: 'Order not found.' });
         }
         order.trackingNumber = trackingNumber;
         order.courier = courier;
 
-        // --- CACHE UPDATE ---
-        // If the order is already SHIPPED, we need to ensure it's in the cache.
-        // It might not be there if status was updated before tracking info.
-        if (db.shippedOrders && order.status === 'SHIPPED') {
-             // Check if it's already in the cache (by reference or ID)
-             const exists = db.shippedOrders.find(o => o.orderId === orderId);
-             if (!exists) {
-                 db.shippedOrders.push(order);
-             }
-        }
-
-        await db.write();
+        await db.updateOrder(order);
         logger.info(`[SERVER] Tracking info added to order ID ${orderId}.`);
 
         // Send shipment notification email
@@ -1619,8 +1435,9 @@ ${statusChecklist}
         return res.status(400).json({ errors: errors.array() });
       }
       const { username, password } = req.body;
-      // Note: Prototype pollution check is handled by validateUsername middleware
-      if (Object.prototype.hasOwnProperty.call(db.data.users, username)) {
+
+      const existingUser = await db.getUser(username);
+      if (existingUser) {
         return res.status(400).json({ error: 'User already exists' });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -1630,8 +1447,7 @@ ${statusChecklist}
         password: hashedPassword,
         credentials: [],
       };
-      db.data.users[username] = user;
-      await db.write();
+      await db.createUser(user);
 
       // Send notification email to admin
       if (getSecret('ADMIN_EMAIL')) {
@@ -1664,7 +1480,7 @@ ${statusChecklist}
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
         return res.status(400).json({ error: 'Invalid username or password' });
       }
-      const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
+      const user = await db.getUser(username);
 
       // Sentinel: Timing attack mitigation.
       // Always perform bcrypt comparison to prevent username enumeration via timing analysis.
@@ -1699,17 +1515,14 @@ ${statusChecklist}
             return res.status(400).json({ errors: errors.array() });
         }
         const { email } = req.body;
-        let user = getUserByEmail(email);
+        let user = await getUserByEmail(email);
         if (!user) {
             user = {
                 id: randomUUID(),
                 email,
                 credentials: [],
             };
-            db.data.users[user.id] = user;
-            // Update Index
-            db.data.emailIndex[email] = user.id;
-            await db.write();
+            await db.createUser(user);
         }
         const { privateKey, kid } = getCurrentSigningKey();
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
@@ -1749,11 +1562,11 @@ ${statusChecklist}
         return res.status(400).json({ error: 'No token provided' });
       }
       const { publicKey } = getCurrentSigningKey();
-      jwt.verify(token, publicKey, { algorithms: ['RS256'] }, (err, decoded) => {
+      jwt.verify(token, publicKey, { algorithms: ['RS256'] }, async (err, decoded) => {
         if (err) {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
-        const user = getUserByEmail(decoded.email);
+        const user = await getUserByEmail(decoded.email);
         if (!user) {
           return res.status(401).json({ error: 'User not found' });
         }
@@ -1840,8 +1653,7 @@ ${statusChecklist}
 
         // If a refresh token is received, store it securely for future use.
         if (tokens.refresh_token) {
-          db.data.config.google_refresh_token = tokens.refresh_token;
-          await db.write();
+          await db.setConfig('google_refresh_token', tokens.refresh_token);
           logger.info('[SERVER] Google OAuth2 refresh token stored.');
         }
 
@@ -1852,7 +1664,7 @@ ${statusChecklist}
         logger.info('Google authentication successful for:', userEmail);
 
         // Find or create a user in our database
-        let user = getUserByEmail(userEmail);
+        let user = await getUserByEmail(userEmail);
         if (!user) {
           // Create a new user if they don't exist
           const newUsername = userEmail.split('@')[0]; // Use email prefix as username
@@ -1864,10 +1676,7 @@ ${statusChecklist}
             credentials: [],
             google_tokens: tokens,
           };
-          db.data.users[user.id] = user;
-          // Update Index
-          db.data.emailIndex[userEmail] = user.id;
-          await db.write();
+          await db.createUser(user);
           logger.info(`New user created for ${userEmail}`);
 
           // Send notification email to admin
@@ -1888,7 +1697,7 @@ ${statusChecklist}
         } else {
           // User exists, just update their tokens
           user.google_tokens = tokens;
-          await db.write();
+          await db.updateUser(user);
         }
 
         // Create a JWT for the user to log them in
@@ -1915,7 +1724,7 @@ ${statusChecklist}
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
         return res.status(400).json({ error: 'Invalid username.' });
       }
-      let user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
+      let user = await db.getUser(username);
 
       if (!user) {
         // Create a new user if they don't exist
@@ -1925,8 +1734,7 @@ ${statusChecklist}
           password: null, // No password for WebAuthn-only users
           credentials: [],
         };
-        db.data.users[username] = user;
-        await db.write();
+        await db.createUser(user);
         logger.info(`New user created for WebAuthn pre-registration: ${username}`);
       }
 
@@ -1940,7 +1748,7 @@ ${statusChecklist}
       });
 
       user.challenge = options.challenge;
-      await db.write();
+      await db.updateUser(user);
 
       res.json(options);
     });
@@ -1952,7 +1760,7 @@ ${statusChecklist}
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
         return res.status(400).json({ error: 'Invalid username.' });
       }
-      const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
+      const user = await db.getUser(username);
       try {
         const verification = await injectedWebAuthn.verifyRegistrationResponse({
           response: body,
@@ -1962,9 +1770,10 @@ ${statusChecklist}
         });
         const { verified, registrationInfo } = verification;
         if (verified) {
+          if (!user.credentials) user.credentials = [];
           user.credentials.push(registrationInfo);
-          db.data.credentials[registrationInfo.credentialID] = registrationInfo;
-          await db.write();
+          await db.updateUser(user);
+          await db.saveCredential(registrationInfo);
         }
         res.json({ verified });
       } catch (error) {
@@ -1980,19 +1789,19 @@ ${statusChecklist}
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
         return res.status(400).json({ error: 'User not found' });
       }
-      const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
+      const user = await db.getUser(username);
       if (!user) {
         return res.status(400).json({ error: 'User not found' });
       }
       const options = await injectedWebAuthn.generateAuthenticationOptions({
-        allowCredentials: user.credentials.map(cred => ({
+        allowCredentials: (user.credentials || []).map(cred => ({
           id: cred.credentialID,
           type: 'public-key',
         })),
         userVerification: 'preferred',
       });
       user.challenge = options.challenge;
-      db.write();
+      await db.updateUser(user);
       res.json(options);
     });
 
@@ -2003,8 +1812,8 @@ ${statusChecklist}
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
         return res.status(400).json({ error: 'Invalid username.' });
       }
-      const user = Object.prototype.hasOwnProperty.call(db.data.users, username) ? db.data.users[username] : undefined;
-      const credential = db.data.credentials[body.id];
+      const user = await db.getUser(username);
+      const credential = await db.getCredential(body.id);
       if (!credential) {
         return res.status(400).json({ error: 'Credential not found.' });
       }

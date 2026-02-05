@@ -70,7 +70,7 @@ describe('Telegram Bot Security', () => {
     };
   });
 
-  it('should be vulnerable to Markdown injection (Reproducing Vulnerability)', () => {
+  it('should be vulnerable to Markdown injection (Reproducing Vulnerability)', async () => {
     // 1. Initialize Bot
     // Force NODE_ENV to development so bot.js registers commands
     const originalEnv = process.env.NODE_ENV;
@@ -105,7 +105,7 @@ describe('Telegram Bot Security', () => {
 
     // 4. Trigger the 'jobs' command
     if (commands['jobs']) {
-      commands['jobs'](ctx);
+      await commands['jobs'](ctx);
     } else {
       throw new Error('jobs command not registered');
     }

@@ -24,7 +24,7 @@ describe('Server Index Security', () => {
 
         // Given the known structure, we can verify that the async function definition contains the required calls.
 
-        const dbWriteStartRegex = /db\.write\s*=\s*async\s*function\(\)\s*{/;
+        const dbWriteStartRegex = /(?:db|lowDbInstance)\.write\s*=\s*async\s*function\(\)\s*{/;
         const match = content.match(dbWriteStartRegex);
 
         if (!match) {

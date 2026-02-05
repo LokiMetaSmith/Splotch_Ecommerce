@@ -1,13 +1,19 @@
 import EasyPost from '@easypost/api';
 import { getSecret } from './secretManager.js';
 import logger from './logger.js';
+import { LowDbAdapter } from './database/lowdb_adapter.js';
 
 let db;
 let api;
 let updateInterval; // Store interval ID for cleanup
 
 function initializeTracker(database) {
-    db = database;
+    if (database && !database.getOrder) {
+        db = new LowDbAdapter(database);
+    } else {
+        db = database;
+    }
+
     const apiKey = getSecret('EASYPOST_API_KEY');
     if (apiKey) {
         api = new EasyPost(apiKey);
@@ -32,14 +38,8 @@ function stopTracker() {
 async function updateTrackingData() {
     if (!db || !api) return;
 
-    // Bolt Optimization: Use cached shippedOrders array instead of filtering all orders
-    let shippedOrders;
-    if (db.shippedOrders) {
-        shippedOrders = db.shippedOrders.filter(o => o.trackingNumber && o.courier);
-    } else {
-        // Fallback if cache isn't initialized (shouldn't happen in normal operation)
-        shippedOrders = Object.values(db.data.orders).filter(o => o.status === 'SHIPPED' && o.trackingNumber && o.courier);
-    }
+    let shippedOrders = await db.getShippedOrders();
+    shippedOrders = shippedOrders.filter(o => o.trackingNumber && o.courier);
 
     if (shippedOrders.length === 0) {
         return;
@@ -69,26 +69,14 @@ async function updateTrackingData() {
             const { order, tracker } = result.value;
             if (tracker.status && tracker.status.toLowerCase() === 'delivered') {
                 logger.info(`[TRACKER] Order ${order.orderId} has been delivered. Updating status.`);
-                const orderToUpdate = db.data.orders[order.orderId];
+                const orderToUpdate = await db.getOrder(order.orderId);
                 if (orderToUpdate) {
                     orderToUpdate.status = 'DELIVERED';
                     orderToUpdate.lastUpdatedAt = new Date().toISOString();
-
-                    // Update Cache
-                    if (db.shippedOrders) {
-                        const idx = db.shippedOrders.findIndex(o => o.orderId === order.orderId);
-                        if (idx !== -1) {
-                            db.shippedOrders.splice(idx, 1);
-                        }
-                    }
-                    hasUpdates = true;
+                    await db.updateOrder(orderToUpdate);
                 }
             }
         }
-    }
-
-    if (hasUpdates) {
-        await db.write();
     }
 }
 
