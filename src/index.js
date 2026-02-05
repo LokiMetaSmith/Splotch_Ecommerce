@@ -1435,6 +1435,19 @@ function handleAddText() {
 }
 
 function handleResetImage() {
+  if (!originalImage && basePolygons.length === 0) {
+    showPaymentStatus("Nothing to reset.", "info");
+    return;
+  }
+
+  if (
+    !confirm(
+      "Are you sure you want to reset your changes? This action cannot be undone.",
+    )
+  ) {
+    return;
+  }
+
   if (originalImage) {
     // Raster Image Reset
     isGrayscale = false;
@@ -1524,8 +1537,6 @@ function handleResetImage() {
     currentPolygons = basePolygons;
     redrawAll();
     showPaymentStatus("Image reset to original.", "success");
-  } else {
-    showPaymentStatus("Nothing to reset.", "info");
   }
 }
 
