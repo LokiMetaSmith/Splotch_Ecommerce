@@ -86,6 +86,9 @@ export class PlacementWorker {
                     }
                 }
 
+                // Bolt Optimization: Sort active items by X coordinate to enable early break in the inner loop
+                activePlacedItems.sort((a, b) => a.bounds.x - b.bounds.x);
+
                 for (let x = binBounds.x; x <= maxX; x += step) {
                     counter++;
 
@@ -122,13 +125,15 @@ export class PlacementWorker {
                     // Bolt Optimization: Iterate only active items (Scanline optimization)
                     for (let k = 0; k < activePlacedItems.length; k++) {
                         const itemBounds = activePlacedItems[k].bounds;
+
+                        // Bolt Optimization: Early exit if remaining items are too far right
+                        if (itemBounds.x >= x + pWidth) break;
+
                         // Inline intersect check: x < r2.x + r2.width && x + width > r2.x ...
-                        // We already know Y overlaps from the active list filter!
-                        // But we check both just to be safe and use standard bounding box logic,
-                        // or we can optimize to check only X?
-                        // Let's keep the full check for robustness, but since we filtered by Y,
-                        // the Y check here is redundant but cheap. The main win is iterating fewer items.
-                        if (x < itemBounds.x + itemBounds.width && x + pWidth > itemBounds.x) {
+                        // We already know Y overlaps from the active list filter.
+                        // We checked the "right" boundary via break above.
+                        // So we only need to check the "left" boundary: is current x left of item's right edge?
+                        if (x < itemBounds.x + itemBounds.width) {
                             potentialColliders.push(activePlacedItems[k].path);
                         }
                     }
