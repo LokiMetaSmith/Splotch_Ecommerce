@@ -8,6 +8,16 @@ services:
     volumes:
       - /home/loki/app-data/db.json:/app/db.json
       - /home/loki/app-data/uploads:/app/server/uploads
+    depends_on:
+      - redis
+    networks:
+      - app-net
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    volumes:
+      - /home/loki/app-data/redis:/data
     networks:
       - app-net
 

@@ -25,6 +25,17 @@ services:
       - ./server/.env
     command: >
       bash -c "npm install && node index.js"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - dev-net
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
     networks:
       - dev-net
 
