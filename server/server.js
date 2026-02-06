@@ -44,6 +44,10 @@ import { createClient } from 'redis';
 import { RedisStore as ConnectRedisStore } from 'connect-redis';
 import { RedisStore as RateLimitRedisStore } from 'rate-limit-redis';
 import { LowDbAdapter } from './database/lowdb_adapter.js';
+import { startEmailWorker } from './workers/emailWorker.js';
+import { startTelegramWorker } from './workers/telegramWorker.js';
+import { emailQueue, telegramQueue } from './queueManager.js';
+import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -209,6 +213,28 @@ async function startServer(
   // --- Google OAuth2 Client ---
   let oauth2Client;
 
+  // Helper to schedule email (queue or direct for test)
+  const scheduleEmail = async (jobName, data) => {
+      if (process.env.NODE_ENV === 'test') {
+           await sendEmail({ ...data, oauth2Client });
+      } else {
+           await emailQueue.add(jobName, data);
+      }
+  };
+
+  // Helper to schedule telegram (queue or direct for test)
+  const scheduleTelegram = async (jobName, data) => {
+      if (process.env.NODE_ENV === 'test') {
+           if (jobName === 'send-new-order') {
+                await sendNewOrderNotification(bot, db, data.orderId);
+           } else if (jobName === 'update-status') {
+                await updateOrderStatusNotification(bot, db, data.orderId, data.status);
+           }
+      } else {
+           await telegramQueue.add(jobName, data);
+      }
+  };
+
   // Initialize Sentry if DSN is provided
   if (getSecret('SENTRY_DSN')) {
       Sentry.init({
@@ -238,15 +264,14 @@ async function startServer(
 
     if (getSecret('ADMIN_EMAIL') && oauth2Client && oauth2Client.credentials && oauth2Client.credentials.access_token) {
       try {
-        await sendEmail({
+        await scheduleEmail('send-error-email', {
           to: getSecret('ADMIN_EMAIL'),
           subject: `Print Shop Server Error: ${context}`,
           text: `An error occurred in the Print Shop server.\n\nContext: ${context}\n\nError: ${error.message}`,
           html: `<p>An error occurred in the Print Shop server.</p><p><b>Context:</b> ${escapeHtml(context)}</p><pre>${escapeHtml(error.message)}</pre>`,
-          oauth2Client,
         });
       } catch (emailError) {
-        logger.error('CRITICAL: Failed to send error notification email:', emailError);
+        logger.error('CRITICAL: Failed to queue error notification email:', emailError);
       }
     }
   }
@@ -1077,55 +1102,11 @@ async function startServer(
 
         // Send Telegram notification
         if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
-          const status = 'NEW';
-          const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-          const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-          const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
-          const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
-          const completedOrLater = ['COMPLETED'];
-
-          const statusChecklist = `
-✅ New
-${['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Accepted
-${['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Printing
-${['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Shipped
-${['DELIVERED', 'COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Delivered
-${['COMPLETED'].includes(newOrder.status) ? '✅' : '⬜️'} Completed
-        `;
-          const message = `
-New Order: ${newOrder.orderId}
-Customer: ${newOrder.billingContact.givenName} ${newOrder.billingContact.familyName}
-Email: ${newOrder.billingContact.email}
-Quantity: ${newOrder.orderDetails.quantity}
-Amount: $${(newOrder.amount / 100).toFixed(2)}
-
-${statusChecklist}
-          `;
-          try {
-            const keyboard = getOrderStatusKeyboard(newOrder);
-            const sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, { reply_markup: keyboard });
-
-            if (newOrder) {
-              newOrder.telegramMessageId = sentMessage.message_id;
-
-              // Send the design image
-              if (newOrder.designImagePath) {
-                const imagePath = path.join(__dirname, newOrder.designImagePath);
-                const sentPhoto = await bot.telegram.sendPhoto(getSecret('TELEGRAM_CHANNEL_ID'), { source: imagePath });
-                newOrder.telegramPhotoMessageId = sentPhoto.message_id;
-              }
-
-              // Send the cut line file
-              const cutLinePath = newOrder.cutLinePath || (newOrder.orderDetails && newOrder.orderDetails.cutLinePath);
-              if (cutLinePath) {
-                const docPath = path.join(__dirname, cutLinePath);
-                await bot.telegram.sendDocument(getSecret('TELEGRAM_CHANNEL_ID'), { source: docPath });
-              }
-              await db.updateOrder(newOrder);
-            }
-          } catch (error) {
-            logger.error('[TELEGRAM] Failed to send message or files:', error);
-          }
+             try {
+                await scheduleTelegram('send-new-order', { orderId: newOrder.orderId });
+             } catch (error) {
+                 logger.error('[TELEGRAM] Failed to queue message:', error);
+             }
         }
 
         return res.status(201).json({ success: true, order: newOrder });
@@ -1271,55 +1252,11 @@ ${statusChecklist}
       try {
           // Update Telegram message
           if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID') && order.telegramMessageId) {
-            const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-            const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-            const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
-            const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
-            const completedOrLater = ['COMPLETED'];
-
-            const statusChecklist = `
-✅ New
-${acceptedOrLater.includes(status) ? '✅' : '⬜️'} Accepted
-${printingOrLater.includes(status) ? '✅' : '⬜️'} Printing
-${shippedOrLater.includes(status) ? '✅' : '⬜️'} Shipped
-${deliveredOrLater.includes(status) ? '✅' : '⬜️'} Delivered
-${completedOrLater.includes(status) ? '✅' : '⬜️'} Completed
-            `;
-            const message = `
-Order: ${order.orderId}
-Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
-Email: ${order.billingContact.email}
-Quantity: ${order.orderDetails?.quantity || 0}
-Amount: $${(order.amount / 100).toFixed(2)}
-
-${statusChecklist}
-            `;
-            try {
-              if (status === 'COMPLETED' || status === 'CANCELED') {
-                // Order is complete or canceled, delete the checklist message
-                await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.telegramMessageId);
-                // also delete the photo if it exists and hasn't been deleted
-                if (order.telegramPhotoMessageId) {
-                    await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.telegramPhotoMessageId);
-                }
-              } else {
-                // For all other statuses, edit the message
-                const keyboard = getOrderStatusKeyboard(order);
-                await bot.telegram.editMessageText(
-                    getSecret('TELEGRAM_CHANNEL_ID'),
-                    order.telegramMessageId,
-                    undefined,
-                    message,
-                    { reply_markup: keyboard }
-                );
-                // If the status is SHIPPED, also delete the photo
-                if (status === 'SHIPPED' && order.telegramPhotoMessageId) {
-                  await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.telegramPhotoMessageId);
-                }
-              }
-            } catch (error) {
-              logger.error('[TELEGRAM] Failed to edit or delete message:', error);
-            }
+             try {
+                await scheduleTelegram('update-status', { orderId: order.orderId, status: order.status });
+             } catch (error) {
+                logger.error('[TELEGRAM] Failed to queue status update:', error);
+             }
           }
 
           res.status(200).json({ success: true, order: order });
@@ -1383,7 +1320,7 @@ ${statusChecklist}
                     </tr>
                 `;
 
-                await sendEmail({
+                await scheduleEmail('send-shipping-email', {
                     to: order.billingContact.email,
                     subject: `Your Splotch order #${order.orderId} has shipped!`,
                     text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || 0}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join('\n')}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
@@ -1411,12 +1348,11 @@ ${statusChecklist}
                         <p>Stay in touch!</p>
                         <p><b>Splotch</b></p>
                     `,
-                    oauth2Client,
                 });
-                logger.info(`[SERVER] Shipment notification email sent for order ID ${orderId}.`);
+                logger.info(`[SERVER] Shipment notification email queued for order ID ${orderId}.`);
             } catch (emailError) {
                 // Log the error, but don't block the API response since the tracking info was saved.
-                await logAndEmailError(emailError, `Failed to send shipment notification for order ${orderId}`);
+                logger.error(`Failed to queue shipment notification for order ${orderId}:`, emailError);
             }
         }
 
@@ -1452,15 +1388,14 @@ ${statusChecklist}
       // Send notification email to admin
       if (getSecret('ADMIN_EMAIL')) {
         try {
-          await sendEmail({
+          await scheduleEmail('send-admin-notification', {
             to: getSecret('ADMIN_EMAIL'),
             subject: 'New User Account Created',
             text: `A new user has registered on the Print Shop.\n\nUsername: ${username}`,
             html: `<p>A new user has registered on the Print Shop.</p><p><b>Username:</b> ${username}</p>`,
-            oauth2Client,
           });
         } catch (emailError) {
-          logger.error('Failed to send new user notification email:', emailError);
+          logger.error('Failed to queue new user notification email:', emailError);
         }
       }
 
@@ -1541,17 +1476,16 @@ ${statusChecklist}
             if (process.env.NODE_ENV === 'test' && sendEmail === defaultSendEmail) {
                 logger.info('[TEST] Skipping email send. Magic Link:', magicLink);
             } else {
-                await sendEmail({
+                await scheduleEmail('send-magic-link', {
                     to: email,
                     subject: 'Your Magic Link for Splotch',
                     text: `Click here to log in: ${magicLink}`,
                     html: `<p>Click here to log in: <a href="${magicLink}">${magicLink}</a></p>`,
-                    oauth2Client,
                 });
             }
             res.json({ success: true, message: 'Magic link sent! Please check your email.' });
         } catch (error) {
-            await logAndEmailError(error, 'Failed to send magic link email');
+            await logAndEmailError(error, 'Failed to queue magic link email');
             res.status(500).json({ error: 'Failed to send magic link email.' });
         }
     });
@@ -1682,15 +1616,14 @@ ${statusChecklist}
           // Send notification email to admin
           if (getSecret('ADMIN_EMAIL')) {
             try {
-              await sendEmail({
+              await scheduleEmail('send-admin-notification-google', {
                 to: getSecret('ADMIN_EMAIL'),
                 subject: 'New User Account Created (via Google)',
                 text: `A new user has registered using their Google account.\n\nEmail: ${userEmail}\nUsername: ${newUsername}`,
                 html: `<p>A new user has registered using their Google account.</p><p><b>Email:</b> ${userEmail}</p><p><b>Username:</b> ${newUsername}</p>`,
-                oauth2Client,
               });
             } catch (emailError) {
-              logger.error('Failed to send new user notification email:', emailError);
+              logger.error('Failed to queue new user notification email:', emailError);
             }
           }
 
@@ -1842,6 +1775,19 @@ ${statusChecklist}
 
     // Initialize the shipment tracker
     initializeTracker(db);
+
+    // Start background workers
+    if (process.env.NODE_ENV !== 'test') {
+        try {
+            startEmailWorker(oauth2Client, sendEmail);
+            if (bot) {
+                startTelegramWorker(bot, db);
+            }
+            logger.info('[SERVER] Background workers started.');
+        } catch (workerError) {
+            logger.error('[SERVER] Failed to start background workers:', workerError);
+        }
+    }
 
     // Ensure keys are loaded/created before signing the first token
     await rotateKeys();
