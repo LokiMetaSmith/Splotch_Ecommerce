@@ -1,138 +1,145 @@
 let csrfToken;
 
 async function fetchCsrfToken() {
-    try {
-        const response = await fetch('/api/csrf-token', { credentials: 'include' });
-        if (!response.ok) {
-            throw new Error(`Server responded with ${response.status}`);
-        }
-        const data = await response.json();
-        if (!data.csrfToken) {
-            throw new Error("CSRF token not found in server response");
-        }
-        csrfToken = data.csrfToken;
-    } catch (error) {
-        console.error('Error fetching CSRF token:', error);
-        const loginStatus = document.getElementById('login-status');
-        if (loginStatus) {
-            loginStatus.textContent = 'A security token could not be loaded. Please refresh the page.';
-            loginStatus.style.color = 'red';
-        }
+  try {
+    const response = await fetch("/api/csrf-token", { credentials: "include" });
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}`);
     }
+    const data = await response.json();
+    if (!data.csrfToken) {
+      throw new Error("CSRF token not found in server response");
+    }
+    csrfToken = data.csrfToken;
+  } catch (error) {
+    console.error("Error fetching CSRF token:", error);
+    const loginStatus = document.getElementById("login-status");
+    if (loginStatus) {
+      loginStatus.textContent =
+        "A security token could not be loaded. Please refresh the page.";
+      loginStatus.style.color = "red";
+    }
+  }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    await fetchCsrfToken();
+document.addEventListener("DOMContentLoaded", async () => {
+  await fetchCsrfToken();
 
-    const loginSection = document.getElementById('login-section');
-    const orderHistorySection = document.getElementById('order-history-section');
-    const loginBtn = document.getElementById('loginBtn');
-    const emailInput = document.getElementById('emailInput');
-    const loginStatus = document.getElementById('login-status');
-    const ordersList = document.getElementById('orders-list');
-    const noOrdersMessage = document.getElementById('no-orders-message');
+  const loginSection = document.getElementById("login-section");
+  const orderHistorySection = document.getElementById("order-history-section");
+  const loginBtn = document.getElementById("loginBtn");
+  const emailInput = document.getElementById("emailInput");
+  const loginStatus = document.getElementById("login-status");
+  const ordersList = document.getElementById("orders-list");
+  const noOrdersMessage = document.getElementById("no-orders-message");
 
-    // Check for magic link token in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+  // Check for magic link token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get("token");
 
-    if (token) {
-        verifyTokenAndFetchOrders(token);
-    }
+  if (token) {
+    verifyTokenAndFetchOrders(token);
+  }
 
-    loginBtn.addEventListener('click', async () => {
-        const email = emailInput.value;
-        if (!email) {
-            loginStatus.textContent = 'Please enter a valid email address.';
-            loginStatus.style.color = 'red';
-            return;
-        }
+  document
+    .getElementById("magic-link-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = emailInput.value;
+      if (!email) {
+        loginStatus.textContent = "Please enter a valid email address.";
+        loginStatus.style.color = "red";
+        return;
+      }
 
-        const originalText = loginBtn.innerHTML;
-        loginBtn.disabled = true;
-        loginBtn.innerHTML = `
+      const originalText = loginBtn.innerHTML;
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = `
             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
             <span>Sending...</span>
         `;
-        // Ensure disabled style is applied visually if not handled by CSS
-        loginBtn.classList.add('opacity-75', 'cursor-not-allowed');
+      // Ensure disabled style is applied visually if not handled by CSS
+      loginBtn.classList.add("opacity-75", "cursor-not-allowed");
 
-        try {
-            if (!csrfToken) {
-                throw new Error('CSRF token is not available. Please refresh the page.');
-            }
-            const response = await fetch('/api/auth/magic-login', {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken
-                },
-                body: JSON.stringify({ email, redirectPath: '/orders.html' }),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                loginStatus.textContent = 'Magic link sent! Please check your email.';
-                loginStatus.style.color = 'green';
-            } else {
-                throw new Error(data.error || 'Failed to send magic link.');
-            }
-        } catch (error) {
-            loginStatus.textContent = `Error: ${error.message}`;
-            loginStatus.style.color = 'red';
-        } finally {
-            loginBtn.disabled = false;
-            loginBtn.innerHTML = originalText;
-            loginBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+      try {
+        if (!csrfToken) {
+          throw new Error(
+            "CSRF token is not available. Please refresh the page.",
+          );
         }
+        const response = await fetch("/api/auth/magic-login", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
+          },
+          body: JSON.stringify({ email, redirectPath: "/orders.html" }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          loginStatus.textContent = "Magic link sent! Please check your email.";
+          loginStatus.style.color = "green";
+        } else {
+          throw new Error(data.error || "Failed to send magic link.");
+        }
+      } catch (error) {
+        loginStatus.textContent = `Error: ${error.message}`;
+        loginStatus.style.color = "red";
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = originalText;
+        loginBtn.classList.remove("opacity-75", "cursor-not-allowed");
+      }
     });
 
-    async function verifyTokenAndFetchOrders(authToken) {
-        loginSection.classList.add('hidden');
-        orderHistorySection.classList.remove('hidden');
+  async function verifyTokenAndFetchOrders(authToken) {
+    loginSection.classList.add("hidden");
+    orderHistorySection.classList.remove("hidden");
 
-        try {
-            const response = await fetch('/api/orders/my-orders', {
-                credentials: 'include',
-                headers: {
-                    'Authorization': `Bearer ${authToken}`
-                }
-            });
+    try {
+      const response = await fetch("/api/orders/my-orders", {
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Could not fetch your orders.');
-            }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Could not fetch your orders.");
+      }
 
-            const orders = await response.json();
-            displayOrders(orders, authToken);
+      const orders = await response.json();
+      displayOrders(orders, authToken);
+    } catch (error) {
+      noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
+      noOrdersMessage.style.color = "red";
+    }
+  }
 
-        } catch (error) {
-            noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
-            noOrdersMessage.style.color = 'red';
-        }
+  function displayOrders(orders, authToken) {
+    ordersList.innerHTML = ""; // Clear loading/error message
+    if (orders.length === 0) {
+      ordersList.appendChild(noOrdersMessage); // Show the "no orders" message
+      return;
     }
 
-    function displayOrders(orders, authToken) {
-        ordersList.innerHTML = ''; // Clear loading/error message
-        if (orders.length === 0) {
-            ordersList.appendChild(noOrdersMessage); // Show the "no orders" message
-            return;
-        }
+    orders.forEach((order) => {
+      const orderCard = document.createElement("div");
+      orderCard.className = "p-4 border rounded-lg shadow-sm bg-gray-50";
 
-        orders.forEach(order => {
-            const orderCard = document.createElement('div');
-            orderCard.className = 'p-4 border rounded-lg shadow-sm bg-gray-50';
+      const receivedDate = new Date(order.receivedAt).toLocaleDateString();
+      const formattedAmount = order.amount
+        ? `$${(order.amount / 100).toFixed(2)}`
+        : "N/A";
 
-            const receivedDate = new Date(order.receivedAt).toLocaleDateString();
-            const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
-
-            orderCard.innerHTML = `
+      orderCard.innerHTML = `
                 <div class="flex flex-col sm:flex-row justify-between items-start">
                     <div>
                         <h3 class="text-lg font-semibold text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
@@ -148,17 +155,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button class="reorder-btn button is-primary text-sm" data-design-image="${order.designImagePath}">Reorder This Sticker</button>
                 </div>
             `;
-            ordersList.appendChild(orderCard);
-        });
+      ordersList.appendChild(orderCard);
+    });
 
-        // Add event listeners to reorder buttons
-        document.querySelectorAll('.reorder-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const designImage = e.target.dataset.designImage;
-                // For now, redirect to the main page with the image URL as a query param
-                // A more robust solution would pre-fill all options
-                window.location.href = `/?design=${encodeURIComponent(designImage)}`;
-            });
-        });
-    }
+    // Add event listeners to reorder buttons
+    document.querySelectorAll(".reorder-btn").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        const designImage = e.target.dataset.designImage;
+        // For now, redirect to the main page with the image URL as a query param
+        // A more robust solution would pre-fill all options
+        window.location.href = `/?design=${encodeURIComponent(designImage)}`;
+      });
+    });
+  }
 });
