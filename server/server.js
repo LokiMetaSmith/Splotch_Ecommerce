@@ -563,6 +563,16 @@ async function startServer(
         maxAge: '1d'
     }));
 
+    // Cache-Control: Prevent caching of sensitive data (PII, etc.)
+    // Placed after static files so it doesn't prevent caching of public assets
+    app.use((req, res, next) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Surrogate-Control', 'no-store');
+        next();
+    });
+
     // Middleware to add the token to every response
     app.use((req, res, next) => {
         res.setHeader('X-Server-Session-Token', serverSessionToken);
