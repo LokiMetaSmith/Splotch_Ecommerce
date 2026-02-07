@@ -316,8 +316,12 @@ async function BootStrap() {
   // Check for product mode (Buyer Flow)
   const urlParams = new URLSearchParams(window.location.search);
   const productIdParam = urlParams.get("product_id");
+  const designParam = urlParams.get("design");
   if (productIdParam) {
     await loadProductForBuyer(productIdParam);
+  } else if (designParam) {
+    // REORDER FLOW: Load the image, but allow editing
+    await handleRemoteImageLoad(designParam);
   }
 
   const standardSizesContainer = document.getElementById(
@@ -1995,6 +1999,60 @@ async function handleCreateProduct() {
     console.error(error);
     alert("Failed to create product: " + error.message);
   }
+}
+
+async function handleRemoteImageLoad(imageUrl) {
+  showPaymentStatus("Loading your previous design...", "info");
+  const img = new Image();
+  img.crossOrigin = "Anonymous";
+  img.onload = () => {
+    originalImage = img;
+    updateEditingButtonsState(false); // Enable editing
+
+    // Standard canvas init logic
+    const maxWidth = 500,
+      maxHeight = 400;
+    let newWidth = img.width,
+      newHeight = img.height;
+    if (newWidth > maxWidth) {
+      const r = maxWidth / newWidth;
+      newWidth = maxWidth;
+      newHeight *= r;
+    }
+    if (newHeight > maxHeight) {
+      const r = maxHeight / newHeight;
+      newHeight = maxHeight;
+      newWidth *= r;
+    }
+    setCanvasSize(newWidth, newHeight);
+    ctx.clearRect(0, 0, newWidth, newHeight);
+    ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+    // Default bounds and cutline
+    currentBounds = {
+      left: 0,
+      top: 0,
+      right: newWidth,
+      bottom: newHeight,
+      width: newWidth,
+      height: newHeight,
+    };
+    currentCutline = [
+      [
+        { x: 0, y: 0 },
+        { x: newWidth, y: 0 },
+        { x: newWidth, y: newHeight },
+        { x: 0, y: newHeight },
+      ],
+    ];
+
+    calculateAndUpdatePrice();
+    drawCanvasDecorations(currentBounds);
+    showPaymentStatus("Design loaded! You can now adjust options.", "success");
+  };
+  img.onerror = () =>
+    showPaymentStatus("Failed to load design image.", "error");
+  img.src = decodeURIComponent(imageUrl);
 }
 
 async function loadProductForBuyer(productId) {
