@@ -8,7 +8,7 @@ import { LowDbAdapter } from './database/lowdb_adapter.js';
 
 let bot;
 
-function initializeBot(db) {
+function initializeBot(db, { startPolling = true } = {}) {
   if (db && !db.getOrder) {
       db = new LowDbAdapter(db);
   }
@@ -158,8 +158,12 @@ ${statusChecklist}
         { command: 'completed_orders', description: 'Lists all COMPLETED orders' },
       ];
       bot.telegram.setMyCommands(commands);
-      bot.launch();
-      logger.info('[BOT] Telegraf bot launched.');
+      if (startPolling) {
+          bot.launch();
+          logger.info('[BOT] Telegraf bot launched (Polling enabled).');
+      } else {
+          logger.info('[BOT] Telegraf bot initialized (Polling disabled).');
+      }
     } else {
       // In a test environment, we don't launch the bot, but we need to mock the telegram object.
       // Use no-op functions instead of assuming jest.fn() is available, since this code runs in the server process

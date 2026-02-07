@@ -5,11 +5,43 @@ services:
       context: ./server
     restart: unless-stopped
     env_file: .env
+    environment:
+      - DB_PROVIDER=mongo
+      - MONGO_URL=mongodb://mongo:27017/splotch
+      - ENABLE_BOT_POLLING=false
+    deploy:
+      replicas: 2
     volumes:
-      - /home/loki/app-data/db.json:/app/db.json
       - /home/loki/app-data/uploads:/app/server/uploads
     depends_on:
       - redis
+      - mongo
+    networks:
+      - app-net
+
+  bot:
+    build:
+      context: ./server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DB_PROVIDER=mongo
+      - MONGO_URL=mongodb://mongo:27017/splotch
+      - ENABLE_BOT_POLLING=true
+      - ENABLE_WEB_SERVER=false
+    volumes:
+      - /home/loki/app-data/uploads:/app/server/uploads
+    depends_on:
+      - redis
+      - mongo
+    networks:
+      - app-net
+
+  mongo:
+    image: mongo:6
+    restart: unless-stopped
+    volumes:
+      - /home/loki/app-data/mongo:/data/db
     networks:
       - app-net
 

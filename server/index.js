@@ -88,26 +88,30 @@ async function main() {
         db = getDatabaseAdapter(lowDbInstance);
     }
 
-    const bot = initializeBot(db);
+    const bot = initializeBot(db, { startPolling: process.env.ENABLE_BOT_POLLING !== 'false' });
     // startServer now returns the app and timers
     const { app } = await startServer(db, bot, sendEmail);
 
-  const port = getSecret('PORT') || 3000;
+  if (process.env.ENABLE_WEB_SERVER !== 'false') {
+      const port = getSecret('PORT') || 3000;
 
-  const server = app.listen(port, () => {
-    logger.info(`[SERVER] Server listening at http://localhost:${port}`);
-  });
+      const server = app.listen(port, () => {
+        logger.info(`[SERVER] Server listening at http://localhost:${port}`);
+      });
 
-  server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-      logger.error(`❌ [FATAL] Port ${port} is already in use.`);
-      logger.error('Please close the other process or specify a different port in your .env file.');
-      process.exit(1);
-    } else {
-      logger.error(`❌ [FATAL] An unexpected error occurred:`, error);
-      process.exit(1);
-    }
-  });
+      server.on('error', (error) => {
+        if (error.code === 'EADDRINUSE') {
+          logger.error(`❌ [FATAL] Port ${port} is already in use.`);
+          logger.error('Please close the other process or specify a different port in your .env file.');
+          process.exit(1);
+        } else {
+          logger.error(`❌ [FATAL] An unexpected error occurred:`, error);
+          process.exit(1);
+        }
+      });
+  } else {
+      logger.info('[SERVER] Web server disabled by ENABLE_WEB_SERVER environment variable. Running in background worker mode.');
+  }
 
   // Check for stalled orders every hour
   setInterval(async () => {
