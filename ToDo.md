@@ -186,7 +186,7 @@ The current architecture is suitable for an initial MVP or beta release (< 50 co
 ## Security & Compliance
 
 - [x] **Distributed Rate Limiting:** Move rate limiting state to Redis to enforce limits across all server instances.
-- [ ] **Web Application Firewall (WAF):** Deploy a WAF (e.g., Cloudflare) to protect against DDoS attacks, SQL injection, and other common web threats.
+- [x] **Web Application Firewall (WAF):** Deploy a WAF (e.g., Cloudflare) to protect against DDoS attacks, SQL injection, and other common web threats. (Implemented software-based WAF middleware)
 - [x] **Data Compliance:** Ensure all data storage and processing practices comply with relevant regulations (GDPR, CCPA) as the user base grows.
     - [x] **Cookie Consent Banner:** Implemented a cookie consent banner on the landing page and orders page.
     - [x] **Data Export:** Added functionality for users to export their account data and order history.

@@ -109,12 +109,9 @@ describe('Security: Path Traversal in Create Order', () => {
       .set('X-CSRF-Token', csrfToken)
       .send(payload);
 
-    // Expect Validation Error (400)
-    expect(res.statusCode).toEqual(400);
-    expect(res.body.errors).toBeDefined();
-    // Check for specific validation message
-    const cutLineError = res.body.errors.find(e => e.path === 'orderDetails.cutLinePath');
-    expect(cutLineError).toBeDefined();
-    expect(cutLineError.msg).toMatch(/Path must start with \/uploads\//);
+    // Expect WAF Block (403) or Validation Error (400)
+    // WAF runs first, so we expect 403
+    expect(res.statusCode).toEqual(403);
+    expect(res.body.message).toContain('blocked by the security firewall');
   });
 });
