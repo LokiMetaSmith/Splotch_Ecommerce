@@ -73,7 +73,8 @@ ${statusChecklist}
             docSource = { source: path.join(serverRoot, relPath) };
         }
         try {
-            await bot.telegram.sendDocument(CHANNEL_ID, docSource);
+            const sentDocument = await bot.telegram.sendDocument(CHANNEL_ID, docSource);
+            order.telegramCutLineMessageId = sentDocument.message_id;
         } catch (err) {
             logger.error(`[NOTIFICATION] Failed to send document for order ${orderId}:`, err);
         }
@@ -127,6 +128,9 @@ ${statusChecklist}
         if (order.telegramPhotoMessageId) {
             await bot.telegram.deleteMessage(CHANNEL_ID, order.telegramPhotoMessageId).catch(e => logger.warn('[NOTIFICATION] Failed to delete photo:', e.message));
         }
+        if (order.telegramCutLineMessageId) {
+            await bot.telegram.deleteMessage(CHANNEL_ID, order.telegramCutLineMessageId).catch(e => logger.warn('[NOTIFICATION] Failed to delete cut line document:', e.message));
+        }
     } else {
         const keyboard = getOrderStatusKeyboard(order);
         await bot.telegram.editMessageText(
@@ -139,6 +143,9 @@ ${statusChecklist}
 
         if (order.status === 'SHIPPED' && order.telegramPhotoMessageId) {
             await bot.telegram.deleteMessage(CHANNEL_ID, order.telegramPhotoMessageId).catch(e => logger.warn('[NOTIFICATION] Failed to delete photo on shipped:', e.message));
+        }
+        if (order.status === 'SHIPPED' && order.telegramCutLineMessageId) {
+            await bot.telegram.deleteMessage(CHANNEL_ID, order.telegramCutLineMessageId).catch(e => logger.warn('[NOTIFICATION] Failed to delete cut line document on shipped:', e.message));
         }
     }
 };
