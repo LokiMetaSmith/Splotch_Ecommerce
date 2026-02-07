@@ -6,9 +6,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "test": "npm run test:unit && npm run test:e2e",
+    "test": "pnpm run test:unit && pnpm run test:e2e",
     "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit",
-    "test:server": "cd server && npm test",
+    "test:server": "cd server && pnpm test",
     "test:e2e": "playwright test",
     "test:e2e:real": "playwright test --config playwright.real.config.js",
     "test:gatekeeper": "node gatekeeper/gatekeeper.mjs",

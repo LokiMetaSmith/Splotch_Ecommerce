@@ -21,11 +21,11 @@ cd <your-project-folder>
 Install the necessary Node.js packages for both the server and the client.
 ```bash
 # From the root directory
-npm install
+pnpm install
 
 # For the server
 cd server
-npm install
+pnpm install
 cd ..
 ```
 
@@ -72,7 +72,7 @@ Make sure your `server/.env` file is correctly configured with your Google API c
 Run your print shop server as you normally would:
 ```bash
 # In a terminal, from the project root
-npm run start --prefix server
+pnpm run start --prefix server
 ```
 
 ### Step 3: Authorize the Application
@@ -101,7 +101,7 @@ You will need to run the backend server and the frontend development server in t
 cd server
 
 # Start the server using the npm script
-npm start
+pnpm start
 ```
 The backend server will be running at `http://localhost:3000`.
 
@@ -110,7 +110,7 @@ The backend server will be running at `http://localhost:3000`.
 #### 2. Start the Frontend Dev Server
 ```bash
 # In a second terminal, from the root directory
-npm run dev
+pnpm run dev
 ```
 The frontend application will be available at `http://localhost:5173`.
 
@@ -121,13 +121,13 @@ To create a production-ready build of the application, follow these steps:
 1.  **Build the Application:**
     This command will bundle the application and output the static files to the `dist` directory.
     ```bash
-    npm run build
+    pnpm run build
     ```
 
 2.  **Serve the Production Build:**
     This command will serve the contents of the `dist` directory. This is a simple way to preview the production build locally.
     ```bash
-    npm run start
+    pnpm run start
     ```
     The production build will be available at `http://localhost:3000` by default.
 
@@ -140,7 +140,7 @@ This project includes both unit tests (using Jest) and end-to-end tests (using P
 To run all tests, use the following command:
 
 ```bash
-npm test
+pnpm test
 ```
 
 This will first run the unit tests, and then the end-to-end tests.
@@ -150,7 +150,7 @@ This will first run the unit tests, and then the end-to-end tests.
 To run only the unit tests, use the following command:
 
 ```bash
-npm run test:unit
+pnpm run test:unit
 ```
 
 ### Running End-to-End Tests
@@ -158,10 +158,10 @@ npm run test:unit
 To run only the end-to-end tests, use the following command:
 
 ```bash
-npm run test:e2e
+pnpm run test:e2e
 ```
 
-**Note:** The end-to-end tests require the development server to be running. Make sure you have the dev server running in a separate terminal with `npm run dev` before running the e2e tests.
+**Note:** The end-to-end tests require the development server to be running. Make sure you have the dev server running in a separate terminal with `pnpm run dev` before running the e2e tests.
 
 ## Deployment
 

@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit",
     "start": "node index.js",
-    "build": "npm install"
+    "build": "pnpm install"
   },
   "keywords": [],
   "author": "",
@@ -48,7 +48,6 @@
     "svg-parser": "^2.0.4",
     "svg-path-properties": "^2.0.0",
     "telegraf": "^4.16.3",
-    "tiny-csrf": "1.1.6",
     "winston": "^3.19.0"
   },
   "devDependencies": {

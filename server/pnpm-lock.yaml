@@ -113,9 +113,6 @@ importers:
       telegraf:
         specifier: ^4.16.3
         version: 4.16.3
-      tiny-csrf:
-        specifier: 1.1.6
-        version: 1.1.6
       winston:
         specifier: ^3.19.0
         version: 3.19.0
@@ -3005,9 +3002,6 @@ packages:
 
   text-hex@1.0.0:
     resolution: {integrity: sha512-uuVGNWzgJ4yhRaNSiubPY7OjISw4sw4E5Uv0wbjp+OzcbmVU/rsT8ujgcXJhn9ypzsgr5vlzpPqP+MBBKcGvbg==}
-
-  tiny-csrf@1.1.6:
-    resolution: {integrity: sha512-LffNz9iNYYBrjayZZS/WUNsMFxFDcgOmSNLNPG/LGj38U/R41eUo0ugpl5pskltygp+pnce0ISzsJ39yVYcu+w==}
 
   tiny-warning@1.0.3:
     resolution: {integrity: sha512-lBN9zLN/oAf68o3zNXYrdCt1kP8WsiGW8Oo2ka41b2IM5JL/S1CTyX1rW0mb/zSuJun0ZUrDxx4sqvYS2FWzPA==}
@@ -7135,8 +7129,6 @@ snapshots:
       minimatch: 3.1.2
 
   text-hex@1.0.0: {}
-
-  tiny-csrf@1.1.6: {}
 
   tiny-warning@1.0.3: {}
 
