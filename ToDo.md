@@ -146,6 +146,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 -   **[x] Validate Order Amount on Server:** Ensure the order amount sent by the client matches the calculated price based on product dimensions and configuration to prevent price tampering.
 -   **[x] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./docs/TELEGRAM_BOT_MIGRATION.md) for a step-by-step guide.
 -   **[x] Implement Role-Based Access Control (RBAC):** Add a `role` field to the user model and protect administrative endpoints (e.g., `/api/orders`) to ensure only authorized users can access them.
+-   **[x] Fix failing security tests caused by WAF blocking:** Updated security tests (`tests/security_input_validation.test.js`, `tests/security_xss.test.js`, etc.) to mock the WAF middleware, ensuring that application-level validation and sanitization logic is correctly verified.
 
 ## Medium-Priority
 

@@ -7,7 +7,6 @@ import jwt from 'jsonwebtoken';
 import { JSONFilePreset } from 'lowdb/node';
 
 // Import modules
-import { startServer } from '../server/server.js';
 import { getCurrentSigningKey } from '../server/keyManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +46,12 @@ describe('Security: Input Validation', () => {
         process.env.TELEGRAM_BOT_TOKEN = 'mock_token';
         process.env.TELEGRAM_CHANNEL_ID = 'mock_channel';
         process.env.NODE_ENV = 'test';
+
+        // Mock WAF to bypass middleware blocking and test controller validation
+        jest.unstable_mockModule('../server/waf.js', () => ({
+            wafMiddleware: (req, res, next) => next(),
+        }));
+        const { startServer } = await import('../server/server.js');
 
         const server = await startServer(db, bot, mockSendEmail, testDbPath, mockSquareClient);
         app = server.app;
