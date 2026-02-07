@@ -149,10 +149,10 @@ describe('Path Traversal Vulnerability', () => {
             });
 
         // If vulnerable, it returns 201.
-        // If fixed, it should return 400.
-        expect(res.statusCode).toBe(400);
-        // We expect an error about invalid path
-        // expect(res.body.errors[0].msg).toContain('Invalid path');
+        // If fixed, it should return 400 (validation) or 403 (WAF).
+        // Since we added WAF, it should be 403.
+        expect(res.statusCode).toBe(403);
+        expect(res.body.message).toContain('blocked by the security firewall');
     });
 
     it('should prevent Path Traversal in designImagePath during product creation', async () => {
@@ -174,6 +174,7 @@ describe('Path Traversal Vulnerability', () => {
                 creatorProfitCents: 100
             });
 
-        expect(res.statusCode).toBe(400);
+        expect(res.statusCode).toBe(403);
+        expect(res.body.message).toContain('blocked by the security firewall');
     });
 });

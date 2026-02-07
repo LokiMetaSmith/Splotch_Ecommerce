@@ -48,6 +48,7 @@ import { startEmailWorker } from './workers/emailWorker.js';
 import { startTelegramWorker } from './workers/telegramWorker.js';
 import { emailQueue, telegramQueue } from './queueManager.js';
 import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
+import { wafMiddleware } from './waf.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -506,6 +507,7 @@ async function startServer(
     }));
 
     app.use(express.json());
+    app.use(wafMiddleware);
     app.disable('x-powered-by');
 
     // SECURITY: Block access to sensitive files and directories
