@@ -1783,6 +1783,74 @@ async function startServer(
       }
     });
 
+    // --- Data Compliance Endpoints ---
+    app.get('/api/auth/user/data', authenticateToken, async (req, res) => {
+        try {
+            const user = await getUserByEmail(req.user.email) || await db.getUser(req.user.username);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Fetch orders
+            const orders = user.email ? await db.getUserOrders(user.email) : [];
+
+            // Return data excluding sensitive fields like password
+            const userData = { ...user };
+            delete userData.password;
+            delete userData.google_tokens;
+            delete userData.challenge;
+
+            res.json({ user: userData, orders });
+        } catch (error) {
+            await logAndEmailError(error, 'Error fetching user data');
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    });
+
+    app.delete('/api/auth/user', authenticateToken, async (req, res) => {
+        try {
+            const user = await getUserByEmail(req.user.email) || await db.getUser(req.user.username);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Anonymize orders
+            if (user.email) {
+                const orders = await db.getUserOrders(user.email);
+                for (const order of orders) {
+                    let updated = false;
+                    if (order.billingContact) {
+                        order.billingContact.givenName = 'REDACTED';
+                        order.billingContact.familyName = 'REDACTED';
+                        order.billingContact.email = 'redacted@example.com';
+                        order.billingContact.phoneNumber = 'REDACTED';
+                        updated = true;
+                    }
+                    if (order.shippingContact) {
+                        order.shippingContact.givenName = 'REDACTED';
+                        order.shippingContact.familyName = 'REDACTED';
+                        order.shippingContact.email = 'redacted@example.com';
+                        order.shippingContact.phoneNumber = 'REDACTED';
+                        order.shippingContact.addressLines = ['REDACTED'];
+                        updated = true;
+                    }
+                    if (updated) {
+                        await db.updateOrder(order);
+                    }
+                }
+            }
+
+            // Delete user
+            await db.deleteUser(user.username);
+            logger.info(`[COMPLIANCE] User deleted account: ${user.username}`);
+
+            res.json({ success: true, message: 'Account deleted successfully.' });
+        } catch (error) {
+            await logAndEmailError(error, 'Error deleting user account');
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    });
+
     // Initialize the shipment tracker
     initializeTracker(db);
 

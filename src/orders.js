@@ -32,6 +32,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const loginStatus = document.getElementById("login-status");
   const ordersList = document.getElementById("orders-list");
   const noOrdersMessage = document.getElementById("no-orders-message");
+  const dataPrivacySection = document.getElementById("data-privacy-section");
+  const exportDataBtn = document.getElementById("exportDataBtn");
+  const deleteAccountBtn = document.getElementById("deleteAccountBtn");
+  const privacyStatus = document.getElementById("privacy-status");
 
   // Check for magic link token in URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -40,6 +44,70 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (token) {
     verifyTokenAndFetchOrders(token);
   }
+
+    // Privacy Event Listeners
+    if (exportDataBtn) {
+        exportDataBtn.addEventListener('click', async () => {
+            if (!csrfToken) return;
+            privacyStatus.textContent = "Exporting data...";
+            privacyStatus.style.color = "blue";
+            try {
+                // Re-fetch token from URL in case needed, or pass it down?
+                // Actually token is available in scope if we move this inside verify...
+                // But let's assume token is still in URL or stored.
+                // The current architecture relies on URL param 'token' for auth in fetch calls within this file.
+                const currentToken = new URLSearchParams(window.location.search).get("token");
+
+                const response = await fetch("/api/auth/user/data", {
+                    headers: {
+                        Authorization: `Bearer ${currentToken}`
+                    }
+                });
+                if (!response.ok) throw new Error("Failed to fetch data");
+                const data = await response.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "splotch-user-data.json";
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                privacyStatus.textContent = "Data exported successfully.";
+                privacyStatus.style.color = "green";
+            } catch (e) {
+                privacyStatus.textContent = "Error exporting data: " + e.message;
+                privacyStatus.style.color = "red";
+            }
+        });
+    }
+
+    if (deleteAccountBtn) {
+        deleteAccountBtn.addEventListener('click', async () => {
+            if (!window.confirm("Are you sure you want to delete your account? This action cannot be undone and will anonymize your order history.")) {
+                return;
+            }
+            privacyStatus.textContent = "Deleting account...";
+            privacyStatus.style.color = "red";
+            try {
+                const currentToken = new URLSearchParams(window.location.search).get("token");
+                const response = await fetch("/api/auth/user", {
+                    method: "DELETE",
+                    headers: {
+                        Authorization: `Bearer ${currentToken}`,
+                         "X-CSRF-Token": csrfToken
+                    }
+                });
+                if (!response.ok) throw new Error("Failed to delete account");
+                alert("Your account has been deleted.");
+                window.location.href = "/";
+            } catch (e) {
+                privacyStatus.textContent = "Error deleting account: " + e.message;
+                privacyStatus.style.color = "red";
+            }
+        });
+    }
 
   document
     .getElementById("magic-link-form")
@@ -101,6 +169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function verifyTokenAndFetchOrders(authToken) {
     loginSection.classList.add("hidden");
     orderHistorySection.classList.remove("hidden");
+    if (dataPrivacySection) dataPrivacySection.classList.remove("hidden");
 
     try {
       const response = await fetch("/api/orders/my-orders", {
