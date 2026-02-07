@@ -38,10 +38,11 @@ You can trigger a backup at any time by running the script from the **root of th
 
 **Usage:**
 ```bash
-./scripts/backup.sh --method rclone <rclone_remote_path>
+./scripts/backup.sh --method rclone <rclone_remote_path> [--retention-days <days>]
 ```
-- **Example:** `./scripts/backup.sh --method rclone b2-backups:my-print-shop-backups`
+- **Example:** `./scripts/backup.sh --method rclone b2-backups:my-print-shop-backups --retention-days 30`
 - The `<rclone_remote_path>` should be the name of the remote you configured, a colon, and the name of the bucket or folder where you want to store the backups.
+- The optional `--retention-days` flag allows you to automatically delete backups older than the specified number of days (only for `rclone` method).
 
 ---
 
@@ -66,9 +67,44 @@ This method is for users who prefer to use AWS S3 and the official AWS Command L
 ```
 - **Example:** `./scripts/backup.sh --method aws my-print-shop-s3-backups`
 
+> **Note:** The `--retention-days` flag is **not supported** for the `aws` method. Please use S3 Lifecycle Rules to manage backup retention (see "Retention Policy" below).
+
 ---
 
-## 3. Automating Backups with Cron
+## 3. Retention Policy
+
+Managing storage costs and clutter requires deleting old backups.
+
+### Using `rclone` (Recommended)
+
+You can enforce a retention policy directly via the backup script by using the `--retention-days` flag.
+For example, to keep backups for 30 days and delete anything older:
+
+```bash
+./scripts/backup.sh --method rclone b2-backups:my-bucket --retention-days 30
+```
+
+This command will:
+1. Upload the new backup.
+2. Check the destination for files older than 30 days matching the `backup-*.tar.gz` pattern.
+3. Delete those old files.
+
+### Using AWS S3
+
+The backup script does **not** manage retention for AWS S3 uploads. Instead, you should configure **S3 Lifecycle Rules** on your bucket.
+
+1. Go to the AWS S3 Console and select your backup bucket.
+2. Go to the **Management** tab.
+3. Create a **Lifecycle rule**.
+   - **Rule name:** e.g., "Expire old backups"
+   - **Apply to all objects in the bucket.**
+   - **Action:** Expire current versions of objects.
+   - **Days after object creation:** Set your desired retention period (e.g., 30 days).
+4. Save the rule. AWS will now automatically delete old backups for you.
+
+---
+
+## 4. Automating Backups with Cron
 
 To ensure your data is backed up regularly, you should automate the script using a cron job.
 
@@ -95,7 +131,7 @@ To ensure your data is backed up regularly, you should automate the script using
     - Replace `/path/to/project/` with the absolute path to your application's root directory.
     - Redirecting the output (`> ... 2>&1`) to a log file is highly recommended for troubleshooting.
 
-## 4. Restoring from a Backup
+## 5. Restoring from a Backup
 
 If you need to restore your application's state from a backup:
 

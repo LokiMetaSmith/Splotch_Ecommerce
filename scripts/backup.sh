@@ -4,11 +4,10 @@
 # Supports 'rclone' (recommended) and 'aws-cli' as upload methods.
 #
 # Usage:
-#   ./scripts/backup.sh --method rclone <rclone_remote_path>
-#   ./scripts/backup.sh --method aws <s3_bucket_name>
+#   ./scripts/backup.sh --method <rclone|aws> <destination> [--retention-days <days>]
 #
 # Examples:
-#   ./scripts/backup.sh --method rclone b2-backups:my-bucket
+#   ./scripts/backup.sh --method rclone b2-backups:my-bucket --retention-days 30
 #   ./scripts/backup.sh --method aws my-s3-bucket
 #
 # Prerequisites:
@@ -19,14 +18,37 @@
 set -e
 
 # --- Argument Parsing ---
-if [ "$1" != "--method" ]; then
-  echo "❌ Error: First argument must be --method."
-  echo "Usage: $0 --method [rclone|aws] <destination>"
-  exit 1
-fi
+METHOD=""
+DESTINATION=""
+RETENTION_DAYS=""
 
-METHOD=$2
-DESTINATION=$3
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --method)
+      METHOD="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --retention-days)
+      RETENTION_DAYS="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -*|--*)
+      echo "❌ Error: Unknown option $1"
+      exit 1
+      ;;
+    *)
+      if [ -z "$DESTINATION" ]; then
+        DESTINATION="$1"
+        shift
+      else
+        echo "❌ Error: Unknown argument $1"
+        exit 1
+      fi
+      ;;
+  esac
+done
 
 # --- Configuration ---
 SOURCE_DB="server/db.json"
@@ -36,7 +58,7 @@ BACKUP_FILENAME="backup-$(date +%Y-%m-%d-%H%M%S).tar.gz"
 # --- Validation ---
 if [ -z "$METHOD" ] || [ -z "$DESTINATION" ]; then
   echo "❌ Error: Invalid arguments. Method and destination are required."
-  echo "Usage: $0 --method [rclone|aws] <destination>"
+  echo "Usage: $0 --method <rclone|aws> <destination> [--retention-days <days>]"
   exit 1
 fi
 
@@ -89,6 +111,19 @@ elif [ "$METHOD" == "aws" ]; then
   aws s3 cp "$BACKUP_FILENAME" "s3://$DESTINATION/"
 fi
 echo "✅ Upload complete."
+
+# --- Retention Policy ---
+if [ -n "$RETENTION_DAYS" ]; then
+    echo "Cleanup: Checking for old backups (retention: $RETENTION_DAYS days)..."
+    if [ "$METHOD" == "rclone" ]; then
+        echo "🗑️  Running rclone cleanup..."
+        rclone delete "$DESTINATION/" --min-age "${RETENTION_DAYS}d" --include "backup-*.tar.gz"
+        echo "✅ Cleanup complete."
+    elif [ "$METHOD" == "aws" ]; then
+        echo "⚠️  Warning: Retention policy management via this script is not supported for AWS."
+        echo "   Please configure S3 Lifecycle Rules on your bucket to delete objects older than $RETENTION_DAYS days."
+    fi
+fi
 
 # --- Cleanup ---
 echo "🧹 Cleaning up local archive file..."
