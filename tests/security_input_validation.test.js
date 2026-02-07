@@ -6,7 +6,6 @@ import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import { JSONFilePreset } from 'lowdb/node';
 
-import { startServer } from '../server/server.js';
 import { getCurrentSigningKey } from '../server/keyManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -51,6 +50,12 @@ describe('Security Input Validation', () => {
         if (fs.existsSync(path.join(__dirname, '../favicon.png'))) {
              fs.copyFileSync(path.join(__dirname, '../favicon.png'), path.join(uploadsDir, 'd.png'));
         }
+
+        // Mock WAF to bypass middleware blocking and test controller validation
+        jest.unstable_mockModule('../server/waf.js', () => ({
+            wafMiddleware: (req, res, next) => next(),
+        }));
+        const { startServer } = await import('../server/server.js');
 
         const server = await startServer(db, bot, jest.fn(), testDbPath, mockSquareClient);
         app = server.app;
