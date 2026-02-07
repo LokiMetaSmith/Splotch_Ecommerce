@@ -29,23 +29,38 @@ const PATH_TRAVERSAL_PATTERNS = [
     /(\.\.%2F)/i, // ..%2F
 ];
 
+// Combine patterns for faster initial check
+const SQL_COMBINED = new RegExp(SQL_INJECTION_PATTERNS.map(p => p.source).join('|'), 'i');
+const XSS_COMBINED = new RegExp(XSS_PATTERNS.map(p => p.source).join('|'), 'is');
+const PATH_TRAVERSAL_COMBINED = new RegExp(PATH_TRAVERSAL_PATTERNS.map(p => p.source).join('|'), 'i');
+
 // Recursive function to check for threats in object/array/string
 function checkPayload(payload, path = '') {
     if (!payload) return null;
 
     if (typeof payload === 'string') {
-        // Check string against patterns
-        for (const pattern of SQL_INJECTION_PATTERNS) {
-            if (pattern.test(payload)) return { type: 'SQL Injection', pattern: pattern.toString(), path, value: payload };
+        // Check string against combined patterns first (Fast Path)
+
+        if (SQL_COMBINED.test(payload)) {
+            // Confirm which pattern matched (Slow Path)
+            for (const pattern of SQL_INJECTION_PATTERNS) {
+                if (pattern.test(payload)) return { type: 'SQL Injection', pattern: pattern.toString(), path, value: payload };
+            }
         }
-        for (const pattern of XSS_PATTERNS) {
-            if (pattern.test(payload)) return { type: 'XSS', pattern: pattern.toString(), path, value: payload };
+
+        if (XSS_COMBINED.test(payload)) {
+            for (const pattern of XSS_PATTERNS) {
+                if (pattern.test(payload)) return { type: 'XSS', pattern: pattern.toString(), path, value: payload };
+            }
         }
+
         // Only check path traversal on strings that look like paths? No, check all.
         // But legit text might contain ".." (e.g. "Wait..").
         // The pattern is `../` or `..%2F`, so "Wait.." is safe.
-        for (const pattern of PATH_TRAVERSAL_PATTERNS) {
-            if (pattern.test(payload)) return { type: 'Path Traversal', pattern: pattern.toString(), path, value: payload };
+        if (PATH_TRAVERSAL_COMBINED.test(payload)) {
+            for (const pattern of PATH_TRAVERSAL_PATTERNS) {
+                if (pattern.test(payload)) return { type: 'Path Traversal', pattern: pattern.toString(), path, value: payload };
+            }
         }
         return null;
     }

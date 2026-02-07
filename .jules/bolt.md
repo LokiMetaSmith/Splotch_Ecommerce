@@ -19,3 +19,7 @@
 ## 2025-02-05 - [Scanline Active List]
 **Learning:** In 2D grid-based placement algorithms, checking against *all* placed items for every grid cell is O(W*H*P). filtering items by the current Y-scanline (Active List) reduces the inner loop checks to O(sqrt(P)), providing massive speedups for dense packings.
 **Action:** When iterating a grid for collision detection, always maintain a filtered list of "active" colliders relevant to the current row/band.
+
+## 2026-02-07 - [Combined Regex in Loop]
+**Learning:** Running multiple regex checks (like WAF patterns) in a loop for every string field is expensive (O(M*N)). combining regex patterns with `|` into a single RegExp reduces the overhead significantly for the "happy path" (no match), improving middleware performance by ~2x.
+**Action:** When checking a string against multiple regex patterns, combine them into a single RegExp using `join('|')` to fail fast.
