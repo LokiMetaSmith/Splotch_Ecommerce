@@ -1481,9 +1481,6 @@ async function startServer(
         // The magic link is sensitive and should not be logged.
         // logger.info('Magic Link (for testing):', magicLink);
 
-        logger.info('[magic-login] Checking OAuth2 client state before sending email:');
-        logger.info(oauth2Client.credentials);
-
         try {
             if (process.env.NODE_ENV === 'test' && sendEmail === defaultSendEmail) {
                 logger.info('[TEST] Skipping email send. Magic Link:', magicLink);
