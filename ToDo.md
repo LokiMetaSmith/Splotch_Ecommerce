@@ -51,6 +51,7 @@ These are smaller tasks for improving test quality and covering minor edge cases
 -   **[x] Consolidate Redundant Tests:** The `/api/ping` endpoint is tested in two different files. The duplicate test should be removed.
 -   **[x] Fix Server Pricing Tests:** Fix the regression in `tests/server-pricing.test.js` where perimeters were checked against array length instead of calculated value.
 -   **[x] Remove Unused Dependency `lucas`:** This package appears to be a typo for `lusca` and is unused.
+-   **[x] Fix E2E test warnings:** Fixed "Test image not found" warning in `verify_features.spec.js` and "Unhandled API route" warning in `test-setup.js`.
 
 ---
 <br>

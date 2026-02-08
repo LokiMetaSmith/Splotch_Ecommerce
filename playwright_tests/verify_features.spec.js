@@ -5,13 +5,17 @@ import path from 'path';
 
 const TEST_IMAGE_PATH = path.join('verification', 'test.png');
 
-// Ensure test image exists
-if (!fs.existsSync(TEST_IMAGE_PATH)) {
-    // If it doesn't exist, we might need to create one or fail.
-    // For now, let's assume the environment is set up correctly as per previous memory.
-    // But to be safe, I'll log a warning.
-    console.warn('Test image not found at ' + TEST_IMAGE_PATH);
-}
+test.beforeAll(() => {
+    if (!fs.existsSync(TEST_IMAGE_PATH)) {
+        const dir = path.dirname(TEST_IMAGE_PATH);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        // Create a dummy image (red pixel)
+        const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+        fs.writeFileSync(TEST_IMAGE_PATH, buffer);
+    }
+});
 
 test.describe('Standard Size Buttons and Unit Selection', () => {
     test('Standard Size Buttons update resize slider', async ({ page }) => {
@@ -25,17 +29,7 @@ test.describe('Standard Size Buttons and Unit Selection', () => {
         await page.waitForTimeout(1000);
 
         // We need a real file.
-        if (fs.existsSync(TEST_IMAGE_PATH)) {
-             await fileInput.setInputFiles(TEST_IMAGE_PATH);
-        } else {
-            // Create a dummy image if missing (red pixel)
-            const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-            await fileInput.setInputFiles({
-                name: 'test.png',
-                mimeType: 'image/png',
-                buffer: buffer,
-            });
-        }
+        await fileInput.setInputFiles(TEST_IMAGE_PATH);
 
         // Wait for image to load and controls to be enabled
         await expect(page.locator('#resizeSlider')).toBeEnabled();
@@ -84,12 +78,7 @@ test.describe('Standard Size Buttons and Unit Selection', () => {
         // Wait for listeners
         await page.waitForTimeout(1000);
 
-        const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-        await fileInput.setInputFiles({
-            name: 'test.png',
-            mimeType: 'image/png',
-            buffer: buffer,
-        });
+        await fileInput.setInputFiles(TEST_IMAGE_PATH);
 
         // Hide the mascot which obscures the toggle
         await page.evaluate(() => {
