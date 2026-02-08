@@ -638,6 +638,9 @@ async function startServer(
 
     const isAdmin = async (userPayload) => {
       if (!userPayload) return false;
+      // Guest users cannot be admins
+      if (userPayload.isGuest) return false;
+
       // Check env var fallback first (fastest)
       // FIX: Ensure ADMIN_EMAIL is set and not empty before comparing
       if (getSecret('ADMIN_EMAIL') && userPayload.email === getSecret('ADMIN_EMAIL')) return true;
@@ -773,6 +776,10 @@ async function startServer(
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ errors: errors.array() });
+        }
+
+        if (req.user.isGuest) {
+            return res.status(403).json({ error: 'Forbidden: Guests cannot create products.' });
         }
 
         try {
@@ -1192,6 +1199,9 @@ async function startServer(
       if (!req.user || !req.user.email) {
         return res.status(401).json({ error: 'Authentication token is invalid or missing email.' });
       }
+      if (req.user.isGuest) {
+          return res.status(403).json({ error: 'Forbidden: Guests cannot view order history.' });
+      }
       const userEmail = req.user.email;
 
       const userOrders = await db.getUserOrders(userEmail);
@@ -1549,7 +1559,8 @@ async function startServer(
 
       // Create a short-lived token for the purpose of placing one order
       const { privateKey, kid } = getCurrentSigningKey();
-      const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '5m', header: { kid } });
+      // SECURITY: Mark token as guest to prevent privilege escalation or data access
+      const token = jwt.sign({ email, isGuest: true }, privateKey, { algorithm: 'RS256', expiresIn: '5m', header: { kid } });
 
       logger.info(`[SERVER] Issued temporary token for email: ${email}`);
       res.json({ success: true, token });
@@ -1784,6 +1795,9 @@ async function startServer(
 
     // --- Data Compliance Endpoints ---
     app.get('/api/auth/user/data', authenticateToken, async (req, res) => {
+        if (req.user.isGuest) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
         try {
             const user = await getUserByEmail(req.user.email) || await db.getUser(req.user.username);
             if (!user) {
@@ -1807,6 +1821,9 @@ async function startServer(
     });
 
     app.delete('/api/auth/user', authenticateToken, async (req, res) => {
+        if (req.user.isGuest) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
         try {
             const user = await getUserByEmail(req.user.email) || await db.getUser(req.user.username);
             if (!user) {
