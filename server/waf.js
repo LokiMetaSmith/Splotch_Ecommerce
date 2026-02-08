@@ -35,7 +35,7 @@ const XSS_COMBINED = new RegExp(XSS_PATTERNS.map(p => p.source).join('|'), 'is')
 const PATH_TRAVERSAL_COMBINED = new RegExp(PATH_TRAVERSAL_PATTERNS.map(p => p.source).join('|'), 'i');
 
 // Recursive function to check for threats in object/array/string
-function checkPayload(payload, path = '') {
+function checkPayload(payload) {
     if (!payload) return null;
 
     if (typeof payload === 'string') {
@@ -44,13 +44,13 @@ function checkPayload(payload, path = '') {
         if (SQL_COMBINED.test(payload)) {
             // Confirm which pattern matched (Slow Path)
             for (const pattern of SQL_INJECTION_PATTERNS) {
-                if (pattern.test(payload)) return { type: 'SQL Injection', pattern: pattern.toString(), path, value: payload };
+                if (pattern.test(payload)) return { type: 'SQL Injection', pattern: pattern.toString(), path: [], value: payload };
             }
         }
 
         if (XSS_COMBINED.test(payload)) {
             for (const pattern of XSS_PATTERNS) {
-                if (pattern.test(payload)) return { type: 'XSS', pattern: pattern.toString(), path, value: payload };
+                if (pattern.test(payload)) return { type: 'XSS', pattern: pattern.toString(), path: [], value: payload };
             }
         }
 
@@ -59,7 +59,7 @@ function checkPayload(payload, path = '') {
         // The pattern is `../` or `..%2F`, so "Wait.." is safe.
         if (PATH_TRAVERSAL_COMBINED.test(payload)) {
             for (const pattern of PATH_TRAVERSAL_PATTERNS) {
-                if (pattern.test(payload)) return { type: 'Path Traversal', pattern: pattern.toString(), path, value: payload };
+                if (pattern.test(payload)) return { type: 'Path Traversal', pattern: pattern.toString(), path: [], value: payload };
             }
         }
         return null;
@@ -67,8 +67,11 @@ function checkPayload(payload, path = '') {
 
     if (Array.isArray(payload)) {
         for (let i = 0; i < payload.length; i++) {
-            const result = checkPayload(payload[i], `${path}[${i}]`);
-            if (result) return result;
+            const result = checkPayload(payload[i]);
+            if (result) {
+                result.path.unshift(`[${i}]`);
+                return result;
+            }
         }
         return null;
     }
@@ -78,11 +81,14 @@ function checkPayload(payload, path = '') {
             if (Object.prototype.hasOwnProperty.call(payload, key)) {
                 // Check for NoSQL Injection (keys starting with $)
                 if (key.startsWith('$')) {
-                    return { type: 'NoSQL Injection', pattern: key, path: `${path}.${key}` };
+                    return { type: 'NoSQL Injection', pattern: key, path: [key] };
                 }
 
-                const result = checkPayload(payload[key], `${path}.${key}`);
-                if (result) return result;
+                const result = checkPayload(payload[key]);
+                if (result) {
+                    result.path.unshift(key);
+                    return result;
+                }
             }
         }
         return null;
@@ -95,25 +101,39 @@ export function wafMiddleware(req, res, next) {
     // Combine all inputs to check
     // We check query, body, and params
 
+    const processThreat = (threat, context) => {
+        if (!threat) return null;
+        // Join the path array into a readable string
+        // We prepend the context (query/body/path) first
+        threat.path.unshift(context);
+
+        // Custom joiner: "query" + ".field" but "query" + "[0]"
+        threat.path = threat.path.reduce((acc, curr, i) => {
+            if (i === 0) return curr;
+            return acc + (curr.startsWith('[') ? '' : '.') + curr;
+        }, '');
+        return threat;
+    };
+
     // Check Query
-    let threat = checkPayload(req.query, 'query');
-    if (threat) return blockRequest(req, res, threat);
+    let threat = checkPayload(req.query);
+    if (threat) return blockRequest(req, res, processThreat(threat, 'query'));
 
     // Check Body
-    threat = checkPayload(req.body, 'body');
-    if (threat) return blockRequest(req, res, threat);
+    threat = checkPayload(req.body);
+    if (threat) return blockRequest(req, res, processThreat(threat, 'body'));
 
     // Check URL Path (instead of params which are empty here)
     // We decode the path to catch encoded attacks (e.g. %20OR%20)
     try {
         const decodedPath = decodeURIComponent(req.path);
-        threat = checkPayload(decodedPath, 'path');
-        if (threat) return blockRequest(req, res, threat);
+        threat = checkPayload(decodedPath);
+        if (threat) return blockRequest(req, res, processThreat(threat, 'path'));
     } catch (e) {
         // If decoding fails, it might be a malformed URL, which is suspicious but we can ignore or block.
         // For now, check raw path just in case.
-        threat = checkPayload(req.path, 'path');
-        if (threat) return blockRequest(req, res, threat);
+        threat = checkPayload(req.path);
+        if (threat) return blockRequest(req, res, processThreat(threat, 'path'));
     }
 
     next();

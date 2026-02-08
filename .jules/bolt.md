@@ -23,3 +23,7 @@
 ## 2026-02-07 - [Combined Regex in Loop]
 **Learning:** Running multiple regex checks (like WAF patterns) in a loop for every string field is expensive (O(M*N)). combining regex patterns with `|` into a single RegExp reduces the overhead significantly for the "happy path" (no match), improving middleware performance by ~2x.
 **Action:** When checking a string against multiple regex patterns, combine them into a single RegExp using `join('|')` to fail fast.
+
+## 2026-02-08 - [Recursive String Concatenation]
+**Learning:** Passing a concatenated path string (e.g., `path + '.' + key`) down a recursive object traversal generates a new string for every node, creating significant GC pressure even for benign payloads. Passing an array or reconstructing the path only upon detecting a target avoids this overhead.
+**Action:** In recursive validation or traversal functions, avoid passing state that requires allocation (like strings) unless necessary. Return metadata to the caller to reconstruct context if needed.
