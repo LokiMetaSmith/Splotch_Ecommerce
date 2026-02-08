@@ -838,7 +838,7 @@ export async function init() {
     await getServerSessionToken();
 
     // Assign all DOM elements to the ui object
-    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'addPrintingMarks', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text'];
+    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'addPrintingMarks', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text', 'login-form'];
     ids.forEach(id => {
         // Convert kebab-case to camelCase for keys
         const key = id.replace(/-(\w)/g, (match, letter) => letter.toUpperCase());
@@ -863,7 +863,10 @@ export async function init() {
 
     // Login Modal Listeners
     ui.closeModalBtn?.addEventListener('click', hideLoginModal);
-    ui.passwordLoginBtn?.addEventListener('click', handlePasswordLogin);
+    ui.loginForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handlePasswordLogin();
+    });
     ui.webauthnLoginBtn?.addEventListener('click', handleWebAuthnLogin);
     ui.webauthnRegisterBtn?.addEventListener('click', handleRegistration);
 
