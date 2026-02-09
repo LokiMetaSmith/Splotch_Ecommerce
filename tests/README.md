@@ -42,4 +42,3 @@ This directory contains the unit tests for the Print Shop application.
 ## Future Tests
 
 *   Add tests for the encryption/decryption of the client JSON file.
-*   Add tests for the `generateCutFile` function.
