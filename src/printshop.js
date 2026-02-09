@@ -4,6 +4,7 @@ import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
 import DOMPurify from 'dompurify';
 import { SvgNest } from './lib/svgnest.js';
 import { SVGParser } from './lib/svgparser.js';
+import { generateCutFile } from './lib/cut_file_generator.js';
 import * as jose from 'jose';
 import { jsPDF } from "jspdf";
 import SVGtoPDF from 'svg-to-pdfkit';
@@ -697,26 +698,6 @@ async function handleNesting() {
     } finally {
         hideLoadingIndicator();
     }
-}
-
-function generateCutFile(svgString) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, 'image/svg+xml');
-    const svgElement = doc.documentElement;
-    const cutFileSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    cutFileSvg.setAttribute('width', svgElement.getAttribute('width'));
-    cutFileSvg.setAttribute('height', svgElement.getAttribute('height'));
-    cutFileSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox'));
-
-    // Support multiple shapes
-    svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline').forEach(el => {
-        const newEl = el.cloneNode(true);
-        newEl.setAttribute('stroke', 'red');
-        newEl.setAttribute('fill', 'none');
-        cutFileSvg.appendChild(newEl);
-    });
-
-    return new XMLSerializer().serializeToString(cutFileSvg);
 }
 
 function handleDownloadCutFile() {
