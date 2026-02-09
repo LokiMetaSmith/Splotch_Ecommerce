@@ -1,72 +1,145 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Your Orders - Splotch</title>
-    <link rel="icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" href="/favicon.png" type="image/png">
-    <link rel="apple-touch-icon" href="/favicon192.png">
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/favicon192.png" />
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./splotch-theme.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap"
+      rel="stylesheet"
+    />
     <script type="module" src="./src/orders.js" defer></script>
     <script src="/cookie-consent.js" defer></script>
-</head>
-<body class="bg-gray-100">
-    <main class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8">
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-center text-gray-700">Your Order History</h1>
-            <a href="/" class="text-splotch-red hover:underline">← Back to Editor</a>
-        </div>
+  </head>
+  <body class="bg-gray-100">
+    <main
+      class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8"
+    >
+      <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-center text-gray-700">
+          Your Order History
+        </h1>
+        <a href="/" class="text-splotch-red hover:underline"
+          >← Back to Editor</a
+        >
+      </div>
 
-        <!-- Login Section -->
-        <div id="login-section" class="mb-8 p-6 bg-gray-50 rounded-lg shadow-md">
-            <h2 class="text-xl font-semibold text-splotch-navy mb-4">Access Your Orders</h2>
-            <p class="text-gray-600 mb-4">Enter your email below to receive a magic link to view your past orders.</p>
-            <form id="magic-link-form" class="flex flex-col sm:flex-row gap-4">
-                <input type="email" id="emailInput" placeholder="you@example.com" class="input flex-grow" aria-label="Email address for login">
-                <button type="submit" id="loginBtn" class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full flex justify-center items-center gap-2">Send Magic Link</button>
-            </form>
-            <p id="login-status" class="text-sm mt-4"></p>
-        </div>
+      <!-- Login Section -->
+      <div id="login-section" class="mb-8 p-6 bg-gray-50 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold text-splotch-navy mb-4">
+          Access Your Orders
+        </h2>
+        <p class="text-gray-600 mb-4">
+          Enter your email below to receive a magic link to view your past
+          orders.
+        </p>
+        <form id="magic-link-form" class="flex flex-col sm:flex-row gap-4">
+          <input
+            type="email"
+            id="emailInput"
+            placeholder="you@example.com"
+            class="input flex-grow"
+            aria-label="Email address for login"
+          />
+          <button
+            type="submit"
+            id="loginBtn"
+            class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full flex justify-center items-center gap-2"
+          >
+            Send Magic Link
+          </button>
+        </form>
+        <p id="login-status" class="text-sm mt-4"></p>
+      </div>
 
-        <!-- Order History Section -->
-        <div id="order-history-section" class="hidden">
-            <h2 class="text-2xl font-semibold text-splotch-navy mb-4">Your Past Orders</h2>
-            <div id="orders-list" class="space-y-6">
-                <!-- Orders will be dynamically inserted here -->
-                <div id="no-orders-message" class="text-center py-12 px-4 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50">
-                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4 text-blue-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-medium text-gray-900 mb-1" style="font-family: var(--font-modak); letter-spacing: 0.05em;">No orders yet</h3>
-                    <p class="text-gray-500 mb-6 max-w-sm mx-auto">Looks like you haven't placed any orders yet. Unleash your creativity and design your first custom sticker!</p>
-                    <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-splotch-red hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-splotch-red transition-all">
-                        Start Creating
-                    </a>
-                </div>
+      <!-- Order History Section -->
+      <div id="order-history-section" class="hidden">
+        <h2 class="text-2xl font-semibold text-splotch-navy mb-4">
+          Your Past Orders
+        </h2>
+        <div id="orders-list" class="space-y-6">
+          <!-- Orders will be dynamically inserted here -->
+          <div
+            id="no-orders-message"
+            class="text-center py-12 px-4 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50"
+          >
+            <div
+              class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4 text-blue-600"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-8 w-8"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                />
+              </svg>
             </div>
+            <h3
+              class="text-lg font-medium text-gray-900 mb-1"
+              style="font-family: var(--font-modak); letter-spacing: 0.05em"
+            >
+              No orders yet
+            </h3>
+            <p class="text-gray-500 mb-6 max-w-sm mx-auto">
+              Looks like you haven't placed any orders yet. Unleash your
+              creativity and design your first custom sticker!
+            </p>
+            <a
+              href="/"
+              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-splotch-red hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-splotch-red transition-all"
+            >
+              Start Creating
+            </a>
+          </div>
         </div>
+      </div>
 
-        <!-- Privacy Section -->
-        <div id="data-privacy-section" class="hidden mt-8 p-6 bg-gray-50 rounded-lg shadow-md border-t-4 border-splotch-navy">
-            <h2 class="text-xl font-semibold text-splotch-navy mb-4">Privacy & Data</h2>
-            <p class="text-gray-600 mb-4">Manage your personal data.</p>
-            <div class="flex flex-wrap gap-4">
-                <button id="exportDataBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md">Export My Data</button>
-                <button id="deleteAccountBtn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md">Delete Account</button>
-            </div>
-            <p id="privacy-status" class="text-sm mt-4"></p>
+      <!-- Privacy Section -->
+      <div
+        id="data-privacy-section"
+        class="hidden mt-8 p-6 bg-gray-50 rounded-lg shadow-md border-t-4 border-splotch-navy"
+      >
+        <h2 class="text-xl font-semibold text-splotch-navy mb-4">
+          Privacy & Data
+        </h2>
+        <p class="text-gray-600 mb-4">Manage your personal data.</p>
+        <div class="flex flex-wrap gap-4">
+          <button
+            id="exportDataBtn"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md"
+          >
+            Export My Data
+          </button>
+          <button
+            id="deleteAccountBtn"
+            class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md"
+          >
+            Delete Account
+          </button>
         </div>
-
+        <p id="privacy-status" class="text-sm mt-4" aria-live="polite"></p>
+      </div>
     </main>
     <footer class="bg-white shadow-md mt-8">
-        <div class="container mx-auto px-6 py-3 text-center text-gray-500">
-            &copy; 2025 Splotch | <a href="/terms.html" class="text-splotch-red hover:underline">Terms & FAQ</a>
-        </div>
+      <div class="container mx-auto px-6 py-3 text-center text-gray-500">
+        &copy; 2025 Splotch |
+        <a href="/terms.html" class="text-splotch-red hover:underline"
+          >Terms & FAQ</a
+        >
+      </div>
     </footer>
-</body>
+  </body>
 </html>
