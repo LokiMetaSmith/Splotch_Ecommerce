@@ -34,6 +34,10 @@ const SQL_COMBINED = new RegExp(SQL_INJECTION_PATTERNS.map(p => p.source).join('
 const XSS_COMBINED = new RegExp(XSS_PATTERNS.map(p => p.source).join('|'), 'is');
 const PATH_TRAVERSAL_COMBINED = new RegExp(PATH_TRAVERSAL_PATTERNS.map(p => p.source).join('|'), 'i');
 
+// Bolt Optimization: Regex to detect NoSQL injection in JSON keys (e.g. "$where":)
+// Matches a quoted key starting with $ followed by a colon.
+const NOSQL_JSON_PATTERN = /"\$[^"]*"\s*:/;
+
 // Recursive function to check for threats in object/array/string
 function checkPayload(payload) {
     if (!payload) return null;
@@ -100,6 +104,7 @@ function checkPayload(payload) {
 export function wafMiddleware(req, res, next) {
     // Combine all inputs to check
     // We check query, body, and params
+    let threat;
 
     const processThreat = (threat, context) => {
         if (!threat) return null;
@@ -115,13 +120,38 @@ export function wafMiddleware(req, res, next) {
         return threat;
     };
 
+    // Bolt Optimization: Global Fast Path for Objects
+    // If the JSON string representation of the object doesn't match any attack patterns,
+    // we can skip the expensive recursive traversal.
+    const isSafeFast = (obj) => {
+        if (!obj || typeof obj !== 'object') return false; // Not an object, use standard check
+        try {
+            const json = JSON.stringify(obj);
+            // If the object contains circular references, JSON.stringify throws.
+            // We catch this and fall back to the slow check.
+
+            if (SQL_COMBINED.test(json)) return false;
+            if (XSS_COMBINED.test(json)) return false;
+            if (PATH_TRAVERSAL_COMBINED.test(json)) return false;
+            if (NOSQL_JSON_PATTERN.test(json)) return false;
+
+            return true; // Safe!
+        } catch (e) {
+            return false; // Fallback
+        }
+    };
+
     // Check Query
-    let threat = checkPayload(req.query);
-    if (threat) return blockRequest(req, res, processThreat(threat, 'query'));
+    if (!isSafeFast(req.query)) {
+        threat = checkPayload(req.query);
+        if (threat) return blockRequest(req, res, processThreat(threat, 'query'));
+    }
 
     // Check Body
-    threat = checkPayload(req.body);
-    if (threat) return blockRequest(req, res, processThreat(threat, 'body'));
+    if (!isSafeFast(req.body)) {
+        threat = checkPayload(req.body);
+        if (threat) return blockRequest(req, res, processThreat(threat, 'body'));
+    }
 
     // Check URL Path (instead of params which are empty here)
     // We decode the path to catch encoded attacks (e.g. %20OR%20)

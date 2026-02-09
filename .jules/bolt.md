@@ -27,3 +27,7 @@
 ## 2026-02-08 - [Recursive String Concatenation]
 **Learning:** Passing a concatenated path string (e.g., `path + '.' + key`) down a recursive object traversal generates a new string for every node, creating significant GC pressure even for benign payloads. Passing an array or reconstructing the path only upon detecting a target avoids this overhead.
 **Action:** In recursive validation or traversal functions, avoid passing state that requires allocation (like strings) unless necessary. Return metadata to the caller to reconstruct context if needed.
+
+## 2026-02-09 - [JSON Serialization Fast Path]
+**Learning:** Recursively traversing large JSON objects in middleware (like a WAF) to check string values against regex patterns is O(N) where N is the number of nodes. Serializing the object to a JSON string and checking the string once with a combined regex is O(L) where L is the string length, which is much faster due to native C++ implementation of `JSON.stringify` and RegExp engine.
+**Action:** When validating complex objects for simple string patterns, consider serializing the object to check for the pattern globally before traversing.
