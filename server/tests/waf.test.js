@@ -135,6 +135,22 @@ describe('WAF Middleware', () => {
                 .send({ filter: { user: { $gt: 5 } } });
             expect(res.statusCode).toBe(403);
         });
+
+        test('should allow benign strings that look like NoSQL keys but are values', async () => {
+            // This case might trigger the fast-path regex (false positive),
+            // but the slow path should correctly identify it as safe.
+            const res = await request(app)
+                .post('/test')
+                .send({ msg: 'Say "$hi":' });
+            expect(res.statusCode).toBe(200);
+        });
+
+        test('should allow benign keys that contain $ but do not start with it', async () => {
+            const res = await request(app)
+                .post('/test')
+                .send({ "price$": 100 });
+            expect(res.statusCode).toBe(200);
+        });
     });
 
     describe('XSS Protection', () => {
