@@ -45,69 +45,87 @@ document.addEventListener("DOMContentLoaded", async () => {
     verifyTokenAndFetchOrders(token);
   }
 
-    // Privacy Event Listeners
-    if (exportDataBtn) {
-        exportDataBtn.addEventListener('click', async () => {
-            if (!csrfToken) return;
-            privacyStatus.textContent = "Exporting data...";
-            privacyStatus.style.color = "blue";
-            try {
-                // Re-fetch token from URL in case needed, or pass it down?
-                // Actually token is available in scope if we move this inside verify...
-                // But let's assume token is still in URL or stored.
-                // The current architecture relies on URL param 'token' for auth in fetch calls within this file.
-                const currentToken = new URLSearchParams(window.location.search).get("token");
+  // Privacy Event Listeners
+  if (exportDataBtn) {
+    exportDataBtn.addEventListener("click", async () => {
+      if (!csrfToken) return;
+      const originalText = exportDataBtn.innerHTML;
+      setButtonLoading(exportDataBtn, true, originalText, "Exporting...");
+      privacyStatus.textContent = "Exporting data...";
+      privacyStatus.style.color = "blue";
+      try {
+        // Re-fetch token from URL in case needed, or pass it down?
+        // Actually token is available in scope if we move this inside verify...
+        // But let's assume token is still in URL or stored.
+        // The current architecture relies on URL param 'token' for auth in fetch calls within this file.
+        const currentToken = new URLSearchParams(window.location.search).get(
+          "token",
+        );
 
-                const response = await fetch("/api/auth/user/data", {
-                    headers: {
-                        Authorization: `Bearer ${currentToken}`
-                    }
-                });
-                if (!response.ok) throw new Error("Failed to fetch data");
-                const data = await response.json();
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "splotch-user-data.json";
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                privacyStatus.textContent = "Data exported successfully.";
-                privacyStatus.style.color = "green";
-            } catch (e) {
-                privacyStatus.textContent = "Error exporting data: " + e.message;
-                privacyStatus.style.color = "red";
-            }
+        const response = await fetch("/api/auth/user/data", {
+          headers: {
+            Authorization: `Bearer ${currentToken}`,
+          },
         });
-    }
+        if (!response.ok) throw new Error("Failed to fetch data");
+        const data = await response.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: "application/json",
+        });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "splotch-user-data.json";
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        privacyStatus.textContent = "Data exported successfully.";
+        privacyStatus.style.color = "green";
+      } catch (e) {
+        privacyStatus.textContent = "Error exporting data: " + e.message;
+        privacyStatus.style.color = "red";
+      } finally {
+        setButtonLoading(exportDataBtn, false, originalText);
+      }
+    });
+  }
 
-    if (deleteAccountBtn) {
-        deleteAccountBtn.addEventListener('click', async () => {
-            if (!window.confirm("Are you sure you want to delete your account? This action cannot be undone and will anonymize your order history.")) {
-                return;
-            }
-            privacyStatus.textContent = "Deleting account...";
-            privacyStatus.style.color = "red";
-            try {
-                const currentToken = new URLSearchParams(window.location.search).get("token");
-                const response = await fetch("/api/auth/user", {
-                    method: "DELETE",
-                    headers: {
-                        Authorization: `Bearer ${currentToken}`,
-                         "X-CSRF-Token": csrfToken
-                    }
-                });
-                if (!response.ok) throw new Error("Failed to delete account");
-                alert("Your account has been deleted.");
-                window.location.href = "/";
-            } catch (e) {
-                privacyStatus.textContent = "Error deleting account: " + e.message;
-                privacyStatus.style.color = "red";
-            }
+  if (deleteAccountBtn) {
+    deleteAccountBtn.addEventListener("click", async () => {
+      if (
+        !window.confirm(
+          "Are you sure you want to delete your account? This action cannot be undone and will anonymize your order history.",
+        )
+      ) {
+        return;
+      }
+
+      const originalText = deleteAccountBtn.innerHTML;
+      setButtonLoading(deleteAccountBtn, true, originalText, "Deleting...");
+      privacyStatus.textContent = "Deleting account...";
+      privacyStatus.style.color = "red";
+      try {
+        const currentToken = new URLSearchParams(window.location.search).get(
+          "token",
+        );
+        const response = await fetch("/api/auth/user", {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${currentToken}`,
+            "X-CSRF-Token": csrfToken,
+          },
         });
-    }
+        if (!response.ok) throw new Error("Failed to delete account");
+        alert("Your account has been deleted.");
+        window.location.href = "/";
+      } catch (e) {
+        privacyStatus.textContent = "Error deleting account: " + e.message;
+        privacyStatus.style.color = "red";
+        setButtonLoading(deleteAccountBtn, false, originalText);
+      }
+    });
+  }
 
   document
     .getElementById("magic-link-form")
@@ -238,3 +256,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 });
+
+function setButtonLoading(
+  button,
+  isLoading,
+  originalContent,
+  loadingText = "Loading...",
+) {
+  if (isLoading) {
+    button.disabled = true;
+    button.innerHTML = `
+            <svg class="animate-spin h-5 w-5 text-white inline-block mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>${loadingText}</span>
+        `;
+    button.classList.add("opacity-75", "cursor-not-allowed");
+  } else {
+    button.disabled = false;
+    button.innerHTML = originalContent;
+    button.classList.remove("opacity-75", "cursor-not-allowed");
+  }
+}
