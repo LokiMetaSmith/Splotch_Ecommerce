@@ -1351,7 +1351,7 @@ async function startServer(
                         <p>Heads up—your order has been sent out!</p>
                         <p><b>Ordered:</b> ${orderDate}</p>
                         <p>Here’s the tracking number:</p>
-                        <p><b>${trackingNumber}</b><br>${courier}</p>
+                        <p><b>${escapeHtml(trackingNumber)}</b><br>${escapeHtml(courier)}</p>
                         <p><i>Tracking information can take up to 48 hours to be updated after the order is shipped.</i></p>
                         <h3>Here’s what’s in your Shipment:</h3>
                         <table style="width: 100%; border-collapse: collapse;">
