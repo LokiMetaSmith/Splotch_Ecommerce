@@ -92,9 +92,10 @@ describe('WebAuthn Endpoints', () => {
         csrfToken = csrfRes.body.csrfToken;
 
         const res = await agent
-            .post(`/api/auth/register-verify?username=${username}`)
+            .post('/api/auth/register-verify')
             .set('X-CSRF-Token', csrfToken)
             .send({
+                username,
                 id: 'Y3JlZC1pZC0xMjM', // Base64URL encoded 'cred-id-123'
                 response: {}
             });
@@ -131,9 +132,10 @@ describe('WebAuthn Endpoints', () => {
         mockWebAuthn.verifyAuthenticationResponse.mockResolvedValue({ verified: true });
 
         const res = await agent
-            .post(`/api/auth/login-verify?username=${username}`)
+            .post('/api/auth/login-verify')
             .set('X-CSRF-Token', csrfToken)
             .send({
+                username,
                 id: 'cred-id-123',
                 response: {}
             });

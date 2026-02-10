@@ -1,4 +1,4 @@
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 
 // Basic username sanitization to prevent prototype pollution
 const sanitizeUsername = (username) => {
@@ -22,6 +22,19 @@ export const isValidId = (id) => {
 // Reusable username validation middleware
 export const validateUsername = [
   body('username')
+    .notEmpty().withMessage('Username is required')
+    .isString().withMessage('Username must be a string')
+    .custom(value => {
+      if (sanitizeUsername(value) === null) {
+        throw new Error('Invalid username');
+      }
+      return true;
+    }),
+];
+
+// Reusable username validation middleware for query params
+export const validateUsernameQuery = [
+  query('username')
     .notEmpty().withMessage('Username is required')
     .isString().withMessage('Username must be a string')
     .custom(value => {
