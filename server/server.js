@@ -26,7 +26,7 @@ import { sendEmail as defaultSendEmail } from './email.js';
 import { getCurrentSigningKey, getJwks, rotateKeys, getKey, KEY_ROTATION_MS } from './keyManager.js';
 import { initializeBot } from './bot.js';
 import { initializeTracker } from './tracker.js';
-import { validateUsername, validateId } from './validators.js';
+import { validateUsername, validateUsernameQuery, validateId } from './validators.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 import { Markup } from 'telegraf';
@@ -1707,8 +1707,12 @@ async function startServer(
     });
 
     app.post('/api/auth/register-verify', authLimiter, validateUsername, async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
       const { body } = req;
-      const { username } = req.query;
+      const { username } = req.body;
       // Prevent prototype pollution
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
         return res.status(400).json({ error: 'Invalid username.' });
@@ -1736,7 +1740,11 @@ async function startServer(
       }
     });
 
-    app.get('/api/auth/login-options', authLimiter, validateUsername, async (req, res) => {
+    app.get('/api/auth/login-options', authLimiter, validateUsernameQuery, async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
       const { username } = req.query;
       // Prevent prototype pollution
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
@@ -1759,8 +1767,12 @@ async function startServer(
     });
 
     app.post('/api/auth/login-verify', authLimiter, validateUsername, async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
       const { body } = req;
-      const { username } = req.query;
+      const { username } = req.body;
       // Prevent prototype pollution
       if (['__proto__', 'constructor', 'prototype'].includes(username)) {
         return res.status(400).json({ error: 'Invalid username.' });
