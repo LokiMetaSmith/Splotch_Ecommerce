@@ -28,6 +28,7 @@ let isMetric = false; // To track unit preference
 let currentCutline = [];
 let currentBounds = null;
 let pricingConfig = null;
+let inventoryCache = {}; // Cache for Odoo inventory
 let isGrayscale = false;
 let isSepia = false;
 
@@ -129,7 +130,7 @@ async function BootStrap() {
   sepiaBtnEl = document.getElementById("sepiaBtn");
 
   // Fetch CSRF token and pricing info
-  await Promise.all([fetchCsrfToken(), fetchPricingInfo()]);
+  await Promise.all([fetchCsrfToken(), fetchPricingInfo(), fetchInventory()]);
 
   // Initialize Square Payments SDK
   console.log(
@@ -516,6 +517,8 @@ function calculateAndUpdatePrice() {
   }
 
   const selectedMaterial = stickerMaterialSelect.value;
+  checkInventoryStatus(selectedMaterial);
+
   const selectedResolutionId = stickerResolutionSelect.value;
   const selectedResolution = pricingConfig.resolutions.find(
     (r) => r.id === selectedResolutionId,
@@ -673,6 +676,40 @@ async function fetchPricingInfo() {
       "error",
     );
   }
+}
+
+async function fetchInventory() {
+    try {
+        const response = await fetch(`${serverUrl}/api/inventory`);
+        if (response.ok) {
+            inventoryCache = await response.json();
+            console.log('[CLIENT] Inventory loaded:', inventoryCache);
+        }
+    } catch (error) {
+        console.error('[CLIENT] Failed to load inventory:', error);
+    }
+}
+
+function checkInventoryStatus(materialId) {
+    if (!stickerMaterialSelect) return;
+
+    let warningEl = document.getElementById('material-warning');
+    if (!warningEl) {
+        warningEl = document.createElement('p');
+        warningEl.id = 'material-warning';
+        warningEl.className = 'text-xs text-red-600 font-bold mt-1';
+        stickerMaterialSelect.parentNode.appendChild(warningEl);
+    }
+
+    const qty = inventoryCache[materialId];
+
+    // Check if quantity is 0 or less (if tracked)
+    if (typeof qty === 'number' && qty <= 0) {
+        warningEl.textContent = '⚠️ Low Stock / Out of Stock - Order may be delayed.';
+        warningEl.style.display = 'block';
+    } else {
+        warningEl.style.display = 'none';
+    }
 }
 
 async function fetchCsrfToken() {

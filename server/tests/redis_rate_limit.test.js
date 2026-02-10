@@ -79,6 +79,7 @@ process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.SESSION_SECRET = 'test-secret';
 process.env.SQUARE_ACCESS_TOKEN = 'test-token'; // To pass startup check
 process.env.NODE_ENV = 'test';
+process.env.TEST_USE_REAL_REDIS = 'true';
 
 describe('Distributed Rate Limiting', () => {
     it('should initialize Redis client and use RedisStore for rate limiting when REDIS_URL is present', async () => {

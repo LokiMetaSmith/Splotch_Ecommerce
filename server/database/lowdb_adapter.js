@@ -28,6 +28,7 @@ export class LowDbAdapter {
         if (!this.db.data.credentials) this.db.data.credentials = {};
         if (!this.db.data.config) this.db.data.config = {};
         if (!this.db.data.emailIndex) this.db.data.emailIndex = {};
+        if (!this.db.data.inventory_cache) this.db.data.inventory_cache = {};
 
         this.FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
     }
@@ -334,6 +335,15 @@ export class LowDbAdapter {
 
     async setConfig(key, value) {
         this.db.data.config[key] = value;
+        await this.write();
+    }
+
+    async getInventoryCache() {
+        return this.db.data.inventory_cache;
+    }
+
+    async setInventoryCache(cache) {
+        this.db.data.inventory_cache = cache;
         await this.write();
     }
 

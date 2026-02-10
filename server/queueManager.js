@@ -44,9 +44,12 @@ const defaultJobOptions = {
     }
 };
 
-let emailQueueInstance, telegramQueueInstance;
+let emailQueueInstance, telegramQueueInstance, odooQueueInstance;
 
-if (process.env.NODE_ENV === 'test' && !redisUrl) {
+// Only use real Redis in test if explicitly requested
+const useRealRedisInTest = process.env.TEST_USE_REAL_REDIS === 'true';
+
+if (process.env.NODE_ENV === 'test' && (!redisUrl || !useRealRedisInTest)) {
     logger.info('[QUEUE] Test environment detected. Using Mock Queues.');
     class MockQueue {
         constructor(name) { this.name = name; }
@@ -61,6 +64,7 @@ if (process.env.NODE_ENV === 'test' && !redisUrl) {
     }
     emailQueueInstance = new MockQueue('email-queue');
     telegramQueueInstance = new MockQueue('telegram-queue');
+    odooQueueInstance = new MockQueue('odoo-queue');
 } else {
     emailQueueInstance = new Queue('email-queue', {
         connection,
@@ -68,6 +72,11 @@ if (process.env.NODE_ENV === 'test' && !redisUrl) {
     });
 
     telegramQueueInstance = new Queue('telegram-queue', {
+        connection,
+        defaultJobOptions
+    });
+
+    odooQueueInstance = new Queue('odoo-queue', {
         connection,
         defaultJobOptions
     });
@@ -83,8 +92,15 @@ if (process.env.NODE_ENV === 'test' && !redisUrl) {
             logger.error('[QUEUE] Telegram Queue Error:', err);
         }
     });
+
+    odooQueueInstance.on('error', (err) => {
+        if (process.env.NODE_ENV !== 'test') {
+            logger.error('[QUEUE] Odoo Queue Error:', err);
+        }
+    });
     logger.info(`[QUEUE] Queues initialized with Redis at ${connection.host}:${connection.port}`);
 }
 
 export const emailQueue = emailQueueInstance;
 export const telegramQueue = telegramQueueInstance;
+export const odooQueue = odooQueueInstance;

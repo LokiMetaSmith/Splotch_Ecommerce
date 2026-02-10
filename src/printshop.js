@@ -531,6 +531,15 @@ export function displayOrder(order) {
             </select>
             <button class="add-tracking-btn" data-order-id="${orderId}">Add Tracking</button>
         </div>
+
+        <div class="mt-4 border-t pt-2">
+            <h4 class="font-bold text-sm mb-1 text-gray-600">Log Time (Odoo)</h4>
+            <div class="flex items-center gap-2">
+                <input type="text" class="border rounded p-1 text-sm flex-grow time-log-desc" data-order-id="${orderId}" placeholder="Task Description">
+                <input type="number" class="border rounded p-1 text-sm w-20 time-log-duration" data-order-id="${orderId}" placeholder="Mins">
+                <button class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm log-time-btn" data-order-id="${orderId}">Log</button>
+            </div>
+        </div>
     </div>
     `;
 
@@ -559,6 +568,47 @@ function handleOrderListClick(e) {
         const orderId = trackingBtn.dataset.orderId;
         handleAddTracking(orderId);
         return;
+    }
+
+    const timeLogBtn = e.target.closest('.log-time-btn');
+    if (timeLogBtn) {
+        const orderId = timeLogBtn.dataset.orderId;
+        handleTimeLog(orderId);
+        return;
+    }
+}
+
+async function handleTimeLog(orderId) {
+    const descInput = document.querySelector(`.time-log-desc[data-order-id="${orderId}"]`);
+    const durInput = document.querySelector(`.time-log-duration[data-order-id="${orderId}"]`);
+
+    if (!descInput || !durInput) return;
+
+    const description = descInput.value.trim();
+    const duration = parseInt(durInput.value, 10);
+
+    if (!description) {
+        showErrorToast('Description required.');
+        return;
+    }
+    if (!duration || duration <= 0) {
+        showErrorToast('Valid duration (minutes) required.');
+        return;
+    }
+
+    showLoadingIndicator();
+    try {
+        await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/time-log`, {
+            method: 'POST',
+            body: JSON.stringify({ description, duration })
+        });
+        showSuccessToast('Time logged successfully to Odoo.');
+        descInput.value = '';
+        durInput.value = '';
+    } catch (err) {
+        showErrorToast(`Failed to log time: ${err.message}`);
+    } finally {
+        hideLoadingIndicator();
     }
 }
 
@@ -750,6 +800,112 @@ function handleExportPdf() {
     }
 }
 
+// --- Odoo Configuration Logic ---
+async function loadOdooConfig() {
+    showLoadingIndicator();
+    try {
+        const config = await fetchWithAuth(`${serverUrl}/api/admin/odoo/config`);
+
+        document.getElementById('odoo-url').value = config.url || '';
+        document.getElementById('odoo-db').value = config.db || '';
+        document.getElementById('odoo-username').value = config.username || '';
+        document.getElementById('odoo-password').value = config.password || '';
+        document.getElementById('odoo-default-task').value = config.defaults?.project_task_id || '';
+        document.getElementById('odoo-picking-type').value = config.defaults?.picking_type_id || '';
+
+        await renderMaterialMapping(config.mappings || {});
+    } catch (error) {
+        showErrorToast(`Failed to load Odoo config: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
+    }
+}
+
+async function renderMaterialMapping(currentMappings) {
+    try {
+        const pricing = await fetch(`${serverUrl}/api/pricing-info`).then(res => res.json());
+        const tbody = document.getElementById('material-mapping-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        const materials = pricing.materials ? [...pricing.materials] : [];
+        materials.push({ id: 'ink', name: 'Ink Usage (Sq In)' });
+
+        materials.forEach(mat => {
+            const tr = document.createElement('tr');
+            const odooId = currentMappings[mat.id] || '';
+
+            tr.innerHTML = `
+                <td class="py-2 px-4 border">${escapeHtml(mat.name)} (${escapeHtml(mat.id)})</td>
+                <td class="py-2 px-4 border">
+                    <input type="number" class="w-full p-1 border rounded mapping-input" data-key="${mat.id}" value="${odooId}">
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error('Failed to load pricing info for mapping:', error);
+    }
+}
+
+async function saveOdooConfig(e) {
+    e.preventDefault();
+    showLoadingIndicator();
+
+    const url = document.getElementById('odoo-url').value;
+    const db = document.getElementById('odoo-db').value;
+    const username = document.getElementById('odoo-username').value;
+    const password = document.getElementById('odoo-password').value;
+    const defaultTask = document.getElementById('odoo-default-task').value;
+    const pickingType = document.getElementById('odoo-picking-type').value;
+
+    const mappings = {};
+    document.querySelectorAll('.mapping-input').forEach(input => {
+        const key = input.dataset.key;
+        const val = input.value;
+        if (val) mappings[key] = val;
+    });
+
+    const defaults = {
+        project_task_id: defaultTask ? Number(defaultTask) : null,
+        picking_type_id: pickingType ? Number(pickingType) : null
+    };
+
+    try {
+        await fetchWithAuth(`${serverUrl}/api/admin/odoo/config`, {
+            method: 'POST',
+            body: JSON.stringify({
+                url, db, username, password, mappings, defaults
+            })
+        });
+        showSuccessToast('Odoo configuration saved.');
+    } catch (error) {
+        showErrorToast(`Failed to save config: ${error.message}`);
+    } finally {
+        hideLoadingIndicator();
+    }
+}
+
+async function testOdooConnection() {
+    const resultSpan = document.getElementById('test-connection-result');
+    resultSpan.textContent = 'Testing...';
+    resultSpan.className = 'text-sm font-bold text-gray-500';
+
+    try {
+        const result = await fetchWithAuth(`${serverUrl}/api/admin/odoo/test`, { method: 'POST' });
+        if (result.success) {
+            resultSpan.textContent = `Success! Version: ${JSON.stringify(result.version)}`;
+            resultSpan.className = 'text-sm font-bold text-green-600';
+        } else {
+            resultSpan.textContent = `Failed: ${result.error}`;
+            resultSpan.className = 'text-sm font-bold text-red-600';
+        }
+    } catch (error) {
+        resultSpan.textContent = `Error: ${error.message}`;
+        resultSpan.className = 'text-sm font-bold text-red-600';
+    }
+}
+
 
 // --- Initialization ---
 async function getServerSessionToken() {
@@ -872,6 +1028,38 @@ export async function init() {
             filterAndDisplayOrders(status);
         }
     });
+
+    // --- View Switching ---
+    const viewDashboardBtn = document.getElementById('view-dashboard-btn');
+    const viewSettingsBtn = document.getElementById('view-settings-btn');
+    const dashboardView = document.getElementById('dashboard-view');
+    const settingsView = document.getElementById('settings-view');
+
+    if (viewDashboardBtn && viewSettingsBtn) {
+        viewDashboardBtn.addEventListener('click', () => {
+            dashboardView.classList.remove('hidden');
+            settingsView.classList.add('hidden');
+            viewDashboardBtn.classList.add('border-b-2', 'border-blue-500', 'font-bold', 'text-blue-600');
+            viewDashboardBtn.classList.remove('text-gray-500');
+            viewSettingsBtn.classList.remove('border-b-2', 'border-blue-500', 'font-bold', 'text-blue-600');
+            viewSettingsBtn.classList.add('text-gray-500');
+        });
+
+        viewSettingsBtn.addEventListener('click', () => {
+            dashboardView.classList.add('hidden');
+            settingsView.classList.remove('hidden');
+            viewSettingsBtn.classList.add('border-b-2', 'border-blue-500', 'font-bold', 'text-blue-600');
+            viewSettingsBtn.classList.remove('text-gray-500');
+            viewDashboardBtn.classList.remove('border-b-2', 'border-blue-500', 'font-bold', 'text-blue-600');
+            viewDashboardBtn.classList.add('text-gray-500');
+
+            loadOdooConfig();
+        });
+    }
+
+    // Odoo listeners
+    document.getElementById('odoo-config-form')?.addEventListener('submit', saveOdooConfig);
+    document.getElementById('test-odoo-btn')?.addEventListener('click', testOdooConnection);
 
     // Check for a token in the URL from OAuth redirect
     const urlParams = new URLSearchParams(window.location.search);
