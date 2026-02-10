@@ -3,7 +3,7 @@ import { test, expect } from './test-setup.js';
 import fs from 'fs';
 import path from 'path';
 
-const TEST_IMAGE_PATH = path.join('verification', 'test.png');
+const TEST_IMAGE_PATH = path.join('verification', 'test_features.png');
 
 test.beforeAll(() => {
     if (!fs.existsSync(TEST_IMAGE_PATH)) {
@@ -14,6 +14,12 @@ test.beforeAll(() => {
         // Create a dummy image (red pixel)
         const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
         fs.writeFileSync(TEST_IMAGE_PATH, buffer);
+    }
+});
+
+test.afterAll(() => {
+    if (fs.existsSync(TEST_IMAGE_PATH)) {
+        fs.unlinkSync(TEST_IMAGE_PATH);
     }
 });
 
