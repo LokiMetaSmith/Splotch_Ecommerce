@@ -1,0 +1,48 @@
+version: '3.8'
+services:
+  app:
+    build:
+      context: ./server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DB_PROVIDER=lowdb
+      - DB_PATH=/app/db.json
+      # In Lite mode, we enable bot polling in the main app container
+      # since we are running a single instance.
+      - ENABLE_BOT_POLLING=true
+      - ENABLE_WEB_SERVER=true
+    volumes:
+      - /home/loki/app-data/uploads:/app/server/uploads
+      - /home/loki/app-data/db.json:/app/db.json
+    depends_on:
+      - redis
+    networks:
+      - app-net
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    volumes:
+      - /home/loki/app-data/redis:/data
+    networks:
+      - app-net
+
+  nginx:
+    image: nginx:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./dist:/usr/share/nginx/html
+      - /home/loki/ssl:/etc/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge

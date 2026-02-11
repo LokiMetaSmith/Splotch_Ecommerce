@@ -115,7 +115,7 @@ runcmd:
   - cd /home/loki/lokimetasmith.github.io && npm install && npm run build
   # 5. Launch the application using Docker Compose in detached mode
   # Note: We use docker-compose.prod.yml which is now part of the repository
-  - cd /home/loki/lokimetasmith.github.io && docker-compose -f docker-compose.prod.yml up -d
+  - cd /home/loki/lokimetasmith.github.io && docker-compose -f DOCKER_COMPOSE_FILENAME up -d
   # 6. Create ACME challenge directory
   - mkdir -p /home/loki/lokimetasmith.github.io/dist/.well-known/acme-challenge
   - chown -R loki:loki /home/loki/lokimetasmith.github.io/dist/.well-known
@@ -140,7 +140,7 @@ runcmd:
   # 9. Get the initial certificate and reload nginx
   - |
     runuser -l loki -c 'getssl -f YOUR_DOMAIN_OR_IP'
-  - cd /home/loki/lokimetasmith.github.io && docker-compose -f docker-compose.prod.yml exec nginx nginx -s reload
+  - cd /home/loki/lokimetasmith.github.io && docker-compose -f DOCKER_COMPOSE_FILENAME exec nginx nginx -s reload
   # 10. Set up cron job for renewal
   - |
-    (crontab -l -u loki 2>/dev/null; echo "0 1 * * * /usr/bin/getssl -u -a -q && /usr/bin/docker-compose -f /home/loki/lokimetasmith.github.io/docker-compose.prod.yml exec nginx nginx -s reload") | crontab -u loki -
+    (crontab -l -u loki 2>/dev/null; echo "0 1 * * * /usr/bin/getssl -u -a -q && /usr/bin/docker-compose -f /home/loki/lokimetasmith.github.io/DOCKER_COMPOSE_FILENAME exec nginx nginx -s reload") | crontab -u loki -
