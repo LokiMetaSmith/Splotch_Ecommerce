@@ -134,6 +134,14 @@ export const test = base.extend({
                 });
             }
 
+            if (pathname.endsWith('/api/inventory')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({})
+                });
+            }
+
             // Fallback for unhandled API routes
             console.warn(`[MOCK] Unhandled API route: ${pathname}`);
             return route.fulfill({
