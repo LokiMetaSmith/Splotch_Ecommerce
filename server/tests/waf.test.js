@@ -191,4 +191,15 @@ describe('WAF Middleware', () => {
             expect(res.statusCode).toBe(403);
         });
     });
+
+    describe('WAF Bypass Regression', () => {
+        test('should block UNION SELECT with newline (JSON fast-path bypass attempt)', async () => {
+            // Using a newline prevents the regex from matching because \s does not match escaped \n in JSON string
+            const res = await request(app)
+                .post('/test')
+                .send({ query: "UNION\nSELECT * FROM users" });
+            expect(res.statusCode).toBe(403);
+            expect(loggerMock.warn).toHaveBeenCalledWith(expect.stringContaining('SQL Injection'));
+        });
+    });
 });
