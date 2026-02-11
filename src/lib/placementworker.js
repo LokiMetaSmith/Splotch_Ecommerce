@@ -87,7 +87,7 @@ export class PlacementWorker {
                 }
 
                 // Bolt Optimization: Sort active items by X coordinate to enable early break in the inner loop
-                activePlacedItems.sort((a, b) => a.bounds.x - b.bounds.x);
+                // Removed redundant sort: activePlacedItems is populated from placedItems which is maintained in X-sorted order.
 
                 for (let x = binBounds.x; x <= maxX; x += step) {
                     counter++;
@@ -167,6 +167,10 @@ export class PlacementWorker {
                     // Bolt Optimization: Create candidateRect only on successful placement
                     const candidateRect = { x: x, y: y, width: partBounds.width, height: partBounds.height };
                     placedItems.push({ path: placedPath, bounds: candidateRect });
+
+                    // Bolt Optimization: Keep placedItems sorted by X so activePlacedItems is automatically sorted
+                    placedItems.sort((a, b) => a.bounds.x - b.bounds.x);
+
                     placed = true;
                     break;
                 }
