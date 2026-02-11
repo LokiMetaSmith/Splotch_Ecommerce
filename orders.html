@@ -39,6 +39,7 @@
           orders.
         </p>
         <form id="magic-link-form" class="flex flex-col sm:flex-row gap-4">
+          <label for="emailInput" class="text-sm font-medium text-gray-700 self-center">Email</label>
           <input
             type="email"
             id="emailInput"
@@ -69,7 +70,7 @@
             Send Magic Link
           </button>
         </form>
-        <p id="login-status" class="text-sm mt-4"></p>
+        <p id="login-status" class="text-sm mt-4" role="status" aria-live="polite"></p>
       </div>
 
       <!-- Order History Section -->
