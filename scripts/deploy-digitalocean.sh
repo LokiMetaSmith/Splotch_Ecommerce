@@ -16,13 +16,15 @@
 # 3. An SSH key added to your DigitalOcean account. You will need its fingerprint.
 #
 # Usage:
-# ./scripts/deploy-digitalocean.sh [droplet-name]
+# ./scripts/deploy-digitalocean.sh [droplet-name] [--lite]
 #
 #   - [droplet-name]: (Optional) The name for the new Droplet.
 #                     If not provided, a default name will be used.
+#   - --lite:         (Optional) Use the Lite configuration (smaller droplet, lighter stack).
 #
 # Example:
 # ./scripts/deploy-digitalocean.sh my-print-shop
+# ./scripts/deploy-digitalocean.sh my-print-shop-lite --lite
 #
 # ==============================================================================
 
@@ -34,15 +36,28 @@ set -o pipefail # Return value of a pipeline is the value of the last command to
 # You can modify these default values.
 
 # The name for the Droplet. Falls back to a default if no argument is provided.
-DROPLET_NAME="${1:-print-shop-app}"
+DROPLET_NAME="print-shop-app"
+USE_LITE=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --lite)
+      USE_LITE=true
+      shift # past argument
+      ;;
+    *)
+      if [[ "$1" != -* ]]; then
+          DROPLET_NAME="$1"
+      fi
+      shift # past argument
+      ;;
+  esac
+done
 
 # The region for the Droplet (e.g., nyc3, sfo3).
 # Find available regions with `doctl compute region list`.
 REGION="nyc3"
-
-# The size of the Droplet (e.g., s-1vcpu-1gb).
-# Find available sizes with `doctl compute size list`.
-SIZE="s-1vcpu-1gb"
 
 # The Droplet image. Ubuntu 22.04 LTS is recommended.
 IMAGE="ubuntu-22-04-x64"
@@ -50,6 +65,23 @@ IMAGE="ubuntu-22-04-x64"
 # Path to the cloud-config file.
 # This script assumes it is run from the project root.
 CLOUD_CONFIG_PATH="docs/digitalocean-cloud-config.yml"
+
+# --- Determine Plan and Config ---
+
+if [ "$USE_LITE" = true ]; then
+    # Lite Plan: $6/mo (1GB RAM)
+    # Uses LowDB and consolidated service stack
+    SIZE="s-1vcpu-1gb"
+    DOCKER_COMPOSE_FILE="docker-compose.lite.yml"
+    echo "🔵 MODE: Lite (LowDB, Single Container, 1GB RAM)"
+else
+    # Standard Plan: $12/mo (2GB RAM)
+    # Uses MongoDB, separate services, better for production
+    SIZE="s-1vcpu-2gb"
+    DOCKER_COMPOSE_FILE="docker-compose.prod.yml"
+    echo "🟢 MODE: Standard (MongoDB, Separate Services, 2GB RAM)"
+fi
+
 
 # --- SSH Key Configuration ---
 # IMPORTANT: Replace with your SSH key fingerprint.
@@ -116,6 +148,7 @@ echo "  - Droplet Name: $DROPLET_NAME"
 echo "  - Region:       $REGION"
 echo "  - Size:         $SIZE"
 echo "  - Image:        $IMAGE"
+echo "  - Stack:        $DOCKER_COMPOSE_FILE"
 echo "  - SSH Key:      $SSH_KEY_FINGERPRINT"
 echo "  - User Data:    $CLOUD_CONFIG_PATH"
 echo
@@ -153,6 +186,9 @@ fi
 # We'll use a temporary file to inject secrets, then delete it.
 TEMP_CONFIG="cloud-config-generated.yml"
 cp "$CLOUD_CONFIG_PATH" "$TEMP_CONFIG"
+
+# Inject the correct Docker Compose filename
+sed -i "s|DOCKER_COMPOSE_FILENAME|$DOCKER_COMPOSE_FILE|g" "$TEMP_CONFIG"
 
 # Inject SMTP variables if provided
 if [ -n "$SMTP_HOST" ]; then
@@ -219,6 +255,10 @@ echo "   ssh loki@$DROPLET_IP"
 echo
 echo "3. After SSHing in, you may need to restart the services for the changes to take effect:"
 echo
-echo "   cd /home/loki/lokimetasmith.github.io && docker-compose restart"
+if [ "$USE_LITE" = true ]; then
+  echo "   cd /home/loki/lokimetasmith.github.io && docker-compose -f docker-compose.lite.yml restart"
+else
+  echo "   cd /home/loki/lokimetasmith.github.io && docker-compose -f docker-compose.prod.yml restart"
+fi
 echo
 echo "Deployment script finished."
