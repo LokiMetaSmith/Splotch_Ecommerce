@@ -106,63 +106,142 @@
     </header>
 
     <div class="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <!-- Filter Buttons -->
-        <div id="filter-container" class="flex flex-wrap items-center space-x-2 mb-4 bg-white p-2 rounded-lg shadow-md">
-            <span class="font-bold mr-2">Filter by status:</span>
-            <button class="filter-btn active px-3 py-1 rounded-md text-sm" data-status="ALL" aria-pressed="true">All</button>
-            <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="NEW" aria-pressed="false">New</button>
-            <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="ACCEPTED" aria-pressed="false">Accepted</button>
-            <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="PRINTING" aria-pressed="false">Printing</button>
-            <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="SHIPPED" aria-pressed="false">Shipped</button>
-            <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="DELIVERED" aria-pressed="false">Delivered</button>
-            <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="COMPLETED" aria-pressed="false">Completed</button>
-            <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="CANCELED" aria-pressed="false">Canceled</button>
+        <!-- View Switcher -->
+        <div class="flex space-x-4 border-b mb-4">
+            <button id="view-dashboard-btn" class="py-2 px-4 border-b-2 border-blue-500 font-bold text-blue-600">Dashboard</button>
+            <button id="view-settings-btn" class="py-2 px-4 text-gray-500 hover:text-gray-700">Settings & Integrations</button>
         </div>
     </div>
 
     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2">
-                <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Incoming Orders</h2>
-                <div id="orders-list" class="space-y-4">
-                    <p id="no-orders-message" class="text-gray-500 italic">Loading orders...</p>
-                    <!-- Order cards will be dynamically inserted here by printshop.js -->
-                </div>
+        <!-- Dashboard View -->
+        <div id="dashboard-view">
+            <!-- Filter Buttons -->
+            <div id="filter-container" class="flex flex-wrap items-center space-x-2 mb-4 bg-white p-2 rounded-lg shadow-md">
+                <span class="font-bold mr-2">Filter by status:</span>
+                <button class="filter-btn active px-3 py-1 rounded-md text-sm" data-status="ALL" aria-pressed="true">All</button>
+                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="NEW" aria-pressed="false">New</button>
+                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="ACCEPTED" aria-pressed="false">Accepted</button>
+                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="PRINTING" aria-pressed="false">Printing</button>
+                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="SHIPPED" aria-pressed="false">Shipped</button>
+                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="DELIVERED" aria-pressed="false">Delivered</button>
+                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="COMPLETED" aria-pressed="false">Completed</button>
+                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="CANCELED" aria-pressed="false">Canceled</button>
             </div>
-            <div class="space-y-8">
-                <div class="bg-white p-6 rounded-lg shadow-xl">
-                    <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Nesting</h2>
-                    <div class="mt-4">
-                        <label for="spacingInput" class="mr-2">Spacing:</label>
-                        <input type="number" id="spacingInput" value="10" class="w-20 p-1 border rounded-md">
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2">
+                    <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Incoming Orders</h2>
+                    <div id="orders-list" class="space-y-4">
+                        <p id="no-orders-message" class="text-gray-500 italic">Loading orders...</p>
+                        <!-- Order cards will be dynamically inserted here by printshop.js -->
                     </div>
-                    <div class="mt-2">
-                        <label class="inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="addPrintingMarks" class="form-checkbox h-5 w-5 text-blue-600">
-                            <span class="ml-2 text-gray-700">Add Printing Marks</span>
-                        </label>
-                    </div>
-                    <div class="mt-4 border-t pt-4">
-                        <h3 class="text-lg font-bold mb-2">Media Margins (px)</h3>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div><label for="marginTop">Top:</label><input type="number" id="marginTop" value="10" class="w-full p-1 border rounded-md"></div>
-                            <div><label for="marginBottom">Bottom:</label><input type="number" id="marginBottom" value="10" class="w-full p-1 border rounded-md"></div>
-                            <div><label for="marginLeft">Left:</label><input type="number" id="marginLeft" value="10" class="w-full p-1 border rounded-md"></div>
-                            <div><label for="marginRight">Right:</label><input type="number" id="marginRight" value="10" class="w-full p-1 border rounded-md"></div>
+                </div>
+                <div class="space-y-8">
+                    <div class="bg-white p-6 rounded-lg shadow-xl">
+                        <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Nesting</h2>
+                        <div class="mt-4">
+                            <label for="spacingInput" class="mr-2">Spacing:</label>
+                            <input type="number" id="spacingInput" value="10" class="w-20 p-1 border rounded-md">
+                        </div>
+                        <div class="mt-2">
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="addPrintingMarks" class="form-checkbox h-5 w-5 text-blue-600">
+                                <span class="ml-2 text-gray-700">Add Printing Marks</span>
+                            </label>
+                        </div>
+                        <div class="mt-4 border-t pt-4">
+                            <h3 class="text-lg font-bold mb-2">Media Margins (px)</h3>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div><label for="marginTop">Top:</label><input type="number" id="marginTop" value="10" class="w-full p-1 border rounded-md"></div>
+                                <div><label for="marginBottom">Bottom:</label><input type="number" id="marginBottom" value="10" class="w-full p-1 border rounded-md"></div>
+                                <div><label for="marginLeft">Left:</label><input type="number" id="marginLeft" value="10" class="w-full p-1 border rounded-md"></div>
+                                <div><label for="marginRight">Right:</label><input type="number" id="marginRight" value="10" class="w-full p-1 border rounded-md"></div>
+                            </div>
+                        </div>
+                        <div class="mt-4 border-t pt-4">
+                            <h3 class="text-lg font-bold mb-2">Internal Keep-outs</h3>
+                            <p class="text-xs text-gray-500 mb-2">Enter as JSON array of objects: [{"x":0, "y":0, "width":100, "height":100}]</p>
+                            <textarea id="keepoutAreas" class="w-full p-1 border rounded-md" rows="4">[]</textarea>
+                        </div>
+                        <button id="nestStickersBtn" class="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Nest Stickers</button>
+                        <button id="downloadCutFileBtn" class="mt-4 w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600">Download Cut File</button>
+                        <button id="exportPdfBtn" class="mt-4 w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Export as PDF</button>
+                        <div id="nested-svg-container" class="mt-4 bg-gray-100 p-4 border rounded-lg">
+                            <!-- Nested SVG will be displayed here -->
                         </div>
                     </div>
-                    <div class="mt-4 border-t pt-4">
-                        <h3 class="text-lg font-bold mb-2">Internal Keep-outs</h3>
-                        <p class="text-xs text-gray-500 mb-2">Enter as JSON array of objects: [{"x":0, "y":0, "width":100, "height":100}]</p>
-                        <textarea id="keepoutAreas" class="w-full p-1 border rounded-md" rows="4">[]</textarea>
-                    </div>
-                    <button id="nestStickersBtn" class="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Nest Stickers</button>
-                    <button id="downloadCutFileBtn" class="mt-4 w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600">Download Cut File</button>
-                    <button id="exportPdfBtn" class="mt-4 w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Export as PDF</button>
-                    <div id="nested-svg-container" class="mt-4 bg-gray-100 p-4 border rounded-lg">
-                        <!-- Nested SVG will be displayed here -->
-                    </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settings-view" class="hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto">
+                <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-6">Odoo Integration Settings</h2>
+
+                <form id="odoo-config-form" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block font-bold mb-1">Odoo URL</label>
+                            <input type="url" id="odoo-url" class="w-full p-2 border rounded-md" placeholder="https://your-odoo-instance.com">
+                        </div>
+                        <div>
+                            <label class="block font-bold mb-1">Database</label>
+                            <input type="text" id="odoo-db" class="w-full p-2 border rounded-md" placeholder="odoo-db">
+                        </div>
+                        <div>
+                            <label class="block font-bold mb-1">Username</label>
+                            <input type="text" id="odoo-username" class="w-full p-2 border rounded-md" placeholder="admin">
+                        </div>
+                        <div>
+                            <label class="block font-bold mb-1">Password</label>
+                            <input type="password" id="odoo-password" class="w-full p-2 border rounded-md" placeholder="********">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4">
+                        <button type="button" id="test-odoo-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Test Connection</button>
+                        <span id="test-connection-result" class="text-sm font-bold"></span>
+                    </div>
+
+                    <hr class="border-t border-gray-300">
+
+                    <h3 class="text-xl font-bold">Defaults</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block font-bold mb-1">Default Project Task ID (for Time Logs)</label>
+                            <input type="number" id="odoo-default-task" class="w-full p-2 border rounded-md" placeholder="e.g., 10">
+                        </div>
+                        <div>
+                            <label class="block font-bold mb-1">Picking Type ID (for Consumption)</label>
+                            <input type="number" id="odoo-picking-type" class="w-full p-2 border rounded-md" placeholder="e.g., 5">
+                        </div>
+                    </div>
+
+                    <hr class="border-t border-gray-300">
+
+                    <h3 class="text-xl font-bold">Material Mapping</h3>
+                    <p class="text-sm text-gray-500">Map Print Shop materials to Odoo Product IDs.</p>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white border">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="py-2 px-4 border text-left">Material / Item</th>
+                                    <th class="py-2 px-4 border text-left">Odoo Product ID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="material-mapping-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex justify-end pt-4">
+                        <button type="submit" id="save-odoo-config-btn" class="px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700">Save Configuration</button>
+                    </div>
+                </form>
             </div>
         </div>
     </main>

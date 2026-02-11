@@ -46,9 +46,11 @@ import { RedisStore as RateLimitRedisStore } from 'rate-limit-redis';
 import { LowDbAdapter } from './database/lowdb_adapter.js';
 import { startEmailWorker } from './workers/emailWorker.js';
 import { startTelegramWorker } from './workers/telegramWorker.js';
-import { emailQueue, telegramQueue } from './queueManager.js';
+import { startOdooWorker } from './workers/odooWorker.js';
+import { emailQueue, telegramQueue, odooQueue } from './queueManager.js';
 import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
 import { wafMiddleware } from './waf.js';
+import OdooClient from './odoo.js';
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -316,6 +318,21 @@ async function startServer(
       logger.info('[SERVER] Google OAuth2 client configured with stored refresh token.');
     }
 
+    // --- Odoo Configuration Seed ---
+    let odooConfig = config.odoo || {};
+    if (!odooConfig.url && getSecret('ODOO_URL')) {
+        odooConfig = {
+            url: getSecret('ODOO_URL'),
+            db: getSecret('ODOO_DB'),
+            username: getSecret('ODOO_USERNAME'),
+            password: getSecret('ODOO_PASSWORD'),
+            mappings: {},
+            defaults: {}
+        };
+        await db.setConfig('odoo', odooConfig);
+        logger.info('[SERVER] Odoo configuration seeded from environment variables.');
+    }
+
     // --- Multer Configuration for File Uploads ---
     const storage = storageProvider.getMulterStorage();
     const upload = multer({
@@ -374,8 +391,10 @@ async function startServer(
     let sessionStore;
     let redisClient;
     const redisUrl = getSecret('REDIS_URL');
+    // Only use real Redis in test if explicitly requested
+    const useRealRedis = process.env.TEST_USE_REAL_REDIS === 'true' || process.env.NODE_ENV !== 'test';
 
-    if (redisUrl) {
+    if (redisUrl && useRealRedis) {
         try {
             const client = createClient({ url: redisUrl });
             client.on('error', (err) => logger.error('Redis Client Error', err));
@@ -678,6 +697,66 @@ async function startServer(
 
     app.get('/api/pricing-info', (req, res) => {
         res.json(pricingConfig);
+    });
+
+    // --- Odoo Endpoints ---
+    app.get('/api/admin/odoo/config', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        const config = await db.getConfig();
+        const odooConfig = config.odoo || {};
+        const safeConfig = { ...odooConfig };
+        // Mask password
+        if (safeConfig.password) safeConfig.password = '********';
+        res.json(safeConfig);
+    });
+
+    app.post('/api/admin/odoo/config', authenticateToken, [
+        body('url').optional().isURL(),
+        body('db').optional().isString(),
+        body('username').optional().isString(),
+        body('password').optional().isString(),
+        body('mappings').optional().isObject(),
+        body('defaults').optional().isObject(),
+    ], async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+        const { url, db: odooDb, username, password, mappings, defaults } = req.body;
+        const config = await db.getConfig();
+        const odooConfig = config.odoo || {};
+
+        if (url !== undefined) odooConfig.url = url;
+        if (odooDb !== undefined) odooConfig.db = odooDb;
+        if (username !== undefined) odooConfig.username = username;
+        if (password !== undefined && password !== '********') odooConfig.password = password;
+        if (mappings !== undefined) odooConfig.mappings = mappings;
+        if (defaults !== undefined) odooConfig.defaults = defaults;
+
+        await db.setConfig('odoo', odooConfig);
+        const safeConfig = { ...odooConfig };
+        if (safeConfig.password) safeConfig.password = '********';
+        res.json({ success: true, config: safeConfig });
+    });
+
+    app.post('/api/admin/odoo/test', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+        const config = await db.getConfig();
+        const testClient = new OdooClient(config.odoo || {});
+
+        const result = await testClient.testConnection();
+        if (result.success) {
+            res.json({ success: true, version: result.version });
+        } else {
+            res.status(400).json({ success: false, error: result.error });
+        }
+    });
+
+    app.get('/api/inventory', async (req, res) => {
+        // Public endpoint to get cached inventory status
+        const cache = await db.getInventoryCache();
+        res.json(cache || {});
     });
 
     app.get('/api/metrics', authenticateToken, async (req, res) => {
@@ -1228,6 +1307,46 @@ async function startServer(
 
       // To avoid leaking information, return 404 even if the order exists but the user is not authorized.
       return res.status(404).json({ error: 'Order not found' });
+    });
+
+    app.post('/api/orders/:orderId/time-log', authenticateToken, [
+        ...validateId('orderId'),
+        body('duration').isInt({ min: 1 }).withMessage('Duration must be positive integer (minutes)'),
+        body('description').notEmpty().withMessage('Description is required').isString().trim().escape(),
+    ], async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+        const { orderId } = req.params;
+        const { duration, description } = req.body; // duration in minutes
+
+        // Add to Odoo Queue
+        // Convert duration to hours for Odoo
+        const durationHours = duration / 60;
+
+        // We need a task ID. The worker will pick default if not provided here.
+        // Or we could allow sending taskId from client if we support multiple tasks.
+        // For now, use default in worker.
+
+        // Also, we might want to include order ID in description if using a general task.
+        const fullDescription = `[Order ${orderId}] ${description} (User: ${req.user.username})`;
+
+        try {
+            await odooQueue.add('push-time-log', {
+                taskId: null, // Let worker use default
+                duration: durationHours,
+                description: fullDescription,
+                user: req.user.username,
+                orderId
+            });
+            logger.info(`[SERVER] Time log queued for order ${orderId}`);
+            res.json({ success: true, message: 'Time log queued.' });
+        } catch (error) {
+            await logAndEmailError(error, 'Error queuing time log');
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
     });
 
     app.post('/api/orders/:orderId/status', authenticateToken, [
@@ -1889,6 +2008,9 @@ async function startServer(
             if (bot) {
                 startTelegramWorker(bot, db);
             }
+            startOdooWorker(db, storageProvider);
+            // Schedule inventory sync every hour
+            odooQueue.add('sync-inventory', {}, { repeat: { every: 3600000 }, jobId: 'sync-inventory-job' });
             logger.info('[SERVER] Background workers started.');
         } catch (workerError) {
             logger.error('[SERVER] Failed to start background workers:', workerError);

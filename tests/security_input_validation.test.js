@@ -184,6 +184,9 @@ describe('Security Input Validation', () => {
                 orderDetails: { quantity: 1 }
             });
 
+        if (res.statusCode !== 201) {
+            console.error('Validation Error Response:', JSON.stringify(res.body, null, 2));
+        }
         expect(res.statusCode).toBe(201);
     });
 });
