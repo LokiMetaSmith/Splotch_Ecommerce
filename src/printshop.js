@@ -15,6 +15,7 @@ let authToken;
 let csrfToken;
 let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
+const svgCache = new Map(); // Cache for SVG strings to avoid redundant fetches
 
 // --- DOM Elements ---
 // A single object to hold all DOM elements for cleaner management
@@ -715,12 +716,26 @@ async function handleNesting() {
         // 2. Fetch and prepare the sticker SVGs
         const svgPromises = svgElements.map(async (img) => {
             const cutFilePath = img.dataset.cutFilePath;
-            if (cutFilePath) {
-                return (await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' })).text();
-            } else {
-                const svgString = await (await fetch(img.src, { credentials: 'include' })).text();
-                return generateCutFile(svgString);
+            const cacheKey = cutFilePath || img.src;
+
+            if (svgCache.has(cacheKey)) {
+                return svgCache.get(cacheKey);
             }
+
+            const promise = (async () => {
+                if (cutFilePath) {
+                    return (await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' })).text();
+                } else {
+                    const svgString = await (await fetch(img.src, { credentials: 'include' })).text();
+                    return generateCutFile(svgString);
+                }
+            })();
+
+            svgCache.set(cacheKey, promise);
+            // Handle error by removing from cache so next try can succeed
+            promise.catch(() => svgCache.delete(cacheKey));
+
+            return promise;
         });
         const svgStrings = await Promise.all(svgPromises);
 
