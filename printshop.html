@@ -280,16 +280,16 @@
         </div>
     </footer>
 
-    <div id="loading-indicator" class="hidden fixed top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center">
+    <div id="loading-indicator" class="hidden fixed top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center" role="status" aria-live="assertive" aria-modal="true" aria-label="Loading">
         <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
     </div>
 
-    <div id="error-toast" class="hidden fixed bottom-0 right-0 mb-4 mr-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-md">
+    <div id="error-toast" class="hidden fixed bottom-0 right-0 mb-4 mr-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-md" role="alert" aria-live="assertive">
         <span id="error-message"></span>
         <button id="close-error-toast" class="ml-4 text-white font-bold" aria-label="Close error message">&times;</button>
     </div>
 
-    <div id="success-toast" class="hidden fixed bottom-0 right-0 mb-4 mr-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-md">
+    <div id="success-toast" class="hidden fixed bottom-0 right-0 mb-4 mr-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-md" role="status" aria-live="polite">
         <span id="success-message"></span>
         <button id="close-success-toast" class="ml-4 text-white font-bold" aria-label="Close success message">&times;</button>
     </div>
