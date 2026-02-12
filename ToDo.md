@@ -156,6 +156,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 -   **[x] Remove Fallback Session Secret:** Remove the hardcoded fallback session secret from `server/server.js` to ensure the application fails securely if the secret is not provided.
 -   **[x] Harden Docker Image:** Modify `server/Dockerfile` to create and use a non-root user to run the application, reducing the risk of container-based attacks.
 -   **[x] Improve Input Validation:** Perform a full audit of all API endpoints and apply consistent, strict input validation to all user-supplied data (including URL parameters, query strings, and request bodies).
+    -   [x] Add strict validation to /api/auth/verify-magic-link
 -   **[x] Remove duplicated price validation logic:** Removed redundant code block in `server/server.js` that performed price validation twice.
 
 ## Low-Priority
