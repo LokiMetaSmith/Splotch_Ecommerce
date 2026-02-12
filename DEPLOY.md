@@ -26,37 +26,50 @@ Before you begin, ensure you have the following:
 
 ### Step 1: Configure the Deployment Script
 
-The deployment process is managed by the `deploy-digitalocean.sh` script. You need to edit one variable within this file before running it.
+The deployment process is managed by the `deploy-digitalocean.sh` script. You can either hardcode your SSH key fingerprint or let the script guide you interactively.
 
+**Option A: Hardcode SSH Key (Recommended for automation)**
 1.  Open the script file: `scripts/deploy-digitalocean.sh`.
 2.  Find the `SSH_KEY_FINGERPRINT` variable.
 3.  Replace the placeholder value `"YOUR_SSH_KEY_FINGERPRINT"` with the actual fingerprint of the SSH key you want to use for the new Droplet.
 
-    ```bash
-    # scripts/deploy-digitalocean.sh
-
-    # ...
-    # IMPORTANT: Replace with your SSH key fingerprint.
-    SSH_KEY_FINGERPRINT="PASTE_YOUR_ACTUAL_SSH_KEY_FINGERPRINT_HERE"
-    # ...
-    ```
+**Option B: Interactive Mode**
+If you leave the `SSH_KEY_FINGERPRINT` variable as is, the script will automatically detect that it's unset and will fetch a list of your available SSH keys from DigitalOcean, allowing you to select one interactively.
 
 ### Step 2: Run the Deployment Script
 
-Once the script is configured, you can run it from the root of the project.
+Once the script is configured, you can run it from the root of the project. You have two options for deployment:
+
+**Option A: Standard Deployment (Default)**
+*   **Best for:** Production environments.
+*   **Specs:** 2GB RAM ($12/mo), MongoDB, separate service containers.
+*   **Command:**
+    ```bash
+    ./scripts/deploy-digitalocean.sh [optional-droplet-name]
+    ```
+
+**Option B: Lite Deployment**
+*   **Best for:** Testing or low-traffic personal use.
+*   **Specs:** 1GB RAM ($6/mo), LowDB (file-based), single container.
+*   **Command:**
+    ```bash
+    ./scripts/deploy-digitalocean.sh [optional-droplet-name] --lite
+    ```
+
+**Execution:**
 
 1.  Make sure the script is executable:
     ```bash
     chmod +x scripts/deploy-digitalocean.sh
     ```
 
-2.  Run the script. You can optionally provide a name for your Droplet as an argument.
+2.  Run the command for your chosen mode.
     ```bash
-    # With a custom name
+    # Example: Standard deployment
     ./scripts/deploy-digitalocean.sh my-print-shop
 
-    # Or with the default name ('print-shop-app')
-    ./scripts/deploy-digitalocean.sh
+    # Example: Lite deployment
+    ./scripts/deploy-digitalocean.sh my-print-shop-lite --lite
     ```
 
 The script will now:
@@ -91,10 +104,18 @@ The server is now running, but you must perform a few manual steps to finalize t
         Update the `server_name` directive to your domain or the Droplet's IP address.
 
 3.  **Restart the Services**:
-    After saving your changes to the configuration files, restart the Docker containers to apply them:
+    After saving your changes to the configuration files, restart the Docker containers to apply them.
+
+    **Note:** Ensure you use the correct docker-compose file for your deployment mode.
+
     ```bash
     cd /home/loki/lokimetasmith.github.io
-    docker-compose restart
+
+    # For Standard Deployment:
+    docker-compose -f docker-compose.prod.yml restart
+
+    # For Lite Deployment:
+    docker-compose -f docker-compose.lite.yml restart
     ```
 
 4.  **Update DNS (Optional but Recommended)**:
