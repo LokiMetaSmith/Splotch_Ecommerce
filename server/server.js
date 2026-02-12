@@ -1634,11 +1634,15 @@ async function startServer(
         }
     });
     
-    app.post('/api/auth/verify-magic-link', (req, res) => {
-      const { token } = req.body;
-      if (!token) {
-        return res.status(400).json({ error: 'No token provided' });
+    app.post('/api/auth/verify-magic-link', [
+        body('token').notEmpty().withMessage('Token is required').isString().withMessage('Token must be a string'),
+    ], (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
       }
+      const { token } = req.body;
+
       const { publicKey } = getCurrentSigningKey();
       jwt.verify(token, publicKey, { algorithms: ['RS256'] }, async (err, decoded) => {
         if (err) {
