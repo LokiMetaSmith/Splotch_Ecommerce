@@ -192,6 +192,25 @@ describe('WAF Middleware', () => {
         });
     });
 
+    describe('Recursion Depth Protection', () => {
+        test('should block deeply nested JSON', async () => {
+            // Create a deeply nested JSON string manually
+            const DEPTH = 25; // MAX_DEPTH is 20
+            let json = '1';
+            for (let i = 0; i < DEPTH; i++) {
+                json = `{"a":${json}}`;
+            }
+
+            const res = await request(app)
+                .post('/test')
+                .set('Content-Type', 'application/json')
+                .send(json);
+
+            expect(res.statusCode).toBe(403);
+            expect(loggerMock.warn).toHaveBeenCalledWith(expect.stringContaining('Deeply Nested Payload'));
+        });
+    });
+
     describe('WAF Bypass Regression', () => {
         test('should block UNION SELECT with newline (JSON fast-path bypass attempt)', async () => {
             // Using a newline prevents the regex from matching because \s does not match escaped \n in JSON string
