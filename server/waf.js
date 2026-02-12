@@ -34,9 +34,15 @@ const SQL_COMBINED = new RegExp(SQL_INJECTION_PATTERNS.map(p => p.source).join('
 const XSS_COMBINED = new RegExp(XSS_PATTERNS.map(p => p.source).join('|'), 'is');
 const PATH_TRAVERSAL_COMBINED = new RegExp(PATH_TRAVERSAL_PATTERNS.map(p => p.source).join('|'), 'i');
 
+const MAX_DEPTH = 20;
+
 // Recursive function to check for threats in object/array/string
-function checkPayload(payload) {
+function checkPayload(payload, depth = 0) {
     if (!payload) return null;
+
+    if (depth > MAX_DEPTH) {
+        return { type: 'Deeply Nested Payload', pattern: 'Depth Limit Exceeded', path: [], value: 'Too Deep' };
+    }
 
     if (typeof payload === 'string') {
         // Check string against combined patterns first (Fast Path)
@@ -67,7 +73,7 @@ function checkPayload(payload) {
 
     if (Array.isArray(payload)) {
         for (let i = 0; i < payload.length; i++) {
-            const result = checkPayload(payload[i]);
+            const result = checkPayload(payload[i], depth + 1);
             if (result) {
                 result.path.unshift(`[${i}]`);
                 return result;
@@ -84,7 +90,7 @@ function checkPayload(payload) {
                     return { type: 'NoSQL Injection', pattern: key, path: [key] };
                 }
 
-                const result = checkPayload(payload[key]);
+                const result = checkPayload(payload[key], depth + 1);
                 if (result) {
                     result.path.unshift(key);
                     return result;
