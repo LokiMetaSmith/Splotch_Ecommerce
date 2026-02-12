@@ -353,11 +353,17 @@ async function startServer(
           process.exit(1);
         }
       }
+      // Determine Square Environment
+      const squareEnv = (getSecret('SQUARE_ENVIRONMENT') || 'sandbox').toLowerCase() === 'production'
+          ? SquareEnvironment.Production
+          : SquareEnvironment.Sandbox;
+
       squareClient = new SquareClient({
         version: '2025-07-16',
         token: getSecret('SQUARE_ACCESS_TOKEN'),
-        environment: SquareEnvironment.Sandbox,
+        environment: squareEnv,
       });
+      logger.info(`[SERVER] Square client initialized in ${squareEnv === SquareEnvironment.Production ? 'PRODUCTION' : 'SANDBOX'} mode.`);
       logger.info('[SERVER] Verifying connection to Square servers...');
     } else {
       logger.info('[SERVER] Using injected Square client.');
