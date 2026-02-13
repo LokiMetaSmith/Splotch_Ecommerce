@@ -24,6 +24,7 @@ let canvas, ctx;
 // Globals for SVG processing state
 let basePolygons = []; // The original, unscaled polygons from the SVG
 let currentPolygons = [];
+let rasterCutlinePoly = null; // New global for Raster Mode cutline
 let isMetric = false; // To track unit preference
 let currentCutline = [];
 let currentBounds = null;
@@ -1192,6 +1193,10 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   // Scale the context to account for the higher resolution.
   // Using setTransform ensures this is not cumulative.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Update CSS size to match logical size
+  canvas.style.width = `${logicalWidth}px`;
+  canvas.style.height = `${logicalHeight}px`;
 }
 
 // --- Image Loading and Editing Functions ---
@@ -1222,6 +1227,7 @@ function loadFileAsImage(file) {
     // Reset vector state
     currentPolygons = [];
     basePolygons = [];
+    rasterCutlinePoly = null; // Clear raster cutline
     currentCutline = [];
     reader.onload = () => {
       const img = new Image();
@@ -1229,20 +1235,8 @@ function loadFileAsImage(file) {
         originalImage = img;
         updateEditingButtonsState(false);
         showPaymentStatus("Image loaded successfully.", "success");
-        const maxWidth = 500,
-          maxHeight = 400;
         let newWidth = img.width,
           newHeight = img.height;
-        if (newWidth > maxWidth) {
-          const r = maxWidth / newWidth;
-          newWidth = maxWidth;
-          newHeight *= r;
-        }
-        if (newHeight > maxHeight) {
-          const r = maxHeight / newHeight;
-          newHeight = maxHeight;
-          newWidth *= r;
-        }
         if (canvas && ctx) {
           setCanvasSize(newWidth, newHeight);
           ctx.clearRect(0, 0, newWidth, newHeight);
@@ -1448,6 +1442,12 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
   drawBoundingBox(bounds, offset);
   drawSizeIndicator(bounds, offset);
   drawRuler(bounds, offset);
+
+  // In Raster Mode (where basePolygons is empty), we need to draw the cutline overlay manually
+  // because we don't use redrawAll().
+  if (basePolygons.length === 0 && currentCutline && currentCutline.length > 0) {
+    drawPolygonsToCanvas(currentCutline, "red", offset, true);
+  }
 }
 
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
@@ -1573,20 +1573,8 @@ function handleResetImage() {
     currentPolygons = [];
     currentCutline = [];
 
-    const maxWidth = 500,
-      maxHeight = 400;
     let newWidth = originalImage.width,
       newHeight = originalImage.height;
-    if (newWidth > maxWidth) {
-      const r = maxWidth / newWidth;
-      newWidth = maxWidth;
-      newHeight *= r;
-    }
-    if (newHeight > maxHeight) {
-      const r = maxHeight / newHeight;
-      newHeight = maxHeight;
-      newWidth *= r;
-    }
 
     if (canvas && ctx) {
       setCanvasSize(newWidth, newHeight);
@@ -1710,15 +1698,49 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
     ctx.clearRect(0, 0, newW, newH);
     ctx.drawImage(tempCanvas, 0, 0);
 
-    // Update bounds and price, and redraw the bounding box
-    currentBounds = {
-      left: 0,
-      top: 0,
-      right: newW,
-      bottom: newH,
-      width: newW,
-      height: newH,
-    };
+    // Handle Raster Cutline Rotation (Overlay Mode)
+    if (rasterCutlinePoly) {
+        const angleRad = (angleDegrees * Math.PI) / 180;
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+        const oldCenterX = w / 2;
+        const oldCenterY = h / 2;
+        const newCenterX = newW / 2;
+        const newCenterY = newH / 2;
+
+        rasterCutlinePoly = rasterCutlinePoly.map(poly => poly.map(p => {
+            // Translate to old center
+            const tx = p.x - oldCenterX;
+            const ty = p.y - oldCenterY;
+            // Rotate
+            const rx = tx * cos - ty * sin;
+            const ry = tx * sin + ty * cos;
+            // Translate to new center
+            return { x: rx + newCenterX, y: ry + newCenterY };
+        }));
+
+        // Regenerate currentCutline from rotated poly
+        const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+        currentCutline = cutline;
+        currentBounds = ClipperLib.JS.BoundsOfPaths(cutline);
+    } else {
+        // Default bounds if no cutline
+        currentBounds = {
+            left: 0,
+            top: 0,
+            right: newW,
+            bottom: newH,
+            width: newW,
+            height: newH,
+        };
+        currentCutline = [[
+            { x: 0, y: 0 },
+            { x: newW, y: 0 },
+            { x: newW, y: newH },
+            { x: 0, y: newH },
+        ]];
+    }
+
     calculateAndUpdatePrice();
     drawCanvasDecorations(currentBounds);
   }
@@ -1860,6 +1882,9 @@ function handleStandardResize(targetInches) {
     );
     redrawAll();
   } else if (originalImage) {
+    const prevWidth = canvas.width;
+    const prevHeight = canvas.height;
+
     // Raster Image Resizing - always use the original image to prevent quality loss
     const newWidth = originalImage.width * scale;
     const newHeight = originalImage.height * scale;
@@ -1869,23 +1894,39 @@ function handleStandardResize(targetInches) {
       ctx.clearRect(0, 0, newWidth, newHeight);
       ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
 
-      // Update the bounds and cutline for the new raster size
-      currentBounds = {
-        left: 0,
-        top: 0,
-        right: newWidth,
-        bottom: newHeight,
-        width: newWidth,
-        height: newHeight,
-      };
-      currentCutline = [
-        [
-          { x: 0, y: 0 },
-          { x: newWidth, y: 0 },
-          { x: newWidth, y: newHeight },
-          { x: 0, y: newHeight },
-        ],
-      ];
+      // Handle Raster Cutline Scaling (Overlay Mode)
+      if (rasterCutlinePoly && prevWidth > 0 && prevHeight > 0) {
+          const scaleX = newWidth / prevWidth;
+          const scaleY = newHeight / prevHeight;
+
+          rasterCutlinePoly = rasterCutlinePoly.map(poly => poly.map(p => ({
+              x: p.x * scaleX,
+              y: p.y * scaleY
+          })));
+
+          // Regenerate currentCutline
+          const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+          currentCutline = cutline;
+          currentBounds = ClipperLib.JS.BoundsOfPaths(cutline);
+      } else {
+          // Update the bounds and cutline for the new raster size (Default Box)
+          currentBounds = {
+            left: 0,
+            top: 0,
+            right: newWidth,
+            bottom: newHeight,
+            width: newWidth,
+            height: newHeight,
+          };
+          currentCutline = [
+            [
+              { x: 0, y: 0 },
+              { x: newWidth, y: 0 },
+              { x: newWidth, y: newHeight },
+              { x: 0, y: newHeight },
+            ],
+          ];
+      }
 
       // Trigger the price update and redraw the bounding box
       calculateAndUpdatePrice();
@@ -1980,9 +2021,20 @@ function handleGenerateCutline() {
         y: p.Y / scale,
       }));
 
-      basePolygons = [finalContour];
-      currentPolygons = [finalContour];
-      redrawAll();
+      // Set the raster cutline polygon (Overlay Mode)
+      rasterCutlinePoly = [finalContour];
+
+      // Generate the cutline immediately
+      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+      currentCutline = cutline;
+      currentBounds = ClipperLib.JS.BoundsOfPaths(cutline);
+
+      // Redraw decorations (which will now include the cutline overlay)
+      // Note: We are drawing on top of the existing canvas. Previous decorations might be baked in if not cleared,
+      // but this preserves the raster image state (rotation, etc).
+      drawCanvasDecorations(currentBounds);
+
+      calculateAndUpdatePrice();
       showPaymentStatus("Smart cutline generated successfully.", "success");
     } catch (error) {
       // Restore the original canvas if the process failed
@@ -2123,20 +2175,8 @@ async function handleRemoteImageLoad(imageUrl) {
     updateEditingButtonsState(false); // Enable editing
 
     // Standard canvas init logic
-    const maxWidth = 500,
-      maxHeight = 400;
     let newWidth = img.width,
       newHeight = img.height;
-    if (newWidth > maxWidth) {
-      const r = maxWidth / newWidth;
-      newWidth = maxWidth;
-      newHeight *= r;
-    }
-    if (newHeight > maxHeight) {
-      const r = maxHeight / newHeight;
-      newHeight = maxHeight;
-      newWidth *= r;
-    }
     setCanvasSize(newWidth, newHeight);
     ctx.clearRect(0, 0, newWidth, newHeight);
     ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
@@ -2150,6 +2190,7 @@ async function handleRemoteImageLoad(imageUrl) {
       width: newWidth,
       height: newHeight,
     };
+    rasterCutlinePoly = null; // Clear raster cutline
     currentCutline = [
       [
         { x: 0, y: 0 },
@@ -2186,20 +2227,8 @@ async function loadProductForBuyer(productId) {
     img.onload = () => {
       originalImage = img;
       // Draw
-      const maxWidth = 500,
-        maxHeight = 400;
       let newWidth = img.width,
         newHeight = img.height;
-      if (newWidth > maxWidth) {
-        const r = maxWidth / newWidth;
-        newWidth = maxWidth;
-        newHeight *= r;
-      }
-      if (newHeight > maxHeight) {
-        const r = maxHeight / newHeight;
-        newHeight = maxHeight;
-        newWidth *= r;
-      }
       setCanvasSize(newWidth, newHeight);
       ctx.clearRect(0, 0, newWidth, newHeight);
       ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
@@ -2222,6 +2251,7 @@ async function loadProductForBuyer(productId) {
         width: newWidth,
         height: newHeight,
       };
+      rasterCutlinePoly = null; // Clear raster cutline
       currentCutline = [
         [
           { x: 0, y: 0 },

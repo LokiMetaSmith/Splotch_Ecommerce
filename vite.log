@@ -1,0 +1,35 @@
+
+> lokimetasmith.github.io@1.0.0 dev
+> vite
+
+
+  VITE v7.1.12  ready in 490 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.2:5173/
+9:18:09 PM [vite] (client) page reload src/index.js
+9:18:09 PM [vite] (client) hmr update /styles.css?direct
+9:18:13 PM [vite] (client) hmr update /styles.css?direct
+9:18:13 PM [vite] (client) hmr update /styles.css?direct
+9:18:54 PM [vite] (client) page reload src/index.js
+9:18:54 PM [vite] (client) hmr update /styles.css?direct
+9:18:59 PM [vite] (client) page reload src/index.js
+9:18:59 PM [vite] (client) hmr update /styles.css?direct
+9:19:09 PM [vite] (client) page reload src/index.js
+9:19:09 PM [vite] (client) hmr update /styles.css?direct
+9:19:14 PM [vite] (client) hmr update /styles.css?direct
+9:19:14 PM [vite] (client) hmr update /styles.css?direct
+9:19:57 PM [vite] (client) page reload src/index.js
+9:19:57 PM [vite] (client) hmr update /styles.css?direct
+9:20:42 PM [vite] (client) page reload src/index.js
+9:20:42 PM [vite] (client) hmr update /styles.css?direct
+9:21:04 PM [vite] (client) hmr update /styles.css?direct
+9:21:04 PM [vite] (client) hmr update /styles.css?direct
+9:21:28 PM [vite] (client) hmr update /styles.css?direct
+9:21:28 PM [vite] (client) hmr update /styles.css?direct
+9:21:32 PM [vite] (client) hmr update /styles.css?direct
+9:21:32 PM [vite] (client) hmr update /styles.css?direct
+9:21:44 PM [vite] (client) hmr update /styles.css?direct
+9:21:44 PM [vite] (client) hmr update /styles.css?direct
+9:22:01 PM [vite] (client) page reload src/index.js
+9:22:01 PM [vite] (client) hmr update /styles.css?direct
