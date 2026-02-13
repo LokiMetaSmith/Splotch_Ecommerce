@@ -481,15 +481,54 @@ async function BootStrap() {
 
   window.addEventListener("paste", (e) => {
     const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    let hasFile = false;
     for (const item of items) {
       if (item.kind === "file") {
         const file = item.getAsFile();
         if (file) {
           loadFileAsImage(file);
+          hasFile = true;
         }
       }
     }
+
+    if (hasFile) {
+      e.preventDefault();
+      return;
+    }
+
+    // Check if targeting canvas container
+    const container = document.getElementById("canvas-container");
+    if (container && (e.target === container || container.contains(e.target))) {
+      // If pasting text into canvas container, block it
+      e.preventDefault();
+    }
   });
+
+  // Block keys in canvas container to prevent text input
+  const container = document.getElementById("canvas-container");
+  if (container) {
+    container.addEventListener("keydown", (e) => {
+      // Allow shortcuts like Ctrl+C, Ctrl+V, Ctrl+X
+      if (e.ctrlKey || e.metaKey) return;
+
+      // Allow navigation arrows, Tab, Delete, and Backspace
+      if (
+        [
+          "ArrowUp",
+          "ArrowDown",
+          "ArrowLeft",
+          "ArrowRight",
+          "Tab",
+          "Delete",
+          "Backspace",
+        ].includes(e.key)
+      )
+        return;
+
+      e.preventDefault();
+    });
+  }
 
   // Set up the payment form
   console.log(
