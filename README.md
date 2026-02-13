@@ -114,6 +114,20 @@ pnpm run dev
 ```
 The frontend application will be available at `http://localhost:5173`.
 
+### Lite Mode / Local Development
+
+For local development or single-instance "Lite" deployments where Redis is not available or not desired, the server automatically detects the unavailability of Redis and falls back to in-memory queues and session storage.
+
+You can also explicitly force this mode by setting the environment variable:
+```bash
+NO_REDIS=true
+```
+
+In this mode:
+-   Job queues (Email, Telegram, Odoo) run in-memory within the server process.
+-   Sessions are stored in memory (Note: restarts will clear sessions).
+-   Rate limiting uses in-memory storage.
+
 ## Production Build
 
 To create a production-ready build of the application, follow these steps:

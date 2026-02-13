@@ -47,7 +47,7 @@ import { LowDbAdapter } from './database/lowdb_adapter.js';
 import { startEmailWorker } from './workers/emailWorker.js';
 import { startTelegramWorker } from './workers/telegramWorker.js';
 import { startOdooWorker } from './workers/odooWorker.js';
-import { emailQueue, telegramQueue, odooQueue } from './queueManager.js';
+import { emailQueue, telegramQueue, odooQueue, redisAvailable } from './queueManager.js';
 import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
 import { wafMiddleware } from './waf.js';
 import OdooClient from './odoo.js';
@@ -400,7 +400,7 @@ async function startServer(
     // Only use real Redis in test if explicitly requested
     const useRealRedis = process.env.TEST_USE_REAL_REDIS === 'true' || process.env.NODE_ENV !== 'test';
 
-    if (redisUrl && useRealRedis) {
+    if (redisAvailable && redisUrl && useRealRedis) {
         try {
             const client = createClient({ url: redisUrl });
             client.on('error', (err) => logger.error('Redis Client Error', err));
