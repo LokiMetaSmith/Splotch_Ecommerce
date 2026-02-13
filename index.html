@@ -177,7 +177,13 @@
 
           <!-- Canvas for Image Editing -->
           <div class="bg-gray-50 p-4 rounded-lg shadow-inner mb-6">
-            <div class="relative w-fit mx-auto">
+            <div
+              id="canvas-container"
+              class="relative w-fit mx-auto outline-none"
+              contenteditable="true"
+              inputmode="none"
+              style="caret-color: transparent;"
+            >
               <canvas
                 id="imageCanvas"
                 width="500"
@@ -191,6 +197,7 @@
                 class="absolute inset-0 flex flex-col items-center justify-center select-none z-20 bg-white/60 backdrop-blur-sm rounded-lg cursor-pointer hover:bg-white/80 transition-colors focus-visible:ring-4 focus-visible:ring-splotch-teal focus-visible:outline-none focus-visible:ring-inset"
                 role="button"
                 tabindex="0"
+                contenteditable="false"
                 aria-label="Upload an image by clicking or dragging and dropping"
               >
                 <svg
@@ -225,6 +232,7 @@
                 id="designMarginNote"
                 class="absolute bottom-2 right-2 text-xs text-splotch-red p-1 bg-white bg-opacity-75 rounded"
                 style="font-family: var(--font-baumans); display: none"
+                contenteditable="false"
               >
                 Keep important elements 2-3mm from edge!
               </p>
