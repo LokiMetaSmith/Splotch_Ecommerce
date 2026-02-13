@@ -37,24 +37,34 @@
         outline-offset: 2px;
         background-color: #e5e7eb;
       }
-      /* Skip Link CSS */
-      .skip-link {
-        position: absolute;
-        transform: translateY(-100%);
-        left: 0;
+      /* Corner Button CSS */
+      .corner-btn {
+        position: fixed;
+        top: 0;
+        z-index: 9999;
         background: #2a284d; /* splotch-navy */
         color: #ffffff; /* splotch-white */
         padding: 8px 16px;
-        z-index: 9999;
-        transition: transform 0.2s;
         font-weight: bold;
-        border-bottom-right-radius: 8px;
         text-decoration: none;
+        transition: background-color 0.2s;
       }
-      .skip-link:focus {
-        transform: translateY(0);
+      .corner-btn:hover {
+        background: #1e1c36; /* Darker navy */
+      }
+      .corner-btn:focus-visible {
         outline: 3px solid #ff003a; /* splotch-red */
+        outline-offset: 2px;
       }
+      .corner-btn.left {
+        left: 0;
+        border-bottom-right-radius: 8px;
+      }
+      .corner-btn.right {
+        right: 0;
+        border-bottom-left-radius: 8px;
+      }
+
       /* Toggle Switch CSS */
       input:checked ~ .dot {
         transform: translateX(100%);
@@ -72,7 +82,8 @@
     <link rel="manifest" href="/manifest.json" />
   </head>
   <body class="bg-gray-100">
-    <a href="#sticker-design-box" class="skip-link">Skip to Sticker Editor</a>
+    <a href="#sticker-design-box" class="corner-btn left">Jump to Sticker Editor</a>
+    <a href="/orders.html" class="corner-btn right">View Order History</a>
     <div
       id="adblock-warning"
       style="
@@ -106,11 +117,6 @@
           >
             Sell this Design
           </button>
-          <a
-            href="/orders.html"
-            class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full"
-            >View Order History</a
-          >
         </div>
       </div>
 
@@ -217,7 +223,7 @@
           <!-- Basic Image Editing Controls -->
           <div
             id="editing-controls"
-            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-11 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-11 xl:grid-cols-11 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
           >
             <button
               type="button"
@@ -348,6 +354,7 @@
               id="grayscaleBtn"
               title="Apply Grayscale Filter"
               aria-pressed="false"
+              class="lg:hidden xl:block"
             >
               Grayscale
             </button>
@@ -356,13 +363,14 @@
               id="sepiaBtn"
               title="Apply Sepia Filter"
               aria-pressed="false"
+              class="lg:hidden xl:block"
             >
               Sepia
             </button>
             <button
               type="button"
               id="generateCutlineBtn"
-              class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-2 flex justify-center items-center gap-2"
+              class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-4 xl:col-span-2 flex justify-center items-center gap-2"
               title="Generate Cutline from Image Alpha"
             >
               Generate Smart Cutline
