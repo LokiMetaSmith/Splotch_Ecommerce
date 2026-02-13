@@ -9,3 +9,7 @@
 ## 2026-02-09 - Inconsistent ARIA Live Regions
 **Learning:** Status messages across the app (e.g., `printshop.html` vs `orders.html`) inconsistently use `aria-live`. While some have it, others rely on visual updates only, leaving screen reader users unaware of dynamic content changes like login status.
 **Action:** Always verify dynamic status containers (loading, success, error) have `role="status"` and `aria-live="polite"` to ensure inclusive feedback.
+
+## 2026-02-13 - Font Preview in Select Dropdowns
+**Learning:** Adding `style="font-family: ..."` to `<option>` elements in a font selector is a low-effort, high-impact UX improvement that allows users to preview typefaces immediately without selecting them first.
+**Action:** When implementing font selection tools, always attempt to display the font name in its own typeface within the selection interface.

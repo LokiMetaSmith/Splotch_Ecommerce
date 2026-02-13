@@ -37,32 +37,41 @@
         outline-offset: 2px;
         background-color: #e5e7eb;
       }
-      /* Corner Button CSS */
-      .corner-btn {
+      /* Top Menu Bar CSS */
+      .top-menu-bar {
         position: fixed;
         top: 0;
+        left: 0;
+        right: 0;
+        padding: 1rem;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
         z-index: 9999;
-        background: #2a284d; /* splotch-navy */
-        color: #ffffff; /* splotch-white */
-        padding: 8px 16px;
+      }
+      .menu-item {
+        pointer-events: auto;
+        background: #2a284d; /* splotch-navy fallback */
+        background: var(--splotch-navy, #2a284d);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 9999px;
+        font-family: var(--font-baumans, sans-serif);
         font-weight: bold;
         text-decoration: none;
-        transition: background-color 0.2s;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition:
+          transform 0.2s,
+          background-color 0.2s;
       }
-      .corner-btn:hover {
-        background: #1e1c36; /* Darker navy */
+      .menu-item:hover {
+        transform: translateY(-2px);
+        background: #00a99d; /* splotch-teal fallback */
+        background: var(--splotch-teal, #00a99d);
       }
-      .corner-btn:focus-visible {
+      .menu-item:focus-visible {
         outline: 3px solid #ff003a; /* splotch-red */
         outline-offset: 2px;
-      }
-      .corner-btn.left {
-        left: 0;
-        border-bottom-right-radius: 8px;
-      }
-      .corner-btn.right {
-        right: 0;
-        border-bottom-left-radius: 8px;
       }
 
       /* Toggle Switch CSS */
@@ -82,8 +91,10 @@
     <link rel="manifest" href="/manifest.json" />
   </head>
   <body class="bg-gray-100">
-    <a href="#sticker-design-box" class="corner-btn left">Jump to Sticker Editor</a>
-    <a href="/orders.html" class="corner-btn right">View Order History</a>
+    <nav class="top-menu-bar">
+      <a href="#sticker-design-box" class="menu-item">Jump to Sticker Editor</a>
+      <a href="/orders.html" class="menu-item">View Order History</a>
+    </nav>
     <div
       id="adblock-warning"
       style="
@@ -524,14 +535,48 @@
                 >Font:</label
               >
               <select id="textFontFamily" class="input mt-1 w-full md:w-1/2">
-                <option value="Arial">Arial</option>
-                <option value="Verdana">Verdana</option>
-                <option value="Times New Roman">Times New Roman</option>
-                <option value="Courier New">Courier New</option>
-                <option value="Georgia">Georgia</option>
-                <option value="Modak">Modak (Display)</option>
-                <option value="Baumans">Baumans (Body)</option>
-                <option value="Monofett">Monofett (Display)</option>
+                <option value="Arial" style="font-family: Arial, sans-serif">
+                  Arial
+                </option>
+                <option
+                  value="Verdana"
+                  style="font-family: Verdana, sans-serif"
+                >
+                  Verdana
+                </option>
+                <option
+                  value="Times New Roman"
+                  style="font-family: &quot;Times New Roman&quot;, serif"
+                >
+                  Times New Roman
+                </option>
+                <option
+                  value="Courier New"
+                  style="font-family: &quot;Courier New&quot;, monospace"
+                >
+                  Courier New
+                </option>
+                <option value="Georgia" style="font-family: Georgia, serif">
+                  Georgia
+                </option>
+                <option
+                  value="Modak"
+                  style="font-family: &quot;Modak&quot;, cursive"
+                >
+                  Modak (Display)
+                </option>
+                <option
+                  value="Baumans"
+                  style="font-family: &quot;Baumans&quot;, sans-serif"
+                >
+                  Baumans (Body)
+                </option>
+                <option
+                  value="Monofett"
+                  style="font-family: &quot;Monofett&quot;, cursive"
+                >
+                  Monofett (Display)
+                </option>
               </select>
             </div>
             <p
