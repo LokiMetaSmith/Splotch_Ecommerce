@@ -1154,6 +1154,10 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   // Scale the context to account for the higher resolution.
   // Using setTransform ensures this is not cumulative.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Update CSS size to match logical size
+  canvas.style.width = `${logicalWidth}px`;
+  canvas.style.height = `${logicalHeight}px`;
 }
 
 // --- Image Loading and Editing Functions ---
@@ -1192,20 +1196,8 @@ function loadFileAsImage(file) {
         originalImage = img;
         updateEditingButtonsState(false);
         showPaymentStatus("Image loaded successfully.", "success");
-        const maxWidth = 500,
-          maxHeight = 400;
         let newWidth = img.width,
           newHeight = img.height;
-        if (newWidth > maxWidth) {
-          const r = maxWidth / newWidth;
-          newWidth = maxWidth;
-          newHeight *= r;
-        }
-        if (newHeight > maxHeight) {
-          const r = maxHeight / newHeight;
-          newHeight = maxHeight;
-          newWidth *= r;
-        }
         if (canvas && ctx) {
           setCanvasSize(newWidth, newHeight);
           ctx.clearRect(0, 0, newWidth, newHeight);
@@ -1542,20 +1534,8 @@ function handleResetImage() {
     currentPolygons = [];
     currentCutline = [];
 
-    const maxWidth = 500,
-      maxHeight = 400;
     let newWidth = originalImage.width,
       newHeight = originalImage.height;
-    if (newWidth > maxWidth) {
-      const r = maxWidth / newWidth;
-      newWidth = maxWidth;
-      newHeight *= r;
-    }
-    if (newHeight > maxHeight) {
-      const r = maxHeight / newHeight;
-      newHeight = maxHeight;
-      newWidth *= r;
-    }
 
     if (canvas && ctx) {
       setCanvasSize(newWidth, newHeight);
@@ -2156,20 +2136,8 @@ async function handleRemoteImageLoad(imageUrl) {
     updateEditingButtonsState(false); // Enable editing
 
     // Standard canvas init logic
-    const maxWidth = 500,
-      maxHeight = 400;
     let newWidth = img.width,
       newHeight = img.height;
-    if (newWidth > maxWidth) {
-      const r = maxWidth / newWidth;
-      newWidth = maxWidth;
-      newHeight *= r;
-    }
-    if (newHeight > maxHeight) {
-      const r = maxHeight / newHeight;
-      newHeight = maxHeight;
-      newWidth *= r;
-    }
     setCanvasSize(newWidth, newHeight);
     ctx.clearRect(0, 0, newWidth, newHeight);
     ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
@@ -2220,20 +2188,8 @@ async function loadProductForBuyer(productId) {
     img.onload = () => {
       originalImage = img;
       // Draw
-      const maxWidth = 500,
-        maxHeight = 400;
       let newWidth = img.width,
         newHeight = img.height;
-      if (newWidth > maxWidth) {
-        const r = maxWidth / newWidth;
-        newWidth = maxWidth;
-        newHeight *= r;
-      }
-      if (newHeight > maxHeight) {
-        const r = maxHeight / newHeight;
-        newHeight = maxHeight;
-        newWidth *= r;
-      }
       setCanvasSize(newWidth, newHeight);
       ctx.clearRect(0, 0, newWidth, newHeight);
       ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);

@@ -1,14 +1,5 @@
 
-> lokimetasmith.github.io@1.0.0 dev
-> vite
+> lokimetasmith.github.io@1.0.0 start
+> serve dist
 
-9:18:07 PM [vite] (client) Re-optimizing dependencies because vite config has changed
-
-  VITE v7.1.12  ready in 915 ms
-
-  ➜  Local:   http://localhost:5173/
-  ➜  Network: http://192.168.0.2:5173/
-9:19:30 PM [vite] (client) hmr update /styles.css?direct
-9:19:30 PM [vite] (client) hmr update /styles.css?direct
-9:20:09 PM [vite] (client) hmr update /styles.css?direct
-9:20:09 PM [vite] (client) hmr update /styles.css?direct
+sh: 1: serve: not found
