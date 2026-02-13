@@ -78,6 +78,9 @@ For production environments, Redis is recommended for session storage and rate l
 ## Security and Session Management
 
 -   `SESSION_SECRET`: A secret key for signing the session ID cookie.
+    -   **Required in Production.**
+    -   In development (when `NODE_ENV` is not `production`), a default weak secret is used if this is not set.
+    -   Generate a strong random string (e.g., `openssl rand -base64 32`) for production use.
 -   `CSRF_SECRET`: A secret key for CSRF protection.
 -   `JWT_PRIVATE_KEY`: The private key for signing JSON Web Tokens (JWTs). If not provided, a new key will be generated on server startup. The key should be in PEM format.
 -   `JWT_PUBLIC_KEY`: The public key for verifying JSON Web Tokens (JWTs). If not provided, a new key will be generated on server startup. The key should be in PEM format.
