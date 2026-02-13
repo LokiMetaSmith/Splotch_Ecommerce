@@ -82,4 +82,18 @@ if (mascotContainer && mascotImg && mascotText) {
             mascotContainer.classList.remove('wiggle');
         }
     });
+
+    // Drag and Drop Logic
+    mascotContainer.setAttribute('draggable', true);
+
+    mascotContainer.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('application/x-mascot-drag', 'true');
+        e.dataTransfer.setData('text/uri-list', mascotImg.src);
+        e.dataTransfer.effectAllowed = 'copy';
+
+        // Use the image itself as the drag ghost, not the whole container (bubble etc)
+        if (mascotImg) {
+            e.dataTransfer.setDragImage(mascotImg, mascotImg.width / 2, mascotImg.height / 2);
+        }
+    });
 }

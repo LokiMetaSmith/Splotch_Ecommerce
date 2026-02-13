@@ -387,6 +387,22 @@ async function BootStrap() {
     canvas.addEventListener("drop", (e) => {
       e.preventDefault();
       canvas.classList.remove("border-dashed", "border-2", "border-blue-500");
+
+      // Handle Mascot Drop
+      if (e.dataTransfer.getData('application/x-mascot-drag')) {
+        const mascotSrc = e.dataTransfer.getData('text/uri-list');
+        if (mascotSrc) {
+            fetch(mascotSrc)
+                .then(res => res.blob())
+                .then(blob => {
+                    const file = new File([blob], "Splotch-Mascot.png", { type: blob.type });
+                    loadFileAsImage(file);
+                })
+                .catch(err => console.error("Failed to load mascot", err));
+        }
+        return;
+      }
+
       const file = e.dataTransfer.files[0];
       if (file) {
         loadFileAsImage(file);
@@ -426,6 +442,22 @@ async function BootStrap() {
       if (canvas)
         canvas.classList.remove("border-dashed", "border-2", "border-blue-500");
       canvasPlaceholder.classList.remove(...activeClasses);
+
+      // Handle Mascot Drop
+      if (e.dataTransfer.getData('application/x-mascot-drag')) {
+        const mascotSrc = e.dataTransfer.getData('text/uri-list');
+        if (mascotSrc) {
+            fetch(mascotSrc)
+                .then(res => res.blob())
+                .then(blob => {
+                    const file = new File([blob], "Splotch-Mascot.png", { type: blob.type });
+                    loadFileAsImage(file);
+                })
+                .catch(err => console.error("Failed to load mascot", err));
+        }
+        return;
+      }
+
       const file = e.dataTransfer.files[0];
       if (file) {
         loadFileAsImage(file);
