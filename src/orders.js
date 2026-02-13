@@ -219,7 +219,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     orders.forEach((order) => {
       const orderCard = document.createElement("div");
-      orderCard.className = "p-4 border rounded-lg shadow-sm bg-gray-50";
+      orderCard.className = "order-card p-4 border rounded-lg shadow-sm bg-gray-50";
 
       const receivedDate = new Date(order.receivedAt).toLocaleDateString();
       const formattedAmount = order.amount

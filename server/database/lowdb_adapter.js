@@ -281,7 +281,14 @@ export class LowDbAdapter {
     async getUserByEmail(email) {
         if (this.db.data.emailIndex && this.db.data.emailIndex[email]) {
             const id = this.db.data.emailIndex[email];
-            return this.db.data.users[id];
+            const user = this.db.data.users[id];
+            if (!user) {
+                logger.warn(`[LowDbAdapter] Index points to missing user! Email: ${email}, ID: ${id}`);
+                // Cleanup index?
+                delete this.db.data.emailIndex[email];
+                return undefined;
+            }
+            return user;
         }
         return Object.values(this.db.data.users).find(u => u.email === email);
     }

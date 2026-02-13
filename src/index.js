@@ -911,13 +911,18 @@ async function handlePaymentFormSubmit(event) {
         ? parseInt(stickerQuantityInput.value, 10)
         : 0,
       material: stickerMaterialSelect ? stickerMaterialSelect.value : "unknown",
-      cutLinePath: cutLinePath,
     };
+    if (cutLinePath) {
+      orderDetails.cutLinePath = cutLinePath;
+    }
 
     // Prepare server contact object (ensure phoneNumber is set)
     const serverContact = {
       ...billingContact,
       phoneNumber: billingContact.phone,
+      locality: billingContact.city,
+      administrativeDistrictLevel1: billingContact.state,
+      country: billingContact.countryCode,
     };
 
     const orderPayload = {
