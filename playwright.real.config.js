@@ -11,7 +11,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: 'node server/index.js',
+      command: 'node server/test-server.js',
       port: 3000,
       timeout: 120 * 1000,
       reuseExistingServer: !process.env.CI,

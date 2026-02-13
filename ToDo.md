@@ -28,6 +28,10 @@ These items address fundamental problems with the test setup and major gaps in f
 
 -   **[x] Unify Test Environment Setup:** The Jest environment is not configured correctly to handle ES module imports from the `/src` directory, forcing bad practices like code duplication in tests. This needs to be fixed to allow for standard `import` statements in all unit tests.
 -   **[x] Remove API Mocking in E2E Tests:** The entire Playwright suite runs against a mocked backend. While this is useful for isolating the frontend, it is not a true end-to-end test. A separate E2E test suite or configuration should be created that runs against the **real backend** to validate full-stack integration.
+    -   [x] Created `server/test-server.js` to run the real backend with a mocked Square client.
+    -   [x] Updated `playwright.real.config.js` to use the test server.
+    -   [x] Created `playwright_tests_real/order-flow.spec.js` to test the full order creation flow (upload -> price -> checkout -> order creation) against the real backend.
+    -   [x] Fixed issues in `src/index.js` payload mapping and `server/server.js` validation discovered during this testing.
 -   **[x] Add Tests for All Authentication Flows:** Backend integration tests are missing for all non-password authentication methods. Test suites need to be created for:
     -   [x] WebAuthn (Passkey) registration and login (`/api/auth/register-verify`, `/api/auth/login-verify`, etc.).
     -   [x] Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).

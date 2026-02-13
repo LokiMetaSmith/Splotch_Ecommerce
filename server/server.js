@@ -958,7 +958,7 @@ async function startServer(
             }
             return true;
       }),
-      body('orderDetails.cutLinePath').optional().isString().withMessage('cutLinePath must be a string').custom(value => {
+      body('orderDetails.cutLinePath').optional({ nullable: true }).isString().withMessage('cutLinePath must be a string').custom(value => {
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
@@ -1998,8 +1998,8 @@ async function startServer(
             }
 
             // Delete user
-            await db.deleteUser(user.username);
-            logger.info(`[COMPLIANCE] User deleted account: ${user.username}`);
+            await db.deleteUser(user.username || user.id);
+            logger.info(`[COMPLIANCE] User deleted account: ${user.username || user.id}`);
 
             res.json({ success: true, message: 'Account deleted successfully.' });
         } catch (error) {
