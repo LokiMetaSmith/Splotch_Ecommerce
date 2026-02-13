@@ -775,7 +775,7 @@ async function startServer(
     app.post('/api/upload-design', authenticateToken, upload.fields([
         { name: 'designImage', maxCount: 1 },
         { name: 'cutLineFile', maxCount: 1 }
-    ]), async (req, res) => {
+    ]), wafMiddleware, async (req, res) => {
         if (!req.files || !req.files.designImage) {
             return res.status(400).json({ error: 'No design image file uploaded' });
         }
