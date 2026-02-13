@@ -1,5 +1,4 @@
-import { Worker } from 'bullmq';
-import { connection } from '../queueManager.js';
+import { Worker, connection } from '../queueManager.js';
 import logger from '../logger.js';
 import { sendNewOrderNotification, updateOrderStatusNotification } from '../notificationLogic.js';
 

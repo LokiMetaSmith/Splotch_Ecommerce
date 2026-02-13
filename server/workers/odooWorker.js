@@ -1,5 +1,4 @@
-import { Worker } from 'bullmq';
-import { connection } from '../queueManager.js';
+import { Worker, connection } from '../queueManager.js';
 import logger from '../logger.js';
 import OdooClient from '../odoo.js';
 import { calculateMaterialUsage } from '../utils/materialCalculator.js';

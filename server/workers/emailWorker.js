@@ -1,6 +1,5 @@
-import { Worker } from 'bullmq';
+import { Worker, connection } from '../queueManager.js';
 import { sendEmail } from '../email.js';
-import { connection } from '../queueManager.js';
 import logger from '../logger.js';
 
 let worker;
