@@ -511,11 +511,18 @@ async function startServer(
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
     app.use(cookieParser(csrfSecret));
 
+    const weakDefaultSessionSecret = 'your-super-secret-session-key';
     let sessionSecret = getSecret('SESSION_SECRET');
     if (!sessionSecret) {
-        logger.error('❌ [FATAL] SESSION_SECRET is not set in environment variables.');
-        logger.error('   This is required for security in all environments. The application will now exit.');
-        process.exit(1);
+        if (process.env.NODE_ENV === 'production') {
+            logger.error('❌ [FATAL] SESSION_SECRET is not set in environment variables.');
+            logger.error('   This is required for security in production. The application will now exit.');
+            process.exit(1);
+        } else {
+            sessionSecret = weakDefaultSessionSecret;
+            logger.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a default for development.');
+            logger.warn('   Do not use this configuration in production.');
+        }
     }
 
 
