@@ -1,12 +1,23 @@
 // src/mascot.js
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        }, err => {
-            console.log('ServiceWorker registration failed: ', err);
+    if (import.meta.env.DEV) {
+        // In development, unregister any existing service workers to avoid caching issues with Vite
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+                registration.unregister();
+                console.log('ServiceWorker unregistered in dev mode:', registration);
+            }
         });
-    });
+    } else {
+        // In production, register the service worker
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+    }
 }
 
 // Mascot Interaction
