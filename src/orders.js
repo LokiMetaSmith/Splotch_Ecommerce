@@ -33,6 +33,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ordersList = document.getElementById("orders-list");
   const noOrdersMessage = document.getElementById("no-orders-message");
   const dataPrivacySection = document.getElementById("data-privacy-section");
+
+  // Bolt Optimization: Event Delegation for reorder buttons
+  ordersList.addEventListener("click", (e) => {
+    const reorderBtn = e.target.closest(".reorder-btn");
+    if (reorderBtn) {
+      const designImage = reorderBtn.dataset.designImage;
+      // For now, redirect to the main page with the image URL as a query param
+      // A more robust solution would pre-fill all options
+      window.location.href = `/?design=${encodeURIComponent(designImage)}`;
+    }
+  });
   const exportDataBtn = document.getElementById("exportDataBtn");
   const deleteAccountBtn = document.getElementById("deleteAccountBtn");
   const privacyStatus = document.getElementById("privacy-status");
@@ -211,22 +222,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function displayOrders(orders, authToken) {
-    ordersList.innerHTML = ""; // Clear loading/error message
     if (orders.length === 0) {
+      ordersList.innerHTML = ""; // Clear content
       ordersList.appendChild(noOrdersMessage); // Show the "no orders" message
       return;
     }
 
-    orders.forEach((order) => {
-      const orderCard = document.createElement("div");
-      orderCard.className = "order-card p-4 border rounded-lg shadow-sm bg-gray-50";
+    // Bolt Optimization: Batch DOM updates using innerHTML
+    const html = orders
+      .map((order) => {
+        const receivedDate = new Date(order.receivedAt).toLocaleDateString();
+        const formattedAmount = order.amount
+          ? `$${(order.amount / 100).toFixed(2)}`
+          : "N/A";
 
-      const receivedDate = new Date(order.receivedAt).toLocaleDateString();
-      const formattedAmount = order.amount
-        ? `$${(order.amount / 100).toFixed(2)}`
-        : "N/A";
-
-      orderCard.innerHTML = `
+        return `
+            <div class="order-card p-4 border rounded-lg shadow-sm bg-gray-50">
                 <div class="flex flex-col sm:flex-row justify-between items-start">
                     <div>
                         <h3 class="text-lg font-semibold text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
@@ -241,19 +252,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <div class="mt-4">
                     <button class="reorder-btn button is-primary text-sm" data-design-image="${order.designImagePath}">Reorder This Sticker</button>
                 </div>
-            `;
-      ordersList.appendChild(orderCard);
-    });
+            </div>`;
+      })
+      .join("");
 
-    // Add event listeners to reorder buttons
-    document.querySelectorAll(".reorder-btn").forEach((button) => {
-      button.addEventListener("click", (e) => {
-        const designImage = e.target.dataset.designImage;
-        // For now, redirect to the main page with the image URL as a query param
-        // A more robust solution would pre-fill all options
-        window.location.href = `/?design=${encodeURIComponent(designImage)}`;
-      });
-    });
+    ordersList.innerHTML = html;
   }
 });
 
