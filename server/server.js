@@ -337,7 +337,12 @@ async function startServer(
     const storage = storageProvider.getMulterStorage();
     const upload = multer({
       storage: storage,
-      limits: { fileSize: 10 * 1024 * 1024 } // 10 MB limit
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10 MB limit
+        files: 5,                   // Max 5 file fields
+        fields: 50,                 // Max 50 non-file fields
+        parts: 100                  // Max 100 parts total
+      }
     });
     logger.info('[SERVER] Multer configured for file uploads.');
     
@@ -538,7 +543,7 @@ async function startServer(
       }
     }));
 
-    app.use(express.json());
+    app.use(express.json({ limit: '100kb' }));
     app.use(wafMiddleware);
     app.disable('x-powered-by');
 
