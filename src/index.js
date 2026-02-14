@@ -2186,26 +2186,9 @@ function handleGenerateCutline() {
 // --- Creator / Product Functions ---
 async function checkAuthStatus() {
   try {
-    const response = await fetch(`${serverUrl}/api/auth/verify-token`, {
-      credentials: "include",
-      headers: {
-        // If there's a token in local storage (e.g., from login), add it.
-        // However, the cookie-based flow might be safer if implemented.
-        // The current codebase uses query params or expects cookies?
-        // `authenticateToken` checks Authorization header.
-        // The main page might not have the token in the header if it's not set.
-        // Let's check how the dashboard does it. Dashboard extracts from URL.
-        // For the main page, we might need to rely on a cookie or check localStorage if token was saved.
-        // For this implementation, let's assume if the user visited the dashboard, they might have a token.
-        // But the main page doesn't seem to persist it.
-        // HACKERMAN SOLUTION: Check URL for token too, or just don't show button if not explicit.
-      },
-    });
+    // Check localStorage for token (support both keys for backward compatibility)
+    const token = localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
 
-    // Wait, the main page doesn't have login logic.
-    // The user must provide a token via URL or LocalStorage to be "Logged In" on the main page.
-    // Let's check localStorage.
-    const token = localStorage.getItem("splotch_token");
     if (token) {
       const verifyRes = await fetch(`${serverUrl}/api/auth/verify-token`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -2236,7 +2219,7 @@ async function handleCreateProduct() {
   // But `handleFileChange` just reads locally.
 
   // 1. Get auth token
-  const token = localStorage.getItem("splotch_token");
+  const token = localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
   if (!token) {
     alert("You must be logged in to sell designs.");
     return;
