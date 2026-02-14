@@ -1,0 +1,156 @@
+\documentclass[11pt, a4paper]{article}
+
+\usepackage{geometry}
+\geometry{
+  a4paper,
+  total={170mm,257mm},
+  left=20mm,
+  top=20mm,
+}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdftitle={Splotch Print Shop - Technical Whitepaper},
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Splotch Technical Whitepaper}
+\lhead{LokiMetaSmith}
+\rfoot{Page \thepage}
+
+\title{\textbf{Splotch Print Shop Application}\\ \large Technical Whitepaper}
+\author{LokiMetaSmith}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This whitepaper details the architecture, features, and deployment strategies of the Splotch Print Shop application. Splotch is a comprehensive web-based platform designed for custom sticker printing businesses. It integrates order management, automated nesting for material optimization, payment processing via Square, and multi-channel notifications. The application is built with a focus on scalability, offering both a lightweight "Lite" tier for small shops and a robust "Standard" tier for high-volume production environments.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+The custom printing industry requires efficient handling of customer assets, precise order tracking, and optimized material usage. Splotch addresses these needs by providing a unified interface for customers to place orders and for shop administrators to manage production. Key differentiators include client-side nesting capabilities to reduce server load, seamless integration with Square for payments, and flexible deployment options ranging from single-container instances to distributed microservices.
+
+\section{System Architecture}
+
+\subsection{Frontend}
+The frontend is a Multi-Page Application (MPA) built with \textbf{Vite}. It utilizes vanilla JavaScript and modern web APIs to deliver a lightweight and performant user experience.
+\begin{itemize}
+    \item \textbf{Framework}: Vanilla JS with Vite for bundling.
+    \item \textbf{Styling}: Tailwind CSS for utility-first, responsive design.
+    \item \textbf{Key Libraries}:
+    \begin{itemize}
+        \item \texttt{simplewebauthn/browser}: For WebAuthn (Passkey) support.
+        \item \texttt{ClipperLib} \& \texttt{SvgNest}: For complex polygon operations and nesting.
+        \item \texttt{jspdf} \& \texttt{svg-to-pdfkit}: For generating production-ready PDF files.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Backend}
+The backend is a Node.js application using the \textbf{Express} framework. It is designed to be modular and secure.
+\begin{itemize}
+    \item \textbf{Runtime}: Node.js (v18+).
+    \item \textbf{Framework}: Express.js.
+    \item \textbf{Database}:
+    \begin{itemize}
+        \item \textbf{Standard Tier}: MongoDB (via \texttt{mongodb} driver) for scalability and concurrency.
+        \item \textbf{Lite Tier}: LowDB (JSON file-based) for ease of setup and low resource footprint.
+    \end{itemize}
+    \item \textbf{Queue System}: BullMQ (Redis-backed) for reliable background job processing (emails, Telegram notifications, Odoo sync).
+    \item \textbf{Storage}: Abstraction layer supporting both Local File System and AWS S3-compatible object storage.
+\end{itemize}
+
+\section{Core Features}
+
+\subsection{Order Management}
+The core of Splotch is its order processing system.
+\begin{itemize}
+    \item \textbf{Order Creation}: Customers can upload designs, specify quantities, and pay via Square.
+    \item \textbf{Status Tracking}: Orders move through defined states: \texttt{NEW}, \texttt{ACCEPTED}, \texttt{PRINTING}, \texttt{SHIPPED}, \texttt{DELIVERED}, \texttt{COMPLETED}, \texttt{CANCELED}.
+    \item \textbf{Dashboard}: Administrators have a real-time dashboard to view, filter, and manage orders.
+\end{itemize}
+
+\subsection{Advanced Image Processing \& Nesting}
+To minimize material waste, Splotch includes a powerful client-side nesting engine.
+\begin{itemize}
+    \item \textbf{Vector \& Raster Support}: Handles both SVG vector paths and raster images.
+    \item \textbf{Nesting Algorithm}: Uses a genetic algorithm (via \texttt{SvgNest}) to pack irregular shapes tightly into a defined bin size.
+    \item \textbf{Cut Lines}: Automatically generates or extracts cut lines from uploaded designs.
+    \item \textbf{Export}: Generates print-ready PDFs with embedded cut lines and registration marks.
+\end{itemize}
+
+\subsection{Integrations}
+Splotch connects with several external services to automate workflows.
+\begin{itemize}
+    \item \textbf{Square}: Handles secure payments and transaction records.
+    \item \textbf{Telegram}: A dedicated bot sends real-time notifications to admins for new orders and allows for quick status updates directly from the chat.
+    \item \textbf{Gmail API}: Sends transactional emails (order confirmation, shipping updates, magic links) using OAuth2 for secure authentication.
+    \item \textbf{Odoo}: Optional integration for inventory management and time logging.
+\end{itemize}
+
+\subsection{Authentication \& Security}
+Security is a primary design principle.
+\begin{itemize}
+    \item \textbf{Authentication Methods}:
+    \begin{itemize}
+        \item \textbf{Magic Link}: Passwordless login via email.
+        \item \textbf{WebAuthn}: Hardware security keys (YubiKey, TouchID) for phishing-resistant authentication.
+        \item \textbf{Google OAuth}: Social login for ease of access.
+        \item \textbf{Username/Password}: Traditional fallback with bcrypt hashing.
+    \end{itemize}
+    \item \textbf{Session Management}: JWT-based sessions with RS256 signing and automatic key rotation.
+    \item \textbf{Protection Mechanisms}:
+    \begin{itemize}
+        \item \textbf{WAF}: Custom Web Application Firewall middleware to block common attacks (SQLi, XSS).
+        \item \textbf{Rate Limiting}: Redis-backed rate limiting for API and Auth endpoints.
+        \item \textbf{CSRF}: Token-based protection for state-changing requests.
+        \item \textbf{Input Validation}: Strict schema validation using \texttt{express-validator}.
+    \end{itemize}
+\end{itemize}
+
+\section{Deployment \& DevOps}
+
+\subsection{Deployment Tiers}
+Splotch supports two primary deployment configurations to suit different needs.
+
+\subsubsection{Lite Tier}
+Optimized for low cost and simplicity.
+\begin{itemize}
+    \item \textbf{Database}: LowDB (File-based).
+    \item \textbf{Infrastructure}: Single Docker container running both Web Server and Telegram Bot.
+    \item \textbf{Requirements}: 1 vCPU, 1GB RAM.
+\end{itemize}
+
+\subsubsection{Standard Tier}
+Optimized for production reliability and scale.
+\begin{itemize}
+    \item \textbf{Database}: MongoDB Replica Set.
+    \item \textbf{Infrastructure}: Separate containers for Web Server (2 replicas), Telegram Bot, Redis, and MongoDB.
+    \item \textbf{Requirements}: 1 vCPU, 2GB+ RAM.
+\end{itemize}
+
+\subsection{Automation}
+The repository includes scripts for automated deployment to popular platforms:
+\begin{itemize}
+    \item \textbf{DigitalOcean}: \texttt{scripts/deploy-digitalocean.sh} automates Droplet creation and provisioning using \texttt{doctl}.
+    \item \textbf{Proxmox}: \texttt{scripts/deploy-proxmox.sh} automates VM cloning and cloud-init configuration for self-hosted environments.
+\end{itemize}
+
+\section{Conclusion}
+Splotch represents a modern, secure, and flexible solution for print shops. By leveraging client-side processing for heavy tasks like nesting and server-side robustness for data integrity and integrations, it strikes a balance between performance and cost. Its modular architecture ensures it can grow from a side-business to a full-scale production facility.
+
+\end{document}
