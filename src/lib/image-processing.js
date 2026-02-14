@@ -42,16 +42,27 @@ export function imageHasTransparentBorder(imageData) {
     return true;
 }
 
-/**
- * Traces the contour of the opaque part of an image.
- * Uses Moore-Neighbor tracing algorithm.
- * @param {ImageData} imageData - The image data.
- * @returns {Array<{x: number, y: number}>|null} - The contour points or null if no start found.
- */
-export function traceContour(imageData) {
-    const { data, width, height } = imageData;
+export function getPolygonArea(points) {
+    let area = 0;
+    const len = points.length;
+    for (let i = 0; i < len; i++) {
+        const j = (i + 1) % len;
+        area += points[i].x * points[j].y;
+        area -= points[j].x * points[i].y;
+    }
+    return Math.abs(area / 2);
+}
 
-    // Bolt Optimization: Check alpha first to avoid unnecessary reads
+/**
+ * Traces all contours of opaque parts of an image.
+ * Uses Moore-Neighbor tracing algorithm with a full scan.
+ * @param {ImageData} imageData - The image data.
+ * @returns {Array<Array<{x: number, y: number}>>} - Array of contours.
+ */
+export function traceContours(imageData) {
+    const { data, width, height } = imageData;
+    const visited = new Uint8Array(width * height); // 0 = unvisited, 1 = visited
+
     const isOpaque = (x, y) => {
         if (x < 0 || x >= width || y < 0 || y >= height) return false;
         const i = (y * width + x) * 4;
@@ -71,71 +82,98 @@ export function traceContour(imageData) {
         return true; // Otherwise, pixel is opaque
     };
 
-    // 1. Find the first non-transparent pixel
-    // Bolt Optimization: Linear scan over the array is faster than nested x/y loops with coordinate calculation
-    let startPos = null;
-    const len = data.length;
-    for (let i = 0; i < len; i += 4) {
-        // Inline transparency check for speed in the scan loop
-        const a = data[i+3];
-        if (a < 128) continue;
+    const contours = [];
 
-        const r = data[i];
-        const g = data[i+1];
-        const b = data[i+2];
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
 
-        if (r > 250 && g > 250 && b > 250) continue;
+            // Skip if already part of a boundary
+            if (visited[idx]) continue;
 
-        // Found it
-        const pixelIndex = i / 4;
-        startPos = {
-            x: pixelIndex % width,
-            y: Math.floor(pixelIndex / width)
-        };
-        break;
-    }
+            if (isOpaque(x, y)) {
+                // Only start tracing if we are at a "Left Edge" (enter opaque region from transparent)
+                // This prevents starting traces inside a solid body or on the right edge of a hole (if we don't care about holes)
+                // Actually, this logic correctly identifies the start of an outer boundary or a hole boundary.
+                if (x === 0 || !isOpaque(x - 1, y)) {
 
-    if (!startPos) {
-        return null; // No opaque pixels found
-    }
+                    const contour = [];
+                    let cx = x;
+                    let cy = y;
+                    const startPos = { x, y };
+                    let lastDirection = 6; // Start checking from 6 (South) assuming we entered from West?
+                    // Standard Moore enters from "Backwards".
+                    // If we scan L->R, we enter (x,y) from (x-1,y). So Backtrack is West (4).
+                    // We start checking clockwise from Backtrack? Or Counter-Clockwise?
+                    // Moore usually checks B starting from B's neighbor.
+                    // Let's stick to the previous implementation's direction logic if it worked,
+                    // or use standard: Start search from (entering direction - 1 or + 1).
+                    // Previous code: lastDirection = 6.
 
-    const contour = [];
-    // Bolt Optimization: Use local variables for coordinates to avoid object allocation in the loop
-    let cx = startPos.x;
-    let cy = startPos.y;
-    let lastDirection = 6; // Start by checking the pixel to the left
+                    let foundNext = false;
 
-    do {
-        contour.push({ x: cx, y: cy });
+                    do {
+                        contour.push({ x: cx, y: cy });
+                        visited[cy * width + cx] = 1;
 
-        // Start checking neighbors from the one after the direction we came from
-        let checkDirection = (lastDirection + 5) % 8;
-        let foundNext = false;
+                        // Start checking neighbors from the one after the direction we came from
+                        let checkDirection = (lastDirection + 5) % 8;
+                        foundNext = false;
 
-        for (let i = 0; i < 8; i++) {
-            const neighborOffset = MOORE_NEIGHBORS[checkDirection];
-            // Bolt Optimization: Compute coordinates directly, avoiding {x,y} object allocation
-            const nx = cx + neighborOffset.x;
-            const ny = cy + neighborOffset.y;
+                        for (let i = 0; i < 8; i++) {
+                            const neighborOffset = MOORE_NEIGHBORS[checkDirection];
+                            const nx = cx + neighborOffset.x;
+                            const ny = cy + neighborOffset.y;
 
-            if (isOpaque(nx, ny)) {
-                cx = nx;
-                cy = ny;
-                lastDirection = checkDirection;
-                foundNext = true;
-                break;
+                            if (isOpaque(nx, ny)) {
+                                cx = nx;
+                                cy = ny;
+                                lastDirection = checkDirection;
+                                foundNext = true;
+                                break;
+                            }
+                            checkDirection = (checkDirection + 1) % 8;
+                        }
+
+                        if (!foundNext) {
+                            break;
+                        }
+
+                    } while (cx !== startPos.x || cy !== startPos.y);
+
+                    if (contour.length > 2) {
+                        contours.push(contour);
+                    }
+                }
             }
-            checkDirection = (checkDirection + 1) % 8;
         }
+    }
 
-        if (!foundNext) {
-            // This can happen on a 1px line, we just stop.
-            break;
+    return contours;
+}
+
+/**
+ * Traces the contour of the opaque part of an image.
+ * Legacy wrapper: Returns the LARGEST contour found to avoid noise.
+ * @param {ImageData} imageData - The image data.
+ * @returns {Array<{x: number, y: number}>|null} - The contour points or null.
+ */
+export function traceContour(imageData) {
+    const contours = traceContours(imageData);
+    if (!contours || contours.length === 0) return null;
+
+    let maxArea = -1;
+    let largest = null;
+
+    for (const c of contours) {
+        const area = getPolygonArea(c);
+        if (area > maxArea) {
+            maxArea = area;
+            largest = c;
         }
+    }
 
-    } while (cx !== startPos.x || cy !== startPos.y);
-
-    return contour;
+    return largest;
 }
 
 export function perpendicularDistance(point, lineStart, lineEnd) {
