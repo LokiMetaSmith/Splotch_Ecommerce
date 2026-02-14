@@ -134,7 +134,7 @@ async function main() {
   Last Update: ${new Date(order.lastUpdatedAt || order.receivedAt).toLocaleString()}
       `;
       try {
-        const sentMessage = await bot.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, {
+        const sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, {
           reply_to_message_id: order.telegramMessageId,
         });
         // Store the message ID so we can delete it later
