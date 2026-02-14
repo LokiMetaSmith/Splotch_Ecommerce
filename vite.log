@@ -1,81 +1,70 @@
 
-> lokimetasmith.github.io@1.0.0 dev
+> lokimetasmith.github.io@1.0.0 dev /app
 > vite
 
 
-  VITE v7.1.12  ready in 745 ms
+  VITE v7.3.1  ready in 705 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: http://192.168.0.2:5173/
-3:51:17 PM [vite] (client) page reload src/lib/image-processing.js
-3:51:17 PM [vite] (client) hmr update /styles.css?direct
-3:51:38 PM [vite] (client) hmr update /styles.css?direct
-3:51:38 PM [vite] (client) hmr update /styles.css?direct
-3:54:06 PM [vite] (client) hmr update /styles.css?direct
-3:54:06 PM [vite] (client) hmr update /styles.css?direct
-3:54:06 PM [vite] (client) hmr update /styles.css?direct
-3:54:06 PM [vite] (client) hmr update /styles.css?direct
-3:54:06 PM [vite] (client) hmr update /styles.css?direct
-3:54:07 PM [vite] (client) hmr update /styles.css?direct
-3:54:55 PM [vite] (client) hmr update /styles.css?direct
-3:54:55 PM [vite] (client) hmr update /styles.css?direct
-3:54:55 PM [vite] (client) hmr update /styles.css?direct
-3:54:55 PM [vite] (client) hmr update /styles.css?direct
-3:54:55 PM [vite] (client) hmr update /styles.css?direct
-3:54:55 PM [vite] (client) hmr update /styles.css?direct
-3:55:46 PM [vite] (client) hmr update /styles.css?direct
-3:55:46 PM [vite] (client) hmr update /styles.css?direct
-3:55:46 PM [vite] (client) hmr update /styles.css?direct
-3:55:46 PM [vite] (client) hmr update /styles.css?direct
-3:55:46 PM [vite] (client) hmr update /styles.css?direct
-3:55:46 PM [vite] (client) hmr update /styles.css?direct
-3:56:28 PM [vite] (client) hmr update /styles.css?direct
-3:56:28 PM [vite] (client) hmr update /styles.css?direct
-3:56:28 PM [vite] (client) hmr update /styles.css?direct
-3:56:28 PM [vite] (client) hmr update /styles.css?direct
-3:56:29 PM [vite] (client) hmr update /styles.css?direct
-3:56:29 PM [vite] (client) hmr update /styles.css?direct
-3:57:04 PM [vite] (client) page reload src/lib/image-processing.js
-3:57:04 PM [vite] (client) hmr update /styles.css?direct
-3:57:10 PM [vite] (client) page reload src/lib/image-processing.js
-3:57:10 PM [vite] (client) hmr update /styles.css?direct
-3:57:43 PM [vite] (client) hmr update /styles.css?direct
-3:57:43 PM [vite] (client) hmr update /styles.css?direct
-3:57:43 PM [vite] (client) hmr update /styles.css?direct
-3:57:43 PM [vite] (client) hmr update /styles.css?direct
-3:57:44 PM [vite] (client) hmr update /styles.css?direct
-3:57:44 PM [vite] (client) hmr update /styles.css?direct
-3:58:48 PM [vite] (client) hmr update /styles.css?direct
-3:58:48 PM [vite] (client) hmr update /styles.css?direct
-3:58:48 PM [vite] (client) hmr update /styles.css?direct
-3:58:48 PM [vite] (client) hmr update /styles.css?direct
-3:58:49 PM [vite] (client) hmr update /styles.css?direct
-3:58:49 PM [vite] (client) hmr update /styles.css?direct
-4:00:06 PM [vite] (client) page reload src/lib/image-processing.js
-4:00:06 PM [vite] (client) hmr update /styles.css?direct
-4:00:25 PM [vite] (client) hmr update /styles.css?direct
-4:00:25 PM [vite] (client) hmr update /styles.css?direct
-4:01:03 PM [vite] (client) hmr update /styles.css?direct
-4:01:03 PM [vite] (client) hmr update /styles.css?direct
-4:01:03 PM [vite] (client) hmr update /styles.css?direct
-4:01:03 PM [vite] (client) hmr update /styles.css?direct
-4:01:03 PM [vite] (client) hmr update /styles.css?direct
-4:01:03 PM [vite] (client) hmr update /styles.css?direct
-4:01:39 PM [vite] (client) page reload src/lib/image-processing.js
-4:01:39 PM [vite] (client) hmr update /styles.css?direct
-4:01:48 PM [vite] (client) hmr update /styles.css?direct
-4:01:48 PM [vite] (client) hmr update /styles.css?direct
-4:01:48 PM [vite] (client) hmr update /styles.css?direct
-4:01:48 PM [vite] (client) hmr update /styles.css?direct
-4:01:49 PM [vite] (client) hmr update /styles.css?direct
-4:01:49 PM [vite] (client) hmr update /styles.css?direct
-4:02:48 PM [vite] (client) hmr update /styles.css?direct
-4:02:48 PM [vite] (client) hmr update /styles.css?direct
-4:02:48 PM [vite] (client) hmr update /styles.css?direct
-4:02:48 PM [vite] (client) hmr update /styles.css?direct
-4:02:48 PM [vite] (client) hmr update /styles.css?direct
-4:02:48 PM [vite] (client) hmr update /styles.css?direct
-4:04:10 PM [vite] (client) page reload src/lib/image-processing.js
-4:04:10 PM [vite] (client) hmr update /styles.css?direct
-4:07:10 PM [vite] (client) hmr update /styles.css?direct
-4:07:10 PM [vite] (client) hmr update /styles.css?direct
+6:47:03 PM [vite] (client) hmr update /styles.css?direct
+6:47:03 PM [vite] (client) hmr update /styles.css?direct
+6:47:03 PM [vite] (client) hmr update /styles.css?direct
+6:47:03 PM [vite] (client) hmr update /styles.css?direct
+6:47:52 PM [vite] (client) hmr update /styles.css?direct
+6:47:52 PM [vite] (client) hmr update /styles.css?direct
+6:48:04 PM [vite] (client) hmr update /styles.css?direct
+6:48:04 PM [vite] (client) hmr update /styles.css?direct
+6:48:04 PM [vite] (client) hmr update /styles.css?direct
+6:48:04 PM [vite] (client) hmr update /styles.css?direct
+6:48:07 PM [vite] (client) hmr update /styles.css?direct
+6:48:07 PM [vite] (client) hmr update /styles.css?direct
+6:48:09 PM [vite] (client) hmr update /styles.css?direct
+6:48:09 PM [vite] (client) hmr update /styles.css?direct
+6:48:09 PM [vite] (client) hmr update /styles.css?direct
+6:48:09 PM [vite] (client) hmr update /styles.css?direct
+6:48:19 PM [vite] http proxy error: /api/server-info
+AggregateError [ECONNREFUSED]:
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+6:48:19 PM [vite] (client) hmr update /styles.css?direct
+6:48:19 PM [vite] http proxy error: /api/csrf-token
+AggregateError [ECONNREFUSED]:
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+6:49:27 PM [vite] (client) hmr update /styles.css?direct
+6:49:27 PM [vite] (client) hmr update /styles.css?direct
+6:49:27 PM [vite] (client) hmr update /styles.css?direct
+6:49:27 PM [vite] (client) hmr update /styles.css?direct
+6:49:31 PM [vite] (client) hmr update /styles.css?direct
+6:49:31 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:33 PM [vite] (client) hmr update /styles.css?direct
+6:49:43 PM [vite] (client) hmr update /styles.css?direct
+6:49:43 PM [vite] (client) hmr update /styles.css?direct
+6:49:43 PM [vite] (client) hmr update /styles.css?direct
+6:49:43 PM [vite] (client) hmr update /styles.css?direct
+6:50:14 PM [vite] (client) hmr update /styles.css?direct
+6:50:14 PM [vite] (client) hmr update /styles.css?direct
+6:50:48 PM [vite] (client) page reload src/printshop.js
+6:50:48 PM [vite] (client) hmr update /styles.css?direct
+6:51:01 PM [vite] (client) hmr update /styles.css?direct
+6:51:01 PM [vite] (client) hmr update /styles.css?direct
+6:51:29 PM [vite] (client) page reload src/printshop.js
+6:51:29 PM [vite] (client) hmr update /styles.css?direct
+6:51:37 PM [vite] (client) hmr update /styles.css?direct
+6:51:37 PM [vite] (client) hmr update /styles.css?direct
+6:52:02 PM [vite] (client) page reload src/printshop.js
+6:52:02 PM [vite] (client) hmr update /styles.css?direct
+6:52:08 PM [vite] (client) hmr update /styles.css?direct
+6:52:08 PM [vite] (client) hmr update /styles.css?direct
+6:52:29 PM [vite] (client) page reload src/printshop.js
+6:52:29 PM [vite] (client) hmr update /styles.css?direct
