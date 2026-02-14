@@ -42,7 +42,10 @@ let textInput,
   textFontFamilySelect,
   textEditingControlsContainer,
   cutlineOffsetSlider,
-  cutlineOffsetValueDisplay;
+  cutlineOffsetValueDisplay,
+  cutlineSensitivitySlider,
+  cutlineSensitivityValueDisplay;
+let cutlineSensitivity = 10; // Default sensitivity
 let stickerMaterialSelect,
   stickerResolutionSelect,
   designMarginNote,
@@ -172,6 +175,8 @@ async function BootStrap() {
   sepiaBtnEl = document.getElementById("sepiaBtn");
   cutlineOffsetSlider = document.getElementById("cutlineOffsetSlider");
   cutlineOffsetValueDisplay = document.getElementById("cutlineOffsetValue");
+  cutlineSensitivitySlider = document.getElementById("cutlineSensitivitySlider");
+  cutlineSensitivityValueDisplay = document.getElementById("cutlineSensitivityValue");
 
   // Fetch CSRF token and pricing info
   await Promise.all([fetchCsrfToken(), fetchPricingInfo(), fetchInventory()]);
@@ -325,6 +330,23 @@ async function BootStrap() {
           redrawAll();
         }
       });
+    });
+  }
+
+  if (cutlineSensitivitySlider) {
+    // Update value display immediately
+    cutlineSensitivitySlider.addEventListener("input", (e) => {
+        cutlineSensitivity = parseInt(e.target.value, 10);
+        if (cutlineSensitivityValueDisplay) {
+            cutlineSensitivityValueDisplay.textContent = cutlineSensitivity;
+        }
+    });
+
+    // Trigger regeneration only on change (mouse up) to avoid lag
+    cutlineSensitivitySlider.addEventListener("change", () => {
+        if (originalImage && rasterCutlinePoly) {
+            handleGenerateCutline();
+        }
     });
   }
 
@@ -2051,7 +2073,7 @@ function handleGenerateCutline() {
   setTimeout(() => {
     try {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const contours = traceContours(imageData);
+      const contours = traceContours(imageData, cutlineSensitivity);
 
       if (!contours || contours.length === 0) {
         throw new Error(

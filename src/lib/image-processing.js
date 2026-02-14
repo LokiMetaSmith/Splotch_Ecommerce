@@ -53,15 +53,49 @@ export function getPolygonArea(points) {
     return Math.abs(area / 2);
 }
 
+function detectBackgroundColor(imageData) {
+    const { data, width, height } = imageData;
+    const corners = [
+        0, // Top-Left
+        (width - 1) * 4, // Top-Right
+        ((height - 1) * width) * 4, // Bottom-Left
+        ((height - 1) * width + (width - 1)) * 4 // Bottom-Right
+    ];
+
+    let rSum = 0, gSum = 0, bSum = 0, validCount = 0;
+
+    for (const i of corners) {
+        if (data[i+3] >= 128) { // Consider only opaque corners
+            rSum += data[i];
+            gSum += data[i+1];
+            bSum += data[i+2];
+            validCount++;
+        }
+    }
+
+    if (validCount === 0) {
+        // All corners are transparent, assume white background for fallback logic
+        return { r: 255, g: 255, b: 255 };
+    }
+
+    return {
+        r: Math.round(rSum / validCount),
+        g: Math.round(gSum / validCount),
+        b: Math.round(bSum / validCount)
+    };
+}
+
 /**
  * Traces all contours of opaque parts of an image.
  * Uses Moore-Neighbor tracing algorithm with a full scan.
  * @param {ImageData} imageData - The image data.
+ * @param {number} threshold - Tolerance for background color matching (0-255).
  * @returns {Array<Array<{x: number, y: number}>>} - Array of contours.
  */
-export function traceContours(imageData) {
+export function traceContours(imageData, threshold = 10) {
     const { data, width, height } = imageData;
     const visited = new Uint8Array(width * height); // 0 = unvisited, 1 = visited
+    const bgColor = detectBackgroundColor(imageData);
 
     const isOpaque = (x, y) => {
         if (x < 0 || x >= width || y < 0 || y >= height) return false;
@@ -76,10 +110,13 @@ export function traceContours(imageData) {
         const g = data[i+1];
         const b = data[i+2];
 
-        // Treat pure white pixels as transparent
-        if (r > 250 && g > 250 && b > 250) return false;
+        // Check if pixel is close to background color
+        const diff = Math.abs(r - bgColor.r) + Math.abs(g - bgColor.g) + Math.abs(b - bgColor.b);
 
-        return true; // Otherwise, pixel is opaque
+        // If diff is within threshold * 3 (since we sum 3 channels), treat as transparent (background)
+        if (diff <= threshold * 3) return false;
+
+        return true; // Otherwise, pixel is opaque (foreground)
     };
 
     const contours = [];
@@ -93,22 +130,13 @@ export function traceContours(imageData) {
 
             if (isOpaque(x, y)) {
                 // Only start tracing if we are at a "Left Edge" (enter opaque region from transparent)
-                // This prevents starting traces inside a solid body or on the right edge of a hole (if we don't care about holes)
-                // Actually, this logic correctly identifies the start of an outer boundary or a hole boundary.
                 if (x === 0 || !isOpaque(x - 1, y)) {
 
                     const contour = [];
                     let cx = x;
                     let cy = y;
                     const startPos = { x, y };
-                    let lastDirection = 6; // Start checking from 6 (South) assuming we entered from West?
-                    // Standard Moore enters from "Backwards".
-                    // If we scan L->R, we enter (x,y) from (x-1,y). So Backtrack is West (4).
-                    // We start checking clockwise from Backtrack? Or Counter-Clockwise?
-                    // Moore usually checks B starting from B's neighbor.
-                    // Let's stick to the previous implementation's direction logic if it worked,
-                    // or use standard: Start search from (entering direction - 1 or + 1).
-                    // Previous code: lastDirection = 6.
+                    let lastDirection = 6; // Start checking from 6 (South)
 
                     let foundNext = false;
 
