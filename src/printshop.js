@@ -215,7 +215,7 @@ async function handleWebAuthnLogin() {
             return;
         }
 
-        const authResp = await startAuthentication(opts);
+        const authResp = await startAuthentication({ optionsJSON: opts });
         
         // Encode binary data to Base64URL before sending to server
         const verificationPayload = {
@@ -323,7 +323,7 @@ async function handleRegistration() {
             method: 'POST',
             body: JSON.stringify({ username }),
         });
-        const regResp = await startRegistration(opts);
+        const regResp = await startRegistration({ optionsJSON: opts });
         
         // Encode binary data before sending for verification
         const verificationPayload = {
