@@ -1351,6 +1351,23 @@ function loadFileAsImage(file) {
           // Update the price now that we have dimensions
           calculateAndUpdatePrice();
           drawCanvasDecorations(currentBounds); // Draw the initial bounding box, size indicator, and rulers
+
+          // Bolt Fix: Default to 2 inches on import
+          if (pricingConfig) {
+            handleStandardResize(2);
+
+            // Update Slider UI
+            const resizeSliderEl = document.getElementById("resizeSlider");
+            const resizeInputNumberEl = document.getElementById("resizeInput");
+            const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
+
+            if (resizeSliderEl && resizeInputNumberEl) {
+              const val = isMetric ? 2 * 25.4 : 2;
+              resizeSliderEl.value = val;
+              resizeInputNumberEl.value = val.toFixed(1);
+              if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
+            }
+          }
         }
       };
       img.onerror = () =>
@@ -1659,6 +1676,7 @@ function handleResetImage() {
     basePolygons = [];
     currentPolygons = [];
     currentCutline = [];
+    rasterCutlinePoly = null; // Bolt Fix: Clear raster cutline on reset
 
     let newWidth = originalImage.width,
       newHeight = originalImage.height;
@@ -1790,10 +1808,11 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         const angleRad = (angleDegrees * Math.PI) / 180;
         const cos = Math.cos(angleRad);
         const sin = Math.sin(angleRad);
-        const oldCenterX = w / 2;
-        const oldCenterY = h / 2;
-        const newCenterX = newW / 2;
-        const newCenterY = newH / 2;
+        const dpr = window.devicePixelRatio || 1;
+        const oldCenterX = (w / dpr) / 2;
+        const oldCenterY = (h / dpr) / 2;
+        const newCenterX = (newW / dpr) / 2;
+        const newCenterY = (newH / dpr) / 2;
 
         rasterCutlinePoly = rasterCutlinePoly.map(poly => poly.map(p => {
             // Translate to old center
@@ -1983,8 +2002,13 @@ function handleStandardResize(targetInches) {
 
       // Handle Raster Cutline Scaling (Overlay Mode)
       if (rasterCutlinePoly && prevWidth > 0 && prevHeight > 0) {
-          const scaleX = newWidth / prevWidth;
-          const scaleY = newHeight / prevHeight;
+          // Bolt Fix: Calculate scale based on LOGICAL dimensions to match rasterCutlinePoly coordinate space
+          const dpr = window.devicePixelRatio || 1;
+          const prevLogicalWidth = prevWidth / dpr;
+          const prevLogicalHeight = prevHeight / dpr;
+
+          const scaleX = newWidth / prevLogicalWidth;
+          const scaleY = newHeight / prevLogicalHeight;
 
           rasterCutlinePoly = rasterCutlinePoly.map(poly => poly.map(p => ({
               x: p.x * scaleX,
@@ -2126,7 +2150,11 @@ function handleGenerateCutline() {
       }
 
       // Set the raster cutline polygon (Overlay Mode)
-      rasterCutlinePoly = finalContours;
+      const dpr = window.devicePixelRatio || 1;
+      rasterCutlinePoly = finalContours.map(poly => poly.map(p => ({
+          x: p.x / dpr,
+          y: p.y / dpr
+      })));
 
       // Generate the cutline immediately
       const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
