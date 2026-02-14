@@ -9,6 +9,7 @@ import {
   getPolygonArea,
   simplifyPolygon,
   imageHasTransparentBorder,
+  filterInternalContours,
 } from "./lib/image-processing.js";
 
 // index.js
@@ -26,6 +27,7 @@ let canvas, ctx;
 let basePolygons = []; // The original, unscaled polygons from the SVG
 let currentPolygons = [];
 let rasterCutlinePoly = null; // New global for Raster Mode cutline
+let cleanCanvasState = null; // To store clean image state (pixels + filters + rotation)
 let isMetric = false; // To track unit preference
 let currentCutline = [];
 let currentBounds = null;
@@ -312,24 +314,29 @@ async function BootStrap() {
     generateCutlineBtn.addEventListener("click", handleGenerateCutline);
 
   if (cutlineOffsetSlider) {
+    let pendingCutlineUpdate = false;
     cutlineOffsetSlider.addEventListener("input", (e) => {
       cutlineOffset = parseInt(e.target.value, 10);
       if (cutlineOffsetValueDisplay)
         cutlineOffsetValueDisplay.textContent = cutlineOffset;
 
-      requestAnimationFrame(() => {
-        if (rasterCutlinePoly) {
-          // Re-generate cutline for raster (Overlay Mode)
-          const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
-          currentCutline = cutline;
-          currentBounds = getPolygonsBounds(cutline);
-          calculateAndUpdatePrice();
-          drawCanvasDecorations(currentBounds);
-        } else if (basePolygons.length > 0) {
-          // Re-generate for SVG (Vector Mode)
-          redrawAll();
-        }
-      });
+      if (!pendingCutlineUpdate) {
+        pendingCutlineUpdate = true;
+        requestAnimationFrame(() => {
+          if (rasterCutlinePoly) {
+            // Re-generate cutline for raster (Overlay Mode)
+            const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+            currentCutline = cutline;
+            currentBounds = getPolygonsBounds(cutline);
+            calculateAndUpdatePrice();
+            drawCanvasDecorations(currentBounds);
+          } else if (basePolygons.length > 0) {
+            // Re-generate for SVG (Vector Mode)
+            redrawAll();
+          }
+          pendingCutlineUpdate = false;
+        });
+      }
     });
   }
 
@@ -1286,6 +1293,17 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   canvas.style.height = `${logicalHeight}px`;
 }
 
+function saveCleanState() {
+  if (!canvas || !ctx) return;
+  cleanCanvasState = ctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+function restoreCleanState() {
+  if (!canvas || !ctx || !cleanCanvasState) return;
+  // Use putImageData to bypass transformations and draw directly to device pixels
+  ctx.putImageData(cleanCanvasState, 0, 0);
+}
+
 // --- Image Loading and Editing Functions ---
 function handleFileChange(event) {
   const file = event.target.files[0];
@@ -1328,6 +1346,8 @@ function loadFileAsImage(file) {
           setCanvasSize(newWidth, newHeight);
           ctx.clearRect(0, 0, newWidth, newHeight);
           ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+          saveCleanState(); // Save state before decorations
 
           // For raster images, the bounds and cutline are the canvas itself.
           currentBounds = {
@@ -1543,6 +1563,12 @@ function drawPolygonsToCanvas(
 
 function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
   if (!bounds) return;
+
+  // In Raster Mode (where basePolygons is empty), we need to restore the clean image first to wipe old decorations.
+  if (basePolygons.length === 0 && cleanCanvasState) {
+    restoreCleanState();
+  }
+
   drawBoundingBox(bounds, offset);
   drawSizeIndicator(bounds, offset);
   drawRuler(bounds, offset);
@@ -1686,6 +1712,8 @@ function handleResetImage() {
       ctx.clearRect(0, 0, newWidth, newHeight);
       ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
 
+      saveCleanState(); // Save state before decorations
+
       currentBounds = {
         left: 0,
         top: 0,
@@ -1803,6 +1831,8 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
     ctx.clearRect(0, 0, newW, newH);
     ctx.drawImage(tempCanvas, 0, 0);
 
+    saveCleanState(); // Save state before decorations
+
     // Handle Raster Cutline Rotation (Overlay Mode)
     if (rasterCutlinePoly) {
         const angleRad = (angleDegrees * Math.PI) / 180;
@@ -1860,6 +1890,8 @@ function redrawOriginalImageWithFilters() {
     grayscale: isGrayscale,
     sepia: isSepia,
   });
+
+  saveCleanState(); // Save state before decorations
 
   // Explicitly restore stroke style before drawing decorations
   ctx.strokeStyle = "rgba(128, 128, 128, 0.9)";
@@ -2000,6 +2032,8 @@ function handleStandardResize(targetInches) {
       ctx.clearRect(0, 0, newWidth, newHeight);
       ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
 
+      saveCleanState(); // Save state before decorations
+
       // Handle Raster Cutline Scaling (Overlay Mode)
       if (rasterCutlinePoly && prevWidth > 0 && prevHeight > 0) {
           // Bolt Fix: Calculate scale based on LOGICAL dimensions to match rasterCutlinePoly coordinate space
@@ -2096,7 +2130,12 @@ function handleGenerateCutline() {
   // Use a timeout to allow the UI to update before the heavy computation
   setTimeout(() => {
     try {
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let imageData;
+      if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
+         imageData = cleanCanvasState;
+      } else {
+         imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      }
       const contours = traceContours(imageData, cutlineSensitivity);
 
       if (!contours || contours.length === 0) {
@@ -2106,7 +2145,23 @@ function handleGenerateCutline() {
       }
 
       // Filter contours to remove noise (e.g. area < 100 pixels)
-      const significantContours = contours.filter((c) => getPolygonArea(c) > 100);
+      let significantContours = contours.filter((c) => getPolygonArea(c) > 100);
+
+      // Suppress "island cuts" (internal holes) that are larger than 2mm.
+      // Constraint: "we can have internal cuts, but they should be less than 2mm"
+      // Interpretation: Keep internal cuts <= 2mm. Remove internal cuts > 2mm.
+      if (significantContours.length > 0) {
+          const selectedResolutionId = stickerResolutionSelect ? stickerResolutionSelect.value : 'dpi_300';
+          const selectedResolution = pricingConfig && pricingConfig.resolutions
+            ? pricingConfig.resolutions.find((r) => r.id === selectedResolutionId)
+            : null;
+
+          const ppi = selectedResolution ? selectedResolution.ppi : 300;
+          // Calculate 2mm in pixels
+          const minDimension = (2 / 25.4) * ppi;
+
+          significantContours = filterInternalContours(significantContours, minDimension);
+      }
 
       if (significantContours.length === 0) {
         throw new Error(
@@ -2186,26 +2241,9 @@ function handleGenerateCutline() {
 // --- Creator / Product Functions ---
 async function checkAuthStatus() {
   try {
-    const response = await fetch(`${serverUrl}/api/auth/verify-token`, {
-      credentials: "include",
-      headers: {
-        // If there's a token in local storage (e.g., from login), add it.
-        // However, the cookie-based flow might be safer if implemented.
-        // The current codebase uses query params or expects cookies?
-        // `authenticateToken` checks Authorization header.
-        // The main page might not have the token in the header if it's not set.
-        // Let's check how the dashboard does it. Dashboard extracts from URL.
-        // For the main page, we might need to rely on a cookie or check localStorage if token was saved.
-        // For this implementation, let's assume if the user visited the dashboard, they might have a token.
-        // But the main page doesn't seem to persist it.
-        // HACKERMAN SOLUTION: Check URL for token too, or just don't show button if not explicit.
-      },
-    });
+    // Check localStorage for token (support both keys for backward compatibility)
+    const token = localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
 
-    // Wait, the main page doesn't have login logic.
-    // The user must provide a token via URL or LocalStorage to be "Logged In" on the main page.
-    // Let's check localStorage.
-    const token = localStorage.getItem("splotch_token");
     if (token) {
       const verifyRes = await fetch(`${serverUrl}/api/auth/verify-token`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -2236,7 +2274,7 @@ async function handleCreateProduct() {
   // But `handleFileChange` just reads locally.
 
   // 1. Get auth token
-  const token = localStorage.getItem("splotch_token");
+  const token = localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
   if (!token) {
     alert("You must be logged in to sell designs.");
     return;
@@ -2313,6 +2351,8 @@ async function handleRemoteImageLoad(imageUrl) {
     ctx.clearRect(0, 0, newWidth, newHeight);
     ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
 
+    saveCleanState(); // Save state before decorations
+
     // Default bounds and cutline
     currentBounds = {
       left: 0,
@@ -2364,6 +2404,8 @@ async function loadProductForBuyer(productId) {
       setCanvasSize(newWidth, newHeight);
       ctx.clearRect(0, 0, newWidth, newHeight);
       ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+      saveCleanState(); // Save state before decorations
 
       // Mock Cutline if not provided (or parse it if it is)
       // For MVP, if there is no cutline path in response, we default to box?

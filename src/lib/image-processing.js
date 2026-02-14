@@ -297,3 +297,85 @@ export function simplifyPolygon(points, epsilon = 1.0) {
     if (points.length < 3) return points;
     return rdp(points, epsilon);
 }
+
+export function getPolygonBounds(points) {
+    if (!points || points.length === 0) {
+        return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 };
+    }
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of points) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+    }
+    return { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY };
+}
+
+export function isPointInPolygon(point, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].x, yi = polygon[i].y;
+        const xj = polygon[j].x, yj = polygon[j].y;
+
+        const intersect = ((yi > point.y) !== (yj > point.y))
+            && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+export function filterInternalContours(contours, minDimension) {
+    // 1. Precompute bounds and area for efficiency
+    const meta = contours.map((c, index) => {
+        const bounds = getPolygonBounds(c);
+        const area = getPolygonArea(c);
+        return { index, contour: c, bounds, area };
+    });
+
+    // 2. Sort by area descending (largest first) to optimize nesting checks
+    meta.sort((a, b) => b.area - a.area);
+
+    const result = [];
+
+    for (let i = 0; i < meta.length; i++) {
+        const current = meta[i];
+        let depth = 0;
+
+        // Check against all larger contours
+        for (let j = 0; j < i; j++) {
+            const potentialParent = meta[j];
+            // Quick check: Bounding box must contain
+            if (current.bounds.minX >= potentialParent.bounds.minX &&
+                current.bounds.maxX <= potentialParent.bounds.maxX &&
+                current.bounds.minY >= potentialParent.bounds.minY &&
+                current.bounds.maxY <= potentialParent.bounds.maxY) {
+
+                // Detailed check: Check first point
+                if (isPointInPolygon(current.contour[0], potentialParent.contour)) {
+                    depth++;
+                }
+            }
+        }
+
+        // Even depth (0, 2...) = Solid/Island
+        // Odd depth (1, 3...) = Hole
+        const isHole = (depth % 2 !== 0);
+
+        if (isHole) {
+            const maxDim = Math.max(current.bounds.width, current.bounds.height);
+            // "Internal cuts... should be less than 2mm"
+            // Filter: Remove holes that are LARGER than minDimension.
+            // Keep holes that are SMALLER or EQUAL to minDimension.
+            if (maxDim <= minDimension) {
+                // Bolt Fix: Reverse hole contours so Clipper recognizes them as holes (opposite winding)
+                result.push(current.contour.slice().reverse());
+            }
+        } else {
+            // Always keep solids
+            result.push(current.contour);
+        }
+    }
+
+    return result;
+}
