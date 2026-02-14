@@ -70,6 +70,44 @@ let cutlineOffset = 10; // Default offset
 let lastCalculatedPerimeter = 0;
 let lastCalculatedPerimeterCutlineRef = null;
 
+function getPolygonsBounds(polygons) {
+  if (!polygons || polygons.length === 0) {
+    return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  polygons.forEach((poly) => {
+    poly.forEach((pt) => {
+      // Handle both case styles safely
+      const x = pt.x !== undefined ? pt.x : pt.X;
+      const y = pt.y !== undefined ? pt.y : pt.Y;
+
+      if (x !== undefined && y !== undefined) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    });
+  });
+
+  if (minX === Infinity) {
+    return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+  }
+
+  return {
+    left: minX,
+    top: minY,
+    right: maxX,
+    bottom: maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
 // --- Main Application Setup ---
 async function BootStrap() {
   // Assign DOM elements
@@ -1291,7 +1329,7 @@ function redrawAll() {
 
   // Store the results globally
   currentCutline = cutline;
-  currentBounds = getBoundsOfPaths(cutline);
+  currentBounds = getPolygonsBounds(cutline);
 
   // --- VALIDATION ---
   // Ensure the bounds are valid before attempting to redraw the canvas
@@ -1357,7 +1395,7 @@ function handleSvgUpload(svgText) {
     currentPolygons = polygons;
     currentCutline = cutline;
     // Calculate the bounds of the final cutline for pricing and display
-    currentBounds = getBoundsOfPaths(cutline);
+    currentBounds = getPolygonsBounds(cutline);
 
     // Set canvas size based on the final cutline bounds
     canvas.width = currentBounds.right - currentBounds.left + 40; // Add padding
@@ -1402,38 +1440,6 @@ function generateCutLine(polygons, offset) {
   });
 
   return cutline;
-}
-
-function getBoundsOfPaths(paths) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  let hasPoints = false;
-
-  for (const poly of paths) {
-    for (const pt of poly) {
-      hasPoints = true;
-      // Handle both case conventions just in case (Clipper uses X/Y, we use x/y)
-      const x = pt.x !== undefined ? pt.x : pt.X;
-      const y = pt.y !== undefined ? pt.y : pt.Y;
-
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-    }
-  }
-
-  if (!hasPoints) {
-    return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
-  }
-
-  return {
-    left: minX,
-    top: minY,
-    right: maxX,
-    bottom: maxY,
-    width: maxX - minX,
-    height: maxY - minY,
-  };
 }
 
 function drawPolygonsToCanvas(
@@ -1680,7 +1686,7 @@ function handleResetImage() {
 function rotateCanvasContentFixedBounds(angleDegrees) {
   if (basePolygons.length > 0) {
     // SVG Vector Rotation
-    const bounds = getBoundsOfPaths(currentPolygons);
+    const bounds = getPolygonsBounds(currentPolygons);
     const centerX = bounds.left + (bounds.right - bounds.left) / 2;
     const centerY = bounds.top + (bounds.bottom - bounds.top) / 2;
     const angleRad = (angleDegrees * Math.PI) / 180;
@@ -1754,7 +1760,7 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
         // Regenerate currentCutline from rotated poly
         const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
         currentCutline = cutline;
-        currentBounds = getBoundsOfPaths(cutline);
+        currentBounds = getPolygonsBounds(cutline);
     } else {
         // Default bounds if no cutline
         currentBounds = {
@@ -1872,7 +1878,7 @@ function handleStandardResize(targetInches) {
 
   let currentMaxWidthPixels;
   if (basePolygons.length > 0) {
-    const bounds = getBoundsOfPaths(basePolygons);
+    const bounds = getPolygonsBounds(basePolygons);
     currentMaxWidthPixels = Math.max(bounds.width, bounds.height);
   } else {
     currentMaxWidthPixels = Math.max(originalImage.width, originalImage.height);
@@ -1939,7 +1945,7 @@ function handleStandardResize(targetInches) {
           // Regenerate currentCutline
           const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
           currentCutline = cutline;
-          currentBounds = getBoundsOfPaths(cutline);
+          currentBounds = getPolygonsBounds(cutline);
       } else {
           // Update the bounds and cutline for the new raster size (Default Box)
           currentBounds = {
@@ -2059,7 +2065,7 @@ function handleGenerateCutline() {
       // Generate the cutline immediately
       const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
       currentCutline = cutline;
-      currentBounds = getBoundsOfPaths(cutline);
+      currentBounds = getPolygonsBounds(cutline);
 
       // Redraw decorations (which will now include the cutline overlay)
       // Note: We are drawing on top of the existing canvas. Previous decorations might be baked in if not cleared,
