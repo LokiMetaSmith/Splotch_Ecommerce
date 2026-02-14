@@ -94,8 +94,8 @@ function detectBackgroundColor(imageData) {
  */
 export function traceContours(imageData, threshold = 10) {
     const { data, width, height } = imageData;
-    const visited = new Uint8Array(width * height); // 0 = unvisited, 1 = visited
-    const bgColor = detectBackgroundColor(imageData);
+    let visited = new Uint8Array(width * height); // 0 = unvisited, 1 = visited
+    let bgColor = detectBackgroundColor(imageData);
 
     const isOpaque = (x, y) => {
         if (x < 0 || x >= width || y < 0 || y >= height) return false;
@@ -105,76 +105,91 @@ export function traceContours(imageData, threshold = 10) {
         const a = data[i+3];
         if (a < 128) return false;
 
-        // Only read RGB if alpha check passes
-        const r = data[i];
-        const g = data[i+1];
-        const b = data[i+2];
+        // Only read RGB if alpha check passes and bgColor is set
+        if (bgColor) {
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
 
-        // Check if pixel is close to background color
-        const diff = Math.abs(r - bgColor.r) + Math.abs(g - bgColor.g) + Math.abs(b - bgColor.b);
+            // Check if pixel is close to background color
+            const diff = Math.abs(r - bgColor.r) + Math.abs(g - bgColor.g) + Math.abs(b - bgColor.b);
 
-        // If diff is within threshold * 3 (since we sum 3 channels), treat as transparent (background)
-        if (diff <= threshold * 3) return false;
+            // If diff is within threshold * 3 (since we sum 3 channels), treat as transparent (background)
+            if (diff <= threshold * 3) return false;
+        }
 
         return true; // Otherwise, pixel is opaque (foreground)
     };
 
     const contours = [];
 
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const idx = y * width + x;
+    const runTrace = () => {
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = y * width + x;
 
-            // Skip if already part of a boundary
-            if (visited[idx]) continue;
+                // Skip if already part of a boundary
+                if (visited[idx]) continue;
 
-            if (isOpaque(x, y)) {
-                // Only start tracing if we are at a "Left Edge" (enter opaque region from transparent)
-                if (x === 0 || !isOpaque(x - 1, y)) {
+                if (isOpaque(x, y)) {
+                    // Only start tracing if we are at a "Left Edge" (enter opaque region from transparent)
+                    if (x === 0 || !isOpaque(x - 1, y)) {
 
-                    const contour = [];
-                    let cx = x;
-                    let cy = y;
-                    const startPos = { x, y };
-                    let lastDirection = 6; // Start checking from 6 (South)
+                        const contour = [];
+                        let cx = x;
+                        let cy = y;
+                        const startPos = { x, y };
+                        let lastDirection = 6; // Start checking from 6 (South)
 
-                    let foundNext = false;
+                        let foundNext = false;
 
-                    do {
-                        contour.push({ x: cx, y: cy });
-                        visited[cy * width + cx] = 1;
+                        do {
+                            contour.push({ x: cx, y: cy });
+                            visited[cy * width + cx] = 1;
 
-                        // Start checking neighbors from the one after the direction we came from
-                        let checkDirection = (lastDirection + 5) % 8;
-                        foundNext = false;
+                            // Start checking neighbors from the one after the direction we came from
+                            let checkDirection = (lastDirection + 5) % 8;
+                            foundNext = false;
 
-                        for (let i = 0; i < 8; i++) {
-                            const neighborOffset = MOORE_NEIGHBORS[checkDirection];
-                            const nx = cx + neighborOffset.x;
-                            const ny = cy + neighborOffset.y;
+                            for (let i = 0; i < 8; i++) {
+                                const neighborOffset = MOORE_NEIGHBORS[checkDirection];
+                                const nx = cx + neighborOffset.x;
+                                const ny = cy + neighborOffset.y;
 
-                            if (isOpaque(nx, ny)) {
-                                cx = nx;
-                                cy = ny;
-                                lastDirection = checkDirection;
-                                foundNext = true;
+                                if (isOpaque(nx, ny)) {
+                                    cx = nx;
+                                    cy = ny;
+                                    lastDirection = checkDirection;
+                                    foundNext = true;
+                                    break;
+                                }
+                                checkDirection = (checkDirection + 1) % 8;
+                            }
+
+                            if (!foundNext) {
                                 break;
                             }
-                            checkDirection = (checkDirection + 1) % 8;
+
+                        } while (cx !== startPos.x || cy !== startPos.y);
+
+                        if (contour.length > 2) {
+                            contours.push(contour);
                         }
-
-                        if (!foundNext) {
-                            break;
-                        }
-
-                    } while (cx !== startPos.x || cy !== startPos.y);
-
-                    if (contour.length > 2) {
-                        contours.push(contour);
                     }
                 }
             }
         }
+    };
+
+    // First pass with detected background color
+    runTrace();
+
+    // If no contours found, retry without background color filtering
+    // This handles full-bleed images where the content might match the detected "background" color (corners)
+    if (contours.length === 0) {
+        visited = new Uint8Array(width * height); // Reset visited
+        bgColor = null; // Disable background color check
+        runTrace();
     }
 
     return contours;
