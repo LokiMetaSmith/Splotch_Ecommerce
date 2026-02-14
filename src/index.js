@@ -9,6 +9,7 @@ import {
   getPolygonArea,
   simplifyPolygon,
   imageHasTransparentBorder,
+  filterInternalContours,
 } from "./lib/image-processing.js";
 
 // index.js
@@ -2144,7 +2145,23 @@ function handleGenerateCutline() {
       }
 
       // Filter contours to remove noise (e.g. area < 100 pixels)
-      const significantContours = contours.filter((c) => getPolygonArea(c) > 100);
+      let significantContours = contours.filter((c) => getPolygonArea(c) > 100);
+
+      // Suppress "island cuts" (internal holes) that are larger than 2mm.
+      // Constraint: "we can have internal cuts, but they should be less than 2mm"
+      // Interpretation: Keep internal cuts <= 2mm. Remove internal cuts > 2mm.
+      if (significantContours.length > 0) {
+          const selectedResolutionId = stickerResolutionSelect ? stickerResolutionSelect.value : 'dpi_300';
+          const selectedResolution = pricingConfig && pricingConfig.resolutions
+            ? pricingConfig.resolutions.find((r) => r.id === selectedResolutionId)
+            : null;
+
+          const ppi = selectedResolution ? selectedResolution.ppi : 300;
+          // Calculate 2mm in pixels
+          const minDimension = (2 / 25.4) * ppi;
+
+          significantContours = filterInternalContours(significantContours, minDimension);
+      }
 
       if (significantContours.length === 0) {
         throw new Error(
