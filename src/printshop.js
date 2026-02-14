@@ -21,6 +21,64 @@ const svgCache = new Map(); // Cache for SVG strings to avoid redundant fetches
 // A single object to hold all DOM elements for cleaner management
 export const ui = {};
 
+class ToastManager {
+    constructor(element, messageElement, duration = 3000) {
+        this.element = element;
+        this.messageElement = messageElement;
+        this.duration = duration;
+        this.timeoutId = null;
+        this.isHidden = true;
+
+        if (this.element) {
+            // Bind events for pause on hover/focus
+            this.element.addEventListener('mouseenter', () => this.pause());
+            this.element.addEventListener('mouseleave', () => this.resume());
+            this.element.addEventListener('focusin', () => this.pause());
+            this.element.addEventListener('focusout', () => this.resume());
+        }
+    }
+
+    show(message) {
+        if (!this.element) return;
+        this.messageElement.textContent = message;
+        this.element.classList.remove('opacity-0', 'translate-y-full', 'pointer-events-none');
+        this.isHidden = false;
+        this.startTimer();
+    }
+
+    hide() {
+        if (!this.element) return;
+        this.element.classList.add('opacity-0', 'translate-y-full', 'pointer-events-none');
+        this.isHidden = true;
+        this.clearTimer();
+    }
+
+    startTimer() {
+        this.clearTimer();
+        this.timeoutId = setTimeout(() => this.hide(), this.duration);
+    }
+
+    clearTimer() {
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
+        }
+    }
+
+    pause() {
+        this.clearTimer();
+    }
+
+    resume() {
+        if (!this.isHidden) {
+            this.startTimer();
+        }
+    }
+}
+
+let errorToastManager;
+let successToastManager;
+
 // --- Helper Functions ---
 
 /**
@@ -362,17 +420,36 @@ function hideLoginModal() { ui.loginModal?.classList.add('hidden'); }
 function showLoadingIndicator() { ui.loadingIndicator?.classList.remove('hidden'); }
 function hideLoadingIndicator() { ui.loadingIndicator?.classList.add('hidden'); }
 function showErrorToast(message) {
-    ui.errorMessage.textContent = message;
-    ui.errorToast.classList.remove('hidden');
-    setTimeout(hideErrorToast, 5000);
+    if (errorToastManager) {
+        errorToastManager.show(message);
+    } else {
+        // Fallback if not initialized
+        ui.errorMessage.textContent = message;
+        ui.errorToast.classList.remove('hidden');
+    }
 }
-function hideErrorToast() { ui.errorToast?.classList.add('hidden'); }
+function hideErrorToast() {
+    if (errorToastManager) {
+        errorToastManager.hide();
+    } else {
+        ui.errorToast?.classList.add('hidden');
+    }
+}
 function showSuccessToast(message) {
-    ui.successMessage.textContent = message;
-    ui.successToast.classList.remove('hidden');
-    setTimeout(hideSuccessToast, 3000);
+    if (successToastManager) {
+        successToastManager.show(message);
+    } else {
+        ui.successMessage.textContent = message;
+        ui.successToast.classList.remove('hidden');
+    }
 }
-function hideSuccessToast() { ui.successToast?.classList.add('hidden'); }
+function hideSuccessToast() {
+    if (successToastManager) {
+        successToastManager.hide();
+    } else {
+        ui.successToast?.classList.add('hidden');
+    }
+}
 
 
 // --- Application Logic ---
@@ -997,9 +1074,15 @@ export async function init() {
         ui[key] = document.getElementById(id);
     });
 
-    await getCsrfToken();
+    // Initialize Toast Managers
+    if (ui.errorToast && ui.errorMessage) {
+        errorToastManager = new ToastManager(ui.errorToast, ui.errorMessage, 5000);
+    }
+    if (ui.successToast && ui.successMessage) {
+        successToastManager = new ToastManager(ui.successToast, ui.successMessage, 3000);
+    }
 
-    // Attach event listeners
+    // Attach event listeners immediately so UI is responsive
     ui.ordersList?.addEventListener('click', handleOrderListClick);
     ui.refreshOrdersBtn?.addEventListener('click', () => fetchAndDisplayOrders());
     ui.registerBtn?.addEventListener('click', handleRegistration);
@@ -1025,6 +1108,12 @@ export async function init() {
 
     // The main login button opens the modal
     ui.loginBtn?.addEventListener('click', showLoginModal);
+
+    // Fetch CSRF token in background or await if strictly needed for initial load,
+    // but we shouldn't block UI interactions that don't need it yet.
+    // However, login NEEDS it. But opening the modal doesn't.
+    // Let's await it but handle the case where it fails gracefully (it already catches error).
+    await getCsrfToken();
 
     // Filter button logic
     const filterContainer = document.getElementById('filter-container');

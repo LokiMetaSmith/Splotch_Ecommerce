@@ -90,9 +90,9 @@ describe('WebAuthn Functionality Reproduction', () => {
             <button id="webauthn-register-btn"></button>
             <button id="webauthn-login-btn"></button>
             <div id="loading-indicator" class="hidden"></div>
-            <div id="error-toast" class="hidden"></div>
+            <div id="error-toast" class="opacity-0 translate-y-full pointer-events-none"></div>
             <span id="error-message"></span>
-            <div id="success-toast" class="hidden"></div>
+            <div id="success-toast" class="opacity-0 translate-y-full pointer-events-none"></div>
             <span id="success-message"></span>
             <div id="auth-status"></div>
             <button id="loginBtn"></button>

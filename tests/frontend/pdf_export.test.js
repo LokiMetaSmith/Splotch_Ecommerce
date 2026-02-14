@@ -84,9 +84,9 @@ describe('PDF Export Functionality', () => {
 
         document.body.innerHTML = `
             <div id="exportPdfBtn"></div>
-            <div id="success-toast" class="hidden"></div>
+            <div id="success-toast" class="opacity-0 translate-y-full pointer-events-none"></div>
             <span id="success-message"></span>
-            <div id="error-toast" class="hidden"></div>
+            <div id="error-toast" class="opacity-0 translate-y-full pointer-events-none"></div>
             <span id="error-message"></span>
             <div id="orders-list"></div>
             <p id="no-orders-message"></p>
@@ -133,7 +133,8 @@ describe('PDF Export Functionality', () => {
         expect(jsPDFMock).not.toHaveBeenCalled();
         // Check if error toast is shown (checking class removal)
         const errorToast = document.getElementById('error-toast');
-        expect(errorToast.classList.contains('hidden')).toBe(false);
+        // The toast is visible when opacity-0 is removed
+        expect(errorToast.classList.contains('opacity-0')).toBe(false);
         expect(document.getElementById('error-message').textContent).toBe('No nested SVG to export.');
     });
 
@@ -144,7 +145,7 @@ describe('PDF Export Functionality', () => {
 
         expect(jsPDFMock).not.toHaveBeenCalled();
          const errorToast = document.getElementById('error-toast');
-        expect(errorToast.classList.contains('hidden')).toBe(false);
+        expect(errorToast.classList.contains('opacity-0')).toBe(false);
         expect(document.getElementById('error-message').textContent).toBe('Invalid SVG dimensions for PDF export.');
     });
 });
