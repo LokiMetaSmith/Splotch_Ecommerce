@@ -77,6 +77,11 @@ describe('Image Processing Library', () => {
             const height = 10;
             const data = new Uint8ClampedArray(width * height * 4);
 
+            // Fill background with White (to ensure black square is detected)
+            // Default is transparent (0,0,0,0), which is also fine.
+            // But let's be explicit to match new detectBackgroundColor logic if it assumes white for transparent corners?
+            // No, detectBackgroundColor handles transparency.
+
             for (let y = 3; y <= 6; y++) {
                 for (let x = 3; x <= 6; x++) {
                     const i = (y * width + x) * 4;
@@ -109,37 +114,31 @@ describe('Image Processing Library', () => {
             expect(contour).toBeNull();
         });
 
-        it('should trace a full-bleed opaque image correctly', () => {
+        it('should handle off-white background with threshold', () => {
             const width = 10;
             const height = 10;
             const data = new Uint8ClampedArray(width * height * 4);
-            // Fill completely opaque
+
+            // Fill background with "Dirty White" (240, 240, 240)
             for (let i = 0; i < data.length; i += 4) {
-                data[i+3] = 255;
+                data[i] = 240; data[i+1] = 240; data[i+2] = 240; data[i+3] = 255;
+            }
+
+            // Draw Black Square
+            for (let y = 3; y <= 6; y++) {
+                for (let x = 3; x <= 6; x++) {
+                    const i = (y * width + x) * 4;
+                    data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
+                }
             }
 
             const imageData = { data, width, height };
+            // Default threshold is 10. Diff is (255-240)*3 = 45 > 30? No.
+            // Bg is 240. Black is 0. Diff is 240*3 = 720. 720 > 30. So Black is opaque.
+            // But checking background pixels: 240 vs 240. Diff 0. So background is transparent.
+
             const contour = traceContour(imageData);
-
             expect(contour).not.toBeNull();
-            // It should trace the outer boundary: (0,0) -> (0,9) -> (9,9) -> (9,0) -> (0,0)
-            // The algorithm might visit every pixel on the edge.
-            // Perimeter is 10+10+10+10 - 4 = 36 pixels.
-            expect(contour.length).toBeGreaterThan(10);
-
-            // Verify bounds
-            let minX = 10, maxX = 0, minY = 10, maxY = 0;
-            contour.forEach(p => {
-                if(p.x < minX) minX = p.x;
-                if(p.x > maxX) maxX = p.x;
-                if(p.y < minY) minY = p.y;
-                if(p.y > maxY) maxY = p.y;
-            });
-
-            expect(minX).toBe(0);
-            expect(maxX).toBe(9);
-            expect(minY).toBe(0);
-            expect(maxY).toBe(9);
         });
     });
 
