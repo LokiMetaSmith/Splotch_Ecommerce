@@ -387,6 +387,13 @@
             >
               Sepia
             </button>
+            <div class="flex flex-col justify-center items-center col-span-2">
+                <label for="cutlineOffsetSlider" class="text-xs text-gray-500 mb-1">Cutline Offset</label>
+                <div class="flex items-center gap-1 w-full px-2">
+                    <input type="range" id="cutlineOffsetSlider" min="0" max="50" value="10" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal">
+                    <span id="cutlineOffsetValue" class="text-xs w-6 text-center text-gray-600 font-mono">10</span>
+                </div>
+            </div>
             <button
               type="button"
               id="generateCutlineBtn"

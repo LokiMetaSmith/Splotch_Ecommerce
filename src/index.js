@@ -5,7 +5,8 @@ import {
   drawImageWithFilters,
 } from "./lib/canvas-utils.js";
 import {
-  traceContour,
+  traceContours,
+  getPolygonArea,
   simplifyPolygon,
   imageHasTransparentBorder,
 } from "./lib/image-processing.js";
@@ -39,7 +40,9 @@ let textInput,
   textColorInput,
   addTextBtn,
   textFontFamilySelect,
-  textEditingControlsContainer;
+  textEditingControlsContainer,
+  cutlineOffsetSlider,
+  cutlineOffsetValueDisplay;
 let stickerMaterialSelect,
   stickerResolutionSelect,
   designMarginNote,
@@ -167,6 +170,8 @@ async function BootStrap() {
   const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
   grayscaleBtnEl = document.getElementById("grayscaleBtn");
   sepiaBtnEl = document.getElementById("sepiaBtn");
+  cutlineOffsetSlider = document.getElementById("cutlineOffsetSlider");
+  cutlineOffsetValueDisplay = document.getElementById("cutlineOffsetValue");
 
   // Fetch CSRF token and pricing info
   await Promise.all([fetchCsrfToken(), fetchPricingInfo(), fetchInventory()]);
@@ -300,6 +305,28 @@ async function BootStrap() {
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
   if (generateCutlineBtn)
     generateCutlineBtn.addEventListener("click", handleGenerateCutline);
+
+  if (cutlineOffsetSlider) {
+    cutlineOffsetSlider.addEventListener("input", (e) => {
+      cutlineOffset = parseInt(e.target.value, 10);
+      if (cutlineOffsetValueDisplay)
+        cutlineOffsetValueDisplay.textContent = cutlineOffset;
+
+      requestAnimationFrame(() => {
+        if (rasterCutlinePoly) {
+          // Re-generate cutline for raster (Overlay Mode)
+          const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+          currentCutline = cutline;
+          currentBounds = getPolygonsBounds(cutline);
+          calculateAndUpdatePrice();
+          drawCanvasDecorations(currentBounds);
+        } else if (basePolygons.length > 0) {
+          // Re-generate for SVG (Vector Mode)
+          redrawAll();
+        }
+      });
+    });
+  }
 
   // Creator / Product UI
   const sellDesignBtn = document.getElementById("sellDesignBtn");
@@ -2024,43 +2051,60 @@ function handleGenerateCutline() {
   setTimeout(() => {
     try {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const contour = traceContour(imageData);
+      const contours = traceContours(imageData);
 
-      if (!contour || contour.length < 3) {
+      if (!contours || contours.length === 0) {
         throw new Error(
-          "Could not find a distinct contour. Image may be empty or too complex.",
+          "Could not find any distinct contour. Image may be empty.",
         );
       }
 
-      // The raw contour is too detailed, simplify it using the RDP algorithm.
-      const simplifiedContour = simplifyPolygon(contour, 0.5); // Epsilon of 0.5 pixels
+      // Filter contours to remove noise (e.g. area < 100 pixels)
+      const significantContours = contours.filter((c) => getPolygonArea(c) > 100);
 
-      // Clean the polygon to remove self-intersections and other issues before offsetting.
-      // This requires scaling up for Clipper's integer math.
+      if (significantContours.length === 0) {
+        throw new Error(
+          "No significant shapes found. Image may be too noisy or empty.",
+        );
+      }
+
       const scale = 100;
-      const scaledPoly = simplifiedContour.map((p) => ({
-        X: p.x * scale,
-        Y: p.y * scale,
-      }));
-      const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(
-        scaledPoly,
-        0.1,
-      );
+      const finalContours = [];
 
-      // Add validation to ensure we have a usable polygon AFTER cleaning
-      if (!cleanedScaledPoly || cleanedScaledPoly.length < 3) {
+      significantContours.forEach((contour) => {
+        // The raw contour is too detailed, simplify it using the RDP algorithm.
+        const simplifiedContour = simplifyPolygon(contour, 0.5); // Epsilon of 0.5 pixels
+
+        // Clean the polygon to remove self-intersections and other issues before offsetting.
+        // This requires scaling up for Clipper's integer math.
+        const scaledPoly = simplifiedContour.map((p) => ({
+          X: p.x * scale,
+          Y: p.y * scale,
+        }));
+        const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(
+          scaledPoly,
+          0.1,
+        );
+
+        // Add validation to ensure we have a usable polygon AFTER cleaning
+        if (cleanedScaledPoly && cleanedScaledPoly.length >= 3) {
+          finalContours.push(
+            cleanedScaledPoly.map((p) => ({
+              x: p.X / scale,
+              y: p.Y / scale,
+            })),
+          );
+        }
+      });
+
+      if (finalContours.length === 0) {
         throw new Error(
           "Could not detect a usable outline. Try an image with a transparent background.",
         );
       }
 
-      const finalContour = cleanedScaledPoly.map((p) => ({
-        x: p.X / scale,
-        y: p.Y / scale,
-      }));
-
       // Set the raster cutline polygon (Overlay Mode)
-      rasterCutlinePoly = [finalContour];
+      rasterCutlinePoly = finalContours;
 
       // Generate the cutline immediately
       const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
