@@ -1,0 +1,29 @@
+[dotenv@17.2.1] injecting env (19) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+2026-02-15 02:24:08 [33mwarn[39m: [QUEUE] Redis unavailable. Falling back to in-memory queues. {"service":"print-shop-server"}
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Using Local Storage Provider. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Pricing configuration loaded. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [BOT] Telegraf bot launched (Polling enabled). {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] LowDB database initialized at: {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Multer configured for file uploads. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Initializing Square client... {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Square client initialized in SANDBOX mode. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Verifying connection to Square servers... {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: ✅ [SERVER] DNS resolution successful. Network connection appears to be working. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Square client initialized. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Performing sanity check on Square client... {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: ✅ [SERVER] Sanity check passed. Client has required API properties. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Using MemoryStore for session storage. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: ✅ [SERVER] Custom CSRF_SECRET is set. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Middleware (CORS, JSON, static file serving) enabled. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [33mwarn[39m: [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [WORKER] Email worker started. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [WORKER] Telegram worker started. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [WORKER] Odoo worker started. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Background workers started. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [KEY_MANAGER] Rotating keys... {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [KEY_MANAGER] Now managing 1 active keys. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Signed new session token with key ID: 68c2dd611cf68a38 {"service":"print-shop-server"}
+2026-02-15 02:24:08 [32minfo[39m: [SERVER] Server listening at http://localhost:3000 {"service":"print-shop-server"}
+2026-02-15 02:24:08 [31merror[39m: ❌ [FATAL] Port 3000 is already in use. {"service":"print-shop-server"}
+2026-02-15 02:24:08 [31merror[39m: Please close the other process or specify a different port in your .env file. {"service":"print-shop-server"}

@@ -351,29 +351,43 @@ async function startServer(
     let squareClient = injectedSquareClient;
 
     if (!squareClient) {
-      if (!getSecret('SQUARE_ACCESS_TOKEN')) {
-        logger.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
-        // In a test environment, we don't want to kill the test runner.
-        if (process.env.NODE_ENV !== 'test') {
-          process.exit(1);
+      const squareToken = getSecret('SQUARE_ACCESS_TOKEN');
+      if (!squareToken) {
+        if (process.env.NODE_ENV === 'production') {
+            logger.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+            process.exit(1);
+        } else {
+            logger.warn('⚠️ [SERVER] SQUARE_ACCESS_TOKEN is not set. Square integration will be disabled/mocked.');
         }
       }
-      // Determine Square Environment
-      const squareEnv = (getSecret('SQUARE_ENVIRONMENT') || 'sandbox').toLowerCase() === 'production'
-          ? SquareEnvironment.Production
-          : SquareEnvironment.Sandbox;
 
-      squareClient = new SquareClient({
-        version: '2025-07-16',
-        token: getSecret('SQUARE_ACCESS_TOKEN'),
-        environment: squareEnv,
-      });
-      logger.info(`[SERVER] Square client initialized in ${squareEnv === SquareEnvironment.Production ? 'PRODUCTION' : 'SANDBOX'} mode.`);
-      logger.info('[SERVER] Verifying connection to Square servers...');
+      if (squareToken) {
+          // Determine Square Environment
+          const squareEnv = (getSecret('SQUARE_ENVIRONMENT') || 'sandbox').toLowerCase() === 'production'
+              ? SquareEnvironment.Production
+              : SquareEnvironment.Sandbox;
+
+          squareClient = new SquareClient({
+            version: '2025-07-16',
+            token: squareToken,
+            environment: squareEnv,
+          });
+          logger.info(`[SERVER] Square client initialized in ${squareEnv === SquareEnvironment.Production ? 'PRODUCTION' : 'SANDBOX'} mode.`);
+          logger.info('[SERVER] Verifying connection to Square servers...');
+      } else {
+          // Create a mock/incomplete client to prevent immediate crashes, but API calls will likely fail if used.
+          // We attach a flag to indicate it's not real.
+          squareClient = {
+              _isMock: true,
+              locations: {},
+              payments: {},
+          };
+      }
     } else {
       logger.info('[SERVER] Using injected Square client.');
     }
-    if (process.env.NODE_ENV !== 'test') {
+
+    if (process.env.NODE_ENV !== 'test' && !squareClient._isMock) {
         try {
             await new Promise((resolve, reject) => {
                 dns.lookup('connect.squareup.com', (err) => {
@@ -392,7 +406,7 @@ async function startServer(
     logger.info('[SERVER] Square client initialized.');
   // --- NEW: Local Sanity Check for API properties ---
     logger.info('[SERVER] Performing sanity check on Square client...');
-    if (!squareClient.locations || !squareClient.payments) {
+    if ((!squareClient.locations || !squareClient.payments) && !squareClient._isMock) {
         logger.error('❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).');
         logger.error('   This may indicate an issue with the installed Square SDK package.');
         process.exit(1);
