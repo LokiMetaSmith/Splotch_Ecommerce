@@ -74,6 +74,10 @@ jest.unstable_mockModule('../keyManager.js', () => ({
     KEY_ROTATION_MS: 1000
 }));
 
+jest.unstable_mockModule('../utils/redisCheck.js', () => ({
+    checkRedisAvailability: jest.fn(() => Promise.resolve(true))
+}));
+
 // Set REDIS_URL to trigger redis logic
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.SESSION_SECRET = 'test-secret';

@@ -1281,6 +1281,11 @@ async function startServer(
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
+      // SECURITY: Prevent guest tokens (used for checkout) from searching existing orders
+      if (req.user.isGuest) {
+          return res.status(403).json({ error: 'Forbidden: Guests cannot search orders.' });
+      }
+
       const { q } = req.query;
       const user = await getUserByEmail(req.user.email);
       if (!user) {
@@ -1313,6 +1318,11 @@ async function startServer(
       if (!errors.isEmpty()) {
           return res.status(400).json({ errors: errors.array() });
       }
+      // SECURITY: Prevent guest tokens from viewing order details
+      if (req.user.isGuest) {
+          return res.status(403).json({ error: 'Forbidden: Guests cannot view order details.' });
+      }
+
       const { orderId } = req.params;
       const order = await db.getOrder(orderId);
 
