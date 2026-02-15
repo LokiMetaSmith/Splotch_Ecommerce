@@ -38,6 +38,7 @@ These items address fundamental problems with the test setup and major gaps in f
     -   [x] Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).
     -   [x] Google OAuth flow (`/auth/google`, `/oauth2callback`).
     -   [x] **Add E2E Magic Link Verification Test (Real Backend):** Created `playwright_tests_real/magic-link.spec.js` and updated server to support token retrieval in test mode.
+-   **[x] Fix Server Test Configuration:** Updated `run-tests.sh` to execute server-specific tests (`npm run test:server`) and fixed `jest.config.js` to isolate root unit tests. Also fixed regression in `server/tests/redis_rate_limit.test.js`.
 -   **[x] Fix Test Suite Regressions:** Fixed failing tests in `tests/tracker.test.js` (logging mock), `tests/orders.test.js` (error status code), and `tests/google-oauth.test.js` (CSRF flow). Restored full test suite pass state.
 -   **[x] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
     -   [x] Adding text to the canvas.
