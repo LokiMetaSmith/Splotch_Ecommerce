@@ -442,7 +442,9 @@ async function startServer(
     const authLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
       // In test environment, allow more requests unless explicitly testing rate limiting
-      max: (process.env.NODE_ENV === 'test' && !process.env.ENABLE_RATE_LIMIT_TEST) ? 1000 : 10,
+      max: (process.env.ENABLE_RATE_LIMIT_TEST) ? 10 :
+           (process.env.NODE_ENV === 'test') ? 1000 :
+           (process.env.NODE_ENV === 'production' ? 10 : 100),
       message: 'Too many login attempts from this IP, please try again after 15 minutes',
       standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
       legacyHeaders: false, // Disable the `X-RateLimit-*` headers
@@ -1877,7 +1879,8 @@ async function startServer(
       } catch (error) {
         await logAndEmailError(error, 'Error in /api/auth/register-verify');
         // SECURITY: Do not leak error details to the client
-        res.status(400).json({ error: 'Verification failed.' });
+        const errorMessage = process.env.NODE_ENV === 'production' ? 'Verification failed.' : `Verification failed: ${error.message}`;
+        res.status(400).json({ error: errorMessage });
       }
     });
 
@@ -1942,7 +1945,8 @@ async function startServer(
       } catch (error) {
         await logAndEmailError(error, 'Error in /api/auth/login-verify');
         // SECURITY: Do not leak error details to the client
-        res.status(400).json({ error: 'Verification failed.' });
+        const errorMessage = process.env.NODE_ENV === 'production' ? 'Verification failed.' : `Verification failed: ${error.message}`;
+        res.status(400).json({ error: errorMessage });
       }
     });
 
