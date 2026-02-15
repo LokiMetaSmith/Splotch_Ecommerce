@@ -57,6 +57,9 @@ jest.unstable_mockModule('jsonwebtoken', () => ({
 }));
 
 // Mock other dependencies to avoid side effects during server start
+jest.unstable_mockModule('../utils/redisCheck.js', () => ({
+    checkRedisAvailability: jest.fn().mockResolvedValue(true)
+}));
 jest.unstable_mockModule('../email.js', () => ({
     sendEmail: jest.fn()
 }));
