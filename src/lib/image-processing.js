@@ -380,7 +380,38 @@ export function isPointInPolygon(point, polygon) {
   return inside;
 }
 
-export function filterInternalContours(contours, minDimension) {
+export function smoothPolygon(points, iterations = 1) {
+  if (points.length < 3) return points;
+  let currentPoints = points;
+  for (let k = 0; k < iterations; k++) {
+    const nextPoints = [];
+    const len = currentPoints.length;
+    for (let i = 0; i < len; i++) {
+      const p1 = currentPoints[i];
+      const p2 = currentPoints[(i + 1) % len];
+
+      // Chaikin's algorithm (Corner Cutting)
+      // Point A: 0.75 * P1 + 0.25 * P2
+      // Point B: 0.25 * P1 + 0.75 * P2
+      nextPoints.push({
+        x: 0.75 * p1.x + 0.25 * p2.x,
+        y: 0.75 * p1.y + 0.25 * p2.y,
+      });
+      nextPoints.push({
+        x: 0.25 * p1.x + 0.75 * p2.x,
+        y: 0.25 * p1.y + 0.75 * p2.y,
+      });
+    }
+    currentPoints = nextPoints;
+  }
+  return currentPoints;
+}
+
+export function filterInternalContours(
+  contours,
+  maxAllowedHoleSize,
+  minAllowedHoleSize = 0,
+) {
   // 1. Precompute bounds and area for efficiency
   const meta = contours.map((c, index) => {
     const bounds = getPolygonBounds(c);
@@ -421,14 +452,14 @@ export function filterInternalContours(contours, minDimension) {
     if (isHole) {
       const maxDim = Math.max(current.bounds.width, current.bounds.height);
       // "Internal cuts... should be less than 2mm"
-      // Filter: Remove holes that are LARGER than minDimension.
-      // Keep holes that are SMALLER or EQUAL to minDimension.
-      if (maxDim <= minDimension) {
+      // Filter: Keep holes that are SMALLER than maxAllowedHoleSize
+      // AND LARGER than minAllowedHoleSize (to suppress noise spots).
+      if (maxDim <= maxAllowedHoleSize && maxDim >= minAllowedHoleSize) {
         // Bolt Fix: Reverse hole contours so Clipper recognizes them as holes (opposite winding)
         result.push(current.contour.slice().reverse());
       }
     } else {
-      // Always keep solids
+      // Always keep solids (islands are filtered by area before this function usually)
       result.push(current.contour);
     }
   }

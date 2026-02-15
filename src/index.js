@@ -8,6 +8,7 @@ import {
   traceContours,
   getPolygonArea,
   simplifyPolygon,
+  smoothPolygon,
   imageHasTransparentBorder,
   filterInternalContours,
 } from "./lib/image-processing.js";
@@ -2160,7 +2161,10 @@ function handleGenerateCutline() {
       }
 
       // Filter contours to remove noise (e.g. area < 100 pixels)
-      let significantContours = contours.filter((c) => getPolygonArea(c) > 100);
+      // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
+      const imageArea = canvas.width * canvas.height;
+      const minIslandArea = Math.max(100, imageArea * 0.0001); // At least 100px, or 0.01% of image
+      let significantContours = contours.filter((c) => getPolygonArea(c) > minIslandArea);
 
       // Suppress "island cuts" (internal holes) that are larger than 2mm.
       // Constraint: "we can have internal cuts, but they should be less than 2mm"
@@ -2172,10 +2176,12 @@ function handleGenerateCutline() {
             : null;
 
           const ppi = selectedResolution ? selectedResolution.ppi : 300;
-          // Calculate 2mm in pixels
-          const minDimension = (2 / 25.4) * ppi;
+          // Calculate 2mm in pixels for max hole size
+          const maxAllowedHoleSize = (2 / 25.4) * ppi;
+          // Calculate 0.5mm in pixels for min hole size (noise floor)
+          const minAllowedHoleSize = (0.5 / 25.4) * ppi;
 
-          significantContours = filterInternalContours(significantContours, minDimension);
+          significantContours = filterInternalContours(significantContours, maxAllowedHoleSize, minAllowedHoleSize);
       }
 
       if (significantContours.length === 0) {
@@ -2191,9 +2197,13 @@ function handleGenerateCutline() {
         // The raw contour is too detailed, simplify it using the RDP algorithm.
         const simplifiedContour = simplifyPolygon(contour, 0.5); // Epsilon of 0.5 pixels
 
+        // Bolt Optimization: Apply smoothing to round sharp corners ("surface energy minimization")
+        // 2 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
+        const smoothedContour = smoothPolygon(simplifiedContour, 2);
+
         // Clean the polygon to remove self-intersections and other issues before offsetting.
         // This requires scaling up for Clipper's integer math.
-        const scaledPoly = simplifiedContour.map((p) => ({
+        const scaledPoly = smoothedContour.map((p) => ({
           X: p.x * scale,
           Y: p.y * scale,
         }));
