@@ -13,3 +13,7 @@
 ## 2026-02-13 - Font Preview in Select Dropdowns
 **Learning:** Adding `style="font-family: ..."` to `<option>` elements in a font selector is a low-effort, high-impact UX improvement that allows users to preview typefaces immediately without selecting them first.
 **Action:** When implementing font selection tools, always attempt to display the font name in its own typeface within the selection interface.
+
+## 2026-02-15 - Input Masking
+**Learning:** Simple input masking (like for phone numbers) significantly reduces cognitive load and formatting errors without requiring heavy libraries.
+**Action:** Implement lightweight masking for structured inputs whenever possible.
