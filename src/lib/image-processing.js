@@ -108,28 +108,24 @@ export function traceContours(imageData, threshold = 10) {
   let bgColor = detectBackgroundColor(imageData);
 
   // Bolt Optimization: Helper to check opacity by index directly to avoid bounds checks in tight loops
-  const isOpaqueAtIndex = (i) => {
-    // Check Alpha first
-    if (data[i + 3] < 128) return false;
-
-    // Only read RGB if alpha check passes and bgColor is set
-    if (bgColor) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      // Check if pixel is close to background color
+  // Optimization: Capture necessary values in closure to avoid property access and conditional logic in the hot loop
+  let isOpaqueAtIndex;
+  if (bgColor) {
+    const { r: bgR, g: bgG, b: bgB } = bgColor;
+    const threshold3 = threshold * 3;
+    isOpaqueAtIndex = (i) => {
+      if (data[i + 3] < 128) return false;
       const diff =
-        Math.abs(r - bgColor.r) +
-        Math.abs(g - bgColor.g) +
-        Math.abs(b - bgColor.b);
-
-      // If diff is within threshold * 3 (since we sum 3 channels), treat as transparent (background)
-      if (diff <= threshold * 3) return false;
-    }
-
-    return true;
-  };
+        Math.abs(data[i] - bgR) +
+        Math.abs(data[i + 1] - bgG) +
+        Math.abs(data[i + 2] - bgB);
+      return diff > threshold3;
+    };
+  } else {
+    isOpaqueAtIndex = (i) => {
+      return data[i + 3] >= 128;
+    };
+  }
 
   const isOpaque = (x, y) => {
     if (x < 0 || x >= width || y < 0 || y >= height) return false;
