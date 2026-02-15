@@ -1803,6 +1803,7 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
     redrawAll();
   } else if (originalImage) {
     // Use the current canvas dimensions, which represent the scaled image size
+    const dpr = window.devicePixelRatio || 1;
     const w = canvas.width;
     const h = canvas.height;
 
@@ -1810,7 +1811,12 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
     const newW = angleDegrees === 90 || angleDegrees === -90 ? h : w;
     const newH = angleDegrees === 90 || angleDegrees === -90 ? w : h;
 
+    // Calculate logical dimensions for setCanvasSize (which multiplies by DPR)
+    const newLogicalW = newW / dpr;
+    const newLogicalH = newH / dpr;
+
     // Create a new in-memory canvas to draw the rotated image on
+    // Use physical dimensions to preserve quality
     const tempCanvas = document.createElement("canvas");
     const tempCtx = tempCanvas.getContext("2d");
 
@@ -1824,12 +1830,21 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
 
     // Draw the image from the main canvas onto the temp canvas
     // This preserves all current transformations (scale, filters)
+    // We draw the physical canvas directly
     tempCtx.drawImage(canvas, -w / 2, -h / 2);
 
     // Now, update the main canvas with the rotated image
-    setCanvasSize(newW, newH);
+    // Pass LOGICAL dimensions
+    setCanvasSize(newLogicalW, newLogicalH);
+
+    // Draw the temp canvas onto the main canvas
+    // Since setCanvasSize sets a transform (scale(dpr)), we must reset it temporarily
+    // to draw our physical-pixel tempCanvas 1:1 onto the physical-pixel main canvas.
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, newW, newH);
     ctx.drawImage(tempCanvas, 0, 0);
+    ctx.restore(); // Restore the transform for subsequent drawing operations (decorations)
 
     saveCleanState(); // Save state before decorations
 
