@@ -798,7 +798,18 @@ async function initializeCard(paymentsSDK) {
 
 async function tokenize(paymentMethod, verificationDetails) {
   if (!paymentMethod) throw new Error("Card payment method not initialized.");
-  const tokenResult = await paymentMethod.tokenize(verificationDetails);
+
+  // In dev mode (insecure context), verificationDetails can cause strict validation errors
+  // or SCA failures. We skip passing them if the context is insecure.
+  let tokenizationArgs = verificationDetails;
+  if (verificationDetails && typeof window !== 'undefined' && !window.isSecureContext) {
+    console.warn(
+      "Insecure context detected: Skipping verificationDetails for tokenization.",
+    );
+    tokenizationArgs = undefined;
+  }
+
+  const tokenResult = await paymentMethod.tokenize(tokenizationArgs);
   if (tokenResult.status === "OK") {
     if (!tokenResult.token)
       throw new Error("Tokenization succeeded but no token was returned.");
