@@ -25,4 +25,14 @@ There are four primary ways to deploy this application, each with its own guide:
 - **Use Case:** For deploying the application to a production environment on a cloud provider like DigitalOcean, AWS, or Vultr.
 - **📚 [Guide: Remote Cloud VPS Deployment](./remote-vps.md)**
 
+### 5. Deployment Planning
+
+- **Use Case:** To understand resource requirements and recommended deployment tiers (Lite vs Standard).
+- **📚 [Guide: Plan Recommendations](./plan-recommendations.md)**
+
+### 6. Reverse Proxy Guide
+
+- **Use Case:** General information about using a reverse proxy (Caddy, Nginx) for security and SSL.
+- **📚 [Guide: Using a Reverse Proxy](./reverse-proxy.md)**
+
 Please choose the guide that matches your deployment target.

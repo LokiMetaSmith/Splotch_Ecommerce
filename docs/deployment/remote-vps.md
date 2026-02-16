@@ -2,22 +2,140 @@
 
 This guide covers deploying the Print Shop application to a production environment on a remote Virtual Private Server (VPS) from a cloud provider like DigitalOcean, Vultr, Linode, or AWS.
 
-We present two methods:
+We present three methods:
 
-1.  **Automated Deployment with Cloud-Init (Recommended):** This method uses a script to automate the entire server setup process. It's fast, repeatable, and based on Docker.
-2.  **Manual Deployment (Legacy):** This is a traditional, non-containerized guide for setting up the application step-by-step.
+1.  **Automated Deployment Script (DigitalOcean):** The easiest way to deploy to DigitalOcean using a provided shell script.
+2.  **Manual Cloud-Init Deployment:** For advanced users who want to manually configure the cloud-init user data, supporting both Podman and Docker.
+3.  **Manual Deployment (Legacy):** This is a traditional, non-containerized guide for setting up the application step-by-step.
 
 ---
 
-## Method 1: Automated Deployment with Cloud-Init
+## Method 1: Automated Deployment Script (DigitalOcean)
 
-This is the fastest and most reliable way to deploy the application. We provide two cloud-init scripts: one using Podman (recommended) and one using Docker (legacy).
+This method uses a shell script to automate the creation and provisioning of a new DigitalOcean Droplet. The Droplet will be fully configured to build and run the application using Docker and Nginx.
 
-### Method 1a: Podman and Systemd (Recommended)
+### Prerequisites
+
+Before you begin, ensure you have the following:
+
+1.  **DigitalOcean Account**: You'll need an active account.
+2.  **`doctl` CLI Tool**: The official DigitalOcean command-line tool must be installed and authenticated.
+    *   **Installation**: Follow the official instructions at [docs.digitalocean.com/reference/doctl/how-to/install/](https://docs.digitalocean.com/reference/doctl/how-to/install/).
+    *   **Authentication**: Run `doctl auth init` and provide your personal access token. The token needs read and write permissions.
+3.  **SSH Key in DigitalOcean**: You must have an SSH public key uploaded to your DigitalOcean account. You will need its fingerprint.
+    *   You can find the fingerprint in your DigitalOcean control panel under **Settings -> Security**.
+    *   Alternatively, use the command: `doctl compute ssh-key list`.
+
+### Step 1: Configure the Deployment Script
+
+The deployment process is managed by the `deploy-digitalocean.sh` script. You can either hardcode your SSH key fingerprint or let the script guide you interactively.
+
+**Option A: Hardcode SSH Key (Recommended for automation)**
+1.  Open the script file: `scripts/deploy-digitalocean.sh`.
+2.  Find the `SSH_KEY_FINGERPRINT` variable.
+3.  Replace the placeholder value `"YOUR_SSH_KEY_FINGERPRINT"` with the actual fingerprint of the SSH key you want to use for the new Droplet.
+
+**Option B: Interactive Mode**
+If you leave the `SSH_KEY_FINGERPRINT` variable as is, the script will automatically detect that it's unset and will fetch a list of your available SSH keys from DigitalOcean, allowing you to select one interactively.
+
+### Step 2: Run the Deployment Script
+
+Once the script is configured, you can run it from the root of the project. You have two options for deployment:
+
+**Option A: Standard Deployment (Default)**
+*   **Best for:** Production environments.
+*   **Specs:** 2GB RAM ($12/mo), MongoDB, separate service containers.
+*   **Command:**
+    ```bash
+    ./scripts/deploy-digitalocean.sh [optional-droplet-name]
+    ```
+
+**Option B: Lite Deployment**
+*   **Best for:** Testing or low-traffic personal use.
+*   **Specs:** 1GB RAM ($6/mo), LowDB (file-based), single container.
+*   **Command:**
+    ```bash
+    ./scripts/deploy-digitalocean.sh [optional-droplet-name] --lite
+    ```
+
+**Execution:**
+
+1.  Make sure the script is executable:
+    ```bash
+    chmod +x scripts/deploy-digitalocean.sh
+    ```
+
+2.  Run the command for your chosen mode.
+    ```bash
+    # Example: Standard deployment
+    ./scripts/deploy-digitalocean.sh my-print-shop
+
+    # Example: Lite deployment
+    ./scripts/deploy-digitalocean.sh my-print-shop-lite --lite
+    ```
+
+The script will now:
+*   Confirm the settings with you.
+*   Create the Droplet on your DigitalOcean account.
+*   Use the `docs/digitalocean-cloud-config.yml` file to provision the server. This includes installing Docker, cloning the repository, and starting the application.
+*   Output the new Droplet's IP address.
+
+### Step 3: Post-Deployment Configuration
+
+The server is now running, but you must perform a few manual steps to finalize the setup.
+
+1.  **SSH into the new Droplet**:
+    The script creates a user named `loki`. Use the IP address from the script's output to connect:
+    ```bash
+    ssh loki@YOUR_DROPLET_IP
+    ```
+
+2.  **Update Configuration Files**:
+    The server was provisioned using a template. You **must** replace the placeholder values in the Nginx and environment configuration files.
+
+    *   **Edit the environment file**:
+        ```bash
+        nano /home/loki/lokimetasmith.github.io/.env
+        ```
+        Replace all placeholders like `YOUR_DROPLET_IP`, `YOUR_PRODUCTION_SQUARE_TOKEN`, etc., with your actual production credentials and secrets.
+
+    *   **Edit the Nginx config**:
+        ```bash
+        nano /home/loki/lokimetasmith.github.io/nginx.conf
+        ```
+        Update the `server_name` directive to your domain or the Droplet's IP address.
+
+3.  **Restart the Services**:
+    After saving your changes to the configuration files, restart the Docker containers to apply them.
+
+    **Note:** Ensure you use the correct docker-compose file for your deployment mode.
+
+    ```bash
+    cd /home/loki/lokimetasmith.github.io
+
+    # For Standard Deployment:
+    docker-compose -f docker-compose.prod.yml restart
+
+    # For Lite Deployment:
+    docker-compose -f docker-compose.lite.yml restart
+    ```
+
+4.  **Update DNS (Optional but Recommended)**:
+    If you have a domain name, create an 'A' record in your DNS provider's dashboard and point it to the Droplet's IP address.
+
+Your application is now deployed and live!
+
+---
+
+## Method 2: Manual Cloud-Init Deployment
+
+This method gives you more control and works with any cloud provider that supports cloud-init. We provide two cloud-init scripts: one using Podman (recommended) and one using Docker (legacy).
+
+### Method 2a: Podman and Systemd (Recommended)
 
 This approach is the most secure and robust. It uses Podman to run the containers without a privileged daemon and manages the application with a proper systemd service for maximum stability.
 
-1.  **Use the `cloud-config-podman.example.yml` file.** This file is designed for this modern workflow.
+1.  **Use the `docs/cloud-config-podman.example.yml` file.** This file is designed for this modern workflow.
 2.  **Customize the Configuration:**
     - Make a copy of the file named `my-cloud-config.yml`.
     - Add your public SSH key.
@@ -27,11 +145,11 @@ This approach is the most secure and robust. It uses Podman to run the container
     - Follow the "Launch the Server" steps below, using the content of your customized `my-cloud-config.yml` file as the User Data.
     - The script will automatically build the application, create the pod, and enable a systemd service to manage it.
 
-### Method 1b: Docker (Legacy)
+### Method 2b: Docker (Legacy)
 
 This approach uses the original Docker-based cloud-init script.
 
-1.  **Use the `cloud-config.example.yml` file.**
+1.  **Use the `docs/cloud-config.example.yml` file.**
 2.  **Customize the Configuration:**
     - Make a copy of the file named `my-cloud-config.yml`.
     - Add your public SSH key.
@@ -67,7 +185,7 @@ After these steps, your application will be live and running in a containerized 
 
 ---
 
-## Method 2: Manual Deployment (Legacy)
+## Method 3: Manual Deployment (Legacy)
 
 This method walks you through setting up the application manually on a fresh server without using Docker.
 
