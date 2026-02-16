@@ -31,3 +31,7 @@
 ## 2026-02-09 - [JSON Serialization Fast Path]
 **Learning:** Recursively traversing large JSON objects in middleware (like a WAF) to check string values against regex patterns is O(N) where N is the number of nodes. Serializing the object to a JSON string and checking the string once with a combined regex is O(L) where L is the string length, which is much faster due to native C++ implementation of `JSON.stringify` and RegExp engine.
 **Action:** When validating complex objects for simple string patterns, consider serializing the object to check for the pattern globally before traversing.
+
+## 2026-02-16 - [SmoothPolygon Allocation]
+**Learning:** In high-frequency geometry processing, repeatedly calling `Array.push()` inside a loop causes dynamic array resizing overhead. Pre-allocating the array using `new Array(size)` and assigning by index eliminates this. Also, replacing modulo operator `%` with conditional checks in tight loops yields measurable speedups in JS engines.
+**Action:** When processing geometry (points) where the output size is known (e.g. 2x input), pre-allocate result arrays.
