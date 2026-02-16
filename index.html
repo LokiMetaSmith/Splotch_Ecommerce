@@ -183,7 +183,7 @@
               class="relative w-fit mx-auto outline-none"
               contenteditable="true"
               inputmode="none"
-              style="caret-color: transparent;"
+              style="caret-color: transparent"
             >
               <canvas
                 id="imageCanvas"
@@ -227,6 +227,12 @@
                 >
                   or click to upload
                 </p>
+                <p
+                  class="text-xs text-splotch-teal font-bold mt-2 pointer-events-none animate-pulse"
+                  style="font-family: var(--font-baumans)"
+                >
+                  (Tip: Drag the mascot here to try it!)
+                </p>
               </div>
               <p
                 id="designMarginNote"
@@ -237,7 +243,6 @@
                 Keep important elements 2-3mm from edge!
               </p>
             </div>
-          </div>
           </div>
 
           <!-- Basic Image Editing Controls -->
@@ -388,18 +393,51 @@
               Sepia
             </button>
             <div class="flex flex-col justify-center items-center col-span-2">
-                <label for="cutlineOffsetSlider" class="text-xs text-gray-500 mb-1">Cutline Offset</label>
-                <div class="flex items-center gap-1 w-full px-2">
-                    <input type="range" id="cutlineOffsetSlider" min="0" max="50" value="10" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal">
-                    <span id="cutlineOffsetValue" class="text-xs w-6 text-center text-gray-600 font-mono">10</span>
-                </div>
+              <label
+                for="cutlineOffsetSlider"
+                class="text-xs text-gray-500 mb-1"
+                >Cutline Offset</label
+              >
+              <div class="flex items-center gap-1 w-full px-2">
+                <input
+                  type="range"
+                  id="cutlineOffsetSlider"
+                  min="0"
+                  max="50"
+                  value="10"
+                  step="1"
+                  class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                />
+                <span
+                  id="cutlineOffsetValue"
+                  class="text-xs w-6 text-center text-gray-600 font-mono"
+                  >10</span
+                >
+              </div>
             </div>
             <div class="flex flex-col justify-center items-center col-span-2">
-                <label for="cutlineSensitivitySlider" class="text-xs text-gray-500 mb-1">Edge Sensitivity</label>
-                <div class="flex items-center gap-1 w-full px-2">
-                    <input type="range" id="cutlineSensitivitySlider" min="0" max="100" value="10" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal" title="Adjust background detection tolerance">
-                    <span id="cutlineSensitivityValue" class="text-xs w-6 text-center text-gray-600 font-mono">10</span>
-                </div>
+              <label
+                for="cutlineSensitivitySlider"
+                class="text-xs text-gray-500 mb-1"
+                >Edge Sensitivity</label
+              >
+              <div class="flex items-center gap-1 w-full px-2">
+                <input
+                  type="range"
+                  id="cutlineSensitivitySlider"
+                  min="0"
+                  max="100"
+                  value="10"
+                  step="1"
+                  class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                  title="Adjust background detection tolerance"
+                />
+                <span
+                  id="cutlineSensitivityValue"
+                  class="text-xs w-6 text-center text-gray-600 font-mono"
+                  >10</span
+                >
+              </div>
             </div>
             <button
               type="button"
