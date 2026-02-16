@@ -7,7 +7,7 @@ import { SVGParser } from './lib/svgparser.js';
 import { generateCutFile } from './lib/cut_file_generator.js';
 import * as jose from 'jose';
 import { jsPDF } from "jspdf";
-import SVGtoPDF from 'svg-to-pdfkit';
+import "svg2pdf.js";
 
 // --- Global Variables ---
 const serverUrl = ''; // Use relative paths for API calls
@@ -860,7 +860,7 @@ function handleDownloadCutFile() {
     URL.revokeObjectURL(url);
 }
 
-function handleExportPdf() {
+async function handleExportPdf() {
     if (!window.nestedSvg) {
         showErrorToast('No nested SVG to export.');
         return;
@@ -882,7 +882,12 @@ function handleExportPdf() {
             format: [width, height]
         });
 
-        SVGtoPDF(doc, svgElement, 0, 0);
+        await doc.svg(svgElement, {
+            x: 0,
+            y: 0,
+            width: width,
+            height: height
+        });
 
         doc.save('nested-stickers.pdf');
         showSuccessToast('PDF exported successfully.');

@@ -5,7 +5,7 @@ import { describe, test, expect, beforeAll, jest } from '@jest/globals';
 // Mocks
 jest.unstable_mockModule('jose', () => ({}));
 jest.unstable_mockModule('jspdf', () => ({ jsPDF: jest.fn() }));
-jest.unstable_mockModule('svg-to-pdfkit', () => ({ default: jest.fn() }));
+jest.unstable_mockModule('svg2pdf.js', () => ({ default: jest.fn() }));
 jest.unstable_mockModule('@simplewebauthn/browser', () => ({
     startRegistration: jest.fn(),
     startAuthentication: jest.fn()
