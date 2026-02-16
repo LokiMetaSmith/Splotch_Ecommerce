@@ -51,8 +51,9 @@ export function imageHasTransparentBorder(imageData) {
 export function getPolygonArea(points) {
   let area = 0;
   const len = points.length;
+  // Bolt Optimization: Removed modulo from loop for performance
   for (let i = 0; i < len; i++) {
-    const j = (i + 1) % len;
+    const j = i === len - 1 ? 0 : i + 1;
     area += points[i].x * points[j].y;
     area -= points[j].x * points[i].y;
   }
@@ -380,23 +381,24 @@ export function smoothPolygon(points, iterations = 1) {
   if (points.length < 3) return points;
   let currentPoints = points;
   for (let k = 0; k < iterations; k++) {
-    const nextPoints = [];
     const len = currentPoints.length;
+    // Bolt Optimization: Pre-allocate array to avoid resizing and removed modulo
+    const nextPoints = new Array(len * 2);
     for (let i = 0; i < len; i++) {
       const p1 = currentPoints[i];
-      const p2 = currentPoints[(i + 1) % len];
+      const p2 = currentPoints[i === len - 1 ? 0 : i + 1];
 
       // Chaikin's algorithm (Corner Cutting)
       // Point A: 0.75 * P1 + 0.25 * P2
       // Point B: 0.25 * P1 + 0.75 * P2
-      nextPoints.push({
+      nextPoints[i * 2] = {
         x: 0.75 * p1.x + 0.25 * p2.x,
         y: 0.75 * p1.y + 0.25 * p2.y,
-      });
-      nextPoints.push({
+      };
+      nextPoints[i * 2 + 1] = {
         x: 0.25 * p1.x + 0.75 * p2.x,
         y: 0.25 * p1.y + 0.75 * p2.y,
-      });
+      };
     }
     currentPoints = nextPoints;
   }
