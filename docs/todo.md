@@ -153,7 +153,7 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 -   **[x] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[x] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
 -   **[x] Validate Order Amount on Server:** Ensure the order amount sent by the client matches the calculated price based on product dimensions and configuration to prevent price tampering.
--   **[x] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./docs/TELEGRAM_BOT_MIGRATION.md) for a step-by-step guide.
+-   **[x] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./archive/telegram_bot_migration.md) for a step-by-step guide.
 -   **[x] Implement Role-Based Access Control (RBAC):** Add a `role` field to the user model and protect administrative endpoints (e.g., `/api/orders`) to ensure only authorized users can access them.
 -   **[x] Fix failing security tests caused by WAF blocking:** Updated security tests (`tests/security_input_validation.test.js`, `tests/security_xss.test.js`, etc.) to mock the WAF middleware, ensuring that application-level validation and sanitization logic is correctly verified.
 
@@ -192,7 +192,7 @@ The current architecture is suitable for an initial MVP or beta release (< 50 co
 - [x] **Centralized Logging:** Replace `console.log` and file logging with a structured logging service (e.g., Datadog, LogDNA, or ELK Stack) for real-time monitoring and alerting.
 - [x] **Error Monitoring:** Integrate an error tracking service (e.g., Sentry, Honeybadger) to capture and analyze runtime exceptions instead of relying on email notifications.
 - [x] **Performance Monitoring:** Set up Application Performance Monitoring (APM) to track API latency, database query performance, and resource usage. (Enhanced: Implemented local metrics collection for API, DB, and System resources, exposed via /api/metrics)
-- [x] **Automated Backups:** Configure automated, scheduled backups for the database and object storage with a clearly defined retention policy and tested restoration procedure. (Updated `scripts/backup.sh` with `--retention-days` flag and documented in `BACKUPS.md`).
+-   **[x] Automated Backups:** Configure automated, scheduled backups for the database and object storage with a clearly defined retention policy and tested restoration procedure. (Updated `scripts/backup.sh` with `--retention-days` flag and documented in `backups.md`).
 
 ## Security & Compliance
 
