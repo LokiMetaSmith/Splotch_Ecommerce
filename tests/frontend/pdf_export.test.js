@@ -30,19 +30,20 @@ global.localStorage = localStorageMock;
 global.URL.createObjectURL = jest.fn();
 global.URL.revokeObjectURL = jest.fn();
 
-const jsPDFMock = jest.fn(() => ({
+const docMock = {
     save: jest.fn(),
-}));
+    svg: jest.fn(() => Promise.resolve()),
+};
 
-const SVGtoPDFMock = jest.fn();
+const jsPDFMock = jest.fn(() => docMock);
 
 // Use unstable_mockModule for ESM dependencies
 jest.unstable_mockModule('jspdf', () => ({
     jsPDF: jsPDFMock,
 }));
 
-jest.unstable_mockModule('svg-to-pdfkit', () => ({
-    default: SVGtoPDFMock,
+jest.unstable_mockModule('svg2pdf.js', () => ({
+    default: jest.fn(),
 }));
 
 // Mock other dependencies
@@ -110,18 +111,28 @@ describe('PDF Export Functionality', () => {
         await printshop.init();
     });
 
-    test('should call jsPDF and SVGtoPDF when export button is clicked', async () => {
+    test('should call jsPDF and doc.svg when export button is clicked', async () => {
         const btn = document.getElementById('exportPdfBtn');
+        // Trigger the click (it's async but returns a promise we can't await directly from click(), so we rely on mocks)
         btn.click();
+
+        // Wait for async operations to complete
+        await new Promise(resolve => setTimeout(resolve, 10));
 
         expect(jsPDFMock).toHaveBeenCalledWith({
             unit: 'px',
             format: [100, 100]
         });
-        expect(SVGtoPDFMock).toHaveBeenCalled();
+
+        const docInstance = jsPDFMock.mock.results[0].value;
+        expect(docInstance.svg).toHaveBeenCalledWith(expect.anything(), {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100
+        });
 
         // Verify save was called on the doc instance
-        const docInstance = jsPDFMock.mock.results[0].value;
         expect(docInstance.save).toHaveBeenCalledWith('nested-stickers.pdf');
     });
 
