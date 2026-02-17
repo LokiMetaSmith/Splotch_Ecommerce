@@ -213,6 +213,10 @@ export function traceContours(imageData, threshold = 10) {
   if (contours.length === 0) {
     visited = new Uint8Array(width * height); // Reset visited
     bgColor = null; // Disable background color check
+    // Bolt Fix: Redefine opacity check for the retry
+    isOpaqueAtIndex = (i) => {
+      return data[i + 3] >= 128;
+    };
     runTrace();
   }
 
