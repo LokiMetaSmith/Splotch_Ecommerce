@@ -2,9 +2,11 @@
 > lokimetasmith.github.io@1.0.0 dev
 > vite
 
-5:25:11 AM [vite] (client) Re-optimizing dependencies because vite config has changed
 
-  VITE v7.1.12  ready in 576 ms
+  VITE v7.1.12  ready in 805 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: http://192.168.0.2:5173/
+6:46:57 AM [vite] (client) hmr update /styles.css?direct
+6:46:57 AM [vite] (client) hmr update /styles.css?direct
+6:46:57 AM [vite] (client) hmr update /styles.css?direct

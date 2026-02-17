@@ -1,0 +1,49 @@
+
+> server@1.0.0 start
+> node index.js
+
+[dotenv@17.2.1] injecting env (4) from .env -- tip: 📡 auto-backup env with Radar: https://dotenvx.com/radar
+2026-02-17 06:47:51 [33mwarn[39m: [QUEUE] Redis unavailable. Falling back to in-memory queues. {"service":"print-shop-server"}
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Using Local Storage Provider. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Pricing configuration loaded. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [33mwarn[39m: [TELEGRAM] Bot token not found. Bot is disabled. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] LowDB database initialized at: {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Multer configured for file uploads. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Initializing Square client... {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Square client initialized in SANDBOX mode. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Verifying connection to Square servers... {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: ✅ [SERVER] DNS resolution successful. Network connection appears to be working. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Square client initialized. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Performing sanity check on Square client... {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: ✅ [SERVER] Sanity check passed. Client has required API properties. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Using MemoryStore for session storage. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: ✅ [SERVER] Custom CSRF_SECRET is set. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Middleware (CORS, JSON, static file serving) enabled. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [33mwarn[39m: [TRACKER] EASYPOST_API_KEY is not set. Shipment tracker is disabled. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [WORKER] Email worker started. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [WORKER] Telegram worker started. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [WORKER] Odoo worker started. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Background workers started. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [KEY_MANAGER] Rotating keys... {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [KEY_MANAGER] Now managing 1 active keys. {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Signed new session token with key ID: 9e952ed01d612a56 {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [SERVER] Server listening at http://localhost:3000 {"service":"print-shop-server"}
+2026-02-17 06:47:51 [32minfo[39m: [WORKER] Processing Odoo job sync-inventory (1771310871273) {"service":"print-shop-server"}
+2026-02-17 06:47:51 [33mwarn[39m: [WORKER] Odoo not configured. Skipping job. {"service":"print-shop-server"}
+2026-02-17 06:48:12 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/csrf-token","status":200,"durationMs":26.420426}
+2026-02-17 06:48:12 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/pricing-info","status":200,"durationMs":7.928633}
+2026-02-17 06:48:12 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/inventory","status":200,"durationMs":4.944521}
+2026-02-17 06:48:59 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/csrf-token","status":200,"durationMs":11.830786}
+2026-02-17 06:48:59 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/pricing-info","status":200,"durationMs":10.534133}
+2026-02-17 06:48:59 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/inventory","status":200,"durationMs":11.1933}
+2026-02-17 06:49:37 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/pricing-info","status":200,"durationMs":2.237202}
+2026-02-17 06:49:38 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/pricing-info","status":200,"durationMs":8.007853}
+2026-02-17 06:49:38 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/csrf-token","status":200,"durationMs":18.13186}
+2026-02-17 06:49:38 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/inventory","status":200,"durationMs":6.385527}
+2026-02-17 06:50:31 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/csrf-token","status":200,"durationMs":2.815839}
+2026-02-17 06:50:31 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/pricing-info","status":200,"durationMs":9.978246}
+2026-02-17 06:50:31 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/inventory","status":200,"durationMs":1.681534}
+2026-02-17 06:51:44 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/csrf-token","status":200,"durationMs":6.409345}
+2026-02-17 06:51:44 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/pricing-info","status":200,"durationMs":12.216502}
+2026-02-17 06:51:44 [32minfo[39m: [PERFORMANCE] {"service":"print-shop-server","method":"GET","url":"/api/inventory","status":200,"durationMs":2.199807}
