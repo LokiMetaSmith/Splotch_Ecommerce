@@ -238,7 +238,17 @@ async function BootStrap() {
     stickerMaterialSelect.addEventListener("change", calculateAndUpdatePrice);
   }
   if (stickerResolutionSelect) {
-    stickerResolutionSelect.addEventListener("change", calculateAndUpdatePrice);
+    stickerResolutionSelect.addEventListener("change", () => {
+      calculateAndUpdatePrice();
+      // Bolt Fix: Trigger visual resize when resolution changes
+      if (canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        setCanvasSize(canvas.width / dpr, canvas.height / dpr);
+        if (currentBounds) {
+          drawCanvasDecorations(currentBounds);
+        }
+      }
+    });
   }
   if (addTextBtn) {
     addTextBtn.addEventListener("click", handleAddText);
@@ -1289,9 +1299,27 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   // Using setTransform ensures this is not cumulative.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Update CSS size to match logical size
-  canvas.style.width = `${logicalWidth}px`;
-  canvas.style.height = `${logicalHeight}px`;
+  // Bolt Fix: True-to-Size Preview
+  // Calculate display size based on the selected PPI (or default to 96 if not loaded/selected)
+  let ppi = 96;
+  if (pricingConfig && stickerResolutionSelect) {
+    const selectedRes = pricingConfig.resolutions.find(
+      (r) => r.id === stickerResolutionSelect.value,
+    );
+    if (selectedRes) {
+      ppi = selectedRes.ppi;
+    }
+  }
+
+  // logicalWidth is in "Image Pixels".
+  // Physical Inches = logicalWidth / ppi
+  // CSS Pixels = Physical Inches * 96
+  const cssWidth = (logicalWidth / ppi) * 96;
+  const cssHeight = (logicalHeight / ppi) * 96;
+
+  // Update CSS size to match calculated display size
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
 }
 
 function saveCleanState() {
