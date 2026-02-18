@@ -327,7 +327,10 @@ async function startServer(
             username: getSecret('ODOO_USERNAME'),
             password: getSecret('ODOO_PASSWORD'),
             mappings: {},
-            defaults: {}
+            defaults: {
+                location_id: getSecret('ODOO_LOCATION_ID'),
+                location_dest_id: getSecret('ODOO_LOCATION_DEST_ID')
+            }
         };
         await db.setConfig('odoo', odooConfig);
         logger.info('[SERVER] Odoo configuration seeded from environment variables.');

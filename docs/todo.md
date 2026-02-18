@@ -126,6 +126,7 @@ This document tracks the features and bug fixes that need to be implemented for 
 - [x] **Shipment Tracking:**
     - [x] Integrate with UPS or USPS APIs to track the delivery status of shipped orders.
     - [x] Use the tracking information to automatically move orders to the "Delivered" status.
+- [x] **Odoo Configuration:** Make Odoo location IDs (source and destination) configurable via environment variables or database config, replacing hardcoded values.
 
 ## Testing and Deployment
 
