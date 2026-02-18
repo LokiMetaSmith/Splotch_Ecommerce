@@ -27,9 +27,11 @@ jest.unstable_mockModule('telegraf', () => {
         telegram: {
           setMyCommands: mockSetMyCommands,
           sendMessage: jest.fn().mockResolvedValue({}),
+          getChatMember: jest.fn().mockResolvedValue({ status: 'administrator' }),
         },
         command: mockCommand,
         on: mockOn,
+        use: jest.fn(),
         launch: mockLaunch,
       };
     }),

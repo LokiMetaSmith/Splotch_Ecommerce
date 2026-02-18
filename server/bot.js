@@ -19,6 +19,51 @@ function initializeBot(db, { startPolling = true } = {}) {
     const isTestEnv = process.env.NODE_ENV === 'test';
     bot = new Telegraf(token);
 
+    // --- Authorization Middleware ---
+    bot.use(async (ctx, next) => {
+        // If in test env, we might want to bypass or mock this?
+        // But for security, we should test this logic too.
+        // In unit tests, we mock getChatMember.
+
+        const channelId = getSecret('TELEGRAM_CHANNEL_ID');
+        if (!channelId) {
+             logger.warn('[TELEGRAM] TELEGRAM_CHANNEL_ID not set. Denying all access.');
+             // Fail secure: Do not process update.
+             return;
+        }
+
+        let userId;
+        if (ctx.from) {
+            userId = ctx.from.id;
+        } else {
+            // Update without user (e.g. my_chat_member)? Allow to proceed or drop?
+            // Usually we only care about messages/callbacks from users.
+            return next();
+        }
+
+        try {
+            const member = await ctx.telegram.getChatMember(channelId, userId);
+            if (['creator', 'administrator', 'member'].includes(member.status)) {
+                return next();
+            }
+        } catch (error) {
+            logger.error(`[TELEGRAM] Authorization check failed for user ${userId}:`, error);
+            // Fall through to unauthorized handling
+        }
+
+        // Unauthorized handling
+        if (ctx.callbackQuery) {
+            await ctx.answerCbQuery('⛔️ Unauthorized', { show_alert: true })
+               .catch(err => logger.error('[TELEGRAM] Error sending unauthorized callback answer:', err));
+        } else if (ctx.message) {
+            // Only reply to direct messages or mentions to avoid spamming groups
+            if (ctx.chat.type === 'private' || (ctx.message.text && ctx.message.text.includes(`@${ctx.botInfo?.username}`))) {
+                 await ctx.reply('⛔️ Unauthorized. You must be a member of the alerts channel.')
+                    .catch(err => logger.error('[TELEGRAM] Error sending unauthorized message:', err));
+            }
+        }
+    });
+
     const listOrdersByStatus = async (ctx, statuses, title) => {
       try {
         const orders = await db.getOrdersByStatus(statuses);
@@ -30,9 +75,6 @@ function initializeBot(db, { startPolling = true } = {}) {
         }
 
         // SECURITY: Use HTML mode for safer rendering.
-        // Note: input variables like billingContact are expected to be HTML-escaped by server.js (using escapeHtml)
-        // before being stored in the database. This prevents HTML injection.
-        // We switched from Markdown because Markdown characters in user input were not escaped, causing injection.
         let list = `<b>${title}:</b>\n\n`;
         orders.forEach(order => {
           list += `• <b>Order ID:</b> <code>${order.orderId}</code>\n`;
@@ -175,6 +217,7 @@ ${statusChecklist}
         editMessageText: () => Promise.resolve(),
         deleteMessage: () => Promise.resolve(),
         setMyCommands: () => Promise.resolve(),
+        getChatMember: () => Promise.resolve({ status: 'administrator' }),
         getMe: () => Promise.resolve({ id: 123456, is_bot: true, first_name: 'TestBot', username: 'TestBot' }),
       };
       // Manually set botInfo in test environment to satisfy Context constructor requirements
@@ -192,9 +235,11 @@ ${statusChecklist}
         editMessageText: () => Promise.resolve(),
         deleteMessage: () => Promise.resolve(),
         setMyCommands: () => Promise.resolve(),
+        getChatMember: () => Promise.resolve({ status: 'left' }),
       },
       command: () => {},
       on: () => {},
+      use: () => {}, // Added use to mock
       launch: () => {},
       stop: () => {},
     };
