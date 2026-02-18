@@ -5,17 +5,9 @@
  * @param {ImageData} imageData - The image data from canvas context.
  * @returns {boolean} - True if the border is transparent or white.
  */
-// Bolt Optimization: Defined outside traceContour to avoid reallocation
-const MOORE_NEIGHBORS = [
-  { x: 1, y: 0 }, // 0: E
-  { x: 1, y: -1 }, // 1: NE
-  { x: 0, y: -1 }, // 2: N
-  { x: -1, y: -1 }, // 3: NW
-  { x: -1, y: 0 }, // 4: W
-  { x: -1, y: 1 }, // 5: SW
-  { x: 0, y: 1 }, // 6: S
-  { x: 1, y: 1 }, // 7: SE
-];
+// Bolt Optimization: Use Int8Array for neighbor offsets to avoid object allocation/lookup
+const MOORE_X = new Int8Array([1, 1, 0, -1, -1, -1, 0, 1]);
+const MOORE_Y = new Int8Array([0, -1, -1, -1, 0, 1, 1, 1]);
 
 export function imageHasTransparentBorder(imageData) {
   const { data, width, height } = imageData;
@@ -108,109 +100,138 @@ export function traceContours(imageData, threshold = 10) {
   let visited = new Uint8Array(width * height); // 0 = unvisited, 1 = visited
   let bgColor = detectBackgroundColor(imageData);
 
-  // Bolt Optimization: Helper to check opacity by index directly to avoid bounds checks in tight loops
-  // Optimization: Capture necessary values in closure to avoid property access and conditional logic in the hot loop
-  let isOpaqueAtIndex;
-  if (bgColor) {
-    const { r: bgR, g: bgG, b: bgB } = bgColor;
-    const threshold3 = threshold * 3;
-    isOpaqueAtIndex = (i) => {
-      if (data[i + 3] < 128) return false;
-      const diff =
-        Math.abs(data[i] - bgR) +
-        Math.abs(data[i + 1] - bgG) +
-        Math.abs(data[i + 2] - bgB);
-      return diff > threshold3;
-    };
-  } else {
-    isOpaqueAtIndex = (i) => {
-      return data[i + 3] >= 128;
-    };
-  }
-
-  const isOpaque = (x, y) => {
-    if (x < 0 || x >= width || y < 0 || y >= height) return false;
-    const i = (y * width + x) * 4;
-    return isOpaqueAtIndex(i); // Reuse optimized check
-  };
-
   const contours = [];
 
+  // Optimized boundary tracing helper
+  const traceBoundary = (startX, startY, isOpaqueFn) => {
+    const contour = [];
+    let cx = startX;
+    let cy = startY;
+    const startPos = { x: startX, y: startY };
+    let lastDirection = 6; // Start checking from 6 (South)
+    let foundNext = false;
+
+    do {
+      contour.push({ x: cx, y: cy });
+      visited[cy * width + cx] = 1;
+
+      // Start checking neighbors from the one after the direction we came from
+      let checkDirection = (lastDirection + 5) % 8;
+      foundNext = false;
+
+      for (let i = 0; i < 8; i++) {
+        // Bolt Optimization: Use Int8Array lookup instead of object allocation
+        const nx = cx + MOORE_X[checkDirection];
+        const ny = cy + MOORE_Y[checkDirection];
+
+        if (isOpaqueFn(nx, ny)) {
+          cx = nx;
+          cy = ny;
+          lastDirection = checkDirection;
+          foundNext = true;
+          break;
+        }
+        checkDirection = (checkDirection + 1) % 8;
+      }
+
+      if (!foundNext) {
+        break;
+      }
+    } while (cx !== startPos.x || cy !== startPos.y);
+
+    if (contour.length > 2) {
+      contours.push(contour);
+    }
+  };
+
   const runTrace = () => {
-    for (let y = 0; y < height; y++) {
-      let prevOpaque = false; // Start of row (x=-1) is effectively transparent
-      let rowOffset = y * width;
+    // Bolt Optimization: Inline the loop logic to avoid function call overhead for 4M+ pixel checks.
+    // We split the loop into two branches: one for bgColor handling and one for simple alpha check.
 
-      for (let x = 0; x < width; x++) {
-        const idx = rowOffset + x;
+    if (bgColor) {
+      const { r: bgR, g: bgG, b: bgB } = bgColor;
+      const threshold3 = threshold * 3;
 
-        // Skip if already part of a boundary
-        if (visited[idx]) {
-          prevOpaque = true; // Visited pixels are part of a contour, so they are opaque
-          continue;
-        }
+      // Closure for boundary tracer to use
+      const isOpaqueBg = (x, y) => {
+        if (x < 0 || x >= width || y < 0 || y >= height) return false;
+        const i = (y * width + x) * 4;
+        if (data[i + 3] < 128) return false;
+        const diff =
+          Math.abs(data[i] - bgR) +
+          Math.abs(data[i + 1] - bgG) +
+          Math.abs(data[i + 2] - bgB);
+        return diff > threshold3;
+      };
 
-        // Bolt Optimization: Use direct index access (safe here) and prevOpaque
-        const pixelIndex = idx * 4;
-        const currOpaque = isOpaqueAtIndex(pixelIndex);
+      for (let y = 0; y < height; y++) {
+        let prevOpaque = false;
+        let rowOffset = y * width;
 
-        if (currOpaque) {
-          // Only start tracing if we are at a "Left Edge" (enter opaque region from transparent)
-          // If prevOpaque is false, it implies x=0 or pixel at x-1 was transparent/background
-          if (!prevOpaque) {
-            const contour = [];
-            let cx = x;
-            let cy = y;
-            const startPos = { x, y };
-            let lastDirection = 6; // Start checking from 6 (South)
-
-            let foundNext = false;
-
-            do {
-              contour.push({ x: cx, y: cy });
-              visited[cy * width + cx] = 1;
-
-              // Start checking neighbors from the one after the direction we came from
-              let checkDirection = (lastDirection + 5) % 8;
-              foundNext = false;
-
-              for (let i = 0; i < 8; i++) {
-                const neighborOffset = MOORE_NEIGHBORS[checkDirection];
-                const nx = cx + neighborOffset.x;
-                const ny = cy + neighborOffset.y;
-
-                if (isOpaque(nx, ny)) {
-                  cx = nx;
-                  cy = ny;
-                  lastDirection = checkDirection;
-                  foundNext = true;
-                  break;
-                }
-                checkDirection = (checkDirection + 1) % 8;
-              }
-
-              if (!foundNext) {
-                break;
-              }
-            } while (cx !== startPos.x || cy !== startPos.y);
-
-            if (contour.length > 2) {
-              contours.push(contour);
-            }
+        for (let x = 0; x < width; x++) {
+          const idx = rowOffset + x;
+          if (visited[idx]) {
+            prevOpaque = true;
+            continue;
           }
-        }
 
-        prevOpaque = currOpaque;
+          const pixelIndex = idx * 4;
+          // Inlined check for performance
+          let currOpaque = false;
+          if (data[pixelIndex + 3] >= 128) {
+             const diff =
+               Math.abs(data[pixelIndex] - bgR) +
+               Math.abs(data[pixelIndex + 1] - bgG) +
+               Math.abs(data[pixelIndex + 2] - bgB);
+             if (diff > threshold3) {
+                 currOpaque = true;
+             }
+          }
+
+          if (currOpaque && !prevOpaque) {
+            traceBoundary(x, y, isOpaqueBg);
+          }
+          prevOpaque = currOpaque;
+        }
+      }
+    } else {
+      // Simple Alpha Check (No background color detected or fallback)
+      const isOpaqueSimple = (x, y) => {
+        if (x < 0 || x >= width || y < 0 || y >= height) return false;
+        const i = (y * width + x) * 4;
+        return data[i + 3] >= 128;
+      };
+
+      for (let y = 0; y < height; y++) {
+        let prevOpaque = false;
+        let rowOffset = y * width;
+
+        for (let x = 0; x < width; x++) {
+          const idx = rowOffset + x;
+          if (visited[idx]) {
+            prevOpaque = true;
+            continue;
+          }
+
+          const pixelIndex = idx * 4;
+          // Inlined check
+          const currOpaque = data[pixelIndex + 3] >= 128;
+
+          if (currOpaque && !prevOpaque) {
+            traceBoundary(x, y, isOpaqueSimple);
+          }
+          prevOpaque = currOpaque;
+        }
       }
     }
   };
 
-  // First pass with detected background color
+  // First pass
   runTrace();
 
   // If no contours found, retry without background color filtering
   // This handles full-bleed images where the content might match the detected "background" color (corners)
-  if (contours.length === 0) {
+  if (contours.length === 0 && bgColor) {
     visited = new Uint8Array(width * height); // Reset visited
     bgColor = null; // Disable background color check
     // Bolt Fix: Redefine opacity check for the retry
