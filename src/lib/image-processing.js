@@ -229,10 +229,15 @@ export function traceContours(imageData, threshold = 10) {
   // First pass
   runTrace();
 
-  // If no contours found and we used bgColor, retry without it
+  // If no contours found, retry without background color filtering
+  // This handles full-bleed images where the content might match the detected "background" color (corners)
   if (contours.length === 0 && bgColor) {
-    visited = new Uint8Array(width * height);
-    bgColor = null;
+    visited = new Uint8Array(width * height); // Reset visited
+    bgColor = null; // Disable background color check
+    // Bolt Fix: Redefine opacity check for the retry
+    isOpaqueAtIndex = (i) => {
+      return data[i + 3] >= 128;
+    };
     runTrace();
   }
 
