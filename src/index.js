@@ -1,5 +1,5 @@
 import { SVGParser } from "./lib/svgparser.js";
-import { calculateStickerPrice, calculatePerimeter } from "./lib/pricing.js";
+import { calculateStickerPrice, calculatePerimeter, generateSvgFromCutline } from "./lib/pricing.js";
 import {
   drawRuler as drawCanvasRuler,
   drawImageWithFilters,
@@ -1024,6 +1024,13 @@ async function handlePaymentFormSubmit(event) {
     const cutLineFileInput = document.getElementById("cutLineFile");
     if (cutLineFileInput && cutLineFileInput.files[0]) {
       uploadFormData.append("cutLineFile", cutLineFileInput.files[0]);
+    } else if (currentCutline && currentCutline.length > 0 && currentBounds) {
+      // Automatically generate SVG for cutline if not manually provided
+      const svgContent = generateSvgFromCutline(currentCutline, currentBounds);
+      if (svgContent) {
+        const blob = new Blob([svgContent], { type: "image/svg+xml" });
+        uploadFormData.append("cutLineFile", blob, "generated-cutline.svg");
+      }
     }
 
     const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {

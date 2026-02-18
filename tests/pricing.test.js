@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 
-import { calculateStickerPrice } from '../src/lib/pricing.js';
+import { calculateStickerPrice, generateSvgFromCutline } from '../src/lib/pricing.js';
 
 // Define a test configuration that mirrors the production config structure
 const pricingConfig = {
@@ -96,5 +96,28 @@ describe('Sticker Pricing Calculation', () => {
         // Base total for 600: 9 * 15 * 600 * 1.0 (complexity) = 81000
         // Discount of 15%: 81000 * 0.85 = 68850
         expect(price2).toBe(68850);
+    });
+
+    it('should generate correct SVG from cutline', () => {
+        const bounds = { left: 10, top: 10, right: 110, bottom: 110, width: 100, height: 100 };
+        const cutline = [[
+            { x: 10, y: 10 },
+            { x: 110, y: 10 },
+            { x: 110, y: 110 },
+            { x: 10, y: 110 }
+        ]];
+
+        const svg = generateSvgFromCutline(cutline, bounds);
+
+        expect(svg).toContain('width="100"');
+        expect(svg).toContain('height="100"');
+        expect(svg).toContain('viewBox="0 0 100 100"');
+        // Points should be shifted by (-10, -10)
+        // (10,10) -> (0,0)
+        // (110,10) -> (100,0)
+        expect(svg).toContain('M 0 0');
+        expect(svg).toContain('L 100 0');
+        expect(svg).toContain('L 100 100');
+        expect(svg).toContain('L 0 100');
     });
 });
