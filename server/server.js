@@ -716,6 +716,8 @@ async function startServer(
     });
 
     app.get('/api/pricing-info', (req, res) => {
+        // PERFORMANCE: Allow caching for 1 hour as pricing rarely changes
+        res.setHeader('Cache-Control', 'public, max-age=3600');
         res.json(pricingConfig);
     });
 
@@ -775,6 +777,8 @@ async function startServer(
 
     app.get('/api/inventory', async (req, res) => {
         // Public endpoint to get cached inventory status
+        // PERFORMANCE: Allow short caching (1 min) to reduce DB/Odoo load during bursts
+        res.setHeader('Cache-Control', 'public, max-age=60');
         const cache = await db.getInventoryCache();
         res.json(cache || {});
     });
