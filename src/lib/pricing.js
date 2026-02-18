@@ -70,3 +70,26 @@ export function calculateStickerPrice(pricingConfig, quantity, material, bounds,
         complexityMultiplier: complexityMultiplier
     };
 }
+
+export function generateSvgFromCutline(cutline, bounds) {
+    if (!cutline || cutline.length === 0 || !bounds) return null;
+
+    const width = bounds.width;
+    const height = bounds.height;
+
+    let pathD = "";
+    cutline.forEach((poly) => {
+        if (poly.length === 0) return;
+        pathD += `M ${poly[0].x - bounds.left} ${poly[0].y - bounds.top} `;
+        for (let i = 1; i < poly.length; i++) {
+            pathD += `L ${poly[i].x - bounds.left} ${poly[i].y - bounds.top} `;
+        }
+        pathD += "Z ";
+    });
+
+    return `
+<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+    <path d="${pathD.trim()}" fill="none" stroke="black" stroke-width="1" />
+</svg>
+    `.trim();
+}
