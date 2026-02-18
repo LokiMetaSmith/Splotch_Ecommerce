@@ -36,9 +36,10 @@ export function setupPhoneFormatting() {
 export function setupTooltips() {
   const tooltip = document.createElement("div");
   tooltip.id = "custom-tooltip";
-  // Using Tailwind utility classes for basic structure and transition
+  // Using Tailwind utility classes for basic structure and transition.
+  // Changed z-50 to z-[10000] to ensure visibility over navbar and other fixed elements.
   tooltip.className =
-    "fixed z-50 px-3 py-2 text-xs rounded shadow-lg pointer-events-none transition-opacity duration-200 opacity-0";
+    "fixed z-[10000] px-3 py-2 text-xs rounded shadow-lg pointer-events-none transition-opacity duration-200 opacity-0";
   // Using inline styles for specific Splotch theme variables that might not map directly to Tailwind classes
   tooltip.style.backgroundColor = "var(--splotch-navy)";
   tooltip.style.color = "var(--splotch-white)";
@@ -49,9 +50,20 @@ export function setupTooltips() {
   const show = (el) => {
     tooltip.textContent = el.dataset.tooltip;
     const rect = el.getBoundingClientRect();
-    // Position above the element with an 8px gap
-    tooltip.style.top = `${rect.top - tooltip.offsetHeight - 8}px`;
-    tooltip.style.left = `${rect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
+    const tooltipHeight = tooltip.offsetHeight;
+    const tooltipWidth = tooltip.offsetWidth;
+
+    // Default: Position above the element with an 8px gap
+    let top = rect.top - tooltipHeight - 8;
+
+    // Smart Positioning: If it goes off the top (or very close), flip to below
+    if (top < 10) {
+      top = rect.bottom + 8;
+    }
+
+    tooltip.style.top = `${top}px`;
+    // Center horizontally
+    tooltip.style.left = `${rect.left + rect.width / 2 - tooltipWidth / 2}px`;
     tooltip.classList.remove("opacity-0");
   };
 
@@ -63,6 +75,8 @@ export function setupTooltips() {
     el.addEventListener("mouseleave", hide);
     el.addEventListener("focus", () => show(el));
     el.addEventListener("blur", hide);
+    // Add touchstart for better mobile responsiveness
+    el.addEventListener("touchstart", () => show(el), { passive: true });
   });
 }
 
