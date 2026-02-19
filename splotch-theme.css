@@ -428,3 +428,12 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
 	border-bottom: 0;
 	margin-bottom: -10px;
 }
+
+/* Status Badges */
+.status-new { background-color: #3B82F6 !important; color: white !important; }
+.status-accepted { background-color: #F59E0B !important; color: white !important; }
+.status-printing { background-color: #8B5CF6 !important; color: white !important; }
+.status-shipped { background-color: #10B981 !important; color: white !important; }
+.status-delivered { background-color: #6366F1 !important; color: white !important; }
+.status-completed { background-color: #22C55E !important; color: white !important; }
+.status-canceled { background-color: #EF4444 !important; color: white !important; }
