@@ -71,10 +71,11 @@ describe('Security: Prototype Pollution Prevention', () => {
             .get('/api/orders/__proto__')
             .set('Authorization', `Bearer ${token}`);
 
-        // 403 Forbidden is expected if WAF catches it, 400 if validation catches it. Both are safe.
-        // The logs show WAF blocked it with 403.
-        expect([400, 403]).toContain(res.statusCode);
-        if (res.statusCode === 400) {
+        // Can be blocked by WAF (403) or caught by validation (400)
+        if (res.statusCode === 403) {
+             expect(res.body.error).toBe('Forbidden');
+        } else {
+             expect(res.statusCode).toBe(400);
              expect(res.body.errors[0].msg).toBe('Invalid ID');
         }
     });
@@ -124,9 +125,12 @@ describe('Security: Prototype Pollution Prevention', () => {
             .set('X-CSRF-Token', csrfToken)
             .send({ status: 'SHIPPED' });
 
-        expect([400, 403]).toContain(res.statusCode);
-        if (res.statusCode === 400) {
-            expect(res.body.errors[0].msg).toBe('Invalid ID');
+        // Can be blocked by WAF (403) or caught by validation (400)
+        if (res.statusCode === 403) {
+             expect(res.body.error).toBe('Forbidden');
+        } else {
+             expect(res.statusCode).toBe(400);
+             expect(res.body.errors[0].msg).toBe('Invalid ID');
         }
     });
 
@@ -155,9 +159,12 @@ describe('Security: Prototype Pollution Prevention', () => {
             .set('X-CSRF-Token', csrfToken)
             .send({ trackingNumber: '123', courier: 'UPS' });
 
-        expect([400, 403]).toContain(res.statusCode);
-        if (res.statusCode === 400) {
-            expect(res.body.errors[0].msg).toBe('Invalid ID');
+        // Can be blocked by WAF (403) or caught by validation (400)
+        if (res.statusCode === 403) {
+             expect(res.body.error).toBe('Forbidden');
+        } else {
+             expect(res.statusCode).toBe(400);
+             expect(res.body.errors[0].msg).toBe('Invalid ID');
         }
     });
 });

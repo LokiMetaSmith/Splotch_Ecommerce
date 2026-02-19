@@ -20,6 +20,7 @@ These issues represent the most severe risks to the application's functionality 
 -   **[x] Fix failing tracker tests:** The test `tests/tracker.test.js` was failing because the `EasyPost` mock was not being applied correctly due to module resolution issues between the root and server `node_modules`. This has been fixed by mocking the specific resolved path.
 -   **[x] Fix failing Telegram Bot unit tests:** The tests in `tests/telegram_bot.test.js` are failing with "next(ctx) called with invalid context" due to improper mocking of the `Telegraf` bot instance in the test environment.
 -   **[x] Fix regression in `traceContour`:** Fixed an issue where `traceContour` failed to detect full-bleed opaque images (or images matching the detected background color) by implementing a fallback retry mechanism without background color filtering (Fixed regression caused by closure capturing initial background color).
+-   **[x] Fix failing security prototype tests:** The tests `tests/security_prototype.test.js` were failing because the WAF was correctly blocking prototype pollution attempts with a 403 Forbidden response, but the test expected a 400 Bad Request from the controller validation. Updated tests to accept both.
 
 ---
 

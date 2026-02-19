@@ -243,7 +243,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                         <h3 class="text-lg font-semibold text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
                         <p class="text-sm text-gray-600">Ordered on: ${receivedDate}</p>
                         <p class="text-sm text-gray-600">Amount: ${formattedAmount}</p>
-                        <p class="text-sm text-gray-600">Status: <span class="font-semibold">${order.status}</span></p>
+                        <p class="text-sm text-gray-600 flex items-center gap-2">
+                            Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${order.status.toLowerCase()}">${order.status}</span>
+                        </p>
                     </div>
                     <div class="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">
                         <img src="${order.designImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
