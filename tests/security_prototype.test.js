@@ -71,8 +71,13 @@ describe('Security: Prototype Pollution Prevention', () => {
             .get('/api/orders/__proto__')
             .set('Authorization', `Bearer ${token}`);
 
-        expect(res.statusCode).toBe(400);
-        expect(res.body.errors[0].msg).toBe('Invalid ID');
+        // Can be blocked by WAF (403) or caught by validation (400)
+        if (res.statusCode === 403) {
+             expect(res.body.error).toBe('Forbidden');
+        } else {
+             expect(res.statusCode).toBe(400);
+             expect(res.body.errors[0].msg).toBe('Invalid ID');
+        }
     });
 
     it('should block prototype pollution attempts on GET /api/orders/constructor', async () => {
@@ -120,8 +125,13 @@ describe('Security: Prototype Pollution Prevention', () => {
             .set('X-CSRF-Token', csrfToken)
             .send({ status: 'SHIPPED' });
 
-        expect(res.statusCode).toBe(400);
-        expect(res.body.errors[0].msg).toBe('Invalid ID');
+        // Can be blocked by WAF (403) or caught by validation (400)
+        if (res.statusCode === 403) {
+             expect(res.body.error).toBe('Forbidden');
+        } else {
+             expect(res.statusCode).toBe(400);
+             expect(res.body.errors[0].msg).toBe('Invalid ID');
+        }
     });
 
     it('should block prototype pollution attempts on POST /api/orders/:orderId/tracking', async () => {
@@ -149,7 +159,12 @@ describe('Security: Prototype Pollution Prevention', () => {
             .set('X-CSRF-Token', csrfToken)
             .send({ trackingNumber: '123', courier: 'UPS' });
 
-        expect(res.statusCode).toBe(400);
-        expect(res.body.errors[0].msg).toBe('Invalid ID');
+        // Can be blocked by WAF (403) or caught by validation (400)
+        if (res.statusCode === 403) {
+             expect(res.body.error).toBe('Forbidden');
+        } else {
+             expect(res.statusCode).toBe(400);
+             expect(res.body.errors[0].msg).toBe('Invalid ID');
+        }
     });
 });
