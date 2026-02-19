@@ -10,7 +10,7 @@ test.describe('Data Compliance Flow', () => {
         await expect(banner).toContainText('We use cookies');
 
         // Accept cookies
-        await banner.getByRole('button', { name: 'Accept' }).click();
+        await banner.getByRole('button', { name: 'Accept' }).click({ force: true });
         await expect(banner).toBeHidden();
 
         // Reload to ensure banner doesn't reappear
@@ -26,7 +26,7 @@ test.describe('Data Compliance Flow', () => {
         await expect(page.locator('#login-status')).toContainText('Magic link sent');
 
         // Fetch the token from the server's test endpoint
-        const tokenResponse = await request.get('http://localhost:3000/api/test/last-magic-link');
+        const tokenResponse = await request.get(`http://localhost:3000/api/test/last-magic-link?email=${encodeURIComponent(email)}`);
         expect(tokenResponse.ok()).toBeTruthy();
         const { token } = await tokenResponse.json();
         console.log('Retrieved magic link token:', token);

@@ -53,8 +53,22 @@ const fakeCredential = {
     credentialPublicKey: 'some-public-key',
     counter: 0
 };
-db.users['$TEST_USER'].credentials.push(fakeCredential);
+
+let user = db.users['$TEST_USER'];
+if (!user) {
+    user = Object.values(db.users).find(u => u.username === '$TEST_USER');
+}
+if (!user) {
+    console.error('User $TEST_USER not found');
+    process.exit(1);
+}
+
+if (!user.credentials) user.credentials = [];
+user.credentials.push(fakeCredential);
+
+if (!db.credentials) db.credentials = {};
 db.credentials[fakeCredential.credentialID] = fakeCredential;
+
 fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
 console.log('Fake credential added.');
 "
