@@ -24,7 +24,7 @@ test.describe('Real Backend Magic Link Flow', () => {
     // However, the client receives the response *after* the variable is updated.
 
     // We make a request to the backend directly from the test runner (node context) or via page.request
-    const response = await page.request.get('/api/test/last-magic-link');
+    const response = await page.request.get(`/api/test/last-magic-link?email=${encodeURIComponent(email)}`);
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
 

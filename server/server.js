@@ -180,7 +180,7 @@ async function startServer(
     injectedGoogle = defaultGoogle,
     injectedWebAuthn = defaultWebAuthn
 ) {
-  let lastMagicLinkToken = null;
+  const lastMagicLinkTokens = new Map();
 
   if (!db) {
     // If no db provided, load default LowDb
@@ -1617,7 +1617,14 @@ async function startServer(
         if (process.env.NODE_ENV !== 'test') {
             return res.status(403).json({ error: 'Forbidden' });
         }
-        res.json({ token: lastMagicLinkToken });
+        const { email } = req.query;
+        if (email) {
+            res.json({ token: lastMagicLinkTokens.get(email) });
+        } else {
+            // Fallback to the last inserted token for backward compatibility
+            const lastToken = Array.from(lastMagicLinkTokens.values()).pop();
+            res.json({ token: lastToken });
+        }
     });
 
     app.post('/api/auth/magic-login', authLimiter, [
@@ -1640,7 +1647,7 @@ async function startServer(
         const { privateKey, kid } = getCurrentSigningKey();
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
 
-        lastMagicLinkToken = token;
+        lastMagicLinkTokens.set(email, token);
 
         const magicLink = `${getSecret('BASE_URL')}/magic-login.html?token=${token}`;
 
