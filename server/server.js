@@ -1628,15 +1628,10 @@ async function startServer(
             return res.status(400).json({ errors: errors.array() });
         }
         const { email } = req.body;
-        let user = await getUserByEmail(email);
-        if (!user) {
-            user = {
-                id: randomUUID(),
-                email,
-                credentials: [],
-            };
-            await db.createUser(user);
-        }
+
+        // SECURITY: We do not create the user here to prevent DoS attacks where attackers
+        // flood the database with unverified accounts. The user is created only after verification.
+
         const { privateKey, kid } = getCurrentSigningKey();
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
 
@@ -1679,9 +1674,16 @@ async function startServer(
         if (err) {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
-        const user = await getUserByEmail(decoded.email);
+        let user = await getUserByEmail(decoded.email);
         if (!user) {
-          return res.status(401).json({ error: 'User not found' });
+           // User verified their email by clicking the link, so we create the account now.
+           user = {
+               id: randomUUID(),
+               email: decoded.email,
+               credentials: [],
+           };
+           await db.createUser(user);
+           logger.info(`[SERVER] New user created after magic link verification: ${decoded.email}`);
         }
         const { privateKey, kid } = getCurrentSigningKey();
         const authToken = jwt.sign({ email: user.email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
