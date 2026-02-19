@@ -35,3 +35,7 @@
 ## 2026-02-16 - [SmoothPolygon Allocation]
 **Learning:** In high-frequency geometry processing, repeatedly calling `Array.push()` inside a loop causes dynamic array resizing overhead. Pre-allocating the array using `new Array(size)` and assigning by index eliminates this. Also, replacing modulo operator `%` with conditional checks in tight loops yields measurable speedups in JS engines.
 **Action:** When processing geometry (points) where the output size is known (e.g. 2x input), pre-allocate result arrays.
+
+## 2026-02-19 - [Memoization with WeakMap]
+**Learning:** When memoizing derived data based on large objects (like arrays of points) in a long-lived module scope, using strong references (e.g. `lastInputRef`) can cause memory leaks if the input object is replaced but not garbage collected. Using `WeakMap` allows caching results associated with an object without preventing its garbage collection.
+**Action:** Use `WeakMap` for memoization caches where the key is an object and the cache lifespan is indefinite or tied to the module.

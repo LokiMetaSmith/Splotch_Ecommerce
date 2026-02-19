@@ -1540,11 +1540,22 @@ function handleSvgUpload(svgText) {
   }
 }
 
+const scaledPolyCache = new WeakMap();
+
 function generateCutLine(polygons, offset) {
   const scale = 100; // Scale for integer precision
-  const scaledPolygons = polygons.map((p) => {
-    return p.map((point) => ({ X: point.x * scale, Y: point.y * scale }));
-  });
+
+  let scaledPolygons;
+  // Bolt Optimization: Memoize scaled polygons to avoid O(N) allocation on every slider update.
+  // Using WeakMap avoids memory leaks if the polygons array is garbage collected.
+  if (scaledPolyCache.has(polygons)) {
+    scaledPolygons = scaledPolyCache.get(polygons);
+  } else {
+    scaledPolygons = polygons.map((p) => {
+      return p.map((point) => ({ X: point.x * scale, Y: point.y * scale }));
+    });
+    scaledPolyCache.set(polygons, scaledPolygons);
+  }
 
   const co = new ClipperLib.ClipperOffset();
   const offsetted_paths = new ClipperLib.Paths();
