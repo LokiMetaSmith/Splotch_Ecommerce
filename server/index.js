@@ -51,7 +51,7 @@ if (!rawSecret) {
 
 const IV_LENGTH = 16; // For AES, this is always 16
 
-function encrypt(text) {
+export function encrypt(text) {
     let iv = crypto.randomBytes(IV_LENGTH);
     let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
     let encrypted = cipher.update(text);
@@ -59,7 +59,7 @@ function encrypt(text) {
     return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
-function decrypt(text) {
+export function decrypt(text) {
     let textParts = text.split(':');
     let iv = Buffer.from(textParts.shift(), 'hex');
     let encryptedText = Buffer.from(textParts.join(':'), 'hex');
@@ -170,4 +170,6 @@ async function main() {
   }, 1000 * 60 * 60);
 }
 
-main();
+if (process.argv[1] === __filename) {
+    main();
+}
