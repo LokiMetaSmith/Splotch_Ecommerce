@@ -51,7 +51,7 @@ describe('Security Guest Access Bypass', () => {
 
     // Create an order for the victim
     const order = {
-        orderId: 'order-123',
+        orderId: '550e8400-e29b-41d4-a716-446655440000',
         status: 'NEW',
         billingContact: {
             email: 'victim@example.com',
@@ -74,7 +74,7 @@ describe('Security Guest Access Bypass', () => {
         currency: 'USD',
         receivedAt: new Date().toISOString()
     };
-    db.data.orders['order-123'] = order;
+    db.data.orders['550e8400-e29b-41d4-a716-446655440000'] = order;
 
     mockSendEmail.mockClear();
   });
@@ -113,7 +113,7 @@ describe('Security Guest Access Bypass', () => {
     // 2. Search Orders using Guest Token
     const resSearch = await agent
         .get('/api/orders/search')
-        .query({ q: 'order-123' })
+        .query({ q: '550e8400-e29b-41d4-a716-446655440000' })
         .set('Authorization', `Bearer ${guestToken}`);
 
     // Expect FORBIDDEN (403) confirming vulnerability is patched
@@ -138,7 +138,7 @@ describe('Security Guest Access Bypass', () => {
 
     // 2. Get Order Details
     const resOrder = await agent
-        .get('/api/orders/order-123')
+        .get('/api/orders/550e8400-e29b-41d4-a716-446655440000')
         .set('Authorization', `Bearer ${guestToken}`);
 
     // Expect FORBIDDEN (403) confirming vulnerability is patched

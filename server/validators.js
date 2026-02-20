@@ -13,6 +13,7 @@ const sanitizeUsername = (username) => {
 };
 
 // Check if an ID is valid (not a prototype key)
+// Kept for backward compatibility, but validateId now enforces UUID
 export const isValidId = (id) => {
     if (typeof id !== 'string') return false;
     const forbiddenKeys = ['__proto__', 'constructor', 'prototype'];
@@ -46,12 +47,8 @@ export const validateUsernameQuery = [
 ];
 
 // Reusable ID validation middleware for route parameters
+// Updated: Now enforces UUID format for stricter security
 export const validateId = (paramName) => [
     param(paramName)
-        .custom((value) => {
-            if (!isValidId(value)) {
-                throw new Error('Invalid ID');
-            }
-            return true;
-        })
+        .isUUID().withMessage('Invalid ID format. Must be a valid UUID.')
 ];
