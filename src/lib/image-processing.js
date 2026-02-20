@@ -52,6 +52,43 @@ export function getPolygonArea(points) {
   return Math.abs(area / 2);
 }
 
+// Bolt Optimization: Combined area and bounds calculation to reduce loop iterations
+export function getPolygonMetrics(points) {
+  if (!points || points.length === 0) {
+    return {
+      area: 0,
+      bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 },
+    };
+  }
+
+  let area = 0;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+  const len = points.length;
+
+  for (let i = 0; i < len; i++) {
+    const p = points[i];
+
+    // Bounds
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+
+    // Area
+    const j = i === len - 1 ? 0 : i + 1;
+    area += p.x * points[j].y;
+    area -= points[j].x * p.y;
+  }
+
+  return {
+    area: Math.abs(area / 2),
+    bounds: { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY },
+  };
+}
+
 function detectBackgroundColor(imageData) {
   const { data, width, height } = imageData;
   const corners = [
@@ -434,8 +471,8 @@ export function filterInternalContours(
 ) {
   // 1. Precompute bounds and area for efficiency
   const meta = contours.map((c, index) => {
-    const bounds = getPolygonBounds(c);
-    const area = getPolygonArea(c);
+    // Bolt Optimization: calculate bounds and area in one pass
+    const { bounds, area } = getPolygonMetrics(c);
     return { index, contour: c, bounds, area };
   });
 
