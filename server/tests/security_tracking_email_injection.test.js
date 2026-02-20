@@ -28,7 +28,7 @@ describe('Security Fix - HTML Injection in Emails', () => {
   };
 
   const testOrder = {
-    orderId: 'order-123',
+    orderId: '550e8400-e29b-41d4-a716-446655440000',
     billingContact: {
       email: 'customer@example.com',
       givenName: 'John',
@@ -189,7 +189,7 @@ describe('Security Fix - HTML Injection in Emails', () => {
         courier: '<a href="http://evil.com">Click Me</a>'
     };
 
-    const res = await agent.post('/api/orders/order-123/tracking')
+    const res = await agent.post('/api/orders/550e8400-e29b-41d4-a716-446655440000/tracking')
         .set('Authorization', `Bearer ${token}`)
         .set('X-CSRF-Token', csrfToken)
         .send(maliciousPayload);
