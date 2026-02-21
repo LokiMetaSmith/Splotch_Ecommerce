@@ -1642,7 +1642,10 @@ async function startServer(
         const { privateKey, kid } = getCurrentSigningKey();
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
 
-        lastMagicLinkTokens.set(email, token);
+        // SECURITY: Only store the token in memory during testing to prevent memory leaks in production.
+        if (process.env.NODE_ENV === 'test') {
+            lastMagicLinkTokens.set(email, token);
+        }
 
         const magicLink = `${getSecret('BASE_URL')}/magic-login.html?token=${token}`;
 
