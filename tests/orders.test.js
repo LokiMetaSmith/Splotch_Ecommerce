@@ -286,8 +286,9 @@ describe('Order API Endpoints', () => {
     describe('GET /api/orders/:orderId', () => {
         it('should allow admin to view any order', async () => {
              // Create an order in DB
+             const orderId = '550e8400-e29b-41d4-a716-446655440001';
              const order = {
-                 orderId: 'order_1',
+                 orderId: orderId,
                  billingContact: { email: 'user@example.com' },
                  amount: 1000
              };
@@ -297,16 +298,17 @@ describe('Order API Endpoints', () => {
              const adminToken = getAuthToken('admin', 'admin@example.com');
 
              const res = await request(app)
-                .get('/api/orders/order_1')
+                .get(`/api/orders/${orderId}`)
                 .set('Authorization', `Bearer ${adminToken}`);
 
              expect(res.statusCode).toEqual(200);
-             expect(res.body.orderId).toEqual('order_1');
+             expect(res.body.orderId).toEqual(orderId);
         });
 
         it('should allow owner to view their order', async () => {
+             const orderId = '550e8400-e29b-41d4-a716-446655440002';
              const order = {
-                 orderId: 'order_2',
+                 orderId: orderId,
                  billingContact: { email: 'owner@example.com' },
                  amount: 1000
              };
@@ -316,15 +318,16 @@ describe('Order API Endpoints', () => {
              const ownerToken = getAuthToken('owner', 'owner@example.com');
 
              const res = await request(app)
-                .get('/api/orders/order_2')
+                .get(`/api/orders/${orderId}`)
                 .set('Authorization', `Bearer ${ownerToken}`);
 
              expect(res.statusCode).toEqual(200);
         });
 
         it('should deny access to unauthorized user', async () => {
+             const orderId = '550e8400-e29b-41d4-a716-446655440003';
              const order = {
-                 orderId: 'order_3',
+                 orderId: orderId,
                  billingContact: { email: 'owner@example.com' },
                  amount: 1000
              };
@@ -334,7 +337,7 @@ describe('Order API Endpoints', () => {
              const otherToken = getAuthToken('other', 'other@example.com');
 
              const res = await request(app)
-                .get('/api/orders/order_3')
+                .get(`/api/orders/${orderId}`)
                 .set('Authorization', `Bearer ${otherToken}`);
 
              expect(res.statusCode).toEqual(404);
@@ -343,8 +346,9 @@ describe('Order API Endpoints', () => {
 
     describe('POST /api/orders/:orderId/status', () => {
         it('should update status and send telegram notification', async () => {
+             const orderId = '550e8400-e29b-41d4-a716-446655440004';
              const order = {
-                 orderId: 'order_4',
+                 orderId: orderId,
                  billingContact: { email: 'user@example.com', givenName: 'Test', familyName: 'User' },
                  orderDetails: { quantity: 5 },
                  amount: 500,
@@ -361,7 +365,7 @@ describe('Order API Endpoints', () => {
              const token = getAuthToken('admin', 'admin@example.com');
 
              const res = await agent
-                .post('/api/orders/order_4/status')
+                .post(`/api/orders/${orderId}/status`)
                 .set('Authorization', `Bearer ${token}`)
                 .set('X-CSRF-Token', csrfToken)
                 .send({ status: 'PRINTING' });
@@ -374,8 +378,9 @@ describe('Order API Endpoints', () => {
 
      describe('POST /api/orders/:orderId/tracking', () => {
         it('should update tracking info and send email', async () => {
+             const orderId = '550e8400-e29b-41d4-a716-446655440005';
              const order = {
-                 orderId: 'order_5',
+                 orderId: orderId,
                  billingContact: { email: 'user@example.com', givenName: 'Test', familyName: 'User' },
                  shippingContact: {
                      givenName: 'Test', familyName: 'User',
@@ -395,7 +400,7 @@ describe('Order API Endpoints', () => {
              const token = getAuthToken('admin', 'admin@example.com');
 
              const res = await agent
-                .post('/api/orders/order_5/tracking')
+                .post(`/api/orders/${orderId}/tracking`)
                 .set('Authorization', `Bearer ${token}`)
                 .set('X-CSRF-Token', csrfToken)
                 .send({ trackingNumber: 'TRACK123', courier: 'UPS' });
@@ -408,8 +413,10 @@ describe('Order API Endpoints', () => {
 
     describe('GET /api/orders (Admin List)', () => {
         it('should allow env-defined admin to view all orders', async () => {
-            db.data.orders['o1'] = { orderId: 'o1', receivedAt: '2023-01-01' };
-            db.data.orders['o2'] = { orderId: 'o2', receivedAt: '2023-01-02' };
+            const o1 = '550e8400-e29b-41d4-a716-446655440006';
+            const o2 = '550e8400-e29b-41d4-a716-446655440007';
+            db.data.orders[o1] = { orderId: o1, receivedAt: '2023-01-01' };
+            db.data.orders[o2] = { orderId: o2, receivedAt: '2023-01-02' };
             await db.write();
 
             const token = getAuthToken('admin', 'admin@example.com'); // Matches process.env.ADMIN_EMAIL
@@ -419,11 +426,12 @@ describe('Order API Endpoints', () => {
 
             expect(res.statusCode).toBe(200);
             expect(res.body).toHaveLength(2);
-            expect(res.body[0].orderId).toBe('o2');
+            expect(res.body[0].orderId).toBe(o2);
         });
 
         it('should allow user with "admin" role to view all orders', async () => {
-            db.data.orders['o1'] = { orderId: 'o1', receivedAt: '2023-01-01' };
+            const o1 = '550e8400-e29b-41d4-a716-446655440006';
+            db.data.orders[o1] = { orderId: o1, receivedAt: '2023-01-01' };
             // Create a user with admin role who is NOT the env admin
             const adminUser = {
                 id: 'role_admin',
@@ -468,8 +476,10 @@ describe('Order API Endpoints', () => {
     describe('GET /api/orders/my-orders', () => {
         it('should return orders for the authenticated user', async () => {
             const email = 'my@example.com';
-            db.data.orders['my1'] = { orderId: 'my1', billingContact: { email }, receivedAt: '2023-01-01' };
-            db.data.orders['other1'] = { orderId: 'other1', billingContact: { email: 'other@example.com' }, receivedAt: '2023-01-02' };
+            const my1 = '550e8400-e29b-41d4-a716-446655440008';
+            const other1 = '550e8400-e29b-41d4-a716-446655440009';
+            db.data.orders[my1] = { orderId: my1, billingContact: { email }, receivedAt: '2023-01-01' };
+            db.data.orders[other1] = { orderId: other1, billingContact: { email: 'other@example.com' }, receivedAt: '2023-01-02' };
             await db.write();
             rebuildIndex();
 
@@ -480,7 +490,7 @@ describe('Order API Endpoints', () => {
 
             expect(res.statusCode).toBe(200);
             expect(res.body).toHaveLength(1);
-            expect(res.body[0].orderId).toBe('my1');
+            expect(res.body[0].orderId).toBe(my1);
         });
 
         it('should return empty list if user has no orders', async () => {
@@ -500,32 +510,36 @@ describe('Order API Endpoints', () => {
             // User must exist for search endpoint
             db.data.users['searchuser'] = { email, username: 'searchuser' };
             db.data.emailIndex = { [email]: 'searchuser' };
-            db.data.orders['search123'] = { orderId: 'search123', billingContact: { email }, receivedAt: '2023-01-01' };
-            db.data.orders['search456'] = { orderId: 'search456', billingContact: { email }, receivedAt: '2023-01-02' };
+            const search123 = '550e8400-e29b-41d4-a716-446655440010';
+            const search456 = '550e8400-e29b-41d4-a716-446655440011';
+
+            db.data.orders[search123] = { orderId: search123, billingContact: { email }, receivedAt: '2023-01-01' };
+            db.data.orders[search456] = { orderId: search456, billingContact: { email }, receivedAt: '2023-01-02' };
             await db.write();
             rebuildIndex();
 
             const token = getAuthToken('searchuser', email);
             const res = await request(app)
-                .get('/api/orders/search?q=123')
+                .get('/api/orders/search?q=0010')
                 .set('Authorization', `Bearer ${token}`);
 
             expect(res.statusCode).toBe(200);
             expect(res.body).toHaveLength(1);
-            expect(res.body[0].orderId).toBe('search123');
+            expect(res.body[0].orderId).toBe(search123);
         });
 
         it('should not find other users orders even if ID matches query', async () => {
              const email = 'user1@example.com';
              db.data.users['user1'] = { email, username: 'user1' };
              db.data.emailIndex = { [email]: 'user1' };
-             db.data.orders['secret123'] = { orderId: 'secret123', billingContact: { email: 'admin@example.com' } };
+             const secret123 = '550e8400-e29b-41d4-a716-446655440012';
+             db.data.orders[secret123] = { orderId: secret123, billingContact: { email: 'admin@example.com' } };
              await db.write();
              rebuildIndex();
 
              const token = getAuthToken('user1', email);
              const res = await request(app)
-                .get('/api/orders/search?q=123')
+                .get('/api/orders/search?q=0012')
                 .set('Authorization', `Bearer ${token}`);
 
              // The search filters by user email first, then by query.
