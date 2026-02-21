@@ -62,6 +62,7 @@ let paymentStatusContainer,
 let rotateLeftBtnEl,
   rotateRightBtnEl,
   resetBtnEl,
+  clearFileBtn,
   resizeInputEl,
   resizeBtnEl,
   grayscaleBtnEl,
@@ -171,6 +172,7 @@ async function BootStrap() {
   rotateLeftBtnEl = document.getElementById("rotateLeftBtn");
   rotateRightBtnEl = document.getElementById("rotateRightBtn");
   resetBtnEl = document.getElementById("resetBtn");
+  clearFileBtn = document.getElementById("clearFileBtn");
   const resizeSliderEl = document.getElementById("resizeSlider");
   const resizeInputNumberEl = document.getElementById("resizeInput");
   const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
@@ -272,6 +274,7 @@ async function BootStrap() {
       rotateCanvasContentFixedBounds(90),
     );
   if (resetBtnEl) resetBtnEl.addEventListener("click", handleResetImage);
+  if (clearFileBtn) clearFileBtn.addEventListener("click", handleClearImage);
   if (grayscaleBtnEl)
     grayscaleBtnEl.addEventListener("click", toggleGrayscaleFilter);
   if (sepiaBtnEl) sepiaBtnEl.addEventListener("click", toggleSepiaFilter);
@@ -1375,6 +1378,7 @@ function loadFileAsImage(file) {
       img.onload = () => {
         originalImage = img;
         updateEditingButtonsState(false);
+        if (clearFileBtn) clearFileBtn.classList.remove("hidden");
         showPaymentStatus("Image loaded successfully.", "success");
         let newWidth = img.width,
           newHeight = img.height;
@@ -1532,6 +1536,7 @@ function handleSvgUpload(svgText) {
     // Initial drawing
     redrawAll();
 
+    if (clearFileBtn) clearFileBtn.classList.remove("hidden");
     showPaymentStatus("SVG processed and cutline generated.", "success");
     updateEditingButtonsState(false); // Enable editing buttons
   } catch (error) {
@@ -1726,6 +1731,34 @@ function handleAddText() {
   ctx.textBaseline = "middle";
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
   showPaymentStatus(`Text "${text}" added.`, "success");
+}
+
+function handleClearImage() {
+  if (!confirm("Are you sure you want to remove the image?")) return;
+
+  originalImage = null;
+  basePolygons = [];
+  currentPolygons = [];
+  rasterCutlinePoly = null;
+  currentCutline = [];
+  currentBounds = null;
+  cleanCanvasState = null;
+
+  if (fileInputGlobalRef) fileInputGlobalRef.value = "";
+  if (fileNameDisplayEl) fileNameDisplayEl.textContent = "";
+
+  if (canvas && ctx) {
+    // Reset to default size (matches HTML)
+    setCanvasSize(500, 400);
+    // Clearing 0,0 to width,height works because setCanvasSize sets transform
+    ctx.clearRect(0, 0, 500, 400);
+  }
+
+  updateEditingButtonsState(true);
+  calculateAndUpdatePrice();
+
+  if (clearFileBtn) clearFileBtn.classList.add("hidden");
+  showPaymentStatus("Image removed.", "info");
 }
 
 function handleResetImage() {
@@ -2445,6 +2478,7 @@ async function handleRemoteImageLoad(imageUrl) {
 
     calculateAndUpdatePrice();
     drawCanvasDecorations(currentBounds);
+    if (clearFileBtn) clearFileBtn.classList.remove("hidden");
     showPaymentStatus("Design loaded! You can now adjust options.", "success");
   };
   img.onerror = () =>
