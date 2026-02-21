@@ -9,6 +9,9 @@
 const MOORE_X = new Int8Array([1, 1, 0, -1, -1, -1, 0, 1]);
 const MOORE_Y = new Int8Array([0, -1, -1, -1, 0, 1, 1, 1]);
 
+// Bolt Optimization: Check endianness once for Uint32Array optimizations
+const IS_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([0x12345678]).buffer)[0] === 0x78;
+
 export function imageHasTransparentBorder(imageData) {
   const { data, width, height } = imageData;
   const borderSampleSize = 10; // Check this many pixels on each edge
@@ -134,6 +137,9 @@ function detectBackgroundColor(imageData) {
  */
 export function traceContours(imageData, threshold = 10) {
   const { data, width, height } = imageData;
+  // Bolt Optimization: Use Uint32Array for fast pixel access (avoids multiple typed array lookups)
+  const u32 = new Uint32Array(data.buffer, data.byteOffset, data.length >> 2);
+
   let visited = new Uint8Array(width * height); // 0 = unvisited, 1 = visited
   let bgColor = detectBackgroundColor(imageData);
 
@@ -153,7 +159,8 @@ export function traceContours(imageData, threshold = 10) {
       visited[cy * width + cx] = 1;
 
       // Start checking neighbors from the one after the direction we came from
-      let checkDirection = (lastDirection + 5) % 8;
+      // Bolt Optimization: Use bitwise AND for modulo 8 (power of 2)
+      let checkDirection = (lastDirection + 5) & 7;
       foundNext = false;
 
       for (let i = 0; i < 8; i++) {
@@ -168,7 +175,7 @@ export function traceContours(imageData, threshold = 10) {
           foundNext = true;
           break;
         }
-        checkDirection = (checkDirection + 1) % 8;
+        checkDirection = (checkDirection + 1) & 7;
       }
 
       if (!foundNext) {
@@ -184,22 +191,57 @@ export function traceContours(imageData, threshold = 10) {
   const runTrace = () => {
     // Bolt Optimization: Inline the loop logic to avoid function call overhead for 4M+ pixel checks.
     // We split the loop into two branches: one for bgColor handling and one for simple alpha check.
+    // Bolt Optimization: Using Uint32Array access pattern for speed.
 
     if (bgColor) {
       const { r: bgR, g: bgG, b: bgB } = bgColor;
       const threshold3 = threshold * 3;
 
-      // Closure for boundary tracer to use
-      const isOpaqueBg = (x, y) => {
-        if (x < 0 || x >= width || y < 0 || y >= height) return false;
-        const i = (y * width + x) * 4;
-        if (data[i + 3] < 128) return false;
-        const diff =
-          Math.abs(data[i] - bgR) +
-          Math.abs(data[i + 1] - bgG) +
-          Math.abs(data[i + 2] - bgB);
-        return diff > threshold3;
-      };
+      // Define optimized closures and loop bodies based on endianness
+      let isOpaqueBg;
+      let checkPixel;
+
+      if (IS_LITTLE_ENDIAN) {
+        // Little Endian: ABGR (A at highest byte)
+        isOpaqueBg = (x, y) => {
+          if (x < 0 || x >= width || y < 0 || y >= height) return false;
+          const pixel = u32[y * width + x];
+          if ((pixel >>> 24) < 128) return false;
+          const r = pixel & 0xFF;
+          const g = (pixel >> 8) & 0xFF;
+          const b = (pixel >> 16) & 0xFF;
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          return diff > threshold3;
+        };
+        checkPixel = (pixel) => {
+          if ((pixel >>> 24) < 128) return false;
+          const r = pixel & 0xFF;
+          const g = (pixel >> 8) & 0xFF;
+          const b = (pixel >> 16) & 0xFF;
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          return diff > threshold3;
+        };
+      } else {
+        // Big Endian: RGBA (A at lowest byte)
+        isOpaqueBg = (x, y) => {
+          if (x < 0 || x >= width || y < 0 || y >= height) return false;
+          const pixel = u32[y * width + x];
+          if ((pixel & 0xFF) < 128) return false;
+          const r = (pixel >>> 24) & 0xFF;
+          const g = (pixel >> 16) & 0xFF;
+          const b = (pixel >> 8) & 0xFF;
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          return diff > threshold3;
+        };
+        checkPixel = (pixel) => {
+          if ((pixel & 0xFF) < 128) return false;
+          const r = (pixel >>> 24) & 0xFF;
+          const g = (pixel >> 16) & 0xFF;
+          const b = (pixel >> 8) & 0xFF;
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          return diff > threshold3;
+        };
+      }
 
       for (let y = 0; y < height; y++) {
         let prevOpaque = false;
@@ -212,18 +254,9 @@ export function traceContours(imageData, threshold = 10) {
             continue;
           }
 
-          const pixelIndex = idx * 4;
-          // Inlined check for performance
-          let currOpaque = false;
-          if (data[pixelIndex + 3] >= 128) {
-             const diff =
-               Math.abs(data[pixelIndex] - bgR) +
-               Math.abs(data[pixelIndex + 1] - bgG) +
-               Math.abs(data[pixelIndex + 2] - bgB);
-             if (diff > threshold3) {
-                 currOpaque = true;
-             }
-          }
+          // Bolt Optimization: Single array lookup
+          const pixel = u32[idx];
+          const currOpaque = checkPixel(pixel);
 
           if (currOpaque && !prevOpaque) {
             traceBoundary(x, y, isOpaqueBg);
@@ -233,11 +266,22 @@ export function traceContours(imageData, threshold = 10) {
       }
     } else {
       // Simple Alpha Check (No background color detected or fallback)
-      const isOpaqueSimple = (x, y) => {
-        if (x < 0 || x >= width || y < 0 || y >= height) return false;
-        const i = (y * width + x) * 4;
-        return data[i + 3] >= 128;
-      };
+      let isOpaqueSimple;
+      let checkPixelSimple;
+
+      if (IS_LITTLE_ENDIAN) {
+        isOpaqueSimple = (x, y) => {
+            if (x < 0 || x >= width || y < 0 || y >= height) return false;
+            return (u32[y * width + x] >>> 24) >= 128;
+        };
+        checkPixelSimple = (pixel) => (pixel >>> 24) >= 128;
+      } else {
+        isOpaqueSimple = (x, y) => {
+            if (x < 0 || x >= width || y < 0 || y >= height) return false;
+            return (u32[y * width + x] & 0xFF) >= 128;
+        };
+        checkPixelSimple = (pixel) => (pixel & 0xFF) >= 128;
+      }
 
       for (let y = 0; y < height; y++) {
         let prevOpaque = false;
@@ -250,9 +294,9 @@ export function traceContours(imageData, threshold = 10) {
             continue;
           }
 
-          const pixelIndex = idx * 4;
-          // Inlined check
-          const currOpaque = data[pixelIndex + 3] >= 128;
+          // Bolt Optimization: Single array lookup
+          const pixel = u32[idx];
+          const currOpaque = checkPixelSimple(pixel);
 
           if (currOpaque && !prevOpaque) {
             traceBoundary(x, y, isOpaqueSimple);
