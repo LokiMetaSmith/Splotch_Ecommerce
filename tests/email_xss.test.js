@@ -115,7 +115,7 @@ describe('Email Stored XSS Vulnerability Check', () => {
         const xssPayload = "<script>alert('XSS')</script>";
         const safePart = "123 Safe St";
 
-        const orderId = 'order_xss_test';
+        const orderId = '550e8400-e29b-41d4-a716-446655440013';
         const maliciousOrder = {
             orderId: orderId,
             status: 'SHIPPED',

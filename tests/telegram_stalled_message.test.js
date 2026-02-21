@@ -85,7 +85,7 @@ describe('Telegram Stalled Message Deletion', () => {
         adminToken = loginRes.body.token;
 
         // Create an order with stalledMessageId
-        const orderId = 'test-order-stalled';
+        const orderId = '550e8400-e29b-41d4-a716-446655440014';
         const order = {
             orderId: orderId,
             status: 'NEW',

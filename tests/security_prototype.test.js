@@ -76,7 +76,7 @@ describe('Security: Prototype Pollution Prevention', () => {
              expect(res.body.error).toBe('Forbidden');
         } else {
              expect(res.statusCode).toBe(400);
-             expect(res.body.errors[0].msg).toBe('Invalid ID');
+             expect(res.body.errors[0].msg).toBe('Invalid ID format. Must be a valid UUID.');
         }
     });
 
@@ -87,7 +87,7 @@ describe('Security: Prototype Pollution Prevention', () => {
             .set('Authorization', `Bearer ${token}`);
 
         expect(res.statusCode).toBe(400);
-        expect(res.body.errors[0].msg).toBe('Invalid ID');
+        expect(res.body.errors[0].msg).toBe('Invalid ID format. Must be a valid UUID.');
     });
 
      it('should block prototype pollution attempts on GET /api/orders/prototype', async () => {
@@ -97,7 +97,7 @@ describe('Security: Prototype Pollution Prevention', () => {
             .set('Authorization', `Bearer ${token}`);
 
         expect(res.statusCode).toBe(400);
-        expect(res.body.errors[0].msg).toBe('Invalid ID');
+        expect(res.body.errors[0].msg).toBe('Invalid ID format. Must be a valid UUID.');
     });
 
     it('should block prototype pollution attempts on POST /api/orders/:orderId/status', async () => {
@@ -130,7 +130,7 @@ describe('Security: Prototype Pollution Prevention', () => {
              expect(res.body.error).toBe('Forbidden');
         } else {
              expect(res.statusCode).toBe(400);
-             expect(res.body.errors[0].msg).toBe('Invalid ID');
+             expect(res.body.errors[0].msg).toBe('Invalid ID format. Must be a valid UUID.');
         }
     });
 
@@ -164,7 +164,7 @@ describe('Security: Prototype Pollution Prevention', () => {
              expect(res.body.error).toBe('Forbidden');
         } else {
              expect(res.statusCode).toBe(400);
-             expect(res.body.errors[0].msg).toBe('Invalid ID');
+             expect(res.body.errors[0].msg).toBe('Invalid ID format. Must be a valid UUID.');
         }
     });
 });
