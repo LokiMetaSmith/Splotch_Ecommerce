@@ -23,6 +23,7 @@ These issues represent the most severe risks to the application's functionality 
 -   **[x] Fix failing security prototype tests:** The tests `tests/security_prototype.test.js` were failing because the WAF was correctly blocking prototype pollution attempts with a 403 Forbidden response, but the test expected a 400 Bad Request from the controller validation. Updated tests to accept both.
 -   **[x] Test Client JSON Encryption:** Add unit tests for the encryption/decryption logic used for the client JSON database (`server/db.json`). This logic is currently untested and relies on a global variable `ENCRYPT_CLIENT_JSON`.
 -   **[x] Fix tests broken by strict UUID validation:** Updated `tests/orders.test.js`, `tests/email_xss.test.js`, `tests/telegram_stalled_message.test.js`, and `tests/security_prototype.test.js` to use valid UUIDs and expect correct error messages, resolving failures caused by the implementation of strict UUID validation.
+-   **[x] Refactor Client JSON Encryption:** Implemented `EncryptedJSONFile` adapter for LowDB to handle encryption/decryption on the fly. This eliminates the security risk of writing decrypted data to disk during server startup and ensures `db.json` remains encrypted at rest.
 
 ---
 

@@ -19,55 +19,18 @@ import { initializeBot } from './bot.js';
 import { sendEmail } from './email.js';
 import { getSecret } from './secretManager.js';
 import { JSONFilePreset } from 'lowdb/node';
+import { Low } from 'lowdb';
 import { getDatabaseAdapter } from './database/index.js';
+import { EncryptedJSONFile } from './database/EncryptedJSONFile.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import crypto from 'crypto';
-import fs from 'fs';
+import { encrypt, decrypt } from './encryption.js';
+
+// Re-export for backward compatibility with tests
+export { encrypt, decrypt };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const rawSecret = getSecret('JWT_SECRET');
-let ENCRYPTION_KEY;
-
-// Robust key derivation to prevent crashes and ensure 32-byte key length for AES-256
-if (!rawSecret) {
-    if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
-        logger.error('❌ [FATAL] JWT_SECRET is missing but ENCRYPT_CLIENT_JSON is true.');
-        logger.error('   You must provide a JWT_SECRET to encrypt the database.');
-        process.exit(1);
-    }
-    // If encryption is disabled, we set a dummy key to prevent crashes if the key is accessed inadvertently.
-    // This key will not be used for encryption as the encrypt/decrypt functions are guarded by the flag.
-    ENCRYPTION_KEY = crypto.createHash('sha256').update('unused-key-when-encryption-disabled').digest();
-} else if (Buffer.byteLength(rawSecret) === 32) {
-    // Backward compatibility: If exactly 32 bytes, use as-is (legacy behavior)
-    ENCRYPTION_KEY = rawSecret;
-} else {
-    // Robustness: Hash arbitrary length secrets to exactly 32 bytes
-    ENCRYPTION_KEY = crypto.createHash('sha256').update(String(rawSecret)).digest();
-}
-
-const IV_LENGTH = 16; // For AES, this is always 16
-
-export function encrypt(text) {
-    let iv = crypto.randomBytes(IV_LENGTH);
-    let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
-    let encrypted = cipher.update(text);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
-}
-
-export function decrypt(text) {
-    let textParts = text.split(':');
-    let iv = Buffer.from(textParts.shift(), 'hex');
-    let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
-}
 
 async function main() {
     let db;
@@ -83,26 +46,16 @@ async function main() {
         logger.info('[SERVER] Connected to MongoDB.');
     } else {
         const dbPath = path.join(__dirname, 'db.json');
+        const defaultData = { orders: {}, users: {}, credentials: {}, config: {} };
+        let lowDbInstance;
 
         if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
-            if (fs.existsSync(dbPath)) {
-                const encryptedData = fs.readFileSync(dbPath, 'utf8');
-                const decryptedData = decrypt(encryptedData);
-                fs.writeFileSync(dbPath, decryptedData);
-            }
-        }
-
-        const lowDbInstance = await JSONFilePreset(dbPath, { orders: {}, users: {}, credentials: {}, config: {} });
-
-        if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
-            const originalWrite = lowDbInstance.write;
-            lowDbInstance.write = async function() {
-                const data = JSON.stringify(this.data);
-                const encryptedData = encrypt(data);
-                const tempPath = `${dbPath}.tmp`;
-                await fs.promises.writeFile(tempPath, encryptedData);
-                await fs.promises.rename(tempPath, dbPath);
-            }
+            const adapter = new EncryptedJSONFile(dbPath);
+            lowDbInstance = new Low(adapter, defaultData);
+            await lowDbInstance.read();
+            logger.info('[SERVER] Using EncryptedJSONFile adapter for database.');
+        } else {
+            lowDbInstance = await JSONFilePreset(dbPath, defaultData);
         }
 
         db = getDatabaseAdapter(lowDbInstance);
