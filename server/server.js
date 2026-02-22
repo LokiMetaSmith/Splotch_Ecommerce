@@ -2086,6 +2086,38 @@ async function startServer(
       metricsTimer.unref();
     }
     
+    // --- Global Error Handlers ---
+
+    // 404 Handler for API routes
+    app.use('/api', (req, res) => {
+        res.status(404).json({ error: 'Not Found' });
+    });
+
+    // Global Error Handler
+    // eslint-disable-next-line no-unused-vars
+    app.use((err, req, res, next) => {
+        // Handle JSON parsing errors (e.g. invalid JSON in request body)
+        if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+            logger.warn(`[SECURITY] Malformed JSON detected from ${req.ip}`);
+            return res.status(400).json({ error: 'Bad Request: Malformed JSON' });
+        }
+
+        logger.error('[SERVER] Unhandled Error:', err);
+
+        // Hide stack trace in production (and generally in API responses)
+        const response = {
+            error: 'Internal Server Error'
+        };
+
+        // Only include error details in non-production environments if needed for debugging,
+        // but be careful not to leak sensitive info.
+        if (process.env.NODE_ENV !== 'production') {
+            response.message = err.message;
+        }
+
+        res.status(500).json(response);
+    });
+
     // Return the app and the timers so they can be managed by the caller
     return { app, timers: [sessionTokenTimer, keyRotationTimer, metricsTimer], bot };
     
