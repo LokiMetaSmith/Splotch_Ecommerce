@@ -150,6 +150,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const originalText = loginBtn.innerHTML;
+      const originalClassName = loginBtn.className;
       loginBtn.disabled = true;
       loginBtn.innerHTML = `
             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -160,6 +161,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         `;
       // Ensure disabled style is applied visually if not handled by CSS
       loginBtn.classList.add("opacity-75", "cursor-not-allowed");
+
+      let success = false;
 
       try {
         if (!csrfToken) {
@@ -180,6 +183,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const data = await response.json();
 
         if (response.ok) {
+          success = true;
           loginStatus.textContent = "Magic link sent! Please check your email.";
           loginStatus.style.color = "green";
         } else {
@@ -189,9 +193,41 @@ document.addEventListener("DOMContentLoaded", async () => {
         loginStatus.textContent = `Error: ${error.message}`;
         loginStatus.style.color = "red";
       } finally {
-        loginBtn.disabled = false;
-        loginBtn.innerHTML = originalText;
-        loginBtn.classList.remove("opacity-75", "cursor-not-allowed");
+        if (!success) {
+          loginBtn.disabled = false;
+          loginBtn.innerHTML = originalText;
+          loginBtn.className = originalClassName;
+        } else {
+          // Success: Show Cooldown
+          let cooldown = 30;
+          loginBtn.disabled = true;
+          loginBtn.classList.add("cursor-not-allowed");
+          loginBtn.classList.remove("bg-splotch-red");
+          loginBtn.classList.add("bg-green-600"); // Success color
+
+          const updateButtonText = () => {
+            loginBtn.innerHTML = `
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                <span>Sent! Retry in ${cooldown}s</span>
+            `;
+          };
+
+          updateButtonText();
+
+          const timer = setInterval(() => {
+            cooldown--;
+            if (cooldown <= 0) {
+              clearInterval(timer);
+              loginBtn.disabled = false;
+              loginBtn.innerHTML = originalText;
+              loginBtn.className = originalClassName;
+            } else {
+              updateButtonText();
+            }
+          }, 1000);
+        }
       }
     });
 
