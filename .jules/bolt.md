@@ -39,3 +39,11 @@
 ## 2026-02-19 - [Memoization with WeakMap]
 **Learning:** When memoizing derived data based on large objects (like arrays of points) in a long-lived module scope, using strong references (e.g. `lastInputRef`) can cause memory leaks if the input object is replaced but not garbage collected. Using `WeakMap` allows caching results associated with an object without preventing its garbage collection.
 **Action:** Use `WeakMap` for memoization caches where the key is an object and the cache lifespan is indefinite or tied to the module.
+
+## 2026-02-23 - [Pre-Simplification for Topology Checks]
+**Learning:** Checking containment (`isPointInPolygon`) on raw, high-resolution contours is O(N*M) where M is huge (e.g., 5000+ points). Simplifying contours using RDP *before* topological checks reduces M drastically (e.g., to ~100 points), making the N*M check negligible (0.2ms vs 48ms) without sacrificing significant accuracy for "hole vs island" detection.
+**Action:** When performing geometric relation checks (like containment or intersection) on dense polygons, always simplify them first if perfect precision is not required.
+
+## 2026-02-23 - [ClipperLib Coordinate Case Sensitivity]
+**Learning:** `ClipperLib` uses uppercase `X` and `Y` properties for points. Accessing `point.y` (lowercase) returns `undefined`, leading to `NaN` in calculations. This silent failure in map/transform functions can be hard to spot if downstream consumers handle `NaN` gracefully (or if the feature just silently breaks).
+**Action:** Always verify property casing when working with external libraries, especially those ported from other languages (like C# or C++), which often use PascalCase.

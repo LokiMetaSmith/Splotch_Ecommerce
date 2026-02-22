@@ -2243,7 +2243,11 @@ function handleGenerateCutline() {
       // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
       const imageArea = canvas.width * canvas.height;
       const minIslandArea = Math.max(100, imageArea * 0.0001); // At least 100px, or 0.01% of image
-      let significantContours = contours.filter((c) => getPolygonArea(c) > minIslandArea);
+      // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
+      // This changes O(N*M) check to O(N*m) where m << M.
+      let significantContours = contours
+        .filter((c) => getPolygonArea(c) > minIslandArea)
+        .map(c => simplifyPolygon(c, 0.5)); // Epsilon of 0.5 pixels
 
       // Suppress "island cuts" (internal holes) that are larger than 2mm.
       // Constraint: "we can have internal cuts, but they should be less than 2mm"
@@ -2273,12 +2277,10 @@ function handleGenerateCutline() {
       const finalContours = [];
 
       significantContours.forEach((contour) => {
-        // The raw contour is too detailed, simplify it using the RDP algorithm.
-        const simplifiedContour = simplifyPolygon(contour, 0.5); // Epsilon of 0.5 pixels
-
         // Bolt Optimization: Apply smoothing to round sharp corners ("surface energy minimization")
         // 2 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
-        const smoothedContour = smoothPolygon(simplifiedContour, 2);
+        // Note: contour is already simplified.
+        const smoothedContour = smoothPolygon(contour, 2);
 
         // Clean the polygon to remove self-intersections and other issues before offsetting.
         // This requires scaling up for Clipper's integer math.
