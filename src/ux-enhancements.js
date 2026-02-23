@@ -47,7 +47,8 @@ export function setupTooltips() {
 
   // Create the arrow element
   const arrow = document.createElement("div");
-  arrow.className = "absolute w-0 h-0 border-solid border-transparent pointer-events-none";
+  arrow.className =
+    "absolute w-0 h-0 border-solid border-transparent pointer-events-none";
   // Arrow size: 8px
   arrow.style.borderWidth = "8px";
   arrow.style.left = "50%";
@@ -67,9 +68,9 @@ export function setupTooltips() {
     // Check if we have a content span, if not create one
     let contentSpan = tooltip.querySelector(".tooltip-content");
     if (!contentSpan) {
-        contentSpan = document.createElement("span");
-        contentSpan.className = "tooltip-content";
-        tooltip.insertBefore(contentSpan, arrow);
+      contentSpan = document.createElement("span");
+      contentSpan.className = "tooltip-content";
+      tooltip.insertBefore(contentSpan, arrow);
     }
     contentSpan.textContent = el.dataset.tooltip;
 
@@ -98,19 +99,19 @@ export function setupTooltips() {
 
     // Update Arrow Orientation
     if (isFlipped) {
-        // Tooltip is BELOW. Arrow should be at TOP, pointing UP.
-        // Border-bottom color should be Navy.
-        arrow.style.top = "-16px"; // 2 * borderWidth
-        arrow.style.bottom = "auto";
-        arrow.style.borderBottomColor = "var(--splotch-navy)";
-        arrow.style.borderTopColor = "transparent";
+      // Tooltip is BELOW. Arrow should be at TOP, pointing UP.
+      // Border-bottom color should be Navy.
+      arrow.style.top = "-16px"; // 2 * borderWidth
+      arrow.style.bottom = "auto";
+      arrow.style.borderBottomColor = "var(--splotch-navy)";
+      arrow.style.borderTopColor = "transparent";
     } else {
-        // Tooltip is ABOVE. Arrow should be at BOTTOM, pointing DOWN.
-        // Border-top color should be Navy.
-        arrow.style.top = "auto";
-        arrow.style.bottom = "-16px"; // 2 * borderWidth
-        arrow.style.borderTopColor = "var(--splotch-navy)";
-        arrow.style.borderBottomColor = "transparent";
+      // Tooltip is ABOVE. Arrow should be at BOTTOM, pointing DOWN.
+      // Border-top color should be Navy.
+      arrow.style.top = "auto";
+      arrow.style.bottom = "-16px"; // 2 * borderWidth
+      arrow.style.borderTopColor = "var(--splotch-navy)";
+      arrow.style.borderBottomColor = "transparent";
     }
 
     tooltip.classList.remove("opacity-0");
@@ -129,10 +130,96 @@ export function setupTooltips() {
   });
 }
 
+let keydownListener = null;
+
+/**
+ * Sets up global keyboard shortcuts for the image editor.
+ */
+export function setupKeyboardShortcuts() {
+  if (keydownListener) {
+    document.removeEventListener("keydown", keydownListener);
+  }
+
+  // Add shortcuts to tooltips
+  const shortcuts = {
+    rotateLeftBtn: " ([)",
+    rotateRightBtn: " (])",
+    grayscaleBtn: " (g)",
+    sepiaBtn: " (s)",
+  };
+
+  for (const [id, key] of Object.entries(shortcuts)) {
+    const el = document.getElementById(id);
+    if (el && el.dataset.tooltip) {
+      el.dataset.tooltip += key;
+    }
+  }
+
+  keydownListener = (e) => {
+    // Ignore if typing in input
+    if (
+      e.target.tagName === "INPUT" ||
+      e.target.tagName === "TEXTAREA" ||
+      e.target.isContentEditable
+    )
+      return;
+
+    // Ignore if modifiers (except Shift for zoom)
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    switch (e.key) {
+      case "[":
+        document.getElementById("rotateLeftBtn")?.click();
+        break;
+      case "]":
+        document.getElementById("rotateRightBtn")?.click();
+        break;
+      case "g":
+        document.getElementById("grayscaleBtn")?.click();
+        break;
+      case "s":
+        document.getElementById("sepiaBtn")?.click();
+        break;
+      case "ArrowUp":
+        if (e.shiftKey) {
+          e.preventDefault(); // Prevent scrolling
+          const slider = document.getElementById("resizeSlider");
+          if (slider && !slider.disabled) {
+            const step = parseFloat(slider.step) || 0.1;
+            const val = parseFloat(slider.value) || 0;
+            const max = parseFloat(slider.max) || 100;
+            if (val + step <= max) {
+              slider.value = (val + step).toFixed(1); // Keep precision
+              slider.dispatchEvent(new Event("input"));
+            }
+          }
+        }
+        break;
+      case "ArrowDown":
+        if (e.shiftKey) {
+          e.preventDefault(); // Prevent scrolling
+          const slider = document.getElementById("resizeSlider");
+          if (slider && !slider.disabled) {
+            const step = parseFloat(slider.step) || 0.1;
+            const val = parseFloat(slider.value) || 0;
+            const min = parseFloat(slider.min) || 0;
+            if (val - step >= min) {
+              slider.value = (val - step).toFixed(1); // Keep precision
+              slider.dispatchEvent(new Event("input"));
+            }
+          }
+        }
+        break;
+    }
+  };
+  document.addEventListener("keydown", keydownListener);
+}
+
 // Initialize on load
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", () => {
     setupPhoneFormatting();
     setupTooltips();
+    setupKeyboardShortcuts();
   });
 }
