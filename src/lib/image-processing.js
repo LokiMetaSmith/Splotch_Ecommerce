@@ -466,16 +466,32 @@ export function getPolygonBounds(points) {
 
 export function isPointInPolygon(point, polygon) {
   let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+  const px = point.x;
+  const py = point.y;
+  const len = polygon.length;
+
+  for (let i = 0, j = len - 1; i < len; j = i++) {
     const xi = polygon[i].x,
       yi = polygon[i].y;
     const xj = polygon[j].x,
       yj = polygon[j].y;
 
-    const intersect =
-      yi > point.y !== yj > point.y &&
-      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
+    // Bolt Optimization: Check ray intersection using multiplication to avoid expensive division
+    const intersect = (yi > py) !== (yj > py);
+    if (intersect) {
+      // Original: px < (xj - xi) * (py - yi) / (yj - yi) + xi
+      // Optimized: (px - xi) * (yj - yi) < (xj - xi) * (py - yi) (careful with sign of yj - yi)
+      const term1 = (px - xi) * (yj - yi);
+      const term2 = (xj - xi) * (py - yi);
+
+      // If yj > yi, we check <. If yj < yi, we check >.
+      // Note: yi != yj is guaranteed because (yi > py) != (yj > py)
+      if (yj > yi) {
+        if (term1 < term2) inside = !inside;
+      } else {
+        if (term1 > term2) inside = !inside;
+      }
+    }
   }
   return inside;
 }
