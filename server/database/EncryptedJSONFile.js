@@ -37,6 +37,12 @@ export class EncryptedJSONFile {
   async write(data) {
     const str = JSON.stringify(data, null, 2);
     const encrypted = encrypt(str);
-    await fs.promises.writeFile(this.filename, encrypted);
+    const tempFile = `${this.filename}.tmp`;
+
+    // Write to a temporary file first
+    await fs.promises.writeFile(tempFile, encrypted);
+
+    // Atomically rename the temporary file to the target file
+    await fs.promises.rename(tempFile, this.filename);
   }
 }
