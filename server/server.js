@@ -867,11 +867,13 @@ async function startServer(
     app.post('/api/products', authenticateToken, [
         body('name').notEmpty().withMessage('Product name is required').isString().trim().escape(),
         body('designImagePath').notEmpty().withMessage('Design image is required').isString().custom(value => {
+            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
         }),
         body('cutLinePath').optional().isString().custom(value => {
+            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
@@ -957,6 +959,7 @@ async function startServer(
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isString().withMessage('currency must be a string').isAlpha().withMessage('currency must be alphabetic'),
       body('designImagePath').notEmpty().withMessage('designImagePath is required').custom(value => {
+            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
@@ -980,6 +983,7 @@ async function startServer(
             return true;
       }),
       body('orderDetails.cutLinePath').optional({ nullable: true }).isString().withMessage('cutLinePath must be a string').custom(value => {
+            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
