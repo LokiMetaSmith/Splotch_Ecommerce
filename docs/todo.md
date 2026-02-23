@@ -63,6 +63,7 @@ These are smaller tasks for improving test quality and covering minor edge cases
 -   **[x] Remove Unused Dependency `lucas`:** This package appears to be a typo for `lusca` and is unused.
 -   **[x] Fix E2E test warnings:** Fixed "Test image not found" warning in `verify_features.spec.js` and "Unhandled API route" warning in `test-setup.js`. Fixed race condition in `verify_features.spec.js` causing failures.
 -   **[x] Fix regression:** Fixed unhandled API route /api/inventory in E2E tests.
+-   **[x] Cleanup Obsolete Tests:** Remove `tests/verify_index_async_write.test.js` and `tests/server_index_security.test.js` as they test legacy implementation details of `server/index.js` that have been replaced by `EncryptedJSONFile`.
 
 ---
 <br>
