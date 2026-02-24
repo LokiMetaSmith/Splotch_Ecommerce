@@ -1,6 +1,6 @@
 let csrfToken;
 
-async function fetchCsrfToken() {
+export async function fetchCsrfToken() {
   try {
     const response = await fetch("/api/csrf-token", { credentials: "include" });
     if (!response.ok) {
@@ -22,6 +22,134 @@ async function fetchCsrfToken() {
   }
 }
 
+/**
+ * Renders the list of orders into the container.
+ * @param {Array} orders - List of order objects.
+ * @param {HTMLElement} container - The container element to render into.
+ * @param {HTMLElement} noOrdersMessage - The element to show if there are no orders.
+ */
+export function displayOrders(orders, container, noOrdersMessage) {
+  if (!container) return;
+
+  if (orders.length === 0) {
+    container.innerHTML = ""; // Clear content
+    if (noOrdersMessage) {
+      container.appendChild(noOrdersMessage); // Show the "no orders" message
+      noOrdersMessage.style.display = "block"; // Ensure visibility
+    }
+    return;
+  }
+
+  // Bolt Optimization: Batch DOM updates using innerHTML
+  const html = orders
+    .map((order) => {
+      const receivedDate = new Date(order.receivedAt).toLocaleDateString();
+      const formattedAmount = order.amount
+        ? `$${(order.amount / 100).toFixed(2)}`
+        : "N/A";
+
+      return `
+            <div class="order-card p-4 border rounded-lg shadow-sm bg-gray-50">
+                <div class="flex flex-col sm:flex-row justify-between items-start">
+                    <div>
+                        <h3 class="text-lg font-semibold text-splotch-red flex items-center gap-2">
+                            Order ID: <span class="font-mono text-sm" title="${order.orderId}">${order.orderId.substring(0, 8)}...</span>
+                            <button class="copy-order-id-btn text-gray-500 hover:text-splotch-teal focus:outline-none transition-colors p-1 rounded-full hover:bg-gray-200" data-order-id="${order.orderId}" aria-label="Copy full Order ID">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                                </svg>
+                            </button>
+                        </h3>
+                        <p class="text-sm text-gray-600">Ordered on: ${receivedDate}</p>
+                        <p class="text-sm text-gray-600">Amount: ${formattedAmount}</p>
+                        <p class="text-sm text-gray-600 flex items-center gap-2">
+                            Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${order.status.toLowerCase()}">${order.status}</span>
+                        </p>
+                    </div>
+                    <div class="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">
+                        <img src="${order.designImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <button class="reorder-btn button is-primary text-sm" data-design-image="${order.designImagePath}">Reorder This Sticker</button>
+                </div>
+            </div>`;
+    })
+    .join("");
+
+  container.innerHTML = html;
+}
+
+/**
+ * Sets up event handlers for the orders list (delegation).
+ * @param {HTMLElement} container - The container element (e.g., #orders-list).
+ */
+export function setupOrderListHandlers(container) {
+  if (!container) return;
+
+  container.addEventListener("click", (e) => {
+    // Reorder Handler
+    const reorderBtn = e.target.closest(".reorder-btn");
+    if (reorderBtn) {
+      const designImage = reorderBtn.dataset.designImage;
+      window.location.href = `/?design=${encodeURIComponent(designImage)}`;
+      return;
+    }
+
+    // Copy Order ID Handler
+    const copyBtn = e.target.closest(".copy-order-id-btn");
+    if (copyBtn) {
+      const orderId = copyBtn.dataset.orderId;
+      if (orderId && navigator.clipboard) {
+        navigator.clipboard.writeText(orderId)
+          .then(() => {
+            const originalHTML = copyBtn.innerHTML;
+            // Change to checkmark
+            copyBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-green-600">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+            `;
+            // Optional: tooltip feedback
+            const originalLabel = copyBtn.getAttribute('aria-label');
+            copyBtn.setAttribute('aria-label', 'Copied!');
+
+            setTimeout(() => {
+              copyBtn.innerHTML = originalHTML;
+              copyBtn.setAttribute('aria-label', originalLabel);
+            }, 2000);
+          })
+          .catch((err) => {
+            console.error("Failed to copy text: ", err);
+          });
+      }
+    }
+  });
+}
+
+export function setButtonLoading(
+  button,
+  isLoading,
+  originalContent,
+  loadingText = "Loading...",
+) {
+  if (isLoading) {
+    button.disabled = true;
+    button.innerHTML = `
+            <svg class="animate-spin h-5 w-5 text-white inline-block mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>${loadingText}</span>
+        `;
+    button.classList.add("opacity-75", "cursor-not-allowed");
+  } else {
+    button.disabled = false;
+    button.innerHTML = originalContent;
+    button.classList.remove("opacity-75", "cursor-not-allowed");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await fetchCsrfToken();
 
@@ -34,16 +162,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const noOrdersMessage = document.getElementById("no-orders-message");
   const dataPrivacySection = document.getElementById("data-privacy-section");
 
-  // Bolt Optimization: Event Delegation for reorder buttons
-  ordersList.addEventListener("click", (e) => {
-    const reorderBtn = e.target.closest(".reorder-btn");
-    if (reorderBtn) {
-      const designImage = reorderBtn.dataset.designImage;
-      // For now, redirect to the main page with the image URL as a query param
-      // A more robust solution would pre-fill all options
-      window.location.href = `/?design=${encodeURIComponent(designImage)}`;
-    }
-  });
+  // Bolt Optimization: Event Delegation for reorder buttons AND Copy buttons
+  setupOrderListHandlers(ordersList);
+
   const exportDataBtn = document.getElementById("exportDataBtn");
   const deleteAccountBtn = document.getElementById("deleteAccountBtn");
   const privacyStatus = document.getElementById("privacy-status");
@@ -65,10 +186,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       privacyStatus.textContent = "Exporting data...";
       privacyStatus.style.color = "blue";
       try {
-        // Re-fetch token from URL in case needed, or pass it down?
-        // Actually token is available in scope if we move this inside verify...
-        // But let's assume token is still in URL or stored.
-        // The current architecture relies on URL param 'token' for auth in fetch calls within this file.
         const currentToken = new URLSearchParams(window.location.search).get(
           "token",
         );
@@ -138,9 +255,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  document
-    .getElementById("magic-link-form")
-    .addEventListener("submit", async (e) => {
+  const magicLinkForm = document.getElementById("magic-link-form");
+  if (magicLinkForm) {
+      magicLinkForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = emailInput.value;
       if (!email) {
@@ -230,6 +347,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     });
+  }
 
   async function verifyTokenAndFetchOrders(authToken) {
     loginSection.classList.add("hidden");
@@ -250,73 +368,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const orders = await response.json();
-      displayOrders(orders, authToken);
+      displayOrders(orders, ordersList, noOrdersMessage);
     } catch (error) {
-      noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
-      noOrdersMessage.style.color = "red";
+      if (noOrdersMessage) {
+          noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
+          noOrdersMessage.style.color = "red";
+          ordersList.appendChild(noOrdersMessage);
+      }
     }
-  }
-
-  function displayOrders(orders, authToken) {
-    if (orders.length === 0) {
-      ordersList.innerHTML = ""; // Clear content
-      ordersList.appendChild(noOrdersMessage); // Show the "no orders" message
-      return;
-    }
-
-    // Bolt Optimization: Batch DOM updates using innerHTML
-    const html = orders
-      .map((order) => {
-        const receivedDate = new Date(order.receivedAt).toLocaleDateString();
-        const formattedAmount = order.amount
-          ? `$${(order.amount / 100).toFixed(2)}`
-          : "N/A";
-
-        return `
-            <div class="order-card p-4 border rounded-lg shadow-sm bg-gray-50">
-                <div class="flex flex-col sm:flex-row justify-between items-start">
-                    <div>
-                        <h3 class="text-lg font-semibold text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
-                        <p class="text-sm text-gray-600">Ordered on: ${receivedDate}</p>
-                        <p class="text-sm text-gray-600">Amount: ${formattedAmount}</p>
-                        <p class="text-sm text-gray-600 flex items-center gap-2">
-                            Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${order.status.toLowerCase()}">${order.status}</span>
-                        </p>
-                    </div>
-                    <div class="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">
-                        <img src="${order.designImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <button class="reorder-btn button is-primary text-sm" data-design-image="${order.designImagePath}">Reorder This Sticker</button>
-                </div>
-            </div>`;
-      })
-      .join("");
-
-    ordersList.innerHTML = html;
   }
 });
-
-function setButtonLoading(
-  button,
-  isLoading,
-  originalContent,
-  loadingText = "Loading...",
-) {
-  if (isLoading) {
-    button.disabled = true;
-    button.innerHTML = `
-            <svg class="animate-spin h-5 w-5 text-white inline-block mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>${loadingText}</span>
-        `;
-    button.classList.add("opacity-75", "cursor-not-allowed");
-  } else {
-    button.disabled = false;
-    button.innerHTML = originalContent;
-    button.classList.remove("opacity-75", "cursor-not-allowed");
-  }
-}
