@@ -39,6 +39,15 @@ const XSS_COMBINED = new RegExp(XSS_PATTERNS.map(p => p.source).join('|'), 'is')
 const PATH_TRAVERSAL_COMBINED = new RegExp(PATH_TRAVERSAL_PATTERNS.map(p => p.source).join('|'), 'i');
 const PROTO_POLLUTION_COMBINED = new RegExp(PROTOTYPE_POLLUTION_PATTERNS.map(p => p.source).join('|'), 'i');
 
+// Optimize: Check ALL string threats in one go for the happy path (safe strings)
+// 'is' flag: Ignore case + Dot matches newline (superset of individual flags)
+const THREAT_COMBINED = new RegExp([
+    SQL_COMBINED.source,
+    XSS_COMBINED.source,
+    PATH_TRAVERSAL_COMBINED.source,
+    PROTO_POLLUTION_COMBINED.source
+].join('|'), 'is');
+
 const MAX_DEPTH = 20;
 
 // Recursive function to check for threats in object/array/string
@@ -50,6 +59,13 @@ function checkPayload(payload, depth = 0) {
     }
 
     if (typeof payload === 'string') {
+        // Optimization: Fast path using combined regex
+        // If the payload does not match ANY threat pattern, return immediately.
+        // This saves ~66% of regex operations for benign traffic.
+        if (!THREAT_COMBINED.test(payload)) {
+             return null;
+        }
+
         // Check string against combined patterns first (Fast Path)
 
         if (SQL_COMBINED.test(payload)) {
