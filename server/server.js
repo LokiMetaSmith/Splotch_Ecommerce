@@ -1007,7 +1007,7 @@ async function startServer(
       body('shippingContact.administrativeDistrictLevel1').notEmpty().withMessage('State/Province is required').isLength({ max: 100 }).withMessage('State/Province name is too long').not().contains('<'),
       body('shippingContact.postalCode').notEmpty().withMessage('Postal Code is required').isLength({ max: 20 }).withMessage('Postal Code is too long').not().contains('<'),
       body('shippingContact.country').notEmpty().withMessage('Country is required').isLength({ max: 100 }).withMessage('Country name is too long').not().contains('<'),
-      body('shippingContact.phoneNumber').optional().isString().trim().not().contains('<').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
+      body('shippingContact.phoneNumber').optional().isString().trim().not().contains('<').withMessage('Invalid Phone Number').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {

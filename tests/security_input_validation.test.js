@@ -92,7 +92,7 @@ describe('Security Input Validation', () => {
             .send({
                 sourceId: 'cnon:card-nonce-ok',
                 amountCents: 1000,
-                designImagePath: '/u/d.png',
+                designImagePath: '/uploads/d.png',
                 shippingContact: {
                     givenName: 'Bad', familyName: 'Actor',
                     email: 'bad@actor.com',
@@ -133,7 +133,7 @@ describe('Security Input Validation', () => {
                     addressLines: ['123 St'],
                     locality: 'City', administrativeDistrictLevel1: 'ST', postalCode: '11111', country: 'US',
                     // MALICIOUS INPUT
-                    phoneNumber: '<script>evil()</script>'
+                    phoneNumber: '<12345>'
                 },
                 billingContact: {
                     givenName: 'Bad', email: 'bad@actor.com'
