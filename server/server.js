@@ -628,6 +628,14 @@ async function startServer(
             }
         }
     }));
+    // SECURITY: Enforce strict CSP for uploaded files to prevent Stored XSS
+    // This sandbox directive prevents script execution even if an attacker uploads a malicious SVG/HTML file
+    // that bypasses other checks.
+    app.use('/uploads', (req, res, next) => {
+        res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+        next();
+    });
+
     app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
         maxAge: '1d'
     }));
