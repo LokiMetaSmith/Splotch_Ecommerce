@@ -118,6 +118,7 @@ This document tracks the features and bug fixes that need to be implemented for 
 
 ## Print Shop Page
 - [x] **PDF Export:** Add a button to export the nested print sheet as a PDF.
+- [x] **Fix Visual Layout Bugs:** Fixed mobile responsiveness issues including top menu bar overlapping content and "Set max dimension to" controls being squashed.
 
 ## Authentication
 
