@@ -144,6 +144,21 @@ let pricingConfig = {};
 try {
     const pricingData = fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8');
     pricingConfig = JSON.parse(pricingData);
+
+    // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
+    if (pricingConfig.complexity && pricingConfig.complexity.tiers) {
+        pricingConfig.complexity.tiers.sort((a, b) =>
+            a.thresholdInches === "Infinity"
+                ? 1
+                : b.thresholdInches === "Infinity"
+                    ? -1
+                    : a.thresholdInches - b.thresholdInches
+        );
+    }
+    if (pricingConfig.quantityDiscounts) {
+        pricingConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
+    }
+
     logger.info('[SERVER] Pricing configuration loaded.');
 } catch (error) {
     logger.error('[SERVER] FATAL: Could not load pricing.json.', error);

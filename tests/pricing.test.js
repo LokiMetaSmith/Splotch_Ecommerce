@@ -26,9 +26,9 @@ const pricingConfig = {
       ]
     },
     "quantityDiscounts": [
-      { "quantity": 1, "discount": 0.0 },
+      { "quantity": 500, "discount": 0.15 },
       { "quantity": 200, "discount": 0.10 },
-      { "quantity": 500, "discount": 0.15 }
+      { "quantity": 1, "discount": 0.0 }
     ]
 };
 
