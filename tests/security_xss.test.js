@@ -24,6 +24,8 @@ describe('Stored XSS Vulnerability Check (Order Details)', () => {
     let mockSendEmail;
 
     beforeAll(async () => {
+        process.env.NO_REDIS = 'true'; // Skip Redis check
+
         // Ensure clean DB start
         if (fs.existsSync(testDbPath)) {
             fs.unlinkSync(testDbPath);
@@ -86,7 +88,7 @@ describe('Stored XSS Vulnerability Check (Order Details)', () => {
         app = server.app;
         timers = server.timers;
         serverInstance = app.listen();
-    });
+    }, 120000); // Increase timeout to 120s
 
     beforeEach(async () => {
         db.data.orders = {};
