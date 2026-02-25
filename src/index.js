@@ -846,6 +846,21 @@ async function fetchPricingInfo() {
       throw new Error(`Server responded with ${response.status}`);
     }
     pricingConfig = await response.json();
+
+    // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
+    if (pricingConfig.complexity && pricingConfig.complexity.tiers) {
+        pricingConfig.complexity.tiers.sort((a, b) =>
+            a.thresholdInches === "Infinity"
+                ? 1
+                : b.thresholdInches === "Infinity"
+                    ? -1
+                    : a.thresholdInches - b.thresholdInches
+        );
+    }
+    if (pricingConfig.quantityDiscounts) {
+        pricingConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
+    }
+
     console.log("[CLIENT] Pricing config loaded:", pricingConfig);
     // Once config is loaded, populate the dropdown
     populateResolutionDropdown();

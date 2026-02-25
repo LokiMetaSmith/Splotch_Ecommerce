@@ -42,8 +42,8 @@ export function calculateStickerPrice(pricingConfig, quantity, material, bounds,
     const perimeterInches = perimeterPixels / ppi;
     let complexityMultiplier = 1.0;
     // Sort tiers ascending to find the first one the perimeter is less than.
-    const sortedTiers = [...pricingConfig.complexity.tiers].sort((a,b) => (a.thresholdInches === 'Infinity' ? 1 : b.thresholdInches === 'Infinity' ? -1 : a.thresholdInches - b.thresholdInches));
-    for (const tier of sortedTiers) {
+    // Bolt Optimization: Tiers are pre-sorted on load. Iterating directly.
+    for (const tier of pricingConfig.complexity.tiers) {
         // Find the first tier that the perimeter is less than or equal to.
         if (perimeterInches <= tier.thresholdInches) {
             complexityMultiplier = tier.multiplier;
@@ -53,8 +53,8 @@ export function calculateStickerPrice(pricingConfig, quantity, material, bounds,
 
     // Get quantity discount
     let discount = 0;
-    const sortedDiscounts = [...pricingConfig.quantityDiscounts].sort((a, b) => b.quantity - a.quantity);
-    for (const tier of sortedDiscounts) {
+    // Bolt Optimization: Discounts are pre-sorted on load. Iterating directly.
+    for (const tier of pricingConfig.quantityDiscounts) {
         if (quantity >= tier.quantity) {
             discount = tier.discount;
             break;
