@@ -21,6 +21,8 @@ describe('Security Input Validation', () => {
     let mockSquareClient;
 
     beforeAll(async () => {
+        process.env.NO_REDIS = 'true'; // Skip Redis check
+
         if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
 
         db = await JSONFilePreset(testDbPath, { orders: {}, users: {}, credentials: {}, config: {} });
@@ -61,7 +63,7 @@ describe('Security Input Validation', () => {
         app = server.app;
         timers = server.timers;
         serverInstance = app.listen();
-    });
+    }, 120000); // Increase timeout to 120s
 
     beforeEach(async () => {
         db.data.orders = {};
