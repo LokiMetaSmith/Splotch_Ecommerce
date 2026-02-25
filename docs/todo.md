@@ -19,7 +19,11 @@ These issues represent the most severe risks to the application's functionality 
 -   **[x] Fix failing security tests due to missing test files:** The security tests `tests/security_xss.test.js` and `server/tests/security_mass_assignment.test.js` were failing because they relied on non-existent dummy files. They have been updated to dynamically create and clean up these files.
 -   **[x] Fix failing tracker tests:** The test `tests/tracker.test.js` was failing because the `EasyPost` mock was not being applied correctly due to module resolution issues between the root and server `node_modules`. This has been fixed by mocking the specific resolved path.
 -   **[x] Fix failing Telegram Bot unit tests:** The tests in `tests/telegram_bot.test.js` are failing with "next(ctx) called with invalid context" due to improper mocking of the `Telegraf` bot instance in the test environment.
--   **[x] Fix regression in `traceContour`:** Fixed an issue where `traceContour` failed to detect full-bleed opaque images (or images matching the detected background color) by implementing a fallback retry mechanism without background color filtering.
+-   **[x] Fix regression in `traceContour`:** Fixed an issue where `traceContour` failed to detect full-bleed opaque images (or images matching the detected background color) by implementing a fallback retry mechanism without background color filtering (Fixed regression caused by closure capturing initial background color).
+-   **[x] Fix failing security prototype tests:** The tests `tests/security_prototype.test.js` were failing because the WAF was correctly blocking prototype pollution attempts with a 403 Forbidden response, but the test expected a 400 Bad Request from the controller validation. Updated tests to accept both.
+-   **[x] Test Client JSON Encryption:** Add unit tests for the encryption/decryption logic used for the client JSON database (`server/db.json`). This logic is currently untested and relies on a global variable `ENCRYPT_CLIENT_JSON`.
+-   **[x] Fix tests broken by strict UUID validation:** Updated `tests/orders.test.js`, `tests/email_xss.test.js`, `tests/telegram_stalled_message.test.js`, and `tests/security_prototype.test.js` to use valid UUIDs and expect correct error messages, resolving failures caused by the implementation of strict UUID validation.
+-   **[x] Refactor Client JSON Encryption:** Implemented `EncryptedJSONFile` adapter for LowDB to handle encryption/decryption on the fly. This eliminates the security risk of writing decrypted data to disk during server startup and ensures `db.json` remains encrypted at rest.
 
 ---
 
@@ -38,6 +42,7 @@ These items address fundamental problems with the test setup and major gaps in f
     -   [x] Magic Link generation and verification (`/api/auth/magic-login`, `/api/auth/verify-magic-link`).
     -   [x] Google OAuth flow (`/auth/google`, `/oauth2callback`).
     -   [x] **Add E2E Magic Link Verification Test (Real Backend):** Created `playwright_tests_real/magic-link.spec.js` and updated server to support token retrieval in test mode.
+-   **[x] Fix Server Test Configuration:** Updated `run-tests.sh` to execute server-specific tests (`npm run test:server`) and fixed `jest.config.js` to isolate root unit tests. Also fixed regression in `server/tests/redis_rate_limit.test.js`.
 -   **[x] Fix Test Suite Regressions:** Fixed failing tests in `tests/tracker.test.js` (logging mock), `tests/orders.test.js` (error status code), and `tests/google-oauth.test.js` (CSRF flow). Restored full test suite pass state.
 -   **[x] Add Tests for Frontend Image Manipulation:** None of the frontend image editing features are tested. Unit or integration tests are needed for:
     -   [x] Adding text to the canvas.
@@ -58,6 +63,7 @@ These are smaller tasks for improving test quality and covering minor edge cases
 -   **[x] Remove Unused Dependency `lucas`:** This package appears to be a typo for `lusca` and is unused.
 -   **[x] Fix E2E test warnings:** Fixed "Test image not found" warning in `verify_features.spec.js` and "Unhandled API route" warning in `test-setup.js`. Fixed race condition in `verify_features.spec.js` causing failures.
 -   **[x] Fix regression:** Fixed unhandled API route /api/inventory in E2E tests.
+-   **[x] Cleanup Obsolete Tests:** Remove `tests/verify_index_async_write.test.js` and `tests/server_index_security.test.js` as they test legacy implementation details of `server/index.js` that have been replaced by `EncryptedJSONFile`.
 
 ---
 <br>
@@ -112,6 +118,7 @@ This document tracks the features and bug fixes that need to be implemented for 
 
 ## Print Shop Page
 - [x] **PDF Export:** Add a button to export the nested print sheet as a PDF.
+- [x] **Fix Visual Layout Bugs:** Fixed mobile responsiveness issues including top menu bar overlapping content and "Set max dimension to" controls being squashed.
 
 ## Authentication
 
@@ -125,6 +132,7 @@ This document tracks the features and bug fixes that need to be implemented for 
 - [x] **Shipment Tracking:**
     - [x] Integrate with UPS or USPS APIs to track the delivery status of shipped orders.
     - [x] Use the tracking information to automatically move orders to the "Delivered" status.
+- [x] **Odoo Configuration:** Make Odoo location IDs (source and destination) configurable via environment variables or database config, replacing hardcoded values.
 
 ## Testing and Deployment
 
@@ -152,9 +160,10 @@ This section tracks security vulnerabilities and hardening tasks that need to be
 -   **[x] Implement a Secret Management Solution:** Replace the use of `.env` files in production and staging with a secure secret management service (e.g., Doppler, HashiCorp Vault, or a cloud provider's service) to protect all credentials and API keys.
 -   **[x] Enforce HTTPS:** Update the Nginx configuration to redirect all HTTP traffic to HTTPS and implement a strong TLS configuration. Automate SSL certificate renewal using Certbot or a similar tool.
 -   **[x] Validate Order Amount on Server:** Ensure the order amount sent by the client matches the calculated price based on product dimensions and configuration to prevent price tampering.
--   **[x] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./docs/TELEGRAM_BOT_MIGRATION.md) for a step-by-step guide.
+-   **[x] Fix Vulnerable Dependencies:** The `node-telegram-bot-api` package has known vulnerabilities due to its reliance on the deprecated `request` package. A full migration to a modern alternative is required. See the [detailed migration plan](./archive/telegram_bot_migration.md) for a step-by-step guide.
 -   **[x] Implement Role-Based Access Control (RBAC):** Add a `role` field to the user model and protect administrative endpoints (e.g., `/api/orders`) to ensure only authorized users can access them.
 -   **[x] Fix failing security tests caused by WAF blocking:** Updated security tests (`tests/security_input_validation.test.js`, `tests/security_xss.test.js`, etc.) to mock the WAF middleware, ensuring that application-level validation and sanitization logic is correctly verified.
+    -   [x] Improved `tests/security_input_validation.test.js` to correctly test XSS vulnerability checks independently of length limits and fixed generic error messages.
 
 ## Medium-Priority
 
@@ -191,7 +200,7 @@ The current architecture is suitable for an initial MVP or beta release (< 50 co
 - [x] **Centralized Logging:** Replace `console.log` and file logging with a structured logging service (e.g., Datadog, LogDNA, or ELK Stack) for real-time monitoring and alerting.
 - [x] **Error Monitoring:** Integrate an error tracking service (e.g., Sentry, Honeybadger) to capture and analyze runtime exceptions instead of relying on email notifications.
 - [x] **Performance Monitoring:** Set up Application Performance Monitoring (APM) to track API latency, database query performance, and resource usage. (Enhanced: Implemented local metrics collection for API, DB, and System resources, exposed via /api/metrics)
-- [x] **Automated Backups:** Configure automated, scheduled backups for the database and object storage with a clearly defined retention policy and tested restoration procedure. (Updated `scripts/backup.sh` with `--retention-days` flag and documented in `BACKUPS.md`).
+-   **[x] Automated Backups:** Configure automated, scheduled backups for the database and object storage with a clearly defined retention policy and tested restoration procedure. (Updated `scripts/backup.sh` with `--retention-days` flag and documented in `backups.md`).
 
 ## Security & Compliance
 

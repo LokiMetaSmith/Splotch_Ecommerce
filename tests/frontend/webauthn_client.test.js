@@ -51,7 +51,7 @@ jest.unstable_mockModule('jspdf', () => ({
     jsPDF: jest.fn(),
 }));
 
-jest.unstable_mockModule('svg-to-pdfkit', () => ({
+jest.unstable_mockModule('svg2pdf.js', () => ({
     default: jest.fn(),
 }));
 

@@ -1,5 +1,5 @@
 import { SVGParser } from "./lib/svgparser.js";
-import { calculateStickerPrice, calculatePerimeter } from "./lib/pricing.js";
+import { calculateStickerPrice, calculatePerimeter, generateSvgFromCutline } from "./lib/pricing.js";
 import {
   drawRuler as drawCanvasRuler,
   drawImageWithFilters,
@@ -8,6 +8,7 @@ import {
   traceContours,
   getPolygonArea,
   simplifyPolygon,
+  smoothPolygon,
   imageHasTransparentBorder,
   filterInternalContours,
 } from "./lib/image-processing.js";
@@ -61,6 +62,7 @@ let paymentStatusContainer,
 let rotateLeftBtnEl,
   rotateRightBtnEl,
   resetBtnEl,
+  clearFileBtn,
   resizeInputEl,
   resizeBtnEl,
   grayscaleBtnEl,
@@ -170,6 +172,7 @@ async function BootStrap() {
   rotateLeftBtnEl = document.getElementById("rotateLeftBtn");
   rotateRightBtnEl = document.getElementById("rotateRightBtn");
   resetBtnEl = document.getElementById("resetBtn");
+  clearFileBtn = document.getElementById("clearFileBtn");
   const resizeSliderEl = document.getElementById("resizeSlider");
   const resizeInputNumberEl = document.getElementById("resizeInput");
   const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
@@ -237,7 +240,17 @@ async function BootStrap() {
     stickerMaterialSelect.addEventListener("change", calculateAndUpdatePrice);
   }
   if (stickerResolutionSelect) {
-    stickerResolutionSelect.addEventListener("change", calculateAndUpdatePrice);
+    stickerResolutionSelect.addEventListener("change", () => {
+      calculateAndUpdatePrice();
+      // Bolt Fix: Trigger visual resize when resolution changes
+      if (canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        setCanvasSize(canvas.width / dpr, canvas.height / dpr);
+        if (currentBounds) {
+          drawCanvasDecorations(currentBounds);
+        }
+      }
+    });
   }
   if (addTextBtn) {
     addTextBtn.addEventListener("click", handleAddText);
@@ -261,6 +274,7 @@ async function BootStrap() {
       rotateCanvasContentFixedBounds(90),
     );
   if (resetBtnEl) resetBtnEl.addEventListener("click", handleResetImage);
+  if (clearFileBtn) clearFileBtn.addEventListener("click", handleClearImage);
   if (grayscaleBtnEl)
     grayscaleBtnEl.addEventListener("click", toggleGrayscaleFilter);
   if (sepiaBtnEl) sepiaBtnEl.addEventListener("click", toggleSepiaFilter);
@@ -832,6 +846,21 @@ async function fetchPricingInfo() {
       throw new Error(`Server responded with ${response.status}`);
     }
     pricingConfig = await response.json();
+
+    // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
+    if (pricingConfig.complexity && pricingConfig.complexity.tiers) {
+        pricingConfig.complexity.tiers.sort((a, b) =>
+            a.thresholdInches === "Infinity"
+                ? 1
+                : b.thresholdInches === "Infinity"
+                    ? -1
+                    : a.thresholdInches - b.thresholdInches
+        );
+    }
+    if (pricingConfig.quantityDiscounts) {
+        pricingConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
+    }
+
     console.log("[CLIENT] Pricing config loaded:", pricingConfig);
     // Once config is loaded, populate the dropdown
     populateResolutionDropdown();
@@ -1013,6 +1042,13 @@ async function handlePaymentFormSubmit(event) {
     const cutLineFileInput = document.getElementById("cutLineFile");
     if (cutLineFileInput && cutLineFileInput.files[0]) {
       uploadFormData.append("cutLineFile", cutLineFileInput.files[0]);
+    } else if (currentCutline && currentCutline.length > 0 && currentBounds) {
+      // Automatically generate SVG for cutline if not manually provided
+      const svgContent = generateSvgFromCutline(currentCutline, currentBounds);
+      if (svgContent) {
+        const blob = new Blob([svgContent], { type: "image/svg+xml" });
+        uploadFormData.append("cutLineFile", blob, "generated-cutline.svg");
+      }
     }
 
     const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {
@@ -1288,9 +1324,27 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   // Using setTransform ensures this is not cumulative.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Update CSS size to match logical size
-  canvas.style.width = `${logicalWidth}px`;
-  canvas.style.height = `${logicalHeight}px`;
+  // Bolt Fix: True-to-Size Preview
+  // Calculate display size based on the selected PPI (or default to 96 if not loaded/selected)
+  let ppi = 96;
+  if (pricingConfig && stickerResolutionSelect) {
+    const selectedRes = pricingConfig.resolutions.find(
+      (r) => r.id === stickerResolutionSelect.value,
+    );
+    if (selectedRes) {
+      ppi = selectedRes.ppi;
+    }
+  }
+
+  // logicalWidth is in "Image Pixels".
+  // Physical Inches = logicalWidth / ppi
+  // CSS Pixels = Physical Inches * 96
+  const cssWidth = (logicalWidth / ppi) * 96;
+  const cssHeight = (logicalHeight / ppi) * 96;
+
+  // Update CSS size to match calculated display size
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
 }
 
 function saveCleanState() {
@@ -1339,6 +1393,7 @@ function loadFileAsImage(file) {
       img.onload = () => {
         originalImage = img;
         updateEditingButtonsState(false);
+        if (clearFileBtn) clearFileBtn.classList.remove("hidden");
         showPaymentStatus("Image loaded successfully.", "success");
         let newWidth = img.width,
           newHeight = img.height;
@@ -1496,6 +1551,7 @@ function handleSvgUpload(svgText) {
     // Initial drawing
     redrawAll();
 
+    if (clearFileBtn) clearFileBtn.classList.remove("hidden");
     showPaymentStatus("SVG processed and cutline generated.", "success");
     updateEditingButtonsState(false); // Enable editing buttons
   } catch (error) {
@@ -1504,11 +1560,22 @@ function handleSvgUpload(svgText) {
   }
 }
 
+const scaledPolyCache = new WeakMap();
+
 function generateCutLine(polygons, offset) {
   const scale = 100; // Scale for integer precision
-  const scaledPolygons = polygons.map((p) => {
-    return p.map((point) => ({ X: point.x * scale, Y: point.y * scale }));
-  });
+
+  let scaledPolygons;
+  // Bolt Optimization: Memoize scaled polygons to avoid O(N) allocation on every slider update.
+  // Using WeakMap avoids memory leaks if the polygons array is garbage collected.
+  if (scaledPolyCache.has(polygons)) {
+    scaledPolygons = scaledPolyCache.get(polygons);
+  } else {
+    scaledPolygons = polygons.map((p) => {
+      return p.map((point) => ({ X: point.x * scale, Y: point.y * scale }));
+    });
+    scaledPolyCache.set(polygons, scaledPolygons);
+  }
 
   const co = new ClipperLib.ClipperOffset();
   const offsetted_paths = new ClipperLib.Paths();
@@ -1679,6 +1746,34 @@ function handleAddText() {
   ctx.textBaseline = "middle";
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
   showPaymentStatus(`Text "${text}" added.`, "success");
+}
+
+function handleClearImage() {
+  if (!confirm("Are you sure you want to remove the image?")) return;
+
+  originalImage = null;
+  basePolygons = [];
+  currentPolygons = [];
+  rasterCutlinePoly = null;
+  currentCutline = [];
+  currentBounds = null;
+  cleanCanvasState = null;
+
+  if (fileInputGlobalRef) fileInputGlobalRef.value = "";
+  if (fileNameDisplayEl) fileNameDisplayEl.textContent = "";
+
+  if (canvas && ctx) {
+    // Reset to default size (matches HTML)
+    setCanvasSize(500, 400);
+    // Clearing 0,0 to width,height works because setCanvasSize sets transform
+    ctx.clearRect(0, 0, 500, 400);
+  }
+
+  updateEditingButtonsState(true);
+  calculateAndUpdatePrice();
+
+  if (clearFileBtn) clearFileBtn.classList.add("hidden");
+  showPaymentStatus("Image removed.", "info");
 }
 
 function handleResetImage() {
@@ -2160,7 +2255,14 @@ function handleGenerateCutline() {
       }
 
       // Filter contours to remove noise (e.g. area < 100 pixels)
-      let significantContours = contours.filter((c) => getPolygonArea(c) > 100);
+      // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
+      const imageArea = canvas.width * canvas.height;
+      const minIslandArea = Math.max(100, imageArea * 0.0001); // At least 100px, or 0.01% of image
+      // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
+      // This changes O(N*M) check to O(N*m) where m << M.
+      let significantContours = contours
+        .filter((c) => getPolygonArea(c) > minIslandArea)
+        .map(c => simplifyPolygon(c, 0.5)); // Epsilon of 0.5 pixels
 
       // Suppress "island cuts" (internal holes) that are larger than 2mm.
       // Constraint: "we can have internal cuts, but they should be less than 2mm"
@@ -2172,10 +2274,12 @@ function handleGenerateCutline() {
             : null;
 
           const ppi = selectedResolution ? selectedResolution.ppi : 300;
-          // Calculate 2mm in pixels
-          const minDimension = (2 / 25.4) * ppi;
+          // Calculate 2mm in pixels for max hole size
+          const maxAllowedHoleSize = (2 / 25.4) * ppi;
+          // Calculate 0.5mm in pixels for min hole size (noise floor)
+          const minAllowedHoleSize = (0.5 / 25.4) * ppi;
 
-          significantContours = filterInternalContours(significantContours, minDimension);
+          significantContours = filterInternalContours(significantContours, maxAllowedHoleSize, minAllowedHoleSize);
       }
 
       if (significantContours.length === 0) {
@@ -2188,12 +2292,14 @@ function handleGenerateCutline() {
       const finalContours = [];
 
       significantContours.forEach((contour) => {
-        // The raw contour is too detailed, simplify it using the RDP algorithm.
-        const simplifiedContour = simplifyPolygon(contour, 0.5); // Epsilon of 0.5 pixels
+        // Bolt Optimization: Apply smoothing to round sharp corners ("surface energy minimization")
+        // 2 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
+        // Note: contour is already simplified.
+        const smoothedContour = smoothPolygon(contour, 2);
 
         // Clean the polygon to remove self-intersections and other issues before offsetting.
         // This requires scaling up for Clipper's integer math.
-        const scaledPoly = simplifiedContour.map((p) => ({
+        const scaledPoly = smoothedContour.map((p) => ({
           X: p.x * scale,
           Y: p.y * scale,
         }));
@@ -2389,6 +2495,7 @@ async function handleRemoteImageLoad(imageUrl) {
 
     calculateAndUpdatePrice();
     drawCanvasDecorations(currentBounds);
+    if (clearFileBtn) clearFileBtn.classList.remove("hidden");
     showPaymentStatus("Design loaded! You can now adjust options.", "success");
   };
   img.onerror = () =>

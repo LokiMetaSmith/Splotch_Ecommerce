@@ -428,3 +428,37 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
 	border-bottom: 0;
 	margin-bottom: -10px;
 }
+
+/* Status Badges - Updated for Accessibility (WCAG AA) */
+.status-new { background-color: #1D4ED8 !important; color: white !important; }
+.status-accepted { background-color: #B45309 !important; color: white !important; }
+.status-printing { background-color: #6D28D9 !important; color: white !important; }
+.status-shipped { background-color: #047857 !important; color: white !important; }
+.status-delivered { background-color: #4338CA !important; color: white !important; }
+.status-completed { background-color: #15803D !important; color: white !important; }
+.status-canceled { background-color: #B91C1C !important; color: white !important; }
+
+/* Accessibility Improvements */
+.skip-link {
+    position: absolute;
+    top: -200px;
+    left: 0;
+    z-index: 10001; /* Above the menu bar (9999) */
+    background: var(--splotch-navy);
+    color: var(--splotch-white);
+    padding: 1rem 1.5rem;
+    font-family: var(--font-baumans);
+    font-weight: bold;
+    text-decoration: none;
+    border-radius: 0 0 10px 0;
+    transition: top 0.3s ease-in-out;
+    border: 3px solid var(--splotch-teal);
+    border-top: none;
+    border-left: none;
+}
+
+.skip-link:focus {
+    top: 0;
+    outline: 4px solid var(--splotch-red);
+    outline-offset: -4px;
+}

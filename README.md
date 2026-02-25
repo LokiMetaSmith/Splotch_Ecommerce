@@ -1,4 +1,15 @@
-# Print Shop Application - Getting Started
+# Print Shop Application
+
+Welcome to the Print Shop application. This repository contains the source code for the frontend and backend of the print shop order management system.
+
+## Documentation
+
+*   **[Deployment Guide](docs/deployment/README.md)**: Instructions for deploying to Cloud VPS, Proxmox, or Local Docker.
+*   **[Security](docs/security.md)**: Security best practices and guidelines.
+*   **[Backups](docs/backups.md)**: Backup and restore procedures.
+*   **[Full Documentation Index](docs/README.md)**: Complete list of all documentation.
+
+## Getting Started
 
 This guide provides instructions for setting up and running the Print Shop application locally for development.
 
@@ -179,4 +190,4 @@ pnpm run test:e2e
 
 ## Deployment
 
-For detailed deployment instructions, please see the [Deployment Guide](DEPLOY.md).
+For detailed deployment instructions, please see the [Deployment Guide](docs/deployment/README.md).

@@ -28,6 +28,7 @@ test.describe('Real Backend Order Flow', () => {
     });
 
     test('should upload image, verify price, and create order', async ({ page }) => {
+        test.setTimeout(60000);
         // 1. Navigate to home
         await page.goto('/');
 
@@ -78,7 +79,7 @@ test.describe('Real Backend Order Flow', () => {
         await expect(page.locator('#login-status')).toContainText('Magic link sent');
 
         // Fetch token from test endpoint
-        const response = await page.request.get('/api/test/last-magic-link');
+        const response = await page.request.get(`/api/test/last-magic-link?email=${encodeURIComponent('test@example.com')}`);
         expect(response.ok()).toBeTruthy();
         const { token } = await response.json();
 

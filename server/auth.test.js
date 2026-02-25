@@ -150,7 +150,7 @@ describe('Auth Endpoints', () => {
   });
 
   describe('Magic Link Authentication', () => {
-    it('should send a magic link email', async () => {
+    it('should send a magic link email but NOT create user immediately', async () => {
         const agent = request.agent(app);
 
         // Get CSRF Token
@@ -172,13 +172,13 @@ describe('Auth Endpoints', () => {
         expect(emailArgs.to).toEqual(email);
         expect(emailArgs.text).toContain('Click here to log in:');
 
-        // Verify user was created
+        // Verify user was NOT created yet
         await db.read();
         const user = Object.values(db.data.users).find(u => u.email === email);
-        expect(user).toBeDefined();
+        expect(user).toBeUndefined();
     });
 
-    it('should verify a valid magic link token', async () => {
+    it('should verify a valid magic link token and create user then', async () => {
         const agent = request.agent(app);
         const email = 'test-verify@example.com';
 
@@ -216,6 +216,11 @@ describe('Auth Endpoints', () => {
         const { publicKey } = getCurrentSigningKey();
         const decoded = jwt.verify(res.body.token, publicKey);
         expect(decoded.email).toEqual(email);
+
+        // 6. Verify user exists NOW
+        await db.read();
+        const user = Object.values(db.data.users).find(u => u.email === email);
+        expect(user).toBeDefined();
     });
 
     it('should reject an invalid magic link token', async () => {
@@ -234,10 +239,11 @@ describe('Auth Endpoints', () => {
         expect(res.body.error).toEqual('Invalid or expired token');
     });
 
-    it('should reject a magic link token for a non-existent user', async () => {
+    it('should create a user when verifying a valid token for a new email', async () => {
+        const email = 'nonexistent@example.com';
         // Generate a valid signed token for an email that doesn't exist in DB
         const { privateKey, kid } = getCurrentSigningKey();
-        const token = jwt.sign({ email: 'nonexistent@example.com' }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
+        const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
 
         const agent = request.agent(app);
 
@@ -250,8 +256,14 @@ describe('Auth Endpoints', () => {
             .set('X-CSRF-Token', csrfToken)
             .send({ token });
 
-        expect(res.statusCode).toEqual(401);
-        expect(res.body.error).toEqual('User not found');
+        expect(res.statusCode).toEqual(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.token).toBeDefined();
+
+        // Verify user exists NOW
+        await db.read();
+        const user = Object.values(db.data.users).find(u => u.email === email);
+        expect(user).toBeDefined();
     });
   });
 });

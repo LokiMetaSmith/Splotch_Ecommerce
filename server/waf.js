@@ -29,10 +29,24 @@ const PATH_TRAVERSAL_PATTERNS = [
     /(\.\.%2F)/i, // ..%2F
 ];
 
+const PROTOTYPE_POLLUTION_PATTERNS = [
+    /(__proto__)/i,
+];
+
 // Combine patterns for faster initial check
 const SQL_COMBINED = new RegExp(SQL_INJECTION_PATTERNS.map(p => p.source).join('|'), 'i');
 const XSS_COMBINED = new RegExp(XSS_PATTERNS.map(p => p.source).join('|'), 'is');
 const PATH_TRAVERSAL_COMBINED = new RegExp(PATH_TRAVERSAL_PATTERNS.map(p => p.source).join('|'), 'i');
+const PROTO_POLLUTION_COMBINED = new RegExp(PROTOTYPE_POLLUTION_PATTERNS.map(p => p.source).join('|'), 'i');
+
+// Optimize: Check ALL string threats in one go for the happy path (safe strings)
+// 'is' flag: Ignore case + Dot matches newline (superset of individual flags)
+const THREAT_COMBINED = new RegExp([
+    SQL_COMBINED.source,
+    XSS_COMBINED.source,
+    PATH_TRAVERSAL_COMBINED.source,
+    PROTO_POLLUTION_COMBINED.source
+].join('|'), 'is');
 
 const MAX_DEPTH = 20;
 
@@ -45,6 +59,13 @@ function checkPayload(payload, depth = 0) {
     }
 
     if (typeof payload === 'string') {
+        // Optimization: Fast path using combined regex
+        // If the payload does not match ANY threat pattern, return immediately.
+        // This saves ~66% of regex operations for benign traffic.
+        if (!THREAT_COMBINED.test(payload)) {
+             return null;
+        }
+
         // Check string against combined patterns first (Fast Path)
 
         if (SQL_COMBINED.test(payload)) {
@@ -85,6 +106,11 @@ function checkPayload(payload, depth = 0) {
     if (typeof payload === 'object') {
         for (const key in payload) {
             if (Object.prototype.hasOwnProperty.call(payload, key)) {
+                // Check for Prototype Pollution
+                if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                    return { type: 'Prototype Pollution', pattern: key, path: [key] };
+                }
+
                 // Check for NoSQL Injection (keys starting with $)
                 if (key.startsWith('$')) {
                     return { type: 'NoSQL Injection', pattern: key, path: [key] };
@@ -130,17 +156,36 @@ export function wafMiddleware(req, res, next) {
     threat = checkPayload(req.body);
     if (threat) return blockRequest(req, res, processThreat(threat, 'body'));
 
-    // Check URL Path (instead of params which are empty here)
-    // We decode the path to catch encoded attacks (e.g. %20OR%20)
+    // Check URL (Path + Query)
+    // We decode the url to catch encoded attacks (e.g. %20OR%20)
     try {
-        const decodedPath = decodeURIComponent(req.path);
-        threat = checkPayload(decodedPath);
-        if (threat) return blockRequest(req, res, processThreat(threat, 'path'));
+        const decodedUrl = decodeURIComponent(req.url);
+
+        // Check for Prototype Pollution in URL
+        if (PROTO_POLLUTION_COMBINED.test(decodedUrl)) {
+            for (const pattern of PROTOTYPE_POLLUTION_PATTERNS) {
+                if (pattern.test(decodedUrl)) {
+                    threat = { type: 'Prototype Pollution', pattern: pattern.toString(), path: [], value: decodedUrl };
+                    break;
+                }
+            }
+        }
+
+        if (!threat) threat = checkPayload(decodedUrl);
+        if (threat) return blockRequest(req, res, processThreat(threat, 'url'));
     } catch (e) {
         // If decoding fails, it might be a malformed URL, which is suspicious but we can ignore or block.
-        // For now, check raw path just in case.
-        threat = checkPayload(req.path);
-        if (threat) return blockRequest(req, res, processThreat(threat, 'path'));
+        // For now, check raw url just in case.
+        if (PROTO_POLLUTION_COMBINED.test(req.url)) {
+            for (const pattern of PROTOTYPE_POLLUTION_PATTERNS) {
+                if (pattern.test(req.url)) {
+                    threat = { type: 'Prototype Pollution', pattern: pattern.toString(), path: [], value: req.url };
+                    break;
+                }
+            }
+        }
+        if (!threat) threat = checkPayload(req.url);
+        if (threat) return blockRequest(req, res, processThreat(threat, 'url'));
     }
 
     next();

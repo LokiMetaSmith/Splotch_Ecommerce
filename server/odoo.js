@@ -7,6 +7,7 @@ class OdooClient {
         this.db = config.db;
         this.username = config.username;
         this.password = config.password;
+        this.defaults = config.defaults || {};
         this.uid = null;
 
         if (this.url) {
@@ -159,8 +160,8 @@ class OdooClient {
                 picking_type_id: pickingTypeId,
                 origin: ref,
                 move_type: 'direct', // Consume immediately
-                location_id: 8, // Source Location (e.g., Stock). Needs config!
-                location_dest_id: 5, // Dest Location (e.g., Production/Customer). Needs config!
+                location_id: this.defaults.location_id ? Number(this.defaults.location_id) : 8,
+                location_dest_id: this.defaults.location_dest_id ? Number(this.defaults.location_dest_id) : 5,
             };
 
             // Fetch picking type to get default locations

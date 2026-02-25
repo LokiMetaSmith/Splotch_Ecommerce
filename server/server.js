@@ -144,6 +144,21 @@ let pricingConfig = {};
 try {
     const pricingData = fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8');
     pricingConfig = JSON.parse(pricingData);
+
+    // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
+    if (pricingConfig.complexity && pricingConfig.complexity.tiers) {
+        pricingConfig.complexity.tiers.sort((a, b) =>
+            a.thresholdInches === "Infinity"
+                ? 1
+                : b.thresholdInches === "Infinity"
+                    ? -1
+                    : a.thresholdInches - b.thresholdInches
+        );
+    }
+    if (pricingConfig.quantityDiscounts) {
+        pricingConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
+    }
+
     logger.info('[SERVER] Pricing configuration loaded.');
 } catch (error) {
     logger.error('[SERVER] FATAL: Could not load pricing.json.', error);
@@ -180,7 +195,7 @@ async function startServer(
     injectedGoogle = defaultGoogle,
     injectedWebAuthn = defaultWebAuthn
 ) {
-  let lastMagicLinkToken = null;
+  const lastMagicLinkTokens = new Map();
 
   if (!db) {
     // If no db provided, load default LowDb
@@ -327,7 +342,10 @@ async function startServer(
             username: getSecret('ODOO_USERNAME'),
             password: getSecret('ODOO_PASSWORD'),
             mappings: {},
-            defaults: {}
+            defaults: {
+                location_id: getSecret('ODOO_LOCATION_ID'),
+                location_dest_id: getSecret('ODOO_LOCATION_DEST_ID')
+            }
         };
         await db.setConfig('odoo', odooConfig);
         logger.info('[SERVER] Odoo configuration seeded from environment variables.');
@@ -625,6 +643,14 @@ async function startServer(
             }
         }
     }));
+    // SECURITY: Enforce strict CSP for uploaded files to prevent Stored XSS
+    // This sandbox directive prevents script execution even if an attacker uploads a malicious SVG/HTML file
+    // that bypasses other checks.
+    app.use('/uploads', (req, res, next) => {
+        res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+        next();
+    });
+
     app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
         maxAge: '1d'
     }));
@@ -716,6 +742,8 @@ async function startServer(
     });
 
     app.get('/api/pricing-info', (req, res) => {
+        // PERFORMANCE: Allow caching for 1 hour as pricing rarely changes
+        res.setHeader('Cache-Control', 'public, max-age=3600');
         res.json(pricingConfig);
     });
 
@@ -775,6 +803,8 @@ async function startServer(
 
     app.get('/api/inventory', async (req, res) => {
         // Public endpoint to get cached inventory status
+        // PERFORMANCE: Allow short caching (1 min) to reduce DB/Odoo load during bursts
+        res.setHeader('Cache-Control', 'public, max-age=60');
         const cache = await db.getInventoryCache();
         res.json(cache || {});
     });
@@ -860,11 +890,13 @@ async function startServer(
     app.post('/api/products', authenticateToken, [
         body('name').notEmpty().withMessage('Product name is required').isString().trim().escape(),
         body('designImagePath').notEmpty().withMessage('Design image is required').isString().custom(value => {
+            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
         }),
         body('cutLinePath').optional().isString().custom(value => {
+            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
@@ -950,6 +982,7 @@ async function startServer(
       body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
       body('currency').optional().isString().withMessage('currency must be a string').isAlpha().withMessage('currency must be alphabetic'),
       body('designImagePath').notEmpty().withMessage('designImagePath is required').custom(value => {
+            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
@@ -973,6 +1006,7 @@ async function startServer(
             return true;
       }),
       body('orderDetails.cutLinePath').optional({ nullable: true }).isString().withMessage('cutLinePath must be a string').custom(value => {
+            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
             if (value.startsWith('/uploads/')) return true;
             if (value.startsWith('http')) return true; // Allow URLs
             throw new Error('Path must start with /uploads/ or be a valid URL');
@@ -996,7 +1030,7 @@ async function startServer(
       body('shippingContact.administrativeDistrictLevel1').notEmpty().withMessage('State/Province is required').isLength({ max: 100 }).withMessage('State/Province name is too long').not().contains('<'),
       body('shippingContact.postalCode').notEmpty().withMessage('Postal Code is required').isLength({ max: 20 }).withMessage('Postal Code is too long').not().contains('<'),
       body('shippingContact.country').notEmpty().withMessage('Country is required').isLength({ max: 100 }).withMessage('Country name is too long').not().contains('<'),
-      body('shippingContact.phoneNumber').optional().isString().trim().not().contains('<').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
+      body('shippingContact.phoneNumber').optional().isString().trim().not().contains('<').withMessage('Invalid Phone Number').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -1281,6 +1315,11 @@ async function startServer(
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
+      // SECURITY: Prevent guest tokens (used for checkout) from searching existing orders
+      if (req.user.isGuest) {
+          return res.status(403).json({ error: 'Forbidden: Guests cannot search orders.' });
+      }
+
       const { q } = req.query;
       const user = await getUserByEmail(req.user.email);
       if (!user) {
@@ -1313,6 +1352,11 @@ async function startServer(
       if (!errors.isEmpty()) {
           return res.status(400).json({ errors: errors.array() });
       }
+      // SECURITY: Prevent guest tokens from viewing order details
+      if (req.user.isGuest) {
+          return res.status(403).json({ error: 'Forbidden: Guests cannot view order details.' });
+      }
+
       const { orderId } = req.params;
       const order = await db.getOrder(orderId);
 
@@ -1600,7 +1644,14 @@ async function startServer(
         if (process.env.NODE_ENV !== 'test') {
             return res.status(403).json({ error: 'Forbidden' });
         }
-        res.json({ token: lastMagicLinkToken });
+        const { email } = req.query;
+        if (email) {
+            res.json({ token: lastMagicLinkTokens.get(email) });
+        } else {
+            // Fallback to the last inserted token for backward compatibility
+            const lastToken = Array.from(lastMagicLinkTokens.values()).pop();
+            res.json({ token: lastToken });
+        }
     });
 
     app.post('/api/auth/magic-login', authLimiter, [
@@ -1611,19 +1662,17 @@ async function startServer(
             return res.status(400).json({ errors: errors.array() });
         }
         const { email } = req.body;
-        let user = await getUserByEmail(email);
-        if (!user) {
-            user = {
-                id: randomUUID(),
-                email,
-                credentials: [],
-            };
-            await db.createUser(user);
-        }
+
+        // SECURITY: We do not create the user here to prevent DoS attacks where attackers
+        // flood the database with unverified accounts. The user is created only after verification.
+
         const { privateKey, kid } = getCurrentSigningKey();
         const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
 
-        lastMagicLinkToken = token;
+        // SECURITY: Only store the token in memory during testing to prevent memory leaks in production.
+        if (process.env.NODE_ENV === 'test') {
+            lastMagicLinkTokens.set(email, token);
+        }
 
         const magicLink = `${getSecret('BASE_URL')}/magic-login.html?token=${token}`;
 
@@ -1662,9 +1711,16 @@ async function startServer(
         if (err) {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
-        const user = await getUserByEmail(decoded.email);
+        let user = await getUserByEmail(decoded.email);
         if (!user) {
-          return res.status(401).json({ error: 'User not found' });
+           // User verified their email by clicking the link, so we create the account now.
+           user = {
+               id: randomUUID(),
+               email: decoded.email,
+               credentials: [],
+           };
+           await db.createUser(user);
+           logger.info(`[SERVER] New user created after magic link verification: ${decoded.email}`);
         }
         const { privateKey, kid } = getCurrentSigningKey();
         const authToken = jwt.sign({ email: user.email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
@@ -2057,6 +2113,38 @@ async function startServer(
       metricsTimer.unref();
     }
     
+    // --- Global Error Handlers ---
+
+    // 404 Handler for API routes
+    app.use('/api', (req, res) => {
+        res.status(404).json({ error: 'Not Found' });
+    });
+
+    // Global Error Handler
+    // eslint-disable-next-line no-unused-vars
+    app.use((err, req, res, next) => {
+        // Handle JSON parsing errors (e.g. invalid JSON in request body)
+        if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+            logger.warn(`[SECURITY] Malformed JSON detected from ${req.ip}`);
+            return res.status(400).json({ error: 'Bad Request: Malformed JSON' });
+        }
+
+        logger.error('[SERVER] Unhandled Error:', err);
+
+        // Hide stack trace in production (and generally in API responses)
+        const response = {
+            error: 'Internal Server Error'
+        };
+
+        // Only include error details in non-production environments if needed for debugging,
+        // but be careful not to leak sensitive info.
+        if (process.env.NODE_ENV !== 'production') {
+            response.message = err.message;
+        }
+
+        res.status(500).json(response);
+    });
+
     // Return the app and the timers so they can be managed by the caller
     return { app, timers: [sessionTokenTimer, keyRotationTimer, metricsTimer], bot };
     

@@ -57,6 +57,9 @@ jest.unstable_mockModule('jsonwebtoken', () => ({
 }));
 
 // Mock other dependencies to avoid side effects during server start
+jest.unstable_mockModule('../utils/redisCheck.js', () => ({
+    checkRedisAvailability: jest.fn().mockResolvedValue(true)
+}));
 jest.unstable_mockModule('../email.js', () => ({
     sendEmail: jest.fn()
 }));
@@ -72,6 +75,10 @@ jest.unstable_mockModule('../keyManager.js', () => ({
     rotateKeys: jest.fn(),
     getKey: jest.fn(),
     KEY_ROTATION_MS: 1000
+}));
+
+jest.unstable_mockModule('../utils/redisCheck.js', () => ({
+    checkRedisAvailability: jest.fn(() => Promise.resolve(true))
 }));
 
 // Set REDIS_URL to trigger redis logic

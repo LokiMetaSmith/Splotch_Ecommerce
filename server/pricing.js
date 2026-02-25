@@ -58,14 +58,8 @@ function calculateStickerPrice(
     let complexityMultiplier = 1.0;
 
     if (pricingConfig.complexity && pricingConfig.complexity.tiers) {
-        const sortedTiers = [...pricingConfig.complexity.tiers].sort((a, b) =>
-            a.thresholdInches === "Infinity"
-                ? 1
-                : b.thresholdInches === "Infinity"
-                    ? -1
-                    : a.thresholdInches - b.thresholdInches,
-        );
-        for (const tier of sortedTiers) {
+        // Bolt Optimization: Tiers are pre-sorted on load. Iterating directly.
+        for (const tier of pricingConfig.complexity.tiers) {
             // Logic from client: perimeterInches <= tier.thresholdInches
             const threshold =
                 tier.thresholdInches === "Infinity" ? Infinity : tier.thresholdInches;
@@ -78,10 +72,8 @@ function calculateStickerPrice(
 
     let discount = 0;
     if (pricingConfig.quantityDiscounts) {
-        const sortedDiscounts = [...pricingConfig.quantityDiscounts].sort(
-            (a, b) => b.quantity - a.quantity,
-        );
-        for (const tier of sortedDiscounts) {
+        // Bolt Optimization: Discounts are pre-sorted on load. Iterating directly.
+        for (const tier of pricingConfig.quantityDiscounts) {
             if (quantity >= tier.quantity) {
                 discount = tier.discount;
                 break;

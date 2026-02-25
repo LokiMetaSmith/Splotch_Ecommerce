@@ -5,17 +5,12 @@
  * @param {ImageData} imageData - The image data from canvas context.
  * @returns {boolean} - True if the border is transparent or white.
  */
-// Bolt Optimization: Defined outside traceContour to avoid reallocation
-const MOORE_NEIGHBORS = [
-  { x: 1, y: 0 }, // 0: E
-  { x: 1, y: -1 }, // 1: NE
-  { x: 0, y: -1 }, // 2: N
-  { x: -1, y: -1 }, // 3: NW
-  { x: -1, y: 0 }, // 4: W
-  { x: -1, y: 1 }, // 5: SW
-  { x: 0, y: 1 }, // 6: S
-  { x: 1, y: 1 }, // 7: SE
-];
+// Bolt Optimization: Use Int8Array for neighbor offsets to avoid object allocation/lookup
+const MOORE_X = new Int8Array([1, 1, 0, -1, -1, -1, 0, 1]);
+const MOORE_Y = new Int8Array([0, -1, -1, -1, 0, 1, 1, 1]);
+
+// Bolt Optimization: Check endianness once for Uint32Array optimizations
+const IS_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([0x12345678]).buffer)[0] === 0x78;
 
 export function imageHasTransparentBorder(imageData) {
   const { data, width, height } = imageData;
@@ -51,12 +46,50 @@ export function imageHasTransparentBorder(imageData) {
 export function getPolygonArea(points) {
   let area = 0;
   const len = points.length;
+  // Bolt Optimization: Removed modulo from loop for performance
   for (let i = 0; i < len; i++) {
-    const j = (i + 1) % len;
+    const j = i === len - 1 ? 0 : i + 1;
     area += points[i].x * points[j].y;
     area -= points[j].x * points[i].y;
   }
   return Math.abs(area / 2);
+}
+
+// Bolt Optimization: Combined area and bounds calculation to reduce loop iterations
+export function getPolygonMetrics(points) {
+  if (!points || points.length === 0) {
+    return {
+      area: 0,
+      bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 },
+    };
+  }
+
+  let area = 0;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+  const len = points.length;
+
+  for (let i = 0; i < len; i++) {
+    const p = points[i];
+
+    // Bounds
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+
+    // Area
+    const j = i === len - 1 ? 0 : i + 1;
+    area += p.x * points[j].y;
+    area -= points[j].x * p.y;
+  }
+
+  return {
+    area: Math.abs(area / 2),
+    bounds: { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY },
+  };
 }
 
 function detectBackgroundColor(imageData) {
@@ -104,118 +137,185 @@ function detectBackgroundColor(imageData) {
  */
 export function traceContours(imageData, threshold = 10) {
   const { data, width, height } = imageData;
+  // Bolt Optimization: Use Uint32Array for fast pixel access (avoids multiple typed array lookups)
+  const u32 = new Uint32Array(data.buffer, data.byteOffset, data.length >> 2);
+
   let visited = new Uint8Array(width * height); // 0 = unvisited, 1 = visited
   let bgColor = detectBackgroundColor(imageData);
 
-  // Bolt Optimization: Helper to check opacity by index directly to avoid bounds checks in tight loops
-  const isOpaqueAtIndex = (i) => {
-    // Check Alpha first
-    if (data[i + 3] < 128) return false;
-
-    // Only read RGB if alpha check passes and bgColor is set
-    if (bgColor) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      // Check if pixel is close to background color
-      const diff =
-        Math.abs(r - bgColor.r) +
-        Math.abs(g - bgColor.g) +
-        Math.abs(b - bgColor.b);
-
-      // If diff is within threshold * 3 (since we sum 3 channels), treat as transparent (background)
-      if (diff <= threshold * 3) return false;
-    }
-
-    return true;
-  };
-
-  const isOpaque = (x, y) => {
-    if (x < 0 || x >= width || y < 0 || y >= height) return false;
-    const i = (y * width + x) * 4;
-    return isOpaqueAtIndex(i); // Reuse optimized check
-  };
-
   const contours = [];
 
+  // Optimized boundary tracing helper
+  const traceBoundary = (startX, startY, isOpaqueFn) => {
+    const contour = [];
+    let cx = startX;
+    let cy = startY;
+    const startPos = { x: startX, y: startY };
+    let lastDirection = 6; // Start checking from 6 (South)
+    let foundNext = false;
+
+    do {
+      contour.push({ x: cx, y: cy });
+      visited[cy * width + cx] = 1;
+
+      // Start checking neighbors from the one after the direction we came from
+      // Bolt Optimization: Use bitwise AND for modulo 8 (power of 2)
+      let checkDirection = (lastDirection + 5) & 7;
+      foundNext = false;
+
+      for (let i = 0; i < 8; i++) {
+        // Bolt Optimization: Use Int8Array lookup instead of object allocation
+        const nx = cx + MOORE_X[checkDirection];
+        const ny = cy + MOORE_Y[checkDirection];
+
+        if (isOpaqueFn(nx, ny)) {
+          cx = nx;
+          cy = ny;
+          lastDirection = checkDirection;
+          foundNext = true;
+          break;
+        }
+        checkDirection = (checkDirection + 1) & 7;
+      }
+
+      if (!foundNext) {
+        break;
+      }
+    } while (cx !== startPos.x || cy !== startPos.y);
+
+    if (contour.length > 2) {
+      contours.push(contour);
+    }
+  };
+
   const runTrace = () => {
-    for (let y = 0; y < height; y++) {
-      let prevOpaque = false; // Start of row (x=-1) is effectively transparent
-      let rowOffset = y * width;
+    // Bolt Optimization: Inline the loop logic to avoid function call overhead for 4M+ pixel checks.
+    // We split the loop into two branches: one for bgColor handling and one for simple alpha check.
+    // Bolt Optimization: Using Uint32Array access pattern for speed.
 
-      for (let x = 0; x < width; x++) {
-        const idx = rowOffset + x;
+    if (bgColor) {
+      const { r: bgR, g: bgG, b: bgB } = bgColor;
+      const threshold3 = threshold * 3;
 
-        // Skip if already part of a boundary
-        if (visited[idx]) {
-          prevOpaque = true; // Visited pixels are part of a contour, so they are opaque
-          continue;
-        }
+      // Define optimized closures and loop bodies based on endianness
+      let isOpaqueBg;
+      let checkPixel;
 
-        // Bolt Optimization: Use direct index access (safe here) and prevOpaque
-        const pixelIndex = idx * 4;
-        const currOpaque = isOpaqueAtIndex(pixelIndex);
+      if (IS_LITTLE_ENDIAN) {
+        // Little Endian: ABGR (A at highest byte)
+        isOpaqueBg = (x, y) => {
+          if (x < 0 || x >= width || y < 0 || y >= height) return false;
+          const pixel = u32[y * width + x];
+          if ((pixel >>> 24) < 128) return false;
+          const r = pixel & 0xFF;
+          const g = (pixel >> 8) & 0xFF;
+          const b = (pixel >> 16) & 0xFF;
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          return diff > threshold3;
+        };
+        checkPixel = (pixel) => {
+          if ((pixel >>> 24) < 128) return false;
+          const r = pixel & 0xFF;
+          const g = (pixel >> 8) & 0xFF;
+          const b = (pixel >> 16) & 0xFF;
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          return diff > threshold3;
+        };
+      } else {
+        // Big Endian: RGBA (A at lowest byte)
+        isOpaqueBg = (x, y) => {
+          if (x < 0 || x >= width || y < 0 || y >= height) return false;
+          const pixel = u32[y * width + x];
+          if ((pixel & 0xFF) < 128) return false;
+          const r = (pixel >>> 24) & 0xFF;
+          const g = (pixel >> 16) & 0xFF;
+          const b = (pixel >> 8) & 0xFF;
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          return diff > threshold3;
+        };
+        checkPixel = (pixel) => {
+          if ((pixel & 0xFF) < 128) return false;
+          const r = (pixel >>> 24) & 0xFF;
+          const g = (pixel >> 16) & 0xFF;
+          const b = (pixel >> 8) & 0xFF;
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          return diff > threshold3;
+        };
+      }
 
-        if (currOpaque) {
-          // Only start tracing if we are at a "Left Edge" (enter opaque region from transparent)
-          // If prevOpaque is false, it implies x=0 or pixel at x-1 was transparent/background
-          if (!prevOpaque) {
-            const contour = [];
-            let cx = x;
-            let cy = y;
-            const startPos = { x, y };
-            let lastDirection = 6; // Start checking from 6 (South)
+      for (let y = 0; y < height; y++) {
+        let prevOpaque = false;
+        let rowOffset = y * width;
 
-            let foundNext = false;
-
-            do {
-              contour.push({ x: cx, y: cy });
-              visited[cy * width + cx] = 1;
-
-              // Start checking neighbors from the one after the direction we came from
-              let checkDirection = (lastDirection + 5) % 8;
-              foundNext = false;
-
-              for (let i = 0; i < 8; i++) {
-                const neighborOffset = MOORE_NEIGHBORS[checkDirection];
-                const nx = cx + neighborOffset.x;
-                const ny = cy + neighborOffset.y;
-
-                if (isOpaque(nx, ny)) {
-                  cx = nx;
-                  cy = ny;
-                  lastDirection = checkDirection;
-                  foundNext = true;
-                  break;
-                }
-                checkDirection = (checkDirection + 1) % 8;
-              }
-
-              if (!foundNext) {
-                break;
-              }
-            } while (cx !== startPos.x || cy !== startPos.y);
-
-            if (contour.length > 2) {
-              contours.push(contour);
-            }
+        for (let x = 0; x < width; x++) {
+          const idx = rowOffset + x;
+          if (visited[idx]) {
+            prevOpaque = true;
+            continue;
           }
-        }
 
-        prevOpaque = currOpaque;
+          // Bolt Optimization: Single array lookup
+          const pixel = u32[idx];
+          const currOpaque = checkPixel(pixel);
+
+          if (currOpaque && !prevOpaque) {
+            traceBoundary(x, y, isOpaqueBg);
+          }
+          prevOpaque = currOpaque;
+        }
+      }
+    } else {
+      // Simple Alpha Check (No background color detected or fallback)
+      let isOpaqueSimple;
+      let checkPixelSimple;
+
+      if (IS_LITTLE_ENDIAN) {
+        isOpaqueSimple = (x, y) => {
+            if (x < 0 || x >= width || y < 0 || y >= height) return false;
+            return (u32[y * width + x] >>> 24) >= 128;
+        };
+        checkPixelSimple = (pixel) => (pixel >>> 24) >= 128;
+      } else {
+        isOpaqueSimple = (x, y) => {
+            if (x < 0 || x >= width || y < 0 || y >= height) return false;
+            return (u32[y * width + x] & 0xFF) >= 128;
+        };
+        checkPixelSimple = (pixel) => (pixel & 0xFF) >= 128;
+      }
+
+      for (let y = 0; y < height; y++) {
+        let prevOpaque = false;
+        let rowOffset = y * width;
+
+        for (let x = 0; x < width; x++) {
+          const idx = rowOffset + x;
+          if (visited[idx]) {
+            prevOpaque = true;
+            continue;
+          }
+
+          // Bolt Optimization: Single array lookup
+          const pixel = u32[idx];
+          const currOpaque = checkPixelSimple(pixel);
+
+          if (currOpaque && !prevOpaque) {
+            traceBoundary(x, y, isOpaqueSimple);
+          }
+          prevOpaque = currOpaque;
+        }
       }
     }
   };
 
-  // First pass with detected background color
+  // First pass
   runTrace();
 
   // If no contours found, retry without background color filtering
   // This handles full-bleed images where the content might match the detected "background" color (corners)
-  if (contours.length === 0) {
+  if (contours.length === 0 && bgColor) {
     visited = new Uint8Array(width * height); // Reset visited
     bgColor = null; // Disable background color check
+    // Bolt Fix: Redefine opacity check for the retry
     runTrace();
   }
 
@@ -366,25 +466,73 @@ export function getPolygonBounds(points) {
 
 export function isPointInPolygon(point, polygon) {
   let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+  const px = point.x;
+  const py = point.y;
+  const len = polygon.length;
+
+  for (let i = 0, j = len - 1; i < len; j = i++) {
     const xi = polygon[i].x,
       yi = polygon[i].y;
     const xj = polygon[j].x,
       yj = polygon[j].y;
 
-    const intersect =
-      yi > point.y !== yj > point.y &&
-      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
+    // Bolt Optimization: Check ray intersection using multiplication to avoid expensive division
+    const intersect = (yi > py) !== (yj > py);
+    if (intersect) {
+      // Original: px < (xj - xi) * (py - yi) / (yj - yi) + xi
+      // Optimized: (px - xi) * (yj - yi) < (xj - xi) * (py - yi) (careful with sign of yj - yi)
+      const term1 = (px - xi) * (yj - yi);
+      const term2 = (xj - xi) * (py - yi);
+
+      // If yj > yi, we check <. If yj < yi, we check >.
+      // Note: yi != yj is guaranteed because (yi > py) != (yj > py)
+      if (yj > yi) {
+        if (term1 < term2) inside = !inside;
+      } else {
+        if (term1 > term2) inside = !inside;
+      }
+    }
   }
   return inside;
 }
 
-export function filterInternalContours(contours, minDimension) {
+export function smoothPolygon(points, iterations = 1) {
+  if (points.length < 3) return points;
+  let currentPoints = points;
+  for (let k = 0; k < iterations; k++) {
+    const len = currentPoints.length;
+    // Bolt Optimization: Pre-allocate array to avoid resizing and removed modulo
+    const nextPoints = new Array(len * 2);
+    for (let i = 0; i < len; i++) {
+      const p1 = currentPoints[i];
+      const p2 = currentPoints[i === len - 1 ? 0 : i + 1];
+
+      // Chaikin's algorithm (Corner Cutting)
+      // Point A: 0.75 * P1 + 0.25 * P2
+      // Point B: 0.25 * P1 + 0.75 * P2
+      nextPoints[i * 2] = {
+        x: 0.75 * p1.x + 0.25 * p2.x,
+        y: 0.75 * p1.y + 0.25 * p2.y,
+      };
+      nextPoints[i * 2 + 1] = {
+        x: 0.25 * p1.x + 0.75 * p2.x,
+        y: 0.25 * p1.y + 0.75 * p2.y,
+      };
+    }
+    currentPoints = nextPoints;
+  }
+  return currentPoints;
+}
+
+export function filterInternalContours(
+  contours,
+  maxAllowedHoleSize,
+  minAllowedHoleSize = 0,
+) {
   // 1. Precompute bounds and area for efficiency
   const meta = contours.map((c, index) => {
-    const bounds = getPolygonBounds(c);
-    const area = getPolygonArea(c);
+    // Bolt Optimization: calculate bounds and area in one pass
+    const { bounds, area } = getPolygonMetrics(c);
     return { index, contour: c, bounds, area };
   });
 
@@ -421,14 +569,14 @@ export function filterInternalContours(contours, minDimension) {
     if (isHole) {
       const maxDim = Math.max(current.bounds.width, current.bounds.height);
       // "Internal cuts... should be less than 2mm"
-      // Filter: Remove holes that are LARGER than minDimension.
-      // Keep holes that are SMALLER or EQUAL to minDimension.
-      if (maxDim <= minDimension) {
+      // Filter: Keep holes that are SMALLER than maxAllowedHoleSize
+      // AND LARGER than minAllowedHoleSize (to suppress noise spots).
+      if (maxDim <= maxAllowedHoleSize && maxDim >= minAllowedHoleSize) {
         // Bolt Fix: Reverse hole contours so Clipper recognizes them as holes (opposite winding)
         result.push(current.contour.slice().reverse());
       }
     } else {
-      // Always keep solids
+      // Always keep solids (islands are filtered by area before this function usually)
       result.push(current.contour);
     }
   }

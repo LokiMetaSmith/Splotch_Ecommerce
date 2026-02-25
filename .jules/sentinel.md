@@ -42,3 +42,13 @@
 **Vulnerability:** The custom WAF middleware's recursive `checkPayload` function lacked a depth limit. An attacker could send a deeply nested JSON object (e.g., 20,000 levels deep), causing excessive recursion and blocking the event loop or crashing the server (Stack Overflow).
 **Learning:** Recursive algorithms on user-controlled input are dangerous without limits. In Node.js, the call stack size is limited (default ~10k frames), but deeply nested objects can still consume significant CPU and memory before crashing. Developers often assume JSON depth is reasonable, but attackers can easily craft deep structures.
 **Prevention:** Always implement a depth limit (e.g., 20-50 levels) in recursive functions processing untrusted input. Reject payloads exceeding this limit as they are likely malicious or malformed.
+
+## 2026-02-18 - Custom WAF Prototype Pollution Bypass
+**Vulnerability:** The custom WAF middleware (`server/waf.js`) iterated over object keys using `for (const key in payload)` but failed to detect `__proto__` because it is not an enumerable property (or `hasOwnProperty` fails on it). It also missed `constructor` and `prototype` in the URL string, allowing potential bypass via query parameters.
+**Learning:** Custom security middleware often assumes input objects are "plain" and enumerable. Attackers can exploit special properties (`__proto__`, `constructor`) that parsers might handle differently or that don't show up in standard iteration loops.
+**Prevention:** When validating input objects, explicitly check for "Prototype Pollution" keys (`__proto__`, `constructor`, `prototype`) in addition to general iteration. Also validate the raw URL string for these patterns as parsers might normalize them away before validation.
+
+## 2026-02-20 - Weak ID Validation Allowing Non-UUIDs
+**Vulnerability:** The application used a custom `validateId` middleware that only checked for prototype pollution keys (`__proto__`, `constructor`, `prototype`). This allowed arbitrary strings (e.g., `<script>alert(1)</script>`, `12345`) to be passed as IDs to sensitive endpoints. While WAF caught some XSS payloads, others (like simple strings) bypassed validation, potentially causing issues in downstream systems (logs, external integrations like Odoo) or confusing logic that assumed UUIDs.
+**Learning:** Developers often implement "allow-list" validation (e.g., UUID) for ID parameters but fall back to "block-list" (e.g., "no bad chars") when writing custom validators, missing the broader context. A block-list is almost always insufficient compared to a strict allow-list format.
+**Prevention:** Always enforce strict format validation (e.g., `isUUID()`) for identifiers. Do not rely on "it's not malicious" checks; verify "it IS valid".

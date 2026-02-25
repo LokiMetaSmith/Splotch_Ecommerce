@@ -42,8 +42,8 @@ export function calculateStickerPrice(pricingConfig, quantity, material, bounds,
     const perimeterInches = perimeterPixels / ppi;
     let complexityMultiplier = 1.0;
     // Sort tiers ascending to find the first one the perimeter is less than.
-    const sortedTiers = [...pricingConfig.complexity.tiers].sort((a,b) => (a.thresholdInches === 'Infinity' ? 1 : b.thresholdInches === 'Infinity' ? -1 : a.thresholdInches - b.thresholdInches));
-    for (const tier of sortedTiers) {
+    // Bolt Optimization: Tiers are pre-sorted on load. Iterating directly.
+    for (const tier of pricingConfig.complexity.tiers) {
         // Find the first tier that the perimeter is less than or equal to.
         if (perimeterInches <= tier.thresholdInches) {
             complexityMultiplier = tier.multiplier;
@@ -53,8 +53,8 @@ export function calculateStickerPrice(pricingConfig, quantity, material, bounds,
 
     // Get quantity discount
     let discount = 0;
-    const sortedDiscounts = [...pricingConfig.quantityDiscounts].sort((a, b) => b.quantity - a.quantity);
-    for (const tier of sortedDiscounts) {
+    // Bolt Optimization: Discounts are pre-sorted on load. Iterating directly.
+    for (const tier of pricingConfig.quantityDiscounts) {
         if (quantity >= tier.quantity) {
             discount = tier.discount;
             break;
@@ -69,4 +69,27 @@ export function calculateStickerPrice(pricingConfig, quantity, material, bounds,
         total: Math.round(discountedTotal),
         complexityMultiplier: complexityMultiplier
     };
+}
+
+export function generateSvgFromCutline(cutline, bounds) {
+    if (!cutline || cutline.length === 0 || !bounds) return null;
+
+    const width = bounds.width;
+    const height = bounds.height;
+
+    let pathD = "";
+    cutline.forEach((poly) => {
+        if (poly.length === 0) return;
+        pathD += `M ${poly[0].x - bounds.left} ${poly[0].y - bounds.top} `;
+        for (let i = 1; i < poly.length; i++) {
+            pathD += `L ${poly[i].x - bounds.left} ${poly[i].y - bounds.top} `;
+        }
+        pathD += "Z ";
+    });
+
+    return `
+<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+    <path d="${pathD.trim()}" fill="none" stroke="black" stroke-width="1" />
+</svg>
+    `.trim();
 }

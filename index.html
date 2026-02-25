@@ -87,10 +87,12 @@
     <script type="module" src="./src/index.js" defer></script>
     <script type="module" src="./src/mascot.js" defer></script>
     <script type="module" src="./src/a11y-improvements.js" defer></script>
+    <script type="module" src="./src/ux-enhancements.js" defer></script>
     <script src="/cookie-consent.js" defer></script>
     <link rel="manifest" href="/manifest.json" />
   </head>
-  <body class="bg-gray-100">
+  <body class="bg-gray-100 pt-28">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     <nav class="top-menu-bar">
       <a href="#sticker-design-box" class="menu-item">Jump to Sticker Editor</a>
       <a href="/orders.html" class="menu-item">View Order History</a>
@@ -115,6 +117,7 @@
       </p>
     </div>
     <main
+      id="main-content"
       class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8"
     >
       <div class="flex justify-between items-center mb-6">
@@ -152,19 +155,32 @@
             <label class="label text-sm font-medium text-gray-700" for="file"
               >Upload Sticker Design Image:</label
             >
-            <div class="control">
-              <input
-                class="input mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                id="file"
-                name="file"
-                type="file"
-                accept="image/*"
-                aria-describedby="file-helper"
-              />
+            <div class="control flex items-center gap-2">
+              <div class="flex-grow">
+                <input
+                  class="input mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                  id="file"
+                  name="file"
+                  type="file"
+                  accept="image/*"
+                  aria-describedby="file-helper"
+                />
+              </div>
               <span
                 id="fileNameDisplay"
                 class="text-sm text-gray-600 ml-2"
               ></span>
+              <button
+                type="button"
+                id="clearFileBtn"
+                class="hidden text-splotch-red hover:text-red-700 p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-splotch-red transition-colors"
+                aria-label="Clear selected file"
+                data-tooltip="Remove image and reset"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
             <p
               id="file-helper"
@@ -182,7 +198,7 @@
               class="relative w-fit mx-auto outline-none"
               contenteditable="true"
               inputmode="none"
-              style="caret-color: transparent;"
+              style="caret-color: transparent"
             >
               <canvas
                 id="imageCanvas"
@@ -226,6 +242,12 @@
                 >
                   or click to upload
                 </p>
+                <p
+                  class="text-xs text-splotch-teal font-bold mt-2 pointer-events-none animate-pulse"
+                  style="font-family: var(--font-baumans)"
+                >
+                  (Tip: Drag the mascot here to try it!)
+                </p>
               </div>
               <p
                 id="designMarginNote"
@@ -237,7 +259,6 @@
               </p>
             </div>
           </div>
-          </div>
 
           <!-- Basic Image Editing Controls -->
           <div
@@ -247,7 +268,7 @@
             <button
               type="button"
               id="rotateLeftBtn"
-              title="Rotate Left 90°"
+              data-tooltip="Rotate Left 90°"
               aria-label="Rotate Left"
               class="justify-self-center flex items-center justify-center"
               style="
@@ -275,7 +296,7 @@
             <button
               type="button"
               id="resetBtn"
-              title="Reset Image to Original"
+              data-tooltip="Reset Image to Original"
               aria-label="Reset Image"
               class="justify-self-center flex flex-col items-center justify-center text-red-600 hover:text-red-800 font-medium text-xs"
             >
@@ -298,7 +319,7 @@
             <button
               type="button"
               id="rotateRightBtn"
-              title="Rotate Right 90°"
+              data-tooltip="Rotate Right 90°"
               aria-label="Rotate Right"
               class="justify-self-center flex items-center justify-center"
               style="
@@ -371,7 +392,7 @@
             <button
               type="button"
               id="grayscaleBtn"
-              title="Apply Grayscale Filter"
+              data-tooltip="Apply Grayscale Filter"
               aria-pressed="false"
               class="lg:hidden xl:block"
             >
@@ -380,40 +401,73 @@
             <button
               type="button"
               id="sepiaBtn"
-              title="Apply Sepia Filter"
+              data-tooltip="Apply Sepia Filter"
               aria-pressed="false"
               class="lg:hidden xl:block"
             >
               Sepia
             </button>
             <div class="flex flex-col justify-center items-center col-span-2">
-                <label for="cutlineOffsetSlider" class="text-xs text-gray-500 mb-1">Cutline Offset</label>
-                <div class="flex items-center gap-1 w-full px-2">
-                    <input type="range" id="cutlineOffsetSlider" min="0" max="50" value="10" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal">
-                    <span id="cutlineOffsetValue" class="text-xs w-6 text-center text-gray-600 font-mono">10</span>
-                </div>
+              <label
+                for="cutlineOffsetSlider"
+                class="text-xs text-gray-500 mb-1"
+                >Cutline Offset</label
+              >
+              <div class="flex items-center gap-1 w-full px-2">
+                <input
+                  type="range"
+                  id="cutlineOffsetSlider"
+                  min="0"
+                  max="50"
+                  value="10"
+                  step="1"
+                  class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                />
+                <span
+                  id="cutlineOffsetValue"
+                  class="text-xs w-6 text-center text-gray-600 font-mono"
+                  >10</span
+                >
+              </div>
             </div>
             <div class="flex flex-col justify-center items-center col-span-2">
-                <label for="cutlineSensitivitySlider" class="text-xs text-gray-500 mb-1">Edge Sensitivity</label>
-                <div class="flex items-center gap-1 w-full px-2">
-                    <input type="range" id="cutlineSensitivitySlider" min="0" max="100" value="10" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal" title="Adjust background detection tolerance">
-                    <span id="cutlineSensitivityValue" class="text-xs w-6 text-center text-gray-600 font-mono">10</span>
-                </div>
+              <label
+                for="cutlineSensitivitySlider"
+                class="text-xs text-gray-500 mb-1"
+                >Edge Sensitivity</label
+              >
+              <div class="flex items-center gap-1 w-full px-2">
+                <input
+                  type="range"
+                  id="cutlineSensitivitySlider"
+                  min="0"
+                  max="100"
+                  value="10"
+                  step="1"
+                  class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                  data-tooltip="Adjust background detection tolerance"
+                />
+                <span
+                  id="cutlineSensitivityValue"
+                  class="text-xs w-6 text-center text-gray-600 font-mono"
+                  >10</span
+                >
+              </div>
             </div>
             <button
               type="button"
               id="generateCutlineBtn"
               class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-4 xl:col-span-2 flex justify-center items-center gap-2"
-              title="Generate Cutline from Image Alpha"
+              data-tooltip="Generate Cutline from Image Alpha"
             >
               Generate Smart Cutline
             </button>
           </div>
           <div
             id="standard-sizes-controls"
-            class="flex justify-center items-center space-x-2 my-4"
+            class="flex flex-wrap justify-center items-center gap-2 my-4"
           >
-            <span class="text-sm font-medium text-gray-700"
+            <span class="text-sm font-medium text-gray-700 whitespace-nowrap"
               >Set max dimension to:</span
             >
             <button
@@ -421,6 +475,7 @@
               class="size-btn"
               data-size="1"
               aria-label="Set max dimension to 1 inch"
+              data-tooltip="Set max dimension to 1 inch"
               aria-pressed="false"
             >
               1"
@@ -430,6 +485,7 @@
               class="size-btn"
               data-size="2"
               aria-label="Set max dimension to 2 inches"
+              data-tooltip="Set max dimension to 2 inches"
               aria-pressed="false"
             >
               2"
@@ -439,6 +495,7 @@
               class="size-btn"
               data-size="3"
               aria-label="Set max dimension to 3 inches"
+              data-tooltip="Set max dimension to 3 inches"
               aria-pressed="false"
             >
               3"

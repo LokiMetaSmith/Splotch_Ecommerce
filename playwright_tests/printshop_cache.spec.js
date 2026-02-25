@@ -49,14 +49,16 @@ test('printshop caches SVG fetches during nesting', async ({ page }) => {
     await expect(page.locator('#success-toast')).toContainText('Nesting complete.');
 
     // 7. Click Nest Stickers again
-    // Wait for toast to hide or disappear to avoid click interception, or just wait a bit.
-    // The toast hides after 3s (setTimeout(hideSuccessToast, 3000)).
-    // But we can just wait for the button to be clickable again if it was disabled (it wasn't in the code).
-    // Let's force wait for the toast to go away or manually hide it via JS?
-    // Waiting 3.5s is safe.
-    await page.waitForTimeout(3500);
+    // Manually hide the toast to ensure it doesn't block clicks and we don't wait for animation
+    await page.evaluate(() => {
+        const toast = document.getElementById('success-toast');
+        if (toast) {
+            toast.classList.add('opacity-0', 'translate-y-full', 'pointer-events-none');
+        }
+    });
 
-    await nestBtn.click();
+    // Force click to ensure we hit the button even if layout is tricky on mobile
+    await nestBtn.click({ force: true });
     await expect(page.locator('#success-toast')).toContainText('Nesting complete.');
 
     // 8. Verify fetch count
