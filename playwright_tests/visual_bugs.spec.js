@@ -2,8 +2,8 @@ import { test, expect } from './test-setup.js';
 
 test.describe('Visual Bug Reproduction', () => {
   test('Top menu bar should not overlap with main title', async ({ page }) => {
-    // Set mobile viewport
-    await page.setViewportSize({ width: 375, height: 667 });
+    // Set mobile viewport (iPhone SE 1st gen width)
+    await page.setViewportSize({ width: 320, height: 568 });
     await page.goto('/');
 
     // Wait for elements
@@ -28,8 +28,8 @@ test.describe('Visual Bug Reproduction', () => {
   });
 
   test('Set max dimension label should not be squashed', async ({ page }) => {
-    // Set mobile viewport
-    await page.setViewportSize({ width: 375, height: 667 });
+    // Set mobile viewport (iPhone SE 1st gen width)
+    await page.setViewportSize({ width: 320, height: 568 });
     await page.goto('/');
 
     const label = page.locator('#standard-sizes-controls span').filter({ hasText: 'Set max dimension to:' });
