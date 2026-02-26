@@ -35,4 +35,9 @@ There are four primary ways to deploy this application, each with its own guide:
 - **Use Case:** General information about using a reverse proxy (Caddy, Nginx) for security and SSL.
 - **📚 [Guide: Using a Reverse Proxy](./reverse-proxy.md)**
 
+### 7. DNS & Environments
+
+- **Use Case:** Setting up multiple environments (Production, Development) and configuring DNS.
+- **📚 [Guide: DNS & Environments](./dns-and-environments.md)**
+
 Please choose the guide that matches your deployment target.
