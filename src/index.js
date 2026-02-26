@@ -12,6 +12,7 @@ import {
   imageHasTransparentBorder,
   filterInternalContours,
 } from "./lib/image-processing.js";
+import { showNotification } from "./notifications.js";
 
 // index.js
 
@@ -1380,7 +1381,7 @@ function loadFileAsImage(file) {
       handleSvgUpload(e.target.result);
     };
     reader.onerror = () =>
-      showPaymentStatus("Error reading SVG file.", "error");
+      showNotification("Error reading SVG file.", "error");
     reader.readAsText(file);
   } else if (file.type.startsWith("image/")) {
     // Reset vector state
@@ -1394,7 +1395,7 @@ function loadFileAsImage(file) {
         originalImage = img;
         updateEditingButtonsState(false);
         if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-        showPaymentStatus("Image loaded successfully.", "success");
+        showNotification("Image loaded successfully.", "success");
         let newWidth = img.width,
           newHeight = img.height;
         if (canvas && ctx) {
@@ -1446,13 +1447,13 @@ function loadFileAsImage(file) {
         }
       };
       img.onerror = () =>
-        showPaymentStatus("Error loading image data.", "error");
+        showNotification("Error loading image data.", "error");
       img.src = reader.result;
     };
-    reader.onerror = () => showPaymentStatus("Error reading file.", "error");
+    reader.onerror = () => showNotification("Error reading file.", "error");
     reader.readAsDataURL(file);
   } else {
-    showPaymentStatus(
+    showNotification(
       "Invalid file type. Please select an image or SVG file.",
       "error",
     );
@@ -1552,10 +1553,10 @@ function handleSvgUpload(svgText) {
     redrawAll();
 
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-    showPaymentStatus("SVG processed and cutline generated.", "success");
+    showNotification("SVG processed and cutline generated.", "success");
     updateEditingButtonsState(false); // Enable editing buttons
   } catch (error) {
-    showPaymentStatus(`SVG Processing Error: ${error.message}`, "error");
+    showNotification(`SVG Processing Error: ${error.message}`, "error");
     console.error(error);
   }
 }
@@ -1729,7 +1730,7 @@ function drawRuler(bounds, offset = { x: 0, y: 0 }) {
 
 function handleAddText() {
   if (!canvas || !ctx || !originalImage) {
-    showPaymentStatus("Please load an image before adding text.", "error");
+    showNotification("Please load an image before adding text.", "error");
     return;
   }
   const text = textInput.value;
@@ -1737,7 +1738,7 @@ function handleAddText() {
   const color = textColorInput.value;
   const font = textFontFamilySelect.value;
   if (!text.trim() || isNaN(size) || size <= 0) {
-    showPaymentStatus("Please enter valid text and size.", "error");
+    showNotification("Please enter valid text and size.", "error");
     return;
   }
   ctx.font = `${size}px ${font}`;
@@ -1745,7 +1746,7 @@ function handleAddText() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-  showPaymentStatus(`Text "${text}" added.`, "success");
+  showNotification(`Text "${text}" added.`, "success");
 }
 
 function handleClearImage() {
@@ -1773,12 +1774,12 @@ function handleClearImage() {
   calculateAndUpdatePrice();
 
   if (clearFileBtn) clearFileBtn.classList.add("hidden");
-  showPaymentStatus("Image removed.", "info");
+  showNotification("Image removed.", "info");
 }
 
 function handleResetImage() {
   if (!originalImage && basePolygons.length === 0) {
-    showPaymentStatus("Nothing to reset.", "info");
+    showNotification("Nothing to reset.", "info");
     return;
   }
 
@@ -1863,13 +1864,13 @@ function handleResetImage() {
 
       calculateAndUpdatePrice();
       drawCanvasDecorations(currentBounds);
-      showPaymentStatus("Image reset to original.", "success");
+      showNotification("Image reset to original.", "success");
     }
   } else if (basePolygons.length > 0) {
     // SVG Reset
     currentPolygons = basePolygons;
     redrawAll();
-    showPaymentStatus("Image reset to original.", "success");
+    showNotification("Image reset to original.", "success");
   }
 }
 
@@ -2074,7 +2075,7 @@ function toggleSepiaFilter() {
 
 function handleStandardResize(targetInches) {
   if (!pricingConfig || (!originalImage && basePolygons.length === 0)) {
-    showPaymentStatus("Please load an image first.", "error");
+    showNotification("Please load an image first.", "error");
     return;
   }
 
@@ -2194,7 +2195,7 @@ function handleStandardResize(targetInches) {
 
 function handleGenerateCutline() {
   if (!canvas || !ctx || !originalImage) {
-    showPaymentStatus(
+    showNotification(
       "Smart cutline requires a raster image (PNG, JPG). Please upload one.",
       "error",
     );
@@ -2213,7 +2214,7 @@ function handleGenerateCutline() {
     }
   }
 
-  showPaymentStatus("Generating smart cutline...", "info");
+  showNotification("Generating smart cutline...", "info");
 
   // START LOADING STATE
   const btn = document.getElementById("generateCutlineBtn");
@@ -2343,11 +2344,11 @@ function handleGenerateCutline() {
       drawCanvasDecorations(currentBounds);
 
       calculateAndUpdatePrice();
-      showPaymentStatus("Smart cutline generated successfully.", "success");
+      showNotification("Smart cutline generated successfully.", "success");
     } catch (error) {
       // Restore the original canvas if the process failed
       ctx.putImageData(originalCanvasData, 0, 0);
-      showPaymentStatus(`Error: ${error.message}`, "error");
+      showNotification(`Error: ${error.message}`, "error");
       console.error(error);
     } finally {
       // RESTORE BUTTON STATE
@@ -2385,7 +2386,7 @@ async function handleCreateProduct() {
   const profitCents = Math.round(parseFloat(profitInput) * 100);
 
   if (!name || isNaN(profitCents)) {
-    alert("Please enter a valid name and profit amount.");
+    showNotification("Please enter a valid name and profit amount.", "error");
     return;
   }
 
@@ -2397,7 +2398,7 @@ async function handleCreateProduct() {
   // 1. Get auth token
   const token = localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
   if (!token) {
-    alert("You must be logged in to sell designs.");
+    showNotification("You must be logged in to sell designs.", "error");
     return;
   }
 
@@ -2453,12 +2454,12 @@ async function handleCreateProduct() {
     document.getElementById("createProductBtn").classList.add("hidden"); // Prevent double click
   } catch (error) {
     console.error(error);
-    alert("Failed to create product: " + error.message);
+    showNotification("Failed to create product: " + error.message, "error");
   }
 }
 
 async function handleRemoteImageLoad(imageUrl) {
-  showPaymentStatus("Loading your previous design...", "info");
+  showNotification("Loading your previous design...", "info");
   const img = new Image();
   img.crossOrigin = "Anonymous";
   img.onload = () => {
@@ -2496,17 +2497,17 @@ async function handleRemoteImageLoad(imageUrl) {
     calculateAndUpdatePrice();
     drawCanvasDecorations(currentBounds);
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-    showPaymentStatus("Design loaded! You can now adjust options.", "success");
+    showNotification("Design loaded! You can now adjust options.", "success");
   };
   img.onerror = () =>
-    showPaymentStatus("Failed to load design image.", "error");
+    showNotification("Failed to load design image.", "error");
   img.src = decodeURIComponent(imageUrl);
 }
 
 async function loadProductForBuyer(productId) {
   try {
     currentProductId = productId;
-    showPaymentStatus("Loading product design...", "info");
+    showNotification("Loading product design...", "info");
 
     const response = await fetch(`${serverUrl}/api/products/${productId}`);
     if (!response.ok) throw new Error("Product not found");
@@ -2586,12 +2587,12 @@ async function loadProductForBuyer(productId) {
 
       calculateAndUpdatePrice();
       drawCanvasDecorations(currentBounds);
-      showPaymentStatus("Design loaded!", "success");
+      showNotification("Design loaded!", "success");
     };
     img.crossOrigin = "Anonymous"; // Important for canvas manipulation if on different port
     img.src = product.designImagePath;
   } catch (error) {
     console.error(error);
-    showPaymentStatus("Failed to load product.", "error");
+    showNotification("Failed to load product.", "error");
   }
 }
