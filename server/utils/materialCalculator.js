@@ -1,9 +1,28 @@
 import { Jimp } from 'jimp';
 import fs from 'fs/promises';
+import sizeOf from 'image-size';
 
 export async function calculateMaterialUsage(filePath, ppi = 300) {
     try {
         const buffer = await fs.readFile(filePath);
+
+        // Security Check: Verify image dimensions before expensive processing
+        // Limit to ~50 Megapixels (e.g., 8000x6000) to prevent DoS
+        try {
+            const dimensions = sizeOf(buffer);
+            if (dimensions && dimensions.width && dimensions.height) {
+                const totalPixels = dimensions.width * dimensions.height;
+                if (totalPixels > 50_000_000) {
+                    throw new Error('Image too large for processing (exceeds 50MP limit)');
+                }
+            }
+        } catch (e) {
+            // Re-throw our security error, ignore image-size parsing errors (let Jimp handle/fail them)
+            if (e.message.includes('Image too large')) {
+                throw e;
+            }
+        }
+
         const image = await Jimp.read(buffer);
 
         const widthPx = image.width;
