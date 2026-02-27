@@ -337,19 +337,25 @@ export function traceContours(imageData, threshold = 10) {
 
         for (let x = 0; x < width; x++) {
           const idx = rowOffset + x;
+          // Bolt Optimization: Check opacity FIRST.
+          // In transparent/white heavy images, this skips the 'visited' lookup most of the time.
+          const pixel = u32[idx];
+          const currOpaque = checkPixel(pixel);
+
+          if (!currOpaque) {
+            prevOpaque = false;
+            continue;
+          }
+
           if (visited[idx]) {
             prevOpaque = true;
             continue;
           }
 
-          // Bolt Optimization: Single array lookup
-          const pixel = u32[idx];
-          const currOpaque = checkPixel(pixel);
-
-          if (currOpaque && !prevOpaque) {
+          if (!prevOpaque) {
             traceBoundary(x, y, isOpaqueBg);
           }
-          prevOpaque = currOpaque;
+          prevOpaque = true;
         }
       }
     } else {
@@ -377,19 +383,24 @@ export function traceContours(imageData, threshold = 10) {
 
         for (let x = 0; x < width; x++) {
           const idx = rowOffset + x;
+          // Bolt Optimization: Check opacity FIRST.
+          const pixel = u32[idx];
+          const currOpaque = checkPixelSimple(pixel);
+
+          if (!currOpaque) {
+            prevOpaque = false;
+            continue;
+          }
+
           if (visited[idx]) {
             prevOpaque = true;
             continue;
           }
 
-          // Bolt Optimization: Single array lookup
-          const pixel = u32[idx];
-          const currOpaque = checkPixelSimple(pixel);
-
-          if (currOpaque && !prevOpaque) {
+          if (!prevOpaque) {
             traceBoundary(x, y, isOpaqueSimple);
           }
-          prevOpaque = currOpaque;
+          prevOpaque = true;
         }
       }
     }
