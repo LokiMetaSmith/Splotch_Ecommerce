@@ -1774,6 +1774,7 @@ function handleClearImage() {
   calculateAndUpdatePrice();
 
   if (clearFileBtn) clearFileBtn.classList.add("hidden");
+  if (fileInputGlobalRef) fileInputGlobalRef.focus();
   showNotification("Image removed.", "info");
 }
 
@@ -2452,6 +2453,7 @@ async function handleCreateProduct() {
     document.getElementById("productLinkInput").value = link;
     document.getElementById("productLinkContainer").classList.remove("hidden");
     document.getElementById("createProductBtn").classList.add("hidden"); // Prevent double click
+    document.getElementById("copyLinkBtn")?.focus();
   } catch (error) {
     console.error(error);
     showNotification("Failed to create product: " + error.message, "error");

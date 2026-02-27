@@ -21,3 +21,7 @@
 ## 2026-02-20 - Skip Link Visibility with Fixed Headers
 **Learning:** When using fixed headers like `.top-menu-bar`, a simple static skip link might be hidden behind the header or fail to scroll properly. The combination of absolute positioning, high z-index, and explicit scroll targeting is crucial.
 **Action:** Always verify skip link visibility and functionality against fixed headers.
+
+## 2026-02-27 - Focus Management on Hiding Elements
+**Learning:** Hiding an element that currently has focus (e.g., via `display: none` or `.hidden` class) resets focus to the `body`, disrupting keyboard navigation and forcing users to tab from the beginning of the document.
+**Action:** Always programmatically move focus to a logical next interactive element (e.g., an input or adjacent button) immediately after hiding the active element.
