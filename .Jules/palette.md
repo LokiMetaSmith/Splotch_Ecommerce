@@ -25,3 +25,6 @@
 ## 2026-02-27 - Focus Management on Hiding Elements
 **Learning:** Hiding an element that currently has focus (e.g., via `display: none` or `.hidden` class) resets focus to the `body`, disrupting keyboard navigation and forcing users to tab from the beginning of the document.
 **Action:** Always programmatically move focus to a logical next interactive element (e.g., an input or adjacent button) immediately after hiding the active element.
+## 2025-02-28 - Missing `aria-label`s on Dynamically Generated Icon-Only Close Buttons
+**Learning:** Icon-only close buttons (like the `&times;` or SVG cross) inside dynamically generated JavaScript modals are frequently overlooked when applying `aria-label`s and focus states (`focus-visible:ring-2`), creating accessibility barriers for screen-reader users and keyboard navigators.
+**Action:** When creating or reviewing UI components rendered via string templates in JavaScript, proactively verify that any icon-only buttons include an explicit `aria-label` describing the action, and feature distinct `focus-visible` styles for keyboard navigation.
