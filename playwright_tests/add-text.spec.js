@@ -23,7 +23,7 @@ test('allows a user to add text to an image', async ({ page }) => {
 
   // --- Step 4: Verify the text was added ---
   // Verify the success message appears in the payment status container.
-  const statusContainer = page.locator('#payment-status-container');
+  const statusContainer = page.locator('.message-content');
   await expect(statusContainer).toBeVisible({ timeout: 10000 });
   await expect(statusContainer).toContainText('Text "Hello, World!" added.', { timeout: 10000 });
 

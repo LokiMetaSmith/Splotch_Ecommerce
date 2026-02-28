@@ -39,7 +39,7 @@ test.describe('Frontend Image Manipulation', () => {
         await fileInput.setInputFiles(testImagePath);
 
         // Wait for image to load
-        await expect(page.locator('#payment-status-container')).toContainText('Image loaded successfully');
+        await expect(page.locator('.message-content')).toContainText('Image loaded successfully');
     }
 
     test('should add text to the canvas', async ({ page }) => {
@@ -54,7 +54,7 @@ test.describe('Frontend Image Manipulation', () => {
         await page.click('#addTextBtn');
 
         // Verify success message
-        await expect(page.locator('#payment-status-container')).toContainText('Text "Hello World" added');
+        await expect(page.locator('.message-content')).toContainText('Text "Hello World" added');
     });
 
     test('should rotate the image', async ({ page }) => {
@@ -100,7 +100,7 @@ test.describe('Frontend Image Manipulation', () => {
         const fileInput = page.locator('input#file');
         await page.waitForTimeout(1000);
         await fileInput.setInputFiles(testImagePath);
-        await expect(page.locator('#payment-status-container')).toContainText('Image loaded successfully');
+        await expect(page.locator('.message-content')).toContainText('Image loaded successfully');
 
         // Click Generate Cutline
         const generateBtn = page.locator('#generateCutlineBtn');
@@ -111,6 +111,6 @@ test.describe('Frontend Image Manipulation', () => {
 
         // Expect success message
         await generateBtn.click();
-        await expect(page.locator('#payment-status-container')).toContainText('Smart cutline generated successfully', { timeout: 10000 });
+        await expect(page.locator('.message-content')).toContainText('Smart cutline generated successfully', { timeout: 10000 });
     });
 });
