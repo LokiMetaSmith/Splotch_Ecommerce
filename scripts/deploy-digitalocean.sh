@@ -8,6 +8,11 @@
 # This script automates the creation of a new DigitalOcean Droplet and
 # provisions it to run the Print Shop application using a cloud-config file.
 #
+# NOTE: For production environments, larger teams, and scalable setups, it is
+# highly recommended to use Infrastructure-as-Code (IaC) tools like Terraform
+# and automated CI/CD pipelines instead of manual deploy scripts. See
+# docs/deployment/remote-vps.md for Best Practices on Secure Deployment.
+#
 # Prerequisites:
 # 1. doctl (DigitalOcean Command-Line Tool) must be installed and authenticated.
 #    - Installation: https://docs.digitalocean.com/reference/doctl/how-to/install/
