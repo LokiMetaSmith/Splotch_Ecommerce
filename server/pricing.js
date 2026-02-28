@@ -103,6 +103,13 @@ import fs from "fs";
 import { promisify } from "util";
 import logger from "./logger.js";
 
+const dimensionsCache = new Map();
+const MAX_CACHE_SIZE = 500;
+
+function clearDimensionsCache() {
+    dimensionsCache.clear();
+}
+
 function getPathPerimeter(pathNode) {
     let perimeter = 0;
     if (pathNode.properties && pathNode.properties.d) {
@@ -117,7 +124,19 @@ function getPathPerimeter(pathNode) {
 }
 
 async function getDesignDimensions(filePath) {
+    // Bolt Optimization: Cache design dimensions to avoid expensive disk I/O and SVG parsing
+    // for repeated checks of the same uploaded file or product design.
+    // Use mtimeMs to invalidate cache if the file changes.
+    const stat = await fs.promises.stat(filePath);
+    const cacheKey = `${filePath}_${stat.mtimeMs}`;
+
+    if (dimensionsCache.has(cacheKey)) {
+        return dimensionsCache.get(cacheKey);
+    }
+
     const fileExtension = filePath.split(".").pop().toLowerCase();
+
+    let result;
 
     if (fileExtension === "svg" || fileExtension === "xml") {
         const svgText = await fs.promises.readFile(filePath, "utf8");
@@ -218,7 +237,7 @@ async function getDesignDimensions(filePath) {
             { x: 0, y: side },
         ];
 
-        return {
+        result = {
             bounds: { width, height },
             cutline: [cutlinePolygon], // Array of polygons
         };
@@ -234,7 +253,7 @@ async function getDesignDimensions(filePath) {
             { x: dimensions.width, y: dimensions.height },
             { x: 0, y: dimensions.height },
         ];
-        return {
+        result = {
             bounds: { width: dimensions.width, height: dimensions.height },
             cutline: [cutlinePolygon],
         };
@@ -243,6 +262,14 @@ async function getDesignDimensions(filePath) {
             `Unsupported file type for dimension calculation: ${fileExtension}`,
         );
     }
+
+    if (dimensionsCache.size >= MAX_CACHE_SIZE) {
+        const firstKey = dimensionsCache.keys().next().value;
+        dimensionsCache.delete(firstKey);
+    }
+    dimensionsCache.set(cacheKey, result);
+
+    return result;
 }
 
-export { calculateStickerPrice, calculatePerimeter, getDesignDimensions };
+export { calculateStickerPrice, calculatePerimeter, getDesignDimensions, clearDimensionsCache };
