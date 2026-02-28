@@ -30,7 +30,7 @@ test.describe('Canvas Ruler', () => {
         await fileInput.setInputFiles(testImagePath);
 
         // 3. Wait for canvas to be populated and ruler drawn
-        await expect(page.locator('#payment-status-container')).toContainText('Image loaded successfully');
+        await expect(page.locator('.message-content')).toContainText('Image loaded successfully');
 
         // 4. Verify the ruler is visually present via screenshot
         // We can't easily query the canvas content, but we can verify the canvas exists and take a screenshot
