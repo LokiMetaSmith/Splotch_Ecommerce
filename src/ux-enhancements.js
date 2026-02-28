@@ -254,7 +254,7 @@ export function setupShortcutsHelp() {
     <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4 transform transition-all scale-100" style="font-family: var(--font-baumans)">
       <div class="flex justify-between items-center mb-4 border-b pb-2">
         <h2 id="shortcutsModalTitle" class="text-xl font-bold text-splotch-navy">Keyboard Shortcuts</h2>
-        <button type="button" class="close-modal text-gray-400 hover:text-gray-600 focus:outline-none">
+        <button type="button" class="close-modal text-gray-400 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded" aria-label="Close shortcuts modal">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
