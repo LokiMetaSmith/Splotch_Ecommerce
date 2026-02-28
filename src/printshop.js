@@ -698,7 +698,7 @@ async function handleTimeLog(orderId) {
 async function updateOrderStatus(orderId, newStatus) {
     showLoadingIndicator();
     try {
-        const updatedOrder = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
+        await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
             method: 'POST',
             body: JSON.stringify({ status: newStatus }),
         });
