@@ -637,6 +637,14 @@ function handleOrderListClick(e) {
     if (actionBtn) {
         const orderId = actionBtn.dataset.orderId;
         const status = actionBtn.dataset.status;
+
+        if (status === 'CANCELED') {
+            const confirmed = window.confirm('Are you sure you want to cancel this order? This action cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+        }
+
         updateOrderStatus(orderId, status);
         return;
     }
