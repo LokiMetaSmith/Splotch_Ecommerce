@@ -90,11 +90,22 @@ function getPolygonsBounds(polygons) {
   let maxX = -Infinity;
   let maxY = -Infinity;
 
-  polygons.forEach((poly) => {
-    poly.forEach((pt) => {
-      // Handle both case styles safely
-      const x = pt.x !== undefined ? pt.x : pt.X;
-      const y = pt.y !== undefined ? pt.y : pt.Y;
+  // Bolt Optimization: Replace nested forEach with standard for-loops.
+  // This avoids function call overhead and significantly speeds up bounds calculation
+  // without sacrificing readability or relying on complex loop unrolling.
+  for (let i = 0, len = polygons.length; i < len; i++) {
+    const poly = polygons[i];
+    if (!poly) continue;
+
+    for (let j = 0, plen = poly.length; j < plen; j++) {
+      const pt = poly[j];
+
+      // Inline case handling, prioritizing standard lowercase keys
+      let x = pt.x;
+      let y = pt.y;
+
+      if (x === undefined) x = pt.X;
+      if (y === undefined) y = pt.Y;
 
       if (x !== undefined && y !== undefined) {
         if (x < minX) minX = x;
@@ -102,8 +113,8 @@ function getPolygonsBounds(polygons) {
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
       }
-    });
-  });
+    }
+  }
 
   if (minX === Infinity) {
     return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
