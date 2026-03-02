@@ -249,7 +249,8 @@ function logout() {
     const orderCards = ui.ordersList.querySelectorAll('.order-card');
     orderCards.forEach(card => card.remove());
 
-    ui.noOrdersMessage.textContent = 'Please log in to view orders.';
+    const noOrdersText = document.getElementById('no-orders-text');
+    if (noOrdersText) noOrdersText.textContent = 'Please log in to view orders.';
     ui.noOrdersMessage.style.display = 'block';
 }
 
@@ -455,14 +456,15 @@ function hideSuccessToast() {
 // --- Application Logic ---
 
 async function fetchAndDisplayOrders(query = '') {
+    const noOrdersText = document.getElementById('no-orders-text');
     if (!authToken) {
-        ui.noOrdersMessage.textContent = 'Please log in to view orders.';
+        if (noOrdersText) noOrdersText.textContent = 'Please log in to view orders.';
         updateConnectionStatus('idle');
         return;
     }
     showLoadingIndicator();
     updateConnectionStatus('connecting');
-    ui.noOrdersMessage.textContent = 'Loading orders...';
+    if (noOrdersText) noOrdersText.textContent = 'Loading orders...';
     ui.noOrdersMessage.style.display = 'block';
 
     try {
@@ -496,12 +498,14 @@ function filterAndDisplayOrders(status) {
         ? allOrders
         : allOrders.filter(order => order.status === status);
 
+    const noOrdersText = document.getElementById('no-orders-text');
+
     if (ordersToDisplay.length === 0) {
         // Clear orders but keep message
         ui.ordersList.innerHTML = '';
         ui.ordersList.appendChild(ui.noOrdersMessage);
 
-        ui.noOrdersMessage.textContent = `No orders found with status: ${status}.`;
+        if (noOrdersText) noOrdersText.textContent = `No orders found with status: ${status}.`;
         ui.noOrdersMessage.style.display = 'block';
     } else {
         ui.noOrdersMessage.style.display = 'none';
