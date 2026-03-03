@@ -263,7 +263,7 @@
           <!-- Basic Image Editing Controls -->
           <div
             id="editing-controls"
-            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-11 xl:grid-cols-11 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-12 xl:grid-cols-12 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
           >
             <button
               type="button"
@@ -451,6 +451,30 @@
                   id="cutlineSensitivityValue"
                   class="text-xs w-6 text-center text-gray-600 font-mono"
                   >10</span
+                >
+              </div>
+            </div>
+            <div class="flex flex-col justify-center items-center col-span-2">
+              <label
+                for="lazyLassoSlider"
+                class="text-xs text-gray-500 mb-1"
+                >Lazy Lasso</label
+              >
+              <div class="flex items-center gap-1 w-full px-2">
+                <input
+                  type="range"
+                  id="lazyLassoSlider"
+                  min="0"
+                  max="50"
+                  value="0"
+                  step="1"
+                  class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                  data-tooltip="Smooths out deep cuts and gaps"
+                />
+                <span
+                  id="lazyLassoValue"
+                  class="text-xs w-6 text-center text-gray-600 font-mono"
+                  >0</span
                 >
               </div>
             </div>
