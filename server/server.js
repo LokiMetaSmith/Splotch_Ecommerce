@@ -500,6 +500,7 @@ async function startServer(
       },
       credentials: true,
       optionsSuccessStatus: 200,
+      exposedHeaders: ['X-Server-Session-Token'],
     };
     
    // app.use(limiter);
