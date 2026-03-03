@@ -38,6 +38,10 @@ let inventoryCache = {}; // Cache for Odoo inventory
 let isGrayscale = false;
 let isSepia = false;
 
+// Legend state
+let hoveredLegendTab = null;
+let selectedLegendTab = null;
+
 let textInput,
   textSizeInput,
   textSizeSlider,
@@ -71,6 +75,7 @@ let rotateLeftBtnEl,
 let submitPaymentBtn;
 let widthDisplayEl, heightDisplayEl;
 let canvasPlaceholder;
+let canvasLegendContainer;
 
 let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
@@ -80,6 +85,21 @@ let cutlineOffset = 10; // Default offset
 // Memoization globals for pricing
 let lastCalculatedPerimeter = 0;
 let lastCalculatedPerimeterCutlineRef = null;
+
+// Helper to get active line interaction state
+function getActiveLineId() {
+  return hoveredLegendTab || selectedLegendTab;
+}
+
+function getConstantLineWidth(basePx = 1.5) {
+  if (!canvas || canvas.clientWidth === 0) return basePx;
+
+  // The actual scale factor between the canvas logical pixels and the
+  // physical CSS pixels it occupies on the screen.
+  const scale = canvas.width / canvas.clientWidth;
+
+  return basePx * scale;
+}
 
 function getPolygonsBounds(polygons) {
   if (!polygons || polygons.length === 0) {
@@ -180,6 +200,7 @@ async function BootStrap() {
 
   widthDisplayEl = document.getElementById("widthDisplay");
   heightDisplayEl = document.getElementById("heightDisplay");
+  canvasLegendContainer = document.getElementById("canvas-legend");
 
   rotateLeftBtnEl = document.getElementById("rotateLeftBtn");
   rotateRightBtnEl = document.getElementById("rotateRightBtn");
@@ -1455,6 +1476,9 @@ function loadFileAsImage(file) {
               if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
             }
           }
+
+          // Show the legend tabs since an image is loaded
+          renderLegend();
         }
       };
       img.onerror = () =>
@@ -1566,6 +1590,9 @@ function handleSvgUpload(svgText) {
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
     showNotification("SVG processed and cutline generated.", "success");
     updateEditingButtonsState(false); // Enable editing buttons
+
+    // Show legend since SVG is loaded
+    renderLegend();
   } catch (error) {
     showNotification(`SVG Processing Error: ${error.message}`, "error");
     console.error(error);
@@ -1615,6 +1642,7 @@ function drawPolygonsToCanvas(
 ) {
   if (!ctx || polygons.length === 0) return;
 
+  ctx.save();
   // Bolt Optimization: Batch all polygons into a single path to reduce draw calls
   ctx.beginPath();
 
@@ -1629,15 +1657,36 @@ function drawPolygonsToCanvas(
   });
 
   if (stroke) {
+    // Determine active state for legend highlighting
+    const activeLineId = getActiveLineId();
+    const isCutlineActive = activeLineId === 'cutline';
+    const isOtherActive = activeLineId && !isCutlineActive;
+
     ctx.strokeStyle = style;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 4]); // Make the cutline dashed
+
+    // Constant hairline width
+    const baseLineWidth = getConstantLineWidth(isCutlineActive ? 3.0 : 1.5);
+    ctx.lineWidth = baseLineWidth;
+
+    if (isOtherActive) {
+      ctx.globalAlpha = 0.3; // Dim when another line is selected
+    } else {
+      ctx.globalAlpha = 1.0;
+    }
+
+    if (isCutlineActive) {
+      ctx.setLineDash([]); // Solid when highlighted
+    } else {
+      ctx.setLineDash([getConstantLineWidth(4), getConstantLineWidth(4)]); // Make the cutline dashed
+    }
+
     ctx.stroke();
     ctx.setLineDash([]); // Reset for other drawing operations
   } else {
     ctx.fillStyle = style;
     ctx.fill();
   }
+  ctx.restore();
 }
 
 function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
@@ -1666,16 +1715,33 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
 
   ctx.save();
 
+  const activeLineId = getActiveLineId();
+  const isBoxActive = activeLineId === 'box';
+  const isOtherActive = activeLineId && !isBoxActive;
+
   // The user wanted a grey box with 1-inch dashes for pricing.
   // The previous implementation calculated a dash length from PPI, which was often
   // too large to be visible on smaller images. A fixed dash pattern is more reliable.
 
   // Set color to grey as requested.
   ctx.strokeStyle = "rgba(128, 128, 128, 0.9)"; // A strong, visible grey
-  ctx.lineWidth = 2; // A clean, visible line width
+
+  // Constant hairline width
+  const baseLineWidth = getConstantLineWidth(isBoxActive ? 3.0 : 2.0);
+  ctx.lineWidth = baseLineWidth;
+
+  if (isOtherActive) {
+    ctx.globalAlpha = 0.3;
+  } else {
+    ctx.globalAlpha = 1.0;
+  }
 
   // Use a fixed dash pattern that is visible at most scales.
-  ctx.setLineDash([10, 5]);
+  if (isBoxActive) {
+    ctx.setLineDash([]); // Solid when active
+  } else {
+    ctx.setLineDash([getConstantLineWidth(10), getConstantLineWidth(5)]);
+  }
 
   // Stroke is centered on the path, so we offset by half the line width to keep it inside/visible
   // especially when bounds are at (0,0) of the canvas.
@@ -1728,6 +1794,111 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
   ctx.rotate(-Math.PI / 2);
   ctx.fillText(`${height.toFixed(1)} ${unit}`, 0, 0);
   ctx.restore();
+}
+
+let legendInitialized = false;
+
+function renderLegend() {
+  if (!canvasLegendContainer) return;
+
+  // Only show if there's an image or svg loaded
+  if (!originalImage && basePolygons.length === 0) {
+    canvasLegendContainer.style.display = 'none';
+    return;
+  }
+
+  canvasLegendContainer.style.display = 'flex';
+
+  const tabs = [
+    { id: 'cutline', label: 'Cutline', color: 'red', borderColor: '#ef4444', bgColor: '#fee2e2' },
+    { id: 'box', label: 'Bounding Box', color: 'grey', borderColor: '#9ca3af', bgColor: '#f3f4f6' }
+  ];
+
+  if (!legendInitialized) {
+    canvasLegendContainer.innerHTML = ''; // Clear once on init
+
+    tabs.forEach(tab => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = `legend-tab-${tab.id}`;
+      btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`;
+
+      // Default style
+      btn.style.color = tab.color;
+      btn.style.borderColor = tab.borderColor;
+      btn.style.fontFamily = 'var(--font-baumans)';
+      btn.textContent = tab.label;
+
+      // Interactivity
+      btn.addEventListener('mouseenter', () => {
+        hoveredLegendTab = tab.id;
+        updateLegendStyles();
+        redrawAllForHighlight();
+      });
+
+      btn.addEventListener('mouseleave', () => {
+        if (hoveredLegendTab === tab.id) {
+          hoveredLegendTab = null;
+          updateLegendStyles();
+          redrawAllForHighlight();
+        }
+      });
+
+      btn.addEventListener('click', () => {
+        if (selectedLegendTab === tab.id) {
+          selectedLegendTab = null; // Toggle off
+        } else {
+          selectedLegendTab = tab.id;
+        }
+        updateLegendStyles();
+        redrawAllForHighlight();
+      });
+
+      canvasLegendContainer.appendChild(btn);
+    });
+
+    legendInitialized = true;
+  }
+
+  updateLegendStyles();
+}
+
+function updateLegendStyles() {
+  if (!canvasLegendContainer) return;
+  const tabs = [
+    { id: 'cutline', bgColor: '#fee2e2' },
+    { id: 'box', bgColor: '#f3f4f6' }
+  ];
+
+  tabs.forEach(tab => {
+    const btn = document.getElementById(`legend-tab-${tab.id}`);
+    if (btn) {
+      const isActive = getActiveLineId() === tab.id;
+      if (isActive) {
+        btn.style.backgroundColor = tab.bgColor;
+      } else {
+        btn.style.backgroundColor = 'transparent';
+      }
+    }
+  });
+}
+
+function redrawAllForHighlight() {
+  // A lightweight redraw to just update the canvas decorations when hover state changes.
+  if (basePolygons.length > 0) {
+    // For SVG Vector Mode
+    const drawOffset = {
+      x: -currentBounds.left + 20,
+      y: -currentBounds.top + 20,
+    };
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawPolygonsToCanvas(currentPolygons, "black", drawOffset);
+    drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
+    drawCanvasDecorations(currentBounds, drawOffset);
+  } else if (originalImage) {
+    // For Raster Mode, we can just call drawCanvasDecorations which first restores the clean state
+    drawCanvasDecorations(currentBounds);
+  }
 }
 
 function drawRuler(bounds, offset = { x: 0, y: 0 }) {
@@ -1783,6 +1954,9 @@ function handleClearImage() {
 
   updateEditingButtonsState(true);
   calculateAndUpdatePrice();
+
+  // Hide legend on clear
+  renderLegend();
 
   if (clearFileBtn) clearFileBtn.classList.add("hidden");
   if (fileInputGlobalRef) fileInputGlobalRef.focus();
@@ -2510,6 +2684,10 @@ async function handleRemoteImageLoad(imageUrl) {
     calculateAndUpdatePrice();
     drawCanvasDecorations(currentBounds);
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
+
+    // Show Legend
+    renderLegend();
+
     showNotification("Design loaded! You can now adjust options.", "success");
   };
   img.onerror = () =>
@@ -2600,6 +2778,10 @@ async function loadProductForBuyer(productId) {
 
       calculateAndUpdatePrice();
       drawCanvasDecorations(currentBounds);
+
+      // Show Legend
+      renderLegend();
+
       showNotification("Design loaded!", "success");
     };
     img.crossOrigin = "Anonymous"; // Important for canvas manipulation if on different port
