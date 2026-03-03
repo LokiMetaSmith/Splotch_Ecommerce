@@ -56,7 +56,7 @@ export class LocalStorageProvider extends StorageProvider {
                 cb(null, this.uploadDir);
             },
             filename: (req, file, cb) => {
-                cb(null, randomUUID() + path.extname(file.originalname));
+                cb(null, file.fieldname + '-' + randomUUID() + path.extname(file.originalname));
             }
         });
     }
@@ -146,7 +146,7 @@ export class S3StorageProvider extends StorageProvider {
                 cb(null, this.tempDir);
             },
             filename: (req, file, cb) => {
-                cb(null, randomUUID() + path.extname(file.originalname));
+                cb(null, file.fieldname + '-' + randomUUID() + path.extname(file.originalname));
             }
         });
     }
