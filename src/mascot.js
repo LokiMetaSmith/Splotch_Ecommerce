@@ -102,6 +102,10 @@ if (mascotContainer && mascotImg && mascotText) {
     }
   });
 
+  document.addEventListener("mouseleave", () => {
+    mascotContainer.classList.remove("wiggle");
+  });
+
   // Drag and Drop Logic
   mascotContainer.setAttribute("draggable", true);
 
