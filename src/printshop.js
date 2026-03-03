@@ -120,6 +120,61 @@ function updateConnectionStatus(status) {
  * @param {ArrayBuffer} value The buffer to encode.
  * @returns {string} The encoded string.
  */
+
+/**
+ * Sets a button to a loading state with an inline spinner.
+ * @param {HTMLElement} btn - The button element.
+ * @param {boolean} isLoading - Whether the button is loading.
+ * @param {string} loadingText - Text to display while loading.
+ */
+function setButtonLoading(btn, isLoading, loadingText = 'Processing...') {
+    if (!btn) return;
+    if (isLoading) {
+        if (!btn.dataset.originalContent) {
+            btn.dataset.originalContent = btn.innerHTML;
+        }
+        btn.disabled = true;
+
+        // Save current width to prevent button from resizing when content changes
+        btn.style.width = `${btn.offsetWidth}px`;
+
+        // Add minimal classes just for the loading state, save old classes if needed
+        btn.dataset.originalClasses = btn.className;
+
+        // We add some classes for flex layout of the spinner, but we keep existing classes
+        // Note: Tailwind classes won't conflict if they aren't the same type, but to be safe,
+        // we just add inline-flex items-center justify-center if they aren't there.
+        const classesToAdd = ['opacity-75', 'cursor-not-allowed'];
+        if (!btn.classList.contains('flex') && !btn.classList.contains('inline-flex')) {
+            classesToAdd.push('inline-flex', 'items-center', 'justify-center');
+        }
+
+        btn.classList.add(...classesToAdd);
+        btn.dataset.addedClasses = JSON.stringify(classesToAdd);
+
+        btn.innerHTML = `
+            <svg class="animate-spin h-4 w-4 mr-2 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>${loadingText}</span>
+        `;
+    } else {
+        if (btn.dataset.originalContent) {
+            btn.innerHTML = btn.dataset.originalContent;
+            delete btn.dataset.originalContent;
+        }
+        btn.disabled = false;
+        btn.style.width = ''; // remove fixed width
+
+        if (btn.dataset.addedClasses) {
+            const addedClasses = JSON.parse(btn.dataset.addedClasses);
+            btn.classList.remove(...addedClasses);
+            delete btn.dataset.addedClasses;
+        }
+    }
+}
+
 function bufferEncode(value) {
     return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
         .replace(/\+/g, '-')
@@ -249,21 +304,23 @@ function logout() {
     const orderCards = ui.ordersList.querySelectorAll('.order-card');
     orderCards.forEach(card => card.remove());
 
-    ui.noOrdersMessage.textContent = 'Please log in to view orders.';
+    const noOrdersText = document.getElementById('no-orders-text');
+    if (noOrdersText) noOrdersText.textContent = 'Please log in to view orders.';
     ui.noOrdersMessage.style.display = 'block';
 }
 
 /**
  * Handles the WebAuthn (YubiKey) login flow.
  */
-async function handleWebAuthnLogin() {
+async function handleWebAuthnLogin(e) {
+    const btn = e ? (e.submitter || e.currentTarget || e.target.closest('button')) : ui.webauthnLoginBtn;
     const username = ui.usernameInput.value;
     if (!username) {
         showErrorToast('Please enter your username.');
         return;
     }
 
-    showLoadingIndicator();
+    setButtonLoading(btn, true, 'Authenticating...');
     try {
         const opts = await fetchWithAuth(`${serverUrl}/api/auth/login-options?username=${encodeURIComponent(username)}`);
 
@@ -304,11 +361,11 @@ async function handleWebAuthnLogin() {
         showErrorToast(`WebAuthn Login Failed: ${error.message}`);
         console.error(error);
     } finally {
-        hideLoadingIndicator();
+        setButtonLoading(btn, false);
     }
 }
 
-async function handleAddTracking(orderId) {
+async function handleAddTracking(orderId, btn) {
     const trackingNumber = document.getElementById(`tracking-number-${orderId}`).value;
     const courier = document.getElementById(`courier-${orderId}`).value;
 
@@ -317,7 +374,7 @@ async function handleAddTracking(orderId) {
         return;
     }
 
-    showLoadingIndicator();
+    setButtonLoading(btn, true, 'Saving...');
     try {
         await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/tracking`, {
             method: 'POST',
@@ -328,14 +385,15 @@ async function handleAddTracking(orderId) {
         showErrorToast(`Failed to add tracking info: ${error.message}`);
         console.error(error);
     } finally {
-        hideLoadingIndicator();
+        setButtonLoading(btn, false);
     }
 }
 
 /**
  * Handles the password login flow.
  */
-async function handlePasswordLogin() {
+async function handlePasswordLogin(e) {
+    const btn = e ? (e.submitter || e.currentTarget || e.target.closest('button')) : ui.passwordLoginBtn;
     const username = ui.usernameInput.value;
     const password = ui.passwordInput.value;
 
@@ -344,7 +402,7 @@ async function handlePasswordLogin() {
         return;
     }
 
-    showLoadingIndicator();
+    setButtonLoading(btn, true, 'Logging in...');
     try {
         const data = await fetchWithAuth(`${serverUrl}/api/auth/login`, {
             method: 'POST',
@@ -361,21 +419,22 @@ async function handlePasswordLogin() {
         showErrorToast(`Password Login Failed: ${error.message}`);
         console.error(error);
     } finally {
-        hideLoadingIndicator();
+        setButtonLoading(btn, false);
     }
 }
 
 /**
  * Handles the registration of a new WebAuthn credential.
  */
-async function handleRegistration() {
+async function handleRegistration(e) {
+    const btn = e ? (e.submitter || e.currentTarget || e.target.closest('button')) : ui.webauthnRegisterBtn;
     const username = ui.usernameInput.value;
     if (!username) {
         showErrorToast('Please enter a username to register a key.');
         return;
     }
 
-    showLoadingIndicator();
+    setButtonLoading(btn, true, 'Registering...');
     try {
         const opts = await fetchWithAuth(`${serverUrl}/api/auth/pre-register`, {
             method: 'POST',
@@ -409,7 +468,7 @@ async function handleRegistration() {
         showErrorToast(`Registration Failed: ${error.message}`);
         console.error(error);
     } finally {
-        hideLoadingIndicator();
+        setButtonLoading(btn, false);
     }
 }
 
@@ -455,14 +514,15 @@ function hideSuccessToast() {
 // --- Application Logic ---
 
 async function fetchAndDisplayOrders(query = '') {
+    const noOrdersText = document.getElementById('no-orders-text');
     if (!authToken) {
-        ui.noOrdersMessage.textContent = 'Please log in to view orders.';
+        if (noOrdersText) noOrdersText.textContent = 'Please log in to view orders.';
         updateConnectionStatus('idle');
         return;
     }
     showLoadingIndicator();
     updateConnectionStatus('connecting');
-    ui.noOrdersMessage.textContent = 'Loading orders...';
+    if (noOrdersText) noOrdersText.textContent = 'Loading orders...';
     ui.noOrdersMessage.style.display = 'block';
 
     try {
@@ -496,12 +556,14 @@ function filterAndDisplayOrders(status) {
         ? allOrders
         : allOrders.filter(order => order.status === status);
 
+    const noOrdersText = document.getElementById('no-orders-text');
+
     if (ordersToDisplay.length === 0) {
         // Clear orders but keep message
         ui.ordersList.innerHTML = '';
         ui.ordersList.appendChild(ui.noOrdersMessage);
 
-        ui.noOrdersMessage.textContent = `No orders found with status: ${status}.`;
+        if (noOrdersText) noOrdersText.textContent = `No orders found with status: ${status}.`;
         ui.noOrdersMessage.style.display = 'block';
     } else {
         ui.noOrdersMessage.style.display = 'none';
@@ -637,26 +699,34 @@ function handleOrderListClick(e) {
     if (actionBtn) {
         const orderId = actionBtn.dataset.orderId;
         const status = actionBtn.dataset.status;
-        updateOrderStatus(orderId, status);
+
+        if (status === 'CANCELED') {
+            const confirmed = window.confirm('Are you sure you want to cancel this order? This action cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+        }
+
+        updateOrderStatus(orderId, status, actionBtn);
         return;
     }
 
     const trackingBtn = e.target.closest('.add-tracking-btn');
     if (trackingBtn) {
         const orderId = trackingBtn.dataset.orderId;
-        handleAddTracking(orderId);
+        handleAddTracking(orderId, trackingBtn);
         return;
     }
 
     const timeLogBtn = e.target.closest('.log-time-btn');
     if (timeLogBtn) {
         const orderId = timeLogBtn.dataset.orderId;
-        handleTimeLog(orderId);
+        handleTimeLog(orderId, timeLogBtn);
         return;
     }
 }
 
-async function handleTimeLog(orderId) {
+async function handleTimeLog(orderId, btn) {
     const descInput = document.querySelector(`.time-log-desc[data-order-id="${orderId}"]`);
     const durInput = document.querySelector(`.time-log-duration[data-order-id="${orderId}"]`);
 
@@ -674,7 +744,7 @@ async function handleTimeLog(orderId) {
         return;
     }
 
-    showLoadingIndicator();
+    setButtonLoading(btn, true, 'Logging...');
     try {
         await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/time-log`, {
             method: 'POST',
@@ -686,7 +756,7 @@ async function handleTimeLog(orderId) {
     } catch (err) {
         showErrorToast(`Failed to log time: ${err.message}`);
     } finally {
-        hideLoadingIndicator();
+        setButtonLoading(btn, false);
     }
 }
 
@@ -695,10 +765,10 @@ async function handleTimeLog(orderId) {
  * @param {string} orderId The ID of the order to update.
  * @param {string} newStatus The new status for the order.
  */
-async function updateOrderStatus(orderId, newStatus) {
-    showLoadingIndicator();
+async function updateOrderStatus(orderId, newStatus, btn) {
+    setButtonLoading(btn, true, 'Updating...');
     try {
-        const updatedOrder = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
+        await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
             method: 'POST',
             body: JSON.stringify({ status: newStatus }),
         });
@@ -719,7 +789,7 @@ async function updateOrderStatus(orderId, newStatus) {
         showErrorToast(`Update Failed: ${error.message}`);
         console.error(error);
     } finally {
-        hideLoadingIndicator();
+        setButtonLoading(btn, false);
     }
 }
 
@@ -734,8 +804,9 @@ async function handleSearch() {
     fetchAndDisplayOrders(query);
 }
 
-async function handleNesting() {
-    showLoadingIndicator();
+async function handleNesting(e) {
+    const btn = e ? (e.currentTarget || e.target.closest('button')) : ui.nestStickersBtn;
+    setButtonLoading(btn, true, 'Nesting...');
     ui.nestedSvgContainer.innerHTML = '<p>Nesting in progress...</p>';
 
     const svgElements = Array.from(ui.ordersList.querySelectorAll('.sticker-design'));
@@ -838,7 +909,7 @@ async function handleNesting() {
         showErrorToast(`Nesting failed: ${error.message}`);
         console.error(error);
     } finally {
-        hideLoadingIndicator();
+        setButtonLoading(btn, false);
     }
 }
 
@@ -947,7 +1018,8 @@ async function renderMaterialMapping(currentMappings) {
 
 async function saveOdooConfig(e) {
     e.preventDefault();
-    showLoadingIndicator();
+    const btn = e.submitter || document.getElementById('save-odoo-config-btn');
+    setButtonLoading(btn, true, 'Saving...');
 
     const url = document.getElementById('odoo-url').value;
     const db = document.getElementById('odoo-db').value;
@@ -979,13 +1051,15 @@ async function saveOdooConfig(e) {
     } catch (error) {
         showErrorToast(`Failed to save config: ${error.message}`);
     } finally {
-        hideLoadingIndicator();
+        setButtonLoading(btn, false);
     }
 }
 
-async function testOdooConnection() {
+async function testOdooConnection(e) {
+    const btn = e ? (e.currentTarget || e.target.closest('button')) : document.getElementById('test-odoo-btn');
+    setButtonLoading(btn, true, 'Testing...');
     const resultSpan = document.getElementById('test-connection-result');
-    resultSpan.textContent = 'Testing...';
+    resultSpan.textContent = '';
     resultSpan.className = 'text-sm font-bold text-gray-500';
 
     try {
@@ -1000,6 +1074,8 @@ async function testOdooConnection() {
     } catch (error) {
         resultSpan.textContent = `Error: ${error.message}`;
         resultSpan.className = 'text-sm font-bold text-red-600';
+    } finally {
+        setButtonLoading(btn, false);
     }
 }
 
@@ -1105,7 +1181,7 @@ export async function init() {
     ui.closeModalBtn?.addEventListener('click', hideLoginModal);
     ui.loginForm?.addEventListener('submit', (e) => {
         e.preventDefault();
-        handlePasswordLogin();
+        handlePasswordLogin(e);
     });
     ui.webauthnLoginBtn?.addEventListener('click', handleWebAuthnLogin);
     ui.webauthnRegisterBtn?.addEventListener('click', handleRegistration);

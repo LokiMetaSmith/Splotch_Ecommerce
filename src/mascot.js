@@ -57,6 +57,8 @@ if (mascotContainer && mascotImg && mascotText) {
     "Don't forget to save!",
   ];
 
+  let clickCount = 0;
+
   function updateMascotMessage() {
     const randomMessage = messages[Math.floor(Math.random() * messages.length)];
     mascotText.textContent = randomMessage;
@@ -67,6 +69,12 @@ if (mascotContainer && mascotImg && mascotText) {
 
   function triggerMascotAction() {
     updateMascotMessage();
+
+    clickCount++;
+    if (clickCount === 5) {
+      document.dispatchEvent(new CustomEvent("easterEggUnlocked"));
+    }
+
     mascotContainer.classList.remove("wiggle");
     // Visual feedback for click/keyboard activation
     mascotContainer.style.transform = "scale(1.2) rotate(0deg)";
@@ -100,6 +108,10 @@ if (mascotContainer && mascotImg && mascotText) {
     } else {
       mascotContainer.classList.remove("wiggle");
     }
+  });
+
+  document.addEventListener("mouseleave", () => {
+    mascotContainer.classList.remove("wiggle");
   });
 
   // Drag and Drop Logic

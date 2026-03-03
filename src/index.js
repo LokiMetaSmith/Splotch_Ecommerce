@@ -12,6 +12,7 @@ import {
   imageHasTransparentBorder,
   filterInternalContours,
 } from "./lib/image-processing.js";
+import { showNotification } from "./notifications.js";
 
 // index.js
 
@@ -36,6 +37,11 @@ let pricingConfig = null;
 let inventoryCache = {}; // Cache for Odoo inventory
 let isGrayscale = false;
 let isSepia = false;
+let easterEggUnlocked = false;
+
+// Legend state
+let hoveredLegendTab = null;
+let selectedLegendTab = null;
 
 let textInput,
   textSizeInput,
@@ -47,7 +53,9 @@ let textInput,
   cutlineOffsetSlider,
   cutlineOffsetValueDisplay,
   cutlineSensitivitySlider,
-  cutlineSensitivityValueDisplay;
+  cutlineSensitivityValueDisplay,
+  lazyLassoSlider,
+  lazyLassoValueDisplay;
 let cutlineSensitivity = 10; // Default sensitivity
 let stickerMaterialSelect,
   stickerResolutionSelect,
@@ -70,6 +78,7 @@ let rotateLeftBtnEl,
 let submitPaymentBtn;
 let widthDisplayEl, heightDisplayEl;
 let canvasPlaceholder;
+let canvasLegendContainer;
 
 let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
@@ -80,6 +89,21 @@ let cutlineOffset = 10; // Default offset
 let lastCalculatedPerimeter = 0;
 let lastCalculatedPerimeterCutlineRef = null;
 
+// Helper to get active line interaction state
+function getActiveLineId() {
+  return hoveredLegendTab || selectedLegendTab;
+}
+
+function getConstantLineWidth(basePx = 1.5) {
+  if (!canvas || canvas.clientWidth === 0) return basePx;
+
+  // The actual scale factor between the canvas logical pixels and the
+  // physical CSS pixels it occupies on the screen.
+  const scale = canvas.width / canvas.clientWidth;
+
+  return basePx * scale;
+}
+
 function getPolygonsBounds(polygons) {
   if (!polygons || polygons.length === 0) {
     return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
@@ -89,11 +113,22 @@ function getPolygonsBounds(polygons) {
   let maxX = -Infinity;
   let maxY = -Infinity;
 
-  polygons.forEach((poly) => {
-    poly.forEach((pt) => {
-      // Handle both case styles safely
-      const x = pt.x !== undefined ? pt.x : pt.X;
-      const y = pt.y !== undefined ? pt.y : pt.Y;
+  // Bolt Optimization: Replace nested forEach with standard for-loops.
+  // This avoids function call overhead and significantly speeds up bounds calculation
+  // without sacrificing readability or relying on complex loop unrolling.
+  for (let i = 0, len = polygons.length; i < len; i++) {
+    const poly = polygons[i];
+    if (!poly) continue;
+
+    for (let j = 0, plen = poly.length; j < plen; j++) {
+      const pt = poly[j];
+
+      // Inline case handling, prioritizing standard lowercase keys
+      let x = pt.x;
+      let y = pt.y;
+
+      if (x === undefined) x = pt.X;
+      if (y === undefined) y = pt.Y;
 
       if (x !== undefined && y !== undefined) {
         if (x < minX) minX = x;
@@ -101,8 +136,8 @@ function getPolygonsBounds(polygons) {
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
       }
-    });
-  });
+    }
+  }
 
   if (minX === Infinity) {
     return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
@@ -168,6 +203,7 @@ async function BootStrap() {
 
   widthDisplayEl = document.getElementById("widthDisplay");
   heightDisplayEl = document.getElementById("heightDisplay");
+  canvasLegendContainer = document.getElementById("canvas-legend");
 
   rotateLeftBtnEl = document.getElementById("rotateLeftBtn");
   rotateRightBtnEl = document.getElementById("rotateRightBtn");
@@ -182,6 +218,8 @@ async function BootStrap() {
   cutlineOffsetValueDisplay = document.getElementById("cutlineOffsetValue");
   cutlineSensitivitySlider = document.getElementById("cutlineSensitivitySlider");
   cutlineSensitivityValueDisplay = document.getElementById("cutlineSensitivityValue");
+  lazyLassoSlider = document.getElementById("lazyLassoSlider");
+  lazyLassoValueDisplay = document.getElementById("lazyLassoValue");
 
   // Fetch CSRF token and pricing info
   await Promise.all([fetchCsrfToken(), fetchPricingInfo(), fetchInventory()]);
@@ -365,6 +403,22 @@ async function BootStrap() {
 
     // Trigger regeneration only on change (mouse up) to avoid lag
     cutlineSensitivitySlider.addEventListener("change", () => {
+        if (originalImage && rasterCutlinePoly) {
+            handleGenerateCutline();
+        }
+    });
+  }
+
+  if (lazyLassoSlider) {
+    // Update value display immediately
+    lazyLassoSlider.addEventListener("input", (e) => {
+        if (lazyLassoValueDisplay) {
+            lazyLassoValueDisplay.textContent = e.target.value;
+        }
+    });
+
+    // Trigger regeneration only on change (mouse up) to avoid lag
+    lazyLassoSlider.addEventListener("change", () => {
         if (originalImage && rasterCutlinePoly) {
             handleGenerateCutline();
         }
@@ -657,6 +711,46 @@ async function BootStrap() {
       "error",
     );
   }
+
+  // Easter egg listener
+  document.addEventListener("easterEggUnlocked", () => {
+    if (!easterEggUnlocked) {
+      easterEggUnlocked = true;
+
+      // Attempt to find elements again if globals are null
+      const grayBtn = document.getElementById("grayscaleBtn");
+      const sepBtn = document.getElementById("sepiaBtn");
+      const textContainer = document.getElementById("text-editing-controls");
+
+      if (grayBtn) {
+          grayBtn.style.display = "block";
+          grayBtn.classList.remove("lg:hidden", "xl:block");
+      }
+      if (sepBtn) {
+          sepBtn.style.display = "block";
+          sepBtn.classList.remove("lg:hidden", "xl:block");
+      }
+
+      const isDisabled = (!originalImage && basePolygons.length === 0);
+      if (textContainer) {
+        if (isDisabled) {
+          textContainer.hidden = true;
+          textContainer.setAttribute('hidden', '');
+          textContainer.style.display = "none";
+        } else {
+          textContainer.hidden = false;
+          textContainer.removeAttribute('hidden');
+          textContainer.style.display = "block";
+          // Also need to clear any inline style preventing display
+          textContainer.style.cssText = textContainer.style.cssText.replace(/display:\s*none;?/g, '');
+        }
+      }
+
+      updateEditingButtonsState(isDisabled);
+
+      showNotification("Secret features unlocked! 🎨", "success");
+    }
+  });
 
   // Initial UI state
   if (!productIdParam) {
@@ -1306,8 +1400,43 @@ function updateEditingButtonsState(disabled) {
   });
   if (designMarginNote)
     designMarginNote.style.display = disabled ? "none" : "block";
-  if (textEditingControlsContainer)
-    textEditingControlsContainer.hidden = disabled;
+  const textContainer = document.getElementById("text-editing-controls");
+  if (textContainer) {
+    if (!easterEggUnlocked) {
+      textContainer.hidden = true;
+      textContainer.setAttribute('hidden', '');
+      textContainer.style.display = "none";
+    } else {
+      if (disabled) {
+        textContainer.hidden = true;
+        textContainer.setAttribute('hidden', '');
+        textContainer.style.display = "none";
+      } else {
+        textContainer.hidden = false;
+        textContainer.removeAttribute('hidden');
+        textContainer.style.display = "block";
+        textContainer.style.cssText = textContainer.style.cssText.replace(/display:\s*none;?/g, '');
+      }
+    }
+  }
+
+  // Update styles for filter buttons based on easterEggUnlocked
+  const grayBtn = document.getElementById("grayscaleBtn");
+  const sepBtn = document.getElementById("sepiaBtn");
+
+  if (!easterEggUnlocked) {
+      if (grayBtn) grayBtn.style.display = "none";
+      if (sepBtn) sepBtn.style.display = "none";
+  } else {
+      if (grayBtn) {
+          grayBtn.style.display = "block";
+          grayBtn.classList.remove("lg:hidden", "xl:block");
+      }
+      if (sepBtn) {
+          sepBtn.style.display = "block";
+          sepBtn.classList.remove("lg:hidden", "xl:block");
+      }
+  }
   if (canvasPlaceholder)
     canvasPlaceholder.style.display = disabled ? "flex" : "none";
 }
@@ -1380,7 +1509,7 @@ function loadFileAsImage(file) {
       handleSvgUpload(e.target.result);
     };
     reader.onerror = () =>
-      showPaymentStatus("Error reading SVG file.", "error");
+      showNotification("Error reading SVG file.", "error");
     reader.readAsText(file);
   } else if (file.type.startsWith("image/")) {
     // Reset vector state
@@ -1394,7 +1523,7 @@ function loadFileAsImage(file) {
         originalImage = img;
         updateEditingButtonsState(false);
         if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-        showPaymentStatus("Image loaded successfully.", "success");
+        showNotification("Image loaded successfully.", "success");
         let newWidth = img.width,
           newHeight = img.height;
         if (canvas && ctx) {
@@ -1443,16 +1572,19 @@ function loadFileAsImage(file) {
               if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
             }
           }
+
+          // Show the legend tabs since an image is loaded
+          renderLegend();
         }
       };
       img.onerror = () =>
-        showPaymentStatus("Error loading image data.", "error");
+        showNotification("Error loading image data.", "error");
       img.src = reader.result;
     };
-    reader.onerror = () => showPaymentStatus("Error reading file.", "error");
+    reader.onerror = () => showNotification("Error reading file.", "error");
     reader.readAsDataURL(file);
   } else {
-    showPaymentStatus(
+    showNotification(
       "Invalid file type. Please select an image or SVG file.",
       "error",
     );
@@ -1552,18 +1684,40 @@ function handleSvgUpload(svgText) {
     redrawAll();
 
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-    showPaymentStatus("SVG processed and cutline generated.", "success");
+    showNotification("SVG processed and cutline generated.", "success");
     updateEditingButtonsState(false); // Enable editing buttons
+
+    // Show legend since SVG is loaded
+    renderLegend();
   } catch (error) {
-    showPaymentStatus(`SVG Processing Error: ${error.message}`, "error");
+    showNotification(`SVG Processing Error: ${error.message}`, "error");
     console.error(error);
   }
 }
 
 const scaledPolyCache = new WeakMap();
 
-function generateCutLine(polygons, offset) {
+function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
   const scale = 100; // Scale for integer precision
+
+  // Determine current PPI from UI state to convert real-world values to image pixels
+  let ppi = 300; // Default fallback
+  if (typeof pricingConfig !== 'undefined' && pricingConfig && typeof stickerResolutionSelect !== 'undefined' && stickerResolutionSelect) {
+      const selectedRes = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value);
+      if (selectedRes) {
+          ppi = selectedRes.ppi;
+      }
+  }
+
+  // Convert raw values (which the slider outputs, presumably representing something like 0.1mm increments)
+  // Let's assume the slider values represent 0.1mm (so slider value 10 = 1mm).
+  // Then physical offset in mm is (sliderValue / 10).
+  const offsetMm = rawOffset / 10;
+  const lazyRadiusMm = rawLazyRadius / 10;
+
+  // Convert mm to logical pixels using the current PPI
+  const offsetPx = (offsetMm / 25.4) * ppi;
+  const lazyRadiusPx = (lazyRadiusMm / 25.4) * ppi;
 
   let scaledPolygons;
   // Bolt Optimization: Memoize scaled polygons to avoid O(N) allocation on every slider update.
@@ -1577,18 +1731,36 @@ function generateCutLine(polygons, offset) {
     scaledPolyCache.set(polygons, scaledPolygons);
   }
 
-  const co = new ClipperLib.ClipperOffset();
-  const offsetted_paths = new ClipperLib.Paths();
+  let final_paths;
 
-  co.AddPaths(
-    scaledPolygons,
-    ClipperLib.JoinType.jtRound,
-    ClipperLib.EndType.etClosedPolygon,
-  );
-  co.Execute(offsetted_paths, offset * scale);
+  if (lazyRadiusPx > 0) {
+    // 1. Dilate to bridge gaps
+    const co1 = new ClipperLib.ClipperOffset();
+    const expanded_paths = new ClipperLib.Paths();
+    co1.AddPaths(scaledPolygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co1.Execute(expanded_paths, lazyRadiusPx * scale);
+
+    // 2. Erode to return to the original boundary but with closed gaps
+    const co2 = new ClipperLib.ClipperOffset();
+    const shrunk_paths = new ClipperLib.Paths();
+    co2.AddPaths(expanded_paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co2.Execute(shrunk_paths, -lazyRadiusPx * scale);
+
+    // 3. Apply the actual requested cutline offset
+    const co3 = new ClipperLib.ClipperOffset();
+    final_paths = new ClipperLib.Paths();
+    co3.AddPaths(shrunk_paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co3.Execute(final_paths, offsetPx * scale);
+  } else {
+    // Normal single-pass offset
+    const co = new ClipperLib.ClipperOffset();
+    final_paths = new ClipperLib.Paths();
+    co.AddPaths(scaledPolygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co.Execute(final_paths, offsetPx * scale);
+  }
 
   // Scale back down
-  const cutline = offsetted_paths.map((p) => {
+  const cutline = final_paths.map((p) => {
     return p.map((point) => ({ x: point.X / scale, y: point.Y / scale }));
   });
 
@@ -1603,6 +1775,7 @@ function drawPolygonsToCanvas(
 ) {
   if (!ctx || polygons.length === 0) return;
 
+  ctx.save();
   // Bolt Optimization: Batch all polygons into a single path to reduce draw calls
   ctx.beginPath();
 
@@ -1617,15 +1790,36 @@ function drawPolygonsToCanvas(
   });
 
   if (stroke) {
+    // Determine active state for legend highlighting
+    const activeLineId = getActiveLineId();
+    const isCutlineActive = activeLineId === 'cutline';
+    const isOtherActive = activeLineId && !isCutlineActive;
+
     ctx.strokeStyle = style;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 4]); // Make the cutline dashed
+
+    // Constant hairline width
+    const baseLineWidth = getConstantLineWidth(isCutlineActive ? 3.0 : 1.5);
+    ctx.lineWidth = baseLineWidth;
+
+    if (isOtherActive) {
+      ctx.globalAlpha = 0.3; // Dim when another line is selected
+    } else {
+      ctx.globalAlpha = 1.0;
+    }
+
+    if (isCutlineActive) {
+      ctx.setLineDash([]); // Solid when highlighted
+    } else {
+      ctx.setLineDash([getConstantLineWidth(4), getConstantLineWidth(4)]); // Make the cutline dashed
+    }
+
     ctx.stroke();
     ctx.setLineDash([]); // Reset for other drawing operations
   } else {
     ctx.fillStyle = style;
     ctx.fill();
   }
+  ctx.restore();
 }
 
 function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
@@ -1654,16 +1848,33 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
 
   ctx.save();
 
+  const activeLineId = getActiveLineId();
+  const isBoxActive = activeLineId === 'box';
+  const isOtherActive = activeLineId && !isBoxActive;
+
   // The user wanted a grey box with 1-inch dashes for pricing.
   // The previous implementation calculated a dash length from PPI, which was often
   // too large to be visible on smaller images. A fixed dash pattern is more reliable.
 
   // Set color to grey as requested.
   ctx.strokeStyle = "rgba(128, 128, 128, 0.9)"; // A strong, visible grey
-  ctx.lineWidth = 2; // A clean, visible line width
+
+  // Constant hairline width
+  const baseLineWidth = getConstantLineWidth(isBoxActive ? 3.0 : 2.0);
+  ctx.lineWidth = baseLineWidth;
+
+  if (isOtherActive) {
+    ctx.globalAlpha = 0.3;
+  } else {
+    ctx.globalAlpha = 1.0;
+  }
 
   // Use a fixed dash pattern that is visible at most scales.
-  ctx.setLineDash([10, 5]);
+  if (isBoxActive) {
+    ctx.setLineDash([]); // Solid when active
+  } else {
+    ctx.setLineDash([getConstantLineWidth(10), getConstantLineWidth(5)]);
+  }
 
   // Stroke is centered on the path, so we offset by half the line width to keep it inside/visible
   // especially when bounds are at (0,0) of the canvas.
@@ -1718,6 +1929,111 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
   ctx.restore();
 }
 
+let legendInitialized = false;
+
+function renderLegend() {
+  if (!canvasLegendContainer) return;
+
+  // Only show if there's an image or svg loaded
+  if (!originalImage && basePolygons.length === 0) {
+    canvasLegendContainer.style.display = 'none';
+    return;
+  }
+
+  canvasLegendContainer.style.display = 'flex';
+
+  const tabs = [
+    { id: 'cutline', label: 'Cutline', color: 'red', borderColor: '#ef4444', bgColor: '#fee2e2' },
+    { id: 'box', label: 'Bounding Box', color: 'grey', borderColor: '#9ca3af', bgColor: '#f3f4f6' }
+  ];
+
+  if (!legendInitialized) {
+    canvasLegendContainer.innerHTML = ''; // Clear once on init
+
+    tabs.forEach(tab => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = `legend-tab-${tab.id}`;
+      btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`;
+
+      // Default style
+      btn.style.color = tab.color;
+      btn.style.borderColor = tab.borderColor;
+      btn.style.fontFamily = 'var(--font-baumans)';
+      btn.textContent = tab.label;
+
+      // Interactivity
+      btn.addEventListener('mouseenter', () => {
+        hoveredLegendTab = tab.id;
+        updateLegendStyles();
+        redrawAllForHighlight();
+      });
+
+      btn.addEventListener('mouseleave', () => {
+        if (hoveredLegendTab === tab.id) {
+          hoveredLegendTab = null;
+          updateLegendStyles();
+          redrawAllForHighlight();
+        }
+      });
+
+      btn.addEventListener('click', () => {
+        if (selectedLegendTab === tab.id) {
+          selectedLegendTab = null; // Toggle off
+        } else {
+          selectedLegendTab = tab.id;
+        }
+        updateLegendStyles();
+        redrawAllForHighlight();
+      });
+
+      canvasLegendContainer.appendChild(btn);
+    });
+
+    legendInitialized = true;
+  }
+
+  updateLegendStyles();
+}
+
+function updateLegendStyles() {
+  if (!canvasLegendContainer) return;
+  const tabs = [
+    { id: 'cutline', bgColor: '#fee2e2' },
+    { id: 'box', bgColor: '#f3f4f6' }
+  ];
+
+  tabs.forEach(tab => {
+    const btn = document.getElementById(`legend-tab-${tab.id}`);
+    if (btn) {
+      const isActive = getActiveLineId() === tab.id;
+      if (isActive) {
+        btn.style.backgroundColor = tab.bgColor;
+      } else {
+        btn.style.backgroundColor = 'transparent';
+      }
+    }
+  });
+}
+
+function redrawAllForHighlight() {
+  // A lightweight redraw to just update the canvas decorations when hover state changes.
+  if (basePolygons.length > 0) {
+    // For SVG Vector Mode
+    const drawOffset = {
+      x: -currentBounds.left + 20,
+      y: -currentBounds.top + 20,
+    };
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawPolygonsToCanvas(currentPolygons, "black", drawOffset);
+    drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
+    drawCanvasDecorations(currentBounds, drawOffset);
+  } else if (originalImage) {
+    // For Raster Mode, we can just call drawCanvasDecorations which first restores the clean state
+    drawCanvasDecorations(currentBounds);
+  }
+}
+
 function drawRuler(bounds, offset = { x: 0, y: 0 }) {
   if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
   const ppi =
@@ -1729,7 +2045,7 @@ function drawRuler(bounds, offset = { x: 0, y: 0 }) {
 
 function handleAddText() {
   if (!canvas || !ctx || !originalImage) {
-    showPaymentStatus("Please load an image before adding text.", "error");
+    showNotification("Please load an image before adding text.", "error");
     return;
   }
   const text = textInput.value;
@@ -1737,7 +2053,7 @@ function handleAddText() {
   const color = textColorInput.value;
   const font = textFontFamilySelect.value;
   if (!text.trim() || isNaN(size) || size <= 0) {
-    showPaymentStatus("Please enter valid text and size.", "error");
+    showNotification("Please enter valid text and size.", "error");
     return;
   }
   ctx.font = `${size}px ${font}`;
@@ -1745,7 +2061,7 @@ function handleAddText() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-  showPaymentStatus(`Text "${text}" added.`, "success");
+  showNotification(`Text "${text}" added.`, "success");
 }
 
 function handleClearImage() {
@@ -1772,13 +2088,17 @@ function handleClearImage() {
   updateEditingButtonsState(true);
   calculateAndUpdatePrice();
 
+  // Hide legend on clear
+  renderLegend();
+
   if (clearFileBtn) clearFileBtn.classList.add("hidden");
-  showPaymentStatus("Image removed.", "info");
+  if (fileInputGlobalRef) fileInputGlobalRef.focus();
+  showNotification("Image removed.", "info");
 }
 
 function handleResetImage() {
   if (!originalImage && basePolygons.length === 0) {
-    showPaymentStatus("Nothing to reset.", "info");
+    showNotification("Nothing to reset.", "info");
     return;
   }
 
@@ -1863,13 +2183,13 @@ function handleResetImage() {
 
       calculateAndUpdatePrice();
       drawCanvasDecorations(currentBounds);
-      showPaymentStatus("Image reset to original.", "success");
+      showNotification("Image reset to original.", "success");
     }
   } else if (basePolygons.length > 0) {
     // SVG Reset
     currentPolygons = basePolygons;
     redrawAll();
-    showPaymentStatus("Image reset to original.", "success");
+    showNotification("Image reset to original.", "success");
   }
 }
 
@@ -2074,7 +2394,7 @@ function toggleSepiaFilter() {
 
 function handleStandardResize(targetInches) {
   if (!pricingConfig || (!originalImage && basePolygons.length === 0)) {
-    showPaymentStatus("Please load an image first.", "error");
+    showNotification("Please load an image first.", "error");
     return;
   }
 
@@ -2194,7 +2514,7 @@ function handleStandardResize(targetInches) {
 
 function handleGenerateCutline() {
   if (!canvas || !ctx || !originalImage) {
-    showPaymentStatus(
+    showNotification(
       "Smart cutline requires a raster image (PNG, JPG). Please upload one.",
       "error",
     );
@@ -2213,7 +2533,7 @@ function handleGenerateCutline() {
     }
   }
 
-  showPaymentStatus("Generating smart cutline...", "info");
+  showNotification("Generating smart cutline...", "info");
 
   // START LOADING STATE
   const btn = document.getElementById("generateCutlineBtn");
@@ -2236,6 +2556,9 @@ function handleGenerateCutline() {
     canvas.width,
     canvas.height,
   );
+
+  const lazyLassoSlider = document.getElementById("lazyLassoSlider");
+  const lazyLassoRadius = lazyLassoSlider ? parseInt(lazyLassoSlider.value, 10) : 0;
 
   // Use a timeout to allow the UI to update before the heavy computation
   setTimeout(() => {
@@ -2333,7 +2656,7 @@ function handleGenerateCutline() {
       })));
 
       // Generate the cutline immediately
-      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, lazyLassoRadius);
       currentCutline = cutline;
       currentBounds = getPolygonsBounds(cutline);
 
@@ -2343,11 +2666,11 @@ function handleGenerateCutline() {
       drawCanvasDecorations(currentBounds);
 
       calculateAndUpdatePrice();
-      showPaymentStatus("Smart cutline generated successfully.", "success");
+      showNotification("Smart cutline generated successfully.", "success");
     } catch (error) {
       // Restore the original canvas if the process failed
       ctx.putImageData(originalCanvasData, 0, 0);
-      showPaymentStatus(`Error: ${error.message}`, "error");
+      showNotification(`Error: ${error.message}`, "error");
       console.error(error);
     } finally {
       // RESTORE BUTTON STATE
@@ -2385,7 +2708,7 @@ async function handleCreateProduct() {
   const profitCents = Math.round(parseFloat(profitInput) * 100);
 
   if (!name || isNaN(profitCents)) {
-    alert("Please enter a valid name and profit amount.");
+    showNotification("Please enter a valid name and profit amount.", "error");
     return;
   }
 
@@ -2397,7 +2720,7 @@ async function handleCreateProduct() {
   // 1. Get auth token
   const token = localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
   if (!token) {
-    alert("You must be logged in to sell designs.");
+    showNotification("You must be logged in to sell designs.", "error");
     return;
   }
 
@@ -2451,14 +2774,15 @@ async function handleCreateProduct() {
     document.getElementById("productLinkInput").value = link;
     document.getElementById("productLinkContainer").classList.remove("hidden");
     document.getElementById("createProductBtn").classList.add("hidden"); // Prevent double click
+    document.getElementById("copyLinkBtn")?.focus();
   } catch (error) {
     console.error(error);
-    alert("Failed to create product: " + error.message);
+    showNotification("Failed to create product: " + error.message, "error");
   }
 }
 
 async function handleRemoteImageLoad(imageUrl) {
-  showPaymentStatus("Loading your previous design...", "info");
+  showNotification("Loading your previous design...", "info");
   const img = new Image();
   img.crossOrigin = "Anonymous";
   img.onload = () => {
@@ -2496,17 +2820,21 @@ async function handleRemoteImageLoad(imageUrl) {
     calculateAndUpdatePrice();
     drawCanvasDecorations(currentBounds);
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-    showPaymentStatus("Design loaded! You can now adjust options.", "success");
+
+    // Show Legend
+    renderLegend();
+
+    showNotification("Design loaded! You can now adjust options.", "success");
   };
   img.onerror = () =>
-    showPaymentStatus("Failed to load design image.", "error");
+    showNotification("Failed to load design image.", "error");
   img.src = decodeURIComponent(imageUrl);
 }
 
 async function loadProductForBuyer(productId) {
   try {
     currentProductId = productId;
-    showPaymentStatus("Loading product design...", "info");
+    showNotification("Loading product design...", "info");
 
     const response = await fetch(`${serverUrl}/api/products/${productId}`);
     if (!response.ok) throw new Error("Product not found");
@@ -2586,12 +2914,16 @@ async function loadProductForBuyer(productId) {
 
       calculateAndUpdatePrice();
       drawCanvasDecorations(currentBounds);
-      showPaymentStatus("Design loaded!", "success");
+
+      // Show Legend
+      renderLegend();
+
+      showNotification("Design loaded!", "success");
     };
     img.crossOrigin = "Anonymous"; // Important for canvas manipulation if on different port
     img.src = product.designImagePath;
   } catch (error) {
     console.error(error);
-    showPaymentStatus("Failed to load product.", "error");
+    showNotification("Failed to load product.", "error");
   }
 }

@@ -58,7 +58,7 @@ describe('Username Validation', () => {
   };
 
   it('should accept valid usernames', async () => {
-    const validUsernames = ['testuser', 'valid_user', 'user-name', 'User123', 'short'];
+    const validUsernames = ['testuser', 'valid_user', 'user-name', 'User123', 'short', 'test@testing.com', 'user.name@example.co.uk'];
     for (const username of validUsernames) {
       const res = await register(username);
       expect(res.statusCode).toBe(200);
@@ -68,31 +68,25 @@ describe('Username Validation', () => {
   it('should reject usernames that are too short', async () => {
     const res = await register('ab');
     expect(res.statusCode).toBe(400);
-    expect(res.body.errors[0].msg).toContain('Username must be between 3 and 30 characters');
+    expect(res.body.errors[0].msg).toContain('Username must be between 3 and 255 characters');
   });
 
   it('should reject usernames that are too long', async () => {
-    const res = await register('a'.repeat(31));
+    const res = await register('a'.repeat(256));
     expect(res.statusCode).toBe(400);
-    expect(res.body.errors[0].msg).toContain('Username must be between 3 and 30 characters');
+    expect(res.body.errors[0].msg).toContain('Username must be between 3 and 255 characters');
   });
 
   it('should reject usernames with invalid characters (space)', async () => {
     const res = await register('user name');
     expect(res.statusCode).toBe(400);
-    expect(res.body.errors[0].msg).toContain('Username can only contain letters, numbers, underscores, and hyphens');
-  });
-
-  it('should reject usernames with invalid characters (@)', async () => {
-    const res = await register('user@name');
-    expect(res.statusCode).toBe(400);
-    expect(res.body.errors[0].msg).toContain('Username can only contain letters, numbers, underscores, and hyphens');
+    expect(res.body.errors[0].msg).toContain('Username can only contain letters, numbers, underscores, hyphens, @, and periods');
   });
 
   it('should reject usernames with HTML tags', async () => {
     const res = await register('<h1>hack</h1>');
     expect(res.statusCode).toBe(400);
-    expect(res.body.errors[0].msg).toContain('Username can only contain letters, numbers, underscores, and hyphens');
+    expect(res.body.errors[0].msg).toContain('Username can only contain letters, numbers, underscores, hyphens, @, and periods');
   });
 
   it('should reject prototype pollution keys', async () => {

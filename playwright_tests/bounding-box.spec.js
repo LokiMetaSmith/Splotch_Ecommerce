@@ -49,7 +49,7 @@ test('bounding box is visible when scaling image', async ({ page }) => {
   await page.locator('input[type="file"][id="file"]').setInputFiles(filePath);
 
   // Wait for the success message to confirm processing started/finished
-  const statusContainer = page.locator('#payment-status-container');
+  const statusContainer = page.locator('.message-content');
   await expect(statusContainer).toContainText('Image loaded successfully', { timeout: 10000 });
   console.log('[TEST] Image loaded successfully message detected.');
 

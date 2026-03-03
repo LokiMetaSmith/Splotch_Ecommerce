@@ -1,291 +1,685 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Print Shop - Order Dashboard</title>
-    <link rel="icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" href="/favicon.png" type="image/png">
-    <link rel="apple-touch-icon" href="/favicon192.png">
-    <link href="./styles.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/favicon192.png" />
+    <link href="./styles.css" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        body { font-family: 'Baumans', sans-serif; }
-        h1, h2, h3 { font-family: 'Modak', cursive; }
-        .order-card {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-            background-color: #f9f9f9;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: all 0.3s ease-in-out;
-        }
-        .order-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-        .sticker-peel-container {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 5px;
-            background: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-            border-radius: 2px;
-            transition: all 0.3s cubic-bezier(.25,.8,.25,1);
-            transform-origin: center;
-        }
-        .sticker-peel-container:hover {
-            box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
-            transform: scale(1.05) rotate(-2deg);
-            z-index: 10;
-        }
-        .order-card img.sticker-design {
-            max-width: 200px;
-            max-height: 200px;
-            display: block;
-        }
-        .order-details dt { font-weight: bold; }
-        .order-details dd { margin-left: 0; margin-bottom: 0.5em; }
-        .filter-btn {
-            background-color: #e2e8f0;
-            color: #4a5568;
-            transition: all 0.2s ease-in-out;
-        }
-        .filter-btn:hover {
-            background-color: #cbd5e0;
-        }
-        /* Specific active states matching status colors - Darker shades for WCAG AA contrast (>4.5:1) with white text */
-        .filter-btn[data-status="ALL"].active { background-color: #374151; color: white; font-weight: bold; } /* Gray-700 */
-        .filter-btn[data-status="NEW"].active { background-color: #2563EB; color: white; font-weight: bold; } /* Blue-600 */
-        .filter-btn[data-status="ACCEPTED"].active { background-color: #B45309; color: white; font-weight: bold; } /* Amber-700 */
-        .filter-btn[data-status="PRINTING"].active { background-color: #7C3AED; color: white; font-weight: bold; } /* Violet-600 */
-        .filter-btn[data-status="SHIPPED"].active { background-color: #047857; color: white; font-weight: bold; } /* Emerald-700 */
-        .filter-btn[data-status="DELIVERED"].active { background-color: #4F46E5; color: white; font-weight: bold; } /* Indigo-600 */
-        .filter-btn[data-status="COMPLETED"].active { background-color: #15803D; color: white; font-weight: bold; } /* Green-700 */
-        .filter-btn[data-status="CANCELED"].active { background-color: #DC2626; color: white; font-weight: bold; } /* Red-600 */
+      body {
+        font-family: "Baumans", sans-serif;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: "Modak", cursive;
+      }
+      .order-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease-in-out;
+      }
+      .order-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+      .sticker-peel-container {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 5px;
+        background: white;
+        box-shadow:
+          0 1px 3px rgba(0, 0, 0, 0.12),
+          0 1px 2px rgba(0, 0, 0, 0.24);
+        border-radius: 2px;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transform-origin: center;
+      }
+      .sticker-peel-container:hover {
+        box-shadow:
+          0 14px 28px rgba(0, 0, 0, 0.25),
+          0 10px 10px rgba(0, 0, 0, 0.22);
+        transform: scale(1.05) rotate(-2deg);
+        z-index: 10;
+      }
+      .order-card img.sticker-design {
+        max-width: 200px;
+        max-height: 200px;
+        display: block;
+      }
+      .order-details dt {
+        font-weight: bold;
+      }
+      .order-details dd {
+        margin-left: 0;
+        margin-bottom: 0.5em;
+      }
+      .filter-btn {
+        background-color: #e2e8f0;
+        color: #4a5568;
+        transition: all 0.2s ease-in-out;
+      }
+      .filter-btn:hover {
+        background-color: #cbd5e0;
+      }
+      /* Specific active states matching status colors - Darker shades for WCAG AA contrast (>4.5:1) with white text */
+      .filter-btn[data-status="ALL"].active {
+        background-color: #374151;
+        color: white;
+        font-weight: bold;
+      } /* Gray-700 */
+      .filter-btn[data-status="NEW"].active {
+        background-color: #2563eb;
+        color: white;
+        font-weight: bold;
+      } /* Blue-600 */
+      .filter-btn[data-status="ACCEPTED"].active {
+        background-color: #b45309;
+        color: white;
+        font-weight: bold;
+      } /* Amber-700 */
+      .filter-btn[data-status="PRINTING"].active {
+        background-color: #7c3aed;
+        color: white;
+        font-weight: bold;
+      } /* Violet-600 */
+      .filter-btn[data-status="SHIPPED"].active {
+        background-color: #047857;
+        color: white;
+        font-weight: bold;
+      } /* Emerald-700 */
+      .filter-btn[data-status="DELIVERED"].active {
+        background-color: #4f46e5;
+        color: white;
+        font-weight: bold;
+      } /* Indigo-600 */
+      .filter-btn[data-status="COMPLETED"].active {
+        background-color: #15803d;
+        color: white;
+        font-weight: bold;
+      } /* Green-700 */
+      .filter-btn[data-status="CANCELED"].active {
+        background-color: #dc2626;
+        color: white;
+        font-weight: bold;
+      } /* Red-600 */
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/svgnest@1.0.3/dist/svgnest.js"></script>
     <script src="/lib/clipper.js"></script>
     <script src="/lib/parallel.js"></script>
     <script type="module" src="/src/printshop.js"></script>
-</head>
-<body class="bg-slate-200 text-slate-800">
+  </head>
+  <body class="bg-slate-200 text-slate-800">
     <header class="bg-white shadow-md">
-        <nav class="container mx-auto px-4 sm:px-6 py-3">
-            <div class="flex flex-wrap justify-between items-center">
-                <a href="#" class="text-xl font-semibold text-gray-700">Print Shop</a>
-                <div id="connection-status" class="text-sm w-full md:w-auto md:mr-4 text-center md:text-left my-2 md:my-0" role="status" aria-live="polite">
-                    <span id="connection-status-dot" class="inline-block w-3 h-3 rounded-full mr-2 bg-yellow-500"></span>
-                    <span id="connection-status-text">Status</span>
-                </div>
-                <div class="flex items-center w-full md:w-auto my-2 md:my-0">
-                    <label for="searchInput" class="sr-only">Search Orders by ID</label>
-                    <input type="text" id="searchInput" placeholder="Search by Order ID" class="w-full px-4 py-2 border rounded-md">
-                    <button id="searchBtn" class="ml-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600" aria-label="Search Orders">Search</button>
-                    <button id="refreshOrdersBtn" class="ml-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600" aria-label="Refresh Order List">Refresh</button>
-                </div>
-                <div id="auth-container" class="w-full md:w-auto flex items-center justify-center md:justify-end my-2 md:my-0">
-                    <span id="auth-status" class="mr-4"></span>
-                    <button id="loginBtn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Login</button>
-                    <button id="registerBtn" class="ml-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600" style="display: none;">Register New Key</button>
-                </div>
-            </div>
-        </nav>
-        <div id="connection-error" class="hidden bg-red-500 text-white text-center py-2">
-            Could not connect to the server. Please contact support at <a href="mailto:support@example.com" class="underline">support@example.com</a>.
+      <nav class="container mx-auto px-4 sm:px-6 py-3">
+        <div class="flex flex-wrap justify-between items-center">
+          <a href="#" class="text-xl font-semibold text-gray-700">Print Shop</a>
+          <div
+            id="connection-status"
+            class="text-sm w-full md:w-auto md:mr-4 text-center md:text-left my-2 md:my-0"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              id="connection-status-dot"
+              class="inline-block w-3 h-3 rounded-full mr-2 bg-yellow-500"
+            ></span>
+            <span id="connection-status-text">Status</span>
+          </div>
+          <div class="flex items-center w-full md:w-auto my-2 md:my-0">
+            <label for="searchInput" class="sr-only">Search Orders by ID</label>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search by Order ID"
+              class="w-full px-4 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent"
+            />
+            <button
+              id="searchBtn"
+              class="ml-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              aria-label="Search Orders"
+            >
+              Search
+            </button>
+            <button
+              id="refreshOrdersBtn"
+              class="ml-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              aria-label="Refresh Order List"
+            >
+              Refresh
+            </button>
+          </div>
+          <div
+            id="auth-container"
+            class="w-full md:w-auto flex items-center justify-center md:justify-end my-2 md:my-0"
+          >
+            <span id="auth-status" class="mr-4"></span>
+            <button
+              id="loginBtn"
+              class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            >
+              Login
+            </button>
+            <button
+              id="registerBtn"
+              class="ml-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+              style="display: none"
+            >
+              Register New Key
+            </button>
+          </div>
         </div>
+      </nav>
+      <div
+        id="connection-error"
+        class="hidden bg-red-500 text-white text-center py-2"
+      >
+        Could not connect to the server. Please contact support at
+        <a href="mailto:support@example.com" class="underline"
+          >support@example.com</a
+        >.
+      </div>
     </header>
 
     <div class="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <!-- View Switcher -->
-        <div class="flex space-x-4 border-b mb-4">
-            <button id="view-dashboard-btn" class="py-2 px-4 border-b-2 border-blue-500 font-bold text-blue-600">Dashboard</button>
-            <button id="view-settings-btn" class="py-2 px-4 text-gray-500 hover:text-gray-700">Settings & Integrations</button>
-        </div>
+      <!-- View Switcher -->
+      <div class="flex space-x-4 border-b mb-4">
+        <button
+          id="view-dashboard-btn"
+          class="py-2 px-4 border-b-2 border-blue-500 font-bold text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-t-md"
+        >
+          Dashboard
+        </button>
+        <button
+          id="view-settings-btn"
+          class="py-2 px-4 text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-t-md"
+        >
+          Settings & Integrations
+        </button>
+      </div>
     </div>
 
     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Dashboard View -->
-        <div id="dashboard-view">
-            <!-- Filter Buttons -->
-            <div id="filter-container" class="flex flex-wrap items-center space-x-2 mb-4 bg-white p-2 rounded-lg shadow-md">
-                <span class="font-bold mr-2">Filter by status:</span>
-                <button class="filter-btn active px-3 py-1 rounded-md text-sm" data-status="ALL" aria-pressed="true">All</button>
-                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="NEW" aria-pressed="false">New</button>
-                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="ACCEPTED" aria-pressed="false">Accepted</button>
-                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="PRINTING" aria-pressed="false">Printing</button>
-                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="SHIPPED" aria-pressed="false">Shipped</button>
-                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="DELIVERED" aria-pressed="false">Delivered</button>
-                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="COMPLETED" aria-pressed="false">Completed</button>
-                <button class="filter-btn px-3 py-1 rounded-md text-sm" data-status="CANCELED" aria-pressed="false">Canceled</button>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2">
-                    <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Incoming Orders</h2>
-                    <div id="orders-list" class="space-y-4">
-                        <p id="no-orders-message" class="text-gray-500 italic">Loading orders...</p>
-                        <!-- Order cards will be dynamically inserted here by printshop.js -->
-                    </div>
-                </div>
-                <div class="space-y-8">
-                    <div class="bg-white p-6 rounded-lg shadow-xl">
-                        <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">Nesting</h2>
-                        <div class="mt-4">
-                            <label for="spacingInput" class="mr-2">Spacing:</label>
-                            <input type="number" id="spacingInput" value="10" class="w-20 p-1 border rounded-md">
-                        </div>
-                        <div class="mt-2">
-                            <label class="inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="addPrintingMarks" class="form-checkbox h-5 w-5 text-blue-600">
-                                <span class="ml-2 text-gray-700">Add Printing Marks</span>
-                            </label>
-                        </div>
-                        <div class="mt-4 border-t pt-4">
-                            <h3 class="text-lg font-bold mb-2">Media Margins (px)</h3>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div><label for="marginTop">Top:</label><input type="number" id="marginTop" value="10" class="w-full p-1 border rounded-md"></div>
-                                <div><label for="marginBottom">Bottom:</label><input type="number" id="marginBottom" value="10" class="w-full p-1 border rounded-md"></div>
-                                <div><label for="marginLeft">Left:</label><input type="number" id="marginLeft" value="10" class="w-full p-1 border rounded-md"></div>
-                                <div><label for="marginRight">Right:</label><input type="number" id="marginRight" value="10" class="w-full p-1 border rounded-md"></div>
-                            </div>
-                        </div>
-                        <div class="mt-4 border-t pt-4">
-                            <h3 class="text-lg font-bold mb-2">Internal Keep-outs</h3>
-                            <p class="text-xs text-gray-500 mb-2">Enter as JSON array of objects: [{"x":0, "y":0, "width":100, "height":100}]</p>
-                            <textarea id="keepoutAreas" class="w-full p-1 border rounded-md" rows="4">[]</textarea>
-                        </div>
-                        <button id="nestStickersBtn" class="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Nest Stickers</button>
-                        <button id="downloadCutFileBtn" class="mt-4 w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600">Download Cut File</button>
-                        <button id="exportPdfBtn" class="mt-4 w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Export as PDF</button>
-                        <div id="nested-svg-container" class="mt-4 bg-gray-100 p-4 border rounded-lg">
-                            <!-- Nested SVG will be displayed here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
+      <!-- Dashboard View -->
+      <div id="dashboard-view">
+        <!-- Filter Buttons -->
+        <div
+          id="filter-container"
+          class="flex flex-wrap items-center space-x-2 mb-4 bg-white p-2 rounded-lg shadow-md"
+        >
+          <span class="font-bold mr-2">Filter by status:</span>
+          <button
+            class="filter-btn active px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-700 focus-visible:ring-offset-2"
+            data-status="ALL"
+            aria-pressed="true"
+          >
+            All
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            data-status="NEW"
+            aria-pressed="false"
+          >
+            New
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"
+            data-status="ACCEPTED"
+            aria-pressed="false"
+          >
+            Accepted
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
+            data-status="PRINTING"
+            aria-pressed="false"
+          >
+            Printing
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
+            data-status="SHIPPED"
+            aria-pressed="false"
+          >
+            Shipped
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2"
+            data-status="DELIVERED"
+            aria-pressed="false"
+          >
+            Delivered
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2"
+            data-status="COMPLETED"
+            aria-pressed="false"
+          >
+            Completed
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
+            data-status="CANCELED"
+            aria-pressed="false"
+          >
+            Canceled
+          </button>
         </div>
 
-        <!-- Settings View -->
-        <div id="settings-view" class="hidden">
-            <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto">
-                <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-6">Odoo Integration Settings</h2>
-
-                <form id="odoo-config-form" class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block font-bold mb-1">Odoo URL</label>
-                            <input type="url" id="odoo-url" class="w-full p-2 border rounded-md" placeholder="https://your-odoo-instance.com">
-                        </div>
-                        <div>
-                            <label class="block font-bold mb-1">Database</label>
-                            <input type="text" id="odoo-db" class="w-full p-2 border rounded-md" placeholder="odoo-db">
-                        </div>
-                        <div>
-                            <label class="block font-bold mb-1">Username</label>
-                            <input type="text" id="odoo-username" class="w-full p-2 border rounded-md" placeholder="admin">
-                        </div>
-                        <div>
-                            <label class="block font-bold mb-1">Password</label>
-                            <input type="password" id="odoo-password" class="w-full p-2 border rounded-md" placeholder="********">
-                        </div>
-                    </div>
-
-                    <div class="flex items-center space-x-4">
-                        <button type="button" id="test-odoo-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Test Connection</button>
-                        <span id="test-connection-result" class="text-sm font-bold"></span>
-                    </div>
-
-                    <hr class="border-t border-gray-300">
-
-                    <h3 class="text-xl font-bold">Defaults</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block font-bold mb-1">Default Project Task ID (for Time Logs)</label>
-                            <input type="number" id="odoo-default-task" class="w-full p-2 border rounded-md" placeholder="e.g., 10">
-                        </div>
-                        <div>
-                            <label class="block font-bold mb-1">Picking Type ID (for Consumption)</label>
-                            <input type="number" id="odoo-picking-type" class="w-full p-2 border rounded-md" placeholder="e.g., 5">
-                        </div>
-                    </div>
-
-                    <hr class="border-t border-gray-300">
-
-                    <h3 class="text-xl font-bold">Material Mapping</h3>
-                    <p class="text-sm text-gray-500">Map Print Shop materials to Odoo Product IDs.</p>
-
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white border">
-                            <thead>
-                                <tr class="bg-gray-100">
-                                    <th class="py-2 px-4 border text-left">Material / Item</th>
-                                    <th class="py-2 px-4 border text-left">Odoo Product ID</th>
-                                </tr>
-                            </thead>
-                            <tbody id="material-mapping-tbody">
-                                <!-- Populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="flex justify-end pt-4">
-                        <button type="submit" id="save-odoo-config-btn" class="px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700">Save Configuration</button>
-                    </div>
-                </form>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div class="lg:col-span-2">
+            <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">
+              Incoming Orders
+            </h2>
+            <div id="orders-list" class="space-y-4">
+              <div
+                id="no-orders-message"
+                class="text-center py-12 px-4 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50"
+              >
+                <div
+                  class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4 text-blue-600"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-8 w-8"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                    />
+                  </svg>
+                </div>
+                <h3
+                  class="text-lg font-medium text-gray-900 mb-1"
+                  style="font-family: var(--font-modak); letter-spacing: 0.05em"
+                >
+                  Order Status
+                </h3>
+                <p id="no-orders-text" class="text-gray-500 max-w-sm mx-auto">
+                  Loading orders...
+                </p>
+              </div>
+              <!-- Order cards will be dynamically inserted here by printshop.js -->
             </div>
+          </div>
+          <div class="space-y-8">
+            <div class="bg-white p-6 rounded-lg shadow-xl">
+              <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">
+                Nesting
+              </h2>
+              <div class="mt-4">
+                <label for="spacingInput" class="mr-2">Spacing:</label>
+                <input
+                  type="number"
+                  id="spacingInput"
+                  value="10"
+                  class="w-20 p-1 border rounded-md"
+                />
+              </div>
+              <div class="mt-2">
+                <label class="inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="addPrintingMarks"
+                    class="form-checkbox h-5 w-5 text-blue-600"
+                  />
+                  <span class="ml-2 text-gray-700">Add Printing Marks</span>
+                </label>
+              </div>
+              <div class="mt-4 border-t pt-4">
+                <h3 class="text-lg font-bold mb-2">Media Margins (px)</h3>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label for="marginTop">Top:</label
+                    ><input
+                      type="number"
+                      id="marginTop"
+                      value="10"
+                      class="w-full p-1 border rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label for="marginBottom">Bottom:</label
+                    ><input
+                      type="number"
+                      id="marginBottom"
+                      value="10"
+                      class="w-full p-1 border rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label for="marginLeft">Left:</label
+                    ><input
+                      type="number"
+                      id="marginLeft"
+                      value="10"
+                      class="w-full p-1 border rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label for="marginRight">Right:</label
+                    ><input
+                      type="number"
+                      id="marginRight"
+                      value="10"
+                      class="w-full p-1 border rounded-md"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="mt-4 border-t pt-4">
+                <label for="keepoutAreas" class="text-lg font-bold mb-2 block"
+                  >Internal Keep-outs</label
+                >
+                <p class="text-xs text-gray-500 mb-2">
+                  Enter as JSON array of objects: [{"x":0, "y":0, "width":100,
+                  "height":100}]
+                </p>
+                <textarea
+                  id="keepoutAreas"
+                  class="w-full p-1 border rounded-md"
+                  rows="4"
+                >
+[]</textarea
+                >
+              </div>
+              <button
+                id="nestStickersBtn"
+                class="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+              >
+                Nest Stickers
+              </button>
+              <button
+                id="downloadCutFileBtn"
+                class="mt-4 w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600"
+              >
+                Download Cut File
+              </button>
+              <button
+                id="exportPdfBtn"
+                class="mt-4 w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+              >
+                Export as PDF
+              </button>
+              <div
+                id="nested-svg-container"
+                class="mt-4 bg-gray-100 p-4 border rounded-lg"
+              >
+                <!-- Nested SVG will be displayed here -->
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Settings View -->
+      <div id="settings-view" class="hidden">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto">
+          <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-6">
+            Odoo Integration Settings
+          </h2>
+
+          <form id="odoo-config-form" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label for="odoo-url" class="block font-bold mb-1"
+                  >Odoo URL</label
+                >
+                <input
+                  type="url"
+                  id="odoo-url"
+                  class="w-full p-2 border rounded-md"
+                  placeholder="https://your-odoo-instance.com"
+                />
+              </div>
+              <div>
+                <label for="odoo-db" class="block font-bold mb-1"
+                  >Database</label
+                >
+                <input
+                  type="text"
+                  id="odoo-db"
+                  class="w-full p-2 border rounded-md"
+                  placeholder="odoo-db"
+                />
+              </div>
+              <div>
+                <label for="odoo-username" class="block font-bold mb-1"
+                  >Username</label
+                >
+                <input
+                  type="text"
+                  id="odoo-username"
+                  class="w-full p-2 border rounded-md"
+                  placeholder="admin"
+                />
+              </div>
+              <div>
+                <label for="odoo-password" class="block font-bold mb-1"
+                  >Password</label
+                >
+                <input
+                  type="password"
+                  id="odoo-password"
+                  class="w-full p-2 border rounded-md"
+                  placeholder="********"
+                />
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+              <button
+                type="button"
+                id="test-odoo-btn"
+                class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+              >
+                Test Connection
+              </button>
+              <span
+                id="test-connection-result"
+                class="text-sm font-bold"
+              ></span>
+            </div>
+
+            <hr class="border-t border-gray-300" />
+
+            <h3 class="text-xl font-bold">Defaults</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label for="odoo-default-task" class="block font-bold mb-1"
+                  >Default Project Task ID (for Time Logs)</label
+                >
+                <input
+                  type="number"
+                  id="odoo-default-task"
+                  class="w-full p-2 border rounded-md"
+                  placeholder="e.g., 10"
+                />
+              </div>
+              <div>
+                <label for="odoo-picking-type" class="block font-bold mb-1"
+                  >Picking Type ID (for Consumption)</label
+                >
+                <input
+                  type="number"
+                  id="odoo-picking-type"
+                  class="w-full p-2 border rounded-md"
+                  placeholder="e.g., 5"
+                />
+              </div>
+            </div>
+
+            <hr class="border-t border-gray-300" />
+
+            <h3 class="text-xl font-bold">Material Mapping</h3>
+            <p class="text-sm text-gray-500">
+              Map Print Shop materials to Odoo Product IDs.
+            </p>
+
+            <div class="overflow-x-auto">
+              <table class="min-w-full bg-white border">
+                <thead>
+                  <tr class="bg-gray-100">
+                    <th class="py-2 px-4 border text-left">Material / Item</th>
+                    <th class="py-2 px-4 border text-left">Odoo Product ID</th>
+                  </tr>
+                </thead>
+                <tbody id="material-mapping-tbody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="flex justify-end pt-4">
+              <button
+                type="submit"
+                id="save-odoo-config-btn"
+                class="px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700"
+              >
+                Save Configuration
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </main>
-<div id="login-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-4 sm:mx-0">
+    <div
+      id="login-modal"
+      class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50"
+    >
+      <div
+        class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-4 sm:mx-0"
+      >
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl sm:text-3xl text-splotch-navy">Login</h2>
-            <button id="close-modal-btn" class="text-2xl font-bold text-gray-500 hover:text-gray-800" aria-label="Close modal">&times;</button>
+          <h2 class="text-2xl sm:text-3xl text-splotch-navy">Login</h2>
+          <button
+            id="close-modal-btn"
+            class="text-2xl font-bold text-gray-500 hover:text-gray-800"
+            aria-label="Close modal"
+          >
+            &times;
+          </button>
         </div>
 
         <form id="login-form" class="space-y-4">
-            <div>
-                <label for="username-input" class="block font-bold">Username</label>
-                <input type="text" id="username-input" name="username" class="w-full p-2 border rounded-md" autocomplete="username" required>
-            </div>
-            <div>
-                <label for="password-input" class="block font-bold">Password</label>
-                <input type="password" id="password-input" name="password" class="w-full p-2 border rounded-md" autocomplete="current-password" required>
-            </div>
-            <button type="submit" id="password-login-btn" class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Login with Password</button>
+          <div>
+            <label for="username-input" class="block font-bold">Username</label>
+            <input
+              type="text"
+              id="username-input"
+              name="username"
+              class="w-full p-2 border rounded-md"
+              autocomplete="username"
+              required
+            />
+          </div>
+          <div>
+            <label for="password-input" class="block font-bold">Password</label>
+            <input
+              type="password"
+              id="password-input"
+              name="password"
+              class="w-full p-2 border rounded-md"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            id="password-login-btn"
+            class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            Login with Password
+          </button>
         </form>
 
         <div class="my-6 flex items-center">
-            <hr class="flex-grow border-t border-gray-300">
-            <span class="mx-4 text-gray-500">OR</span>
-            <hr class="flex-grow border-t border-gray-300">
+          <hr class="flex-grow border-t border-gray-300" />
+          <span class="mx-4 text-gray-500">OR</span>
+          <hr class="flex-grow border-t border-gray-300" />
         </div>
 
-        <button id="webauthn-login-btn" class="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Login with Security Key</button>
-        <button id="webauthn-register-btn" class="w-full mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">Register New Security Key</button>
+        <button
+          id="webauthn-login-btn"
+          class="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+        >
+          Login with Security Key
+        </button>
+        <button
+          id="webauthn-register-btn"
+          class="w-full mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+        >
+          Register New Security Key
+        </button>
+      </div>
     </div>
-</div>
     <footer class="bg-white shadow-md mt-8">
-        <div class="container mx-auto px-6 py-3 text-center text-gray-500">
-            &copy; 2026 Splotch Creative LLC
-        </div>
+      <div class="container mx-auto px-6 py-3 text-center text-gray-500">
+        &copy; 2026 Splotch Creative LLC
+      </div>
     </footer>
 
-    <div id="loading-indicator" class="hidden fixed top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center" role="status" aria-live="assertive" aria-modal="true" aria-label="Loading">
-        <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+    <div
+      id="loading-indicator"
+      class="hidden fixed top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center"
+      role="status"
+      aria-live="assertive"
+      aria-modal="true"
+      aria-label="Loading"
+    >
+      <div
+        class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"
+      ></div>
     </div>
 
-    <div id="error-toast" class="fixed bottom-0 right-0 mb-4 mr-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-md z-[100] transition-all duration-300 ease-in-out transform translate-y-full opacity-0 pointer-events-none" role="alert" aria-live="assertive">
-        <span id="error-message"></span>
-        <button id="close-error-toast" class="ml-4 text-white font-bold hover:text-red-100 focus:outline-none focus:underline" aria-label="Close error message">&times;</button>
+    <div
+      id="error-toast"
+      class="fixed bottom-0 right-0 mb-4 mr-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-md z-[100] transition-all duration-300 ease-in-out transform translate-y-full opacity-0 pointer-events-none"
+      role="alert"
+      aria-live="assertive"
+    >
+      <span id="error-message"></span>
+      <button
+        id="close-error-toast"
+        class="ml-4 text-white font-bold hover:text-red-100 focus:outline-none focus:underline"
+        aria-label="Close error message"
+      >
+        &times;
+      </button>
     </div>
 
-    <div id="success-toast" class="fixed bottom-0 right-0 mb-4 mr-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-md z-[100] transition-all duration-300 ease-in-out transform translate-y-full opacity-0 pointer-events-none" role="status" aria-live="polite">
-        <span id="success-message"></span>
-        <button id="close-success-toast" class="ml-4 text-white font-bold hover:text-green-100 focus:outline-none focus:underline" aria-label="Close success message">&times;</button>
+    <div
+      id="success-toast"
+      class="fixed bottom-0 right-0 mb-4 mr-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-md z-[100] transition-all duration-300 ease-in-out transform translate-y-full opacity-0 pointer-events-none"
+      role="status"
+      aria-live="polite"
+    >
+      <span id="success-message"></span>
+      <button
+        id="close-success-toast"
+        class="ml-4 text-white font-bold hover:text-green-100 focus:outline-none focus:underline"
+        aria-label="Close success message"
+      >
+        &times;
+      </button>
     </div>
-
-</body>
+  </body>
 </html>

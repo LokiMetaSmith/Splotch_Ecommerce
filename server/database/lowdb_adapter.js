@@ -16,7 +16,14 @@ export class LowDbAdapter {
               if (order.orderId) {
                 ordersObject[order.orderId] = order;
               } else {
-                logger.warn('[LowDbAdapter] Found order without orderId during migration, skipping:', order);
+                // SECURITY: Do not log the full order object as it may contain PII (name, email, address)
+                // Log a redacted summary or just the paymentId if available.
+                const logSafeOrder = {
+                    paymentId: order.paymentId || 'N/A',
+                    amount: order.amount,
+                    receivedAt: order.receivedAt
+                };
+                logger.warn('[LowDbAdapter] Found order without orderId during migration, skipping:', logSafeOrder);
               }
             });
             this.db.data.orders = ordersObject;

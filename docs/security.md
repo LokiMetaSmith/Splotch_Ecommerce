@@ -17,10 +17,13 @@ This document outlines security best practices for this project, covering the we
     *   Enable detailed logging for the web server and operating system.
     *   Regularly monitor logs for suspicious activity.
     *   Use a centralized logging solution to aggregate and analyze logs.
-*   **Access Control:**
-    *   Use SSH keys for authentication instead of passwords.
-    *   Disable password-based authentication for SSH.
-    *   Limit SSH access to a small number of trusted IP addresses.
+*   **Access Control & Deployment Best Practices:**
+    *   **SSH Keys**: Use SSH keys for authentication instead of passwords. Add public keys to your cloud provider team account (e.g., DigitalOcean Team SSH Keys) for centralized access control.
+    *   **Disable Password Auth**: Disable password-based authentication for SSH by modifying `/etc/ssh/sshd_config`.
+    *   **CI/CD Integration**: Store private SSH keys securely in CI/CD secret management systems (e.g., GitHub Secrets, Vault) to allow developer-agnostic deployments without exposing keys manually.
+    *   **Firewalls**: Use Cloud Firewalls to restrict SSH access to a small number of trusted IP addresses and CI/CD server ranges.
+    *   **Two-Factor Authentication (2FA)**: Mandate 2FA for all team members accessing the infrastructure control plane (e.g., DigitalOcean account).
+    *   For a detailed guide on advanced production deployments, GitOps, and Terraform, see [Best Practices for Secure Deployment](deployment/remote-vps.md#best-practices-for-secure-deployment--team-access).
 
 ## Domain Name Security
 

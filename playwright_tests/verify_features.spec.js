@@ -50,7 +50,7 @@ test.describe('Standard Size Buttons and Unit Selection', () => {
         await expect(btn3).toBeVisible();
 
         // Wait for success message to ensure image is loaded and controls are enabled
-        await expect(page.locator('#payment-status-container')).toContainText('Image loaded successfully', { timeout: 10000 });
+        await expect(page.locator('.message-content')).toContainText('Image loaded successfully', { timeout: 10000 });
         await expect(page.locator('#resizeSlider')).toBeEnabled();
 
         // Click 2" button

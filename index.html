@@ -127,7 +127,7 @@
         <div class="flex space-x-2">
           <button
             id="sellDesignBtn"
-            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-full hidden"
+            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-full hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-600"
           >
             Sell this Design
           </button>
@@ -177,8 +177,19 @@
                 aria-label="Clear selected file"
                 data-tooltip="Remove image and reset"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-6 h-6"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -249,21 +260,30 @@
                   (Tip: Drag the mascot here to try it!)
                 </p>
               </div>
-              <p
-                id="designMarginNote"
-                class="absolute bottom-2 right-2 text-xs text-splotch-red p-1 bg-white bg-opacity-75 rounded"
-                style="font-family: var(--font-baumans); display: none"
-                contenteditable="false"
-              >
-                Keep important elements 2-3mm from edge!
-              </p>
             </div>
+
+            <!-- Interactive Legend Tabs -->
+            <div
+              id="canvas-legend"
+              class="flex justify-center gap-2 mt-4 transition-opacity duration-300"
+              style="display: none;"
+            >
+              <!-- Populated by JS -->
+            </div>
+            <p
+              id="designMarginNote"
+              class="text-xs text-splotch-red bg-white border border-red-200 rounded-full shadow-sm px-3 py-1.5 mx-auto mt-4 w-fit"
+              style="font-family: var(--font-baumans); display: none"
+              contenteditable="false"
+            >
+              Keep important elements 2-3mm from edge!
+            </p>
           </div>
 
           <!-- Basic Image Editing Controls -->
           <div
             id="editing-controls"
-            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-11 xl:grid-cols-11 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-12 xl:grid-cols-12 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
           >
             <button
               type="button"
@@ -394,7 +414,8 @@
               id="grayscaleBtn"
               data-tooltip="Apply Grayscale Filter"
               aria-pressed="false"
-              class="lg:hidden xl:block"
+              class="lg:hidden xl:block focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded"
+              style="display: none;"
             >
               Grayscale
             </button>
@@ -403,7 +424,8 @@
               id="sepiaBtn"
               data-tooltip="Apply Sepia Filter"
               aria-pressed="false"
-              class="lg:hidden xl:block"
+              class="lg:hidden xl:block focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red rounded"
+              style="display: none;"
             >
               Sepia
             </button>
@@ -454,10 +476,34 @@
                 >
               </div>
             </div>
+            <div class="flex flex-col justify-center items-center col-span-2">
+              <label
+                for="lazyLassoSlider"
+                class="text-xs text-gray-500 mb-1"
+                >Lazy Lasso</label
+              >
+              <div class="flex items-center gap-1 w-full px-2">
+                <input
+                  type="range"
+                  id="lazyLassoSlider"
+                  min="0"
+                  max="50"
+                  value="0"
+                  step="1"
+                  class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                  data-tooltip="Smooths out deep cuts and gaps"
+                />
+                <span
+                  id="lazyLassoValue"
+                  class="text-xs w-6 text-center text-gray-600 font-mono"
+                  >0</span
+                >
+              </div>
+            </div>
             <button
               type="button"
               id="generateCutlineBtn"
-              class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-4 xl:col-span-2 flex justify-center items-center gap-2"
+              class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-4 xl:col-span-2 flex justify-center items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500"
               data-tooltip="Generate Cutline from Image Alpha"
             >
               Generate Smart Cutline
@@ -528,6 +574,7 @@
             id="text-editing-controls"
             class="my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-100"
             hidden
+            style="display: none;"
           >
             <h3
               class="text-lg font-semibold text-splotch-navy mb-3"
@@ -597,7 +644,7 @@
               <button
                 type="button"
                 id="addTextBtn"
-                class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2.5 px-4 rounded-full shadow-md transition duration-150 ease-in-out transform hover:scale-105 self-end"
+                class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2.5 px-4 rounded-full shadow-md transition duration-150 ease-in-out transform hover:scale-105 self-end focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red"
                 style="
                   font-family: var(--font-baumans);
                   text-transform: uppercase;
@@ -1116,7 +1163,7 @@
               />
               <button
                 id="copyLinkBtn"
-                class="ml-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                class="ml-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
               >
                 Copy
               </button>

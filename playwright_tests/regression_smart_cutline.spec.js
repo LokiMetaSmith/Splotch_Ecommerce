@@ -17,7 +17,7 @@ test('Generate Smart Cutline should preserve the original image', async ({ page 
     await fileInput.setInputFiles(TEST_IMAGE_PATH);
 
     // Wait for image load success
-    await expect(page.locator('#payment-status-container')).toContainText('Image loaded successfully', { timeout: 10000 });
+    await expect(page.locator('.message-content')).toContainText('Image loaded successfully', { timeout: 10000 });
 
     // Verify canvas has pixels (favicon usually has some color)
     const hasColorBefore = await page.evaluate(() => {
@@ -41,7 +41,7 @@ test('Generate Smart Cutline should preserve the original image', async ({ page 
     await generateBtn.click();
 
     // Wait for success
-    await expect(page.locator('#payment-status-container')).toContainText('Smart cutline generated successfully', { timeout: 15000 });
+    await expect(page.locator('.message-content')).toContainText('Smart cutline generated successfully', { timeout: 15000 });
 
     // Check pixel again
     const isNotBlack = await page.evaluate(() => {
