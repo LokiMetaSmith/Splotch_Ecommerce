@@ -26,8 +26,8 @@ export const validateUsername = [
     .notEmpty().withMessage('Username is required')
     .isString().withMessage('Username must be a string')
     .trim()
-    .isLength({ min: 3, max: 30 }).withMessage('Username must be between 3 and 30 characters')
-    .matches(/^[a-zA-Z0-9_-]+$/).withMessage('Username can only contain letters, numbers, underscores, and hyphens')
+    .isLength({ min: 3, max: 255 }).withMessage('Username must be between 3 and 255 characters')
+    .matches(/^[a-zA-Z0-9_\-@.]+$/).withMessage('Username can only contain letters, numbers, underscores, hyphens, @, and periods')
     .custom(value => {
       if (sanitizeUsername(value) === null) {
         throw new Error('Invalid username');
@@ -42,8 +42,8 @@ export const validateUsernameQuery = [
     .notEmpty().withMessage('Username is required')
     .isString().withMessage('Username must be a string')
     .trim()
-    .isLength({ min: 3, max: 30 }).withMessage('Username must be between 3 and 30 characters')
-    .matches(/^[a-zA-Z0-9_-]+$/).withMessage('Username can only contain letters, numbers, underscores, and hyphens')
+    .isLength({ min: 3, max: 255 }).withMessage('Username must be between 3 and 255 characters')
+    .matches(/^[a-zA-Z0-9_\-@.]+$/).withMessage('Username can only contain letters, numbers, underscores, hyphens, @, and periods')
     .custom(value => {
       if (sanitizeUsername(value) === null) {
         throw new Error('Invalid username');
