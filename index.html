@@ -177,8 +177,19 @@
                 aria-label="Clear selected file"
                 data-tooltip="Remove image and reset"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-6 h-6"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -249,15 +260,16 @@
                   (Tip: Drag the mascot here to try it!)
                 </p>
               </div>
-              <p
-                id="designMarginNote"
-                class="absolute bottom-2 right-2 text-xs text-splotch-red p-1 bg-white bg-opacity-75 rounded"
-                style="font-family: var(--font-baumans); display: none"
-                contenteditable="false"
-              >
-                Keep important elements 2-3mm from edge!
-              </p>
             </div>
+
+            <p
+              id="designMarginNote"
+              class="text-xs text-splotch-red bg-white border border-red-200 rounded-full shadow-sm px-3 py-1.5 mx-auto mt-4 w-fit"
+              style="font-family: var(--font-baumans); display: none"
+              contenteditable="false"
+            >
+              Keep important elements 2-3mm from edge!
+            </p>
           </div>
 
           <!-- Basic Image Editing Controls -->
