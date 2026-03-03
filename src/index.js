@@ -52,7 +52,9 @@ let textInput,
   cutlineOffsetSlider,
   cutlineOffsetValueDisplay,
   cutlineSensitivitySlider,
-  cutlineSensitivityValueDisplay;
+  cutlineSensitivityValueDisplay,
+  lazyLassoSlider,
+  lazyLassoValueDisplay;
 let cutlineSensitivity = 10; // Default sensitivity
 let stickerMaterialSelect,
   stickerResolutionSelect,
@@ -215,6 +217,8 @@ async function BootStrap() {
   cutlineOffsetValueDisplay = document.getElementById("cutlineOffsetValue");
   cutlineSensitivitySlider = document.getElementById("cutlineSensitivitySlider");
   cutlineSensitivityValueDisplay = document.getElementById("cutlineSensitivityValue");
+  lazyLassoSlider = document.getElementById("lazyLassoSlider");
+  lazyLassoValueDisplay = document.getElementById("lazyLassoValue");
 
   // Fetch CSRF token and pricing info
   await Promise.all([fetchCsrfToken(), fetchPricingInfo(), fetchInventory()]);
@@ -398,6 +402,22 @@ async function BootStrap() {
 
     // Trigger regeneration only on change (mouse up) to avoid lag
     cutlineSensitivitySlider.addEventListener("change", () => {
+        if (originalImage && rasterCutlinePoly) {
+            handleGenerateCutline();
+        }
+    });
+  }
+
+  if (lazyLassoSlider) {
+    // Update value display immediately
+    lazyLassoSlider.addEventListener("input", (e) => {
+        if (lazyLassoValueDisplay) {
+            lazyLassoValueDisplay.textContent = e.target.value;
+        }
+    });
+
+    // Trigger regeneration only on change (mouse up) to avoid lag
+    lazyLassoSlider.addEventListener("change", () => {
         if (originalImage && rasterCutlinePoly) {
             handleGenerateCutline();
         }
@@ -1601,8 +1621,27 @@ function handleSvgUpload(svgText) {
 
 const scaledPolyCache = new WeakMap();
 
-function generateCutLine(polygons, offset) {
+function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
   const scale = 100; // Scale for integer precision
+
+  // Determine current PPI from UI state to convert real-world values to image pixels
+  let ppi = 300; // Default fallback
+  if (typeof pricingConfig !== 'undefined' && pricingConfig && typeof stickerResolutionSelect !== 'undefined' && stickerResolutionSelect) {
+      const selectedRes = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value);
+      if (selectedRes) {
+          ppi = selectedRes.ppi;
+      }
+  }
+
+  // Convert raw values (which the slider outputs, presumably representing something like 0.1mm increments)
+  // Let's assume the slider values represent 0.1mm (so slider value 10 = 1mm).
+  // Then physical offset in mm is (sliderValue / 10).
+  const offsetMm = rawOffset / 10;
+  const lazyRadiusMm = rawLazyRadius / 10;
+
+  // Convert mm to logical pixels using the current PPI
+  const offsetPx = (offsetMm / 25.4) * ppi;
+  const lazyRadiusPx = (lazyRadiusMm / 25.4) * ppi;
 
   let scaledPolygons;
   // Bolt Optimization: Memoize scaled polygons to avoid O(N) allocation on every slider update.
@@ -1616,18 +1655,36 @@ function generateCutLine(polygons, offset) {
     scaledPolyCache.set(polygons, scaledPolygons);
   }
 
-  const co = new ClipperLib.ClipperOffset();
-  const offsetted_paths = new ClipperLib.Paths();
+  let final_paths;
 
-  co.AddPaths(
-    scaledPolygons,
-    ClipperLib.JoinType.jtRound,
-    ClipperLib.EndType.etClosedPolygon,
-  );
-  co.Execute(offsetted_paths, offset * scale);
+  if (lazyRadiusPx > 0) {
+    // 1. Dilate to bridge gaps
+    const co1 = new ClipperLib.ClipperOffset();
+    const expanded_paths = new ClipperLib.Paths();
+    co1.AddPaths(scaledPolygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co1.Execute(expanded_paths, lazyRadiusPx * scale);
+
+    // 2. Erode to return to the original boundary but with closed gaps
+    const co2 = new ClipperLib.ClipperOffset();
+    const shrunk_paths = new ClipperLib.Paths();
+    co2.AddPaths(expanded_paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co2.Execute(shrunk_paths, -lazyRadiusPx * scale);
+
+    // 3. Apply the actual requested cutline offset
+    const co3 = new ClipperLib.ClipperOffset();
+    final_paths = new ClipperLib.Paths();
+    co3.AddPaths(shrunk_paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co3.Execute(final_paths, offsetPx * scale);
+  } else {
+    // Normal single-pass offset
+    const co = new ClipperLib.ClipperOffset();
+    final_paths = new ClipperLib.Paths();
+    co.AddPaths(scaledPolygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co.Execute(final_paths, offsetPx * scale);
+  }
 
   // Scale back down
-  const cutline = offsetted_paths.map((p) => {
+  const cutline = final_paths.map((p) => {
     return p.map((point) => ({ x: point.X / scale, y: point.Y / scale }));
   });
 
@@ -2424,6 +2481,9 @@ function handleGenerateCutline() {
     canvas.height,
   );
 
+  const lazyLassoSlider = document.getElementById("lazyLassoSlider");
+  const lazyLassoRadius = lazyLassoSlider ? parseInt(lazyLassoSlider.value, 10) : 0;
+
   // Use a timeout to allow the UI to update before the heavy computation
   setTimeout(() => {
     try {
@@ -2520,7 +2580,7 @@ function handleGenerateCutline() {
       })));
 
       // Generate the cutline immediately
-      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, lazyLassoRadius);
       currentCutline = cutline;
       currentBounds = getPolygonsBounds(cutline);
 
