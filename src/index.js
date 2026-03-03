@@ -37,6 +37,7 @@ let pricingConfig = null;
 let inventoryCache = {}; // Cache for Odoo inventory
 let isGrayscale = false;
 let isSepia = false;
+let easterEggUnlocked = false;
 
 let textInput,
   textSizeInput,
@@ -669,6 +670,46 @@ async function BootStrap() {
       "error",
     );
   }
+
+  // Easter egg listener
+  document.addEventListener("easterEggUnlocked", () => {
+    if (!easterEggUnlocked) {
+      easterEggUnlocked = true;
+
+      // Attempt to find elements again if globals are null
+      const grayBtn = document.getElementById("grayscaleBtn");
+      const sepBtn = document.getElementById("sepiaBtn");
+      const textContainer = document.getElementById("text-editing-controls");
+
+      if (grayBtn) {
+          grayBtn.style.display = "block";
+          grayBtn.classList.remove("lg:hidden", "xl:block");
+      }
+      if (sepBtn) {
+          sepBtn.style.display = "block";
+          sepBtn.classList.remove("lg:hidden", "xl:block");
+      }
+
+      const isDisabled = (!originalImage && basePolygons.length === 0);
+      if (textContainer) {
+        if (isDisabled) {
+          textContainer.hidden = true;
+          textContainer.setAttribute('hidden', '');
+          textContainer.style.display = "none";
+        } else {
+          textContainer.hidden = false;
+          textContainer.removeAttribute('hidden');
+          textContainer.style.display = "block";
+          // Also need to clear any inline style preventing display
+          textContainer.style.cssText = textContainer.style.cssText.replace(/display:\s*none;?/g, '');
+        }
+      }
+
+      updateEditingButtonsState(isDisabled);
+
+      showNotification("Secret features unlocked! 🎨", "success");
+    }
+  });
 
   // Initial UI state
   if (!productIdParam) {
@@ -1318,8 +1359,43 @@ function updateEditingButtonsState(disabled) {
   });
   if (designMarginNote)
     designMarginNote.style.display = disabled ? "none" : "block";
-  if (textEditingControlsContainer)
-    textEditingControlsContainer.hidden = disabled;
+  const textContainer = document.getElementById("text-editing-controls");
+  if (textContainer) {
+    if (!easterEggUnlocked) {
+      textContainer.hidden = true;
+      textContainer.setAttribute('hidden', '');
+      textContainer.style.display = "none";
+    } else {
+      if (disabled) {
+        textContainer.hidden = true;
+        textContainer.setAttribute('hidden', '');
+        textContainer.style.display = "none";
+      } else {
+        textContainer.hidden = false;
+        textContainer.removeAttribute('hidden');
+        textContainer.style.display = "block";
+        textContainer.style.cssText = textContainer.style.cssText.replace(/display:\s*none;?/g, '');
+      }
+    }
+  }
+
+  // Update styles for filter buttons based on easterEggUnlocked
+  const grayBtn = document.getElementById("grayscaleBtn");
+  const sepBtn = document.getElementById("sepiaBtn");
+
+  if (!easterEggUnlocked) {
+      if (grayBtn) grayBtn.style.display = "none";
+      if (sepBtn) sepBtn.style.display = "none";
+  } else {
+      if (grayBtn) {
+          grayBtn.style.display = "block";
+          grayBtn.classList.remove("lg:hidden", "xl:block");
+      }
+      if (sepBtn) {
+          sepBtn.style.display = "block";
+          sepBtn.classList.remove("lg:hidden", "xl:block");
+      }
+  }
   if (canvasPlaceholder)
     canvasPlaceholder.style.display = disabled ? "flex" : "none";
 }
