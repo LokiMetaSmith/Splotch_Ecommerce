@@ -901,8 +901,9 @@ async function handleNesting(e) {
         const resultSvg = nest.start();
 
         // 4. Display result
-        ui.nestedSvgContainer.innerHTML = resultSvg;
-        window.nestedSvg = resultSvg;
+        const sanitizedSvg = DOMPurify.sanitize(resultSvg, { USE_PROFILES: { svg: true } });
+        ui.nestedSvgContainer.innerHTML = sanitizedSvg;
+        window.nestedSvg = sanitizedSvg;
         showSuccessToast('Nesting complete.');
 
     } catch (error) {
