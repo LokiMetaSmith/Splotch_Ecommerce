@@ -1467,13 +1467,23 @@ function setCanvasSize(logicalWidth, logicalHeight) {
 
   // logicalWidth is in "Image Pixels".
   // Physical Inches = logicalWidth / ppi
-  // CSS Pixels = Physical Inches * 96
+
+  // Standard display assumption: CSS inches are ~96 pixels per inch
+  // However, this means if physical size is 3 inches, we'd render it at 3 * 96 = 288px on screen,
+  // which might be tiny or very large depending on physical monitor DPI.
+  // Instead, to ensure it is true to life, we can detect screen real DPI if possible,
+  // but CSS assumes 1in = 96px regardless of actual device resolution.
+  // We'll stick to CSS inches because that's standard for web layouts.
   const cssWidth = (logicalWidth / ppi) * 96;
   const cssHeight = (logicalHeight / ppi) * 96;
 
-  // Update CSS size to match calculated display size
+  // Update CSS size to match calculated display size exactly, true to life.
   canvas.style.width = `${cssWidth}px`;
   canvas.style.height = `${cssHeight}px`;
+  // Specifically remove object-fit/maxWidth to ensure visual scaling changes are absolute
+  canvas.style.maxWidth = 'none';
+  canvas.style.maxHeight = 'none';
+  canvas.style.objectFit = 'fill';
 }
 
 function saveCleanState() {
@@ -2417,6 +2427,15 @@ function handleStandardResize(targetInches) {
   if (currentMaxWidthPixels <= 0) return;
 
   const scale = targetPixels / currentMaxWidthPixels;
+
+  // NOTE: If scale is 1, maybe it already scaled but currentMaxWidthPixels
+  // was taken from the raw image. If this gets called multiple times, we're
+  // ALWAYS multiplying originalImage.width by `scale` in the raster logic below:
+  // const newWidth = originalImage.width * scale;
+  // This is actually CORRECT because currentMaxWidthPixels is also derived from
+  // originalImage.width. So `scale = targetPixels / originalImage.width`.
+  // Therefore `newWidth = originalImage.width * (targetPixels / originalImage.width)`
+  // which equals targetPixels.
 
   // Update Size Buttons State
   const sizeBtns = document.querySelectorAll(".size-btn");
