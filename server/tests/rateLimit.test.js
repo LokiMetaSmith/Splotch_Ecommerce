@@ -76,7 +76,7 @@ describe('Rate Limiting', () => {
     }
   });
 
-  it('should rate limit /api/auth/issue-temp-token', async () => {
+  it('should strictly rate limit /api/auth/issue-temp-token', async () => {
       const agent = request.agent(app);
 
       const csrfRes = await agent.get('/api/csrf-token');
@@ -85,14 +85,38 @@ describe('Rate Limiting', () => {
       // Use a unique IP for this test
       const ip = '5.6.7.8';
 
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 5; i++) {
           const res = await agent
             .post('/api/auth/issue-temp-token')
             .set('X-CSRF-Token', csrfToken)
             .set('X-Forwarded-For', ip)
             .send({ email: `test${i}@example.com` });
 
-          if (i < 10) {
+          if (i < 3) {
+              expect(res.status).not.toBe(429);
+          } else {
+              expect(res.status).toBe(429);
+          }
+      }
+  });
+
+  it('should strictly rate limit /api/auth/magic-login', async () => {
+      const agent = request.agent(app);
+
+      const csrfRes = await agent.get('/api/csrf-token');
+      const csrfToken = csrfRes.body.csrfToken;
+
+      // Use a unique IP for this test
+      const ip = '9.10.11.12';
+
+      for (let i = 0; i < 5; i++) {
+          const res = await agent
+            .post('/api/auth/magic-login')
+            .set('X-CSRF-Token', csrfToken)
+            .set('X-Forwarded-For', ip)
+            .send({ email: `magic${i}@example.com` });
+
+          if (i < 3) {
               expect(res.status).not.toBe(429);
           } else {
               expect(res.status).toBe(429);
