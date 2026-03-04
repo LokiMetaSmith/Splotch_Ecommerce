@@ -1,4 +1,5 @@
-import EasyPost from '@easypost/api';
+import EasyPostPkg from '@easypost/api';
+const EasyPost = EasyPostPkg.default || EasyPostPkg;
 import { getSecret } from './secretManager.js';
 import logger from './logger.js';
 import { LowDbAdapter } from './database/lowdb_adapter.js';
