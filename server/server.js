@@ -472,6 +472,20 @@ async function startServer(
       }) : undefined,
     });
     
+    // SECURITY: Stricter rate limiter for endpoints that trigger emails or temporary tokens
+    const emailTriggerLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: (process.env.ENABLE_RATE_LIMIT_TEST) ? 3 :
+           (process.env.NODE_ENV === 'test') ? 1000 : 3, // Very strict in production to prevent email spam
+      message: 'Too many requests from this IP, please try again after 15 minutes',
+      standardHeaders: true,
+      legacyHeaders: false,
+      store: redisClient ? new RateLimitRedisStore({
+          sendCommand: (...args) => redisClient.sendCommand(args),
+          prefix: 'rl:email:',
+      }) : undefined,
+    });
+
     const allowedOrigins = [
       'https://lokimetasmith.github.io',
     ];
@@ -1655,7 +1669,7 @@ async function startServer(
         }
     });
 
-    app.post('/api/auth/magic-login', authLimiter, [
+    app.post('/api/auth/magic-login', emailTriggerLimiter, [
       body('email').isEmail().withMessage('email is not valid'),
     ], async (req, res) => {
         const errors = validationResult(req);
@@ -1747,7 +1761,7 @@ async function startServer(
       });
     });
     
-    app.post('/api/auth/issue-temp-token', authLimiter, [
+    app.post('/api/auth/issue-temp-token', emailTriggerLimiter, [
       body('email').isEmail().withMessage('A valid email is required'),
     ], (req, res) => {
       const errors = validationResult(req);
