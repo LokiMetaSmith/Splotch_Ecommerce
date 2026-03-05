@@ -559,7 +559,7 @@ async function BootStrap() {
                 .then(res => res.blob())
                 .then(blob => {
                     const file = new File([blob], "Splotch-Mascot.png", { type: blob.type });
-                    loadFileAsImage(file);
+                    loadFileAsImage(file, true);
                 })
                 .catch(err => console.error("Failed to load mascot", err));
         }
@@ -614,7 +614,7 @@ async function BootStrap() {
                 .then(res => res.blob())
                 .then(blob => {
                     const file = new File([blob], "Splotch-Mascot.png", { type: blob.type });
-                    loadFileAsImage(file);
+                    loadFileAsImage(file, true);
                 })
                 .catch(err => console.error("Failed to load mascot", err));
         }
@@ -1505,7 +1505,7 @@ function handleFileChange(event) {
   }
 }
 
-function loadFileAsImage(file) {
+function loadFileAsImage(file, isMascot = false) {
   if (!file) return;
 
   if (fileNameDisplayEl) fileNameDisplayEl.textContent = file.name;
@@ -1566,9 +1566,10 @@ function loadFileAsImage(file) {
           calculateAndUpdatePrice();
           drawCanvasDecorations(currentBounds); // Draw the initial bounding box, size indicator, and rulers
 
-          // Bolt Fix: Default to 2 inches on import
+          // Bolt Fix: Default to 2 inches on import (2.8 for Mascot)
           if (pricingConfig) {
-            handleStandardResize(2);
+            const defaultSize = isMascot ? 2.8 : 2;
+            handleStandardResize(defaultSize);
 
             // Update Slider UI
             const resizeSliderEl = document.getElementById("resizeSlider");
@@ -1576,7 +1577,7 @@ function loadFileAsImage(file) {
             const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
 
             if (resizeSliderEl && resizeInputNumberEl) {
-              const val = isMetric ? 2 * 25.4 : 2;
+              const val = isMetric ? defaultSize * 25.4 : defaultSize;
               resizeSliderEl.value = val;
               resizeInputNumberEl.value = val.toFixed(1);
               if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
