@@ -43,20 +43,27 @@ export async function calculateMaterialUsage(filePath, ppi = 300) {
              // Yes, areaIn2 is based on original PPI.
         }
 
-        image.scan(0, 0, image.width, image.height, (x, y, idx) => {
-            const r = image.bitmap.data[idx + 0];
-            const g = image.bitmap.data[idx + 1];
-            const b = image.bitmap.data[idx + 2];
-            const a = image.bitmap.data[idx + 3];
+        // Bolt Optimization: Replace Jimp's image.scan() which calls a callback function per pixel.
+        // Directly iterating over the underlying Buffer (Uint8Array) eliminates function call overhead
+        // and dramatically speeds up ink coverage calculation for large images.
+        const data = image.bitmap.data;
+        const len = data.length;
+
+        for (let idx = 0; idx < len; idx += 4) {
+            const a = data[idx + 3];
 
             // If transparent (alpha < 10), skip
-            if (a < 10) return;
+            if (a < 10) continue;
+
+            const r = data[idx + 0];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
 
             // If almost white (RGB > 240), treat as white (no ink)
-            if (r > 240 && g > 240 && b > 240) return;
+            if (r > 240 && g > 240 && b > 240) continue;
 
             coloredPixels++;
-        });
+        }
 
         // Avoid division by zero
         if (totalPixels === 0) totalPixels = 1;
