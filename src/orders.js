@@ -1,5 +1,15 @@
 let csrfToken;
 
+export function escapeHtml(unsafe) {
+  if (unsafe == null) return "";
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export async function fetchCsrfToken() {
   try {
     const response = await fetch("/api/csrf-token", { credentials: "include" });
@@ -48,13 +58,18 @@ export function displayOrders(orders, container, noOrdersMessage) {
         ? `$${(order.amount / 100).toFixed(2)}`
         : "N/A";
 
+      const safeOrderId = escapeHtml(order.orderId);
+      const safeOrderIdShort = escapeHtml(order.orderId.substring(0, 8));
+      const safeStatus = escapeHtml(order.status);
+      const safeDesignImagePath = escapeHtml(order.designImagePath);
+
       return `
             <div class="order-card p-4 border rounded-lg shadow-sm bg-gray-50">
                 <div class="flex flex-col sm:flex-row justify-between items-start">
                     <div>
                         <h3 class="text-lg font-semibold text-splotch-red flex items-center gap-2">
-                            Order ID: <span class="font-mono text-sm" title="${order.orderId}">${order.orderId.substring(0, 8)}...</span>
-                            <button class="copy-order-id-btn text-gray-500 hover:text-splotch-teal focus:outline-none transition-colors p-1 rounded-full hover:bg-gray-200" data-order-id="${order.orderId}" aria-label="Copy full Order ID" title="Copy full Order ID">
+                            Order ID: <span class="font-mono text-sm" title="${safeOrderId}">${safeOrderIdShort}...</span>
+                            <button class="copy-order-id-btn text-gray-500 hover:text-splotch-teal focus:outline-none transition-colors p-1 rounded-full hover:bg-gray-200" data-order-id="${safeOrderId}" aria-label="Copy full Order ID" title="Copy full Order ID">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                                   <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
                                 </svg>
@@ -63,15 +78,15 @@ export function displayOrders(orders, container, noOrdersMessage) {
                         <p class="text-sm text-gray-600">Ordered on: ${receivedDate}</p>
                         <p class="text-sm text-gray-600">Amount: ${formattedAmount}</p>
                         <p class="text-sm text-gray-600 flex items-center gap-2">
-                            Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${order.status.toLowerCase()}">${order.status}</span>
+                            Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${safeStatus.toLowerCase()}">${safeStatus}</span>
                         </p>
                     </div>
                     <div class="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">
-                        <img src="${order.designImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
+                        <img src="${safeDesignImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
                     </div>
                 </div>
                 <div class="mt-4">
-                    <button class="reorder-btn button is-primary text-sm" data-design-image="${order.designImagePath}">Reorder This Sticker</button>
+                    <button class="reorder-btn button is-primary text-sm" data-design-image="${safeDesignImagePath}">Reorder This Sticker</button>
                 </div>
             </div>`;
     })
@@ -101,7 +116,8 @@ export function setupOrderListHandlers(container) {
     if (copyBtn) {
       const orderId = copyBtn.dataset.orderId;
       if (orderId && navigator.clipboard) {
-        navigator.clipboard.writeText(orderId)
+        navigator.clipboard
+          .writeText(orderId)
           .then(() => {
             const originalHTML = copyBtn.innerHTML;
             // Change to checkmark
@@ -111,12 +127,12 @@ export function setupOrderListHandlers(container) {
                 </svg>
             `;
             // Optional: tooltip feedback
-            const originalLabel = copyBtn.getAttribute('aria-label');
-            copyBtn.setAttribute('aria-label', 'Copied!');
+            const originalLabel = copyBtn.getAttribute("aria-label");
+            copyBtn.setAttribute("aria-label", "Copied!");
 
             setTimeout(() => {
               copyBtn.innerHTML = originalHTML;
-              copyBtn.setAttribute('aria-label', originalLabel);
+              copyBtn.setAttribute("aria-label", originalLabel);
             }, 2000);
           })
           .catch((err) => {
@@ -257,7 +273,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const magicLinkForm = document.getElementById("magic-link-form");
   if (magicLinkForm) {
-      magicLinkForm.addEventListener("submit", async (e) => {
+    magicLinkForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = emailInput.value;
       if (!email) {
@@ -371,9 +387,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       displayOrders(orders, ordersList, noOrdersMessage);
     } catch (error) {
       if (noOrdersMessage) {
-          noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
-          noOrdersMessage.style.color = "red";
-          ordersList.appendChild(noOrdersMessage);
+        noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
+        noOrdersMessage.style.color = "red";
+        ordersList.appendChild(noOrdersMessage);
       }
     }
   }
