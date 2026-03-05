@@ -65,3 +65,7 @@ This journal tracks critical performance learnings, anti-patterns, and insights 
 ## 2026-03-02 - [SVG Path Generation String Builder]
 **Learning:** In `generateSvgFromCutline`, generating the `d` attribute of an SVG `<path>` by repeatedly appending strings (e.g., `pathD += "M ..."` and `pathD += "L ..."`) inside a loop for thousands of polygon points is highly inefficient. It creates massive Garbage Collection (GC) pressure by constantly creating and discarding new string objects for each concatenation step.
 **Action:** Replace string concatenation inside tight geometry processing loops with a pre-allocated Array and use `.join(' ')`. For `generateSvgFromCutline`, this improved SVG generation speed by ~15-20%. Calculate the required array size (`total points + number of polygons`) beforehand to avoid dynamic array resizing overhead.
+
+## 2026-03-05 - [Jimp Buffer Iteration]
+**Learning:** `Jimp.scan()` uses a callback function per pixel, which creates immense overhead (e.g., millions of function calls for large images). Replacing it with a raw `for` loop over the underlying `Buffer` (`image.bitmap.data`) dramatically improves ink coverage/pixel calculation times by eliminating callback allocation and invocation.
+**Action:** Use direct `Uint8Array`/`Buffer` iteration instead of `Jimp.scan()` when performing pixel-level analysis in Node.js.
