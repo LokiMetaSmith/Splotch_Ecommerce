@@ -12,3 +12,7 @@
 ## 2026-03-05 - Adding Focus States for Accessibility in Utility Buttons
 **Learning:** Keyboard-only users need visual feedback for interactive elements. Even simple utility buttons (like the `close-modal-btn` on modal dialogues) require explicit `focus-visible` styles to ensure usability. Without them, a user tabbing through the page won't know when the "Close" button is active.
 **Action:** Always ensure custom button elements have Tailwind `focus-visible` classes (e.g., `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded`) alongside their normal/hover styling so they remain fully accessible.
+
+## 2026-03-06 - Dynamically Created Focus States
+**Learning:** Components created dynamically using `document.createElement`, such as toast notifications, often lack visual focus states necessary for keyboard navigation accessibility because they don't use standard styled component templates.
+**Action:** Always append Tailwind CSS's `focus-visible` utility classes (e.g., `focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`) when dynamically generating interactive DOM elements to guarantee clear focus indicators for keyboard users.
