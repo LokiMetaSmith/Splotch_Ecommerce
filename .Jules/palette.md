@@ -8,3 +8,7 @@
 ## 2026-03-04 - Explicitly Managing Disabled States for Editing Controls
 **Learning:** To ensure that all image editing controls (like sliders and buttons) correctly disable when no image is loaded, their specific DOM elements must be explicitly added to the `elements` array inside the `updateEditingButtonsState` function in `src/index.js`.
 **Action:** When adding new image-manipulation UI controls to `index.html`, always check `updateEditingButtonsState` to make sure they are appended to its internal `elements` list to maintain proper application state.
+
+## 2026-03-05 - Adding Focus States for Accessibility in Utility Buttons
+**Learning:** Keyboard-only users need visual feedback for interactive elements. Even simple utility buttons (like the `close-modal-btn` on modal dialogues) require explicit `focus-visible` styles to ensure usability. Without them, a user tabbing through the page won't know when the "Close" button is active.
+**Action:** Always ensure custom button elements have Tailwind `focus-visible` classes (e.g., `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded`) alongside their normal/hover styling so they remain fully accessible.
