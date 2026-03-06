@@ -721,6 +721,9 @@ async function BootStrap() {
       const grayBtn = document.getElementById("grayscaleBtn");
       const sepBtn = document.getElementById("sepiaBtn");
       const textContainer = document.getElementById("text-editing-controls");
+      const cutlineSensitivityContainer = document.getElementById("cutlineSensitivityContainer");
+      const lazyLassoContainer = document.getElementById("lazyLassoContainer");
+      const generateCutlineBtn = document.getElementById("generateCutlineBtn");
 
       if (grayBtn) {
           grayBtn.style.display = "block";
@@ -729,6 +732,16 @@ async function BootStrap() {
       if (sepBtn) {
           sepBtn.style.display = "block";
           sepBtn.classList.remove("lg:hidden", "xl:block");
+      }
+
+      if (cutlineSensitivityContainer) {
+          cutlineSensitivityContainer.style.display = "flex";
+      }
+      if (lazyLassoContainer) {
+          lazyLassoContainer.style.display = "flex";
+      }
+      if (generateCutlineBtn) {
+          generateCutlineBtn.style.display = "flex";
       }
 
       const isDisabled = (!originalImage && basePolygons.length === 0);
@@ -1423,10 +1436,16 @@ function updateEditingButtonsState(disabled) {
   // Update styles for filter buttons based on easterEggUnlocked
   const grayBtn = document.getElementById("grayscaleBtn");
   const sepBtn = document.getElementById("sepiaBtn");
+  const cutlineSensitivityContainer = document.getElementById("cutlineSensitivityContainer");
+  const lazyLassoContainer = document.getElementById("lazyLassoContainer");
+  const generateCutlineBtn = document.getElementById("generateCutlineBtn");
 
   if (!easterEggUnlocked) {
       if (grayBtn) grayBtn.style.display = "none";
       if (sepBtn) sepBtn.style.display = "none";
+      if (cutlineSensitivityContainer) cutlineSensitivityContainer.style.display = "none";
+      if (lazyLassoContainer) lazyLassoContainer.style.display = "none";
+      if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
   } else {
       if (grayBtn) {
           grayBtn.style.display = "block";
@@ -1435,6 +1454,15 @@ function updateEditingButtonsState(disabled) {
       if (sepBtn) {
           sepBtn.style.display = "block";
           sepBtn.classList.remove("lg:hidden", "xl:block");
+      }
+      if (cutlineSensitivityContainer) {
+          cutlineSensitivityContainer.style.display = "flex";
+      }
+      if (lazyLassoContainer) {
+          lazyLassoContainer.style.display = "flex";
+      }
+      if (generateCutlineBtn) {
+          generateCutlineBtn.style.display = "flex";
       }
   }
   if (canvasPlaceholder)

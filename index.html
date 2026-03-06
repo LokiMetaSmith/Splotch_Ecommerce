@@ -452,7 +452,7 @@
                 >
               </div>
             </div>
-            <div class="flex flex-col justify-center items-center col-span-2">
+            <div id="cutlineSensitivityContainer" style="display: none;" class="flex flex-col justify-center items-center col-span-2">
               <label
                 for="cutlineSensitivitySlider"
                 class="text-xs text-gray-500 mb-1"
@@ -476,7 +476,7 @@
                 >
               </div>
             </div>
-            <div class="flex flex-col justify-center items-center col-span-2">
+            <div id="lazyLassoContainer" style="display: none;" class="flex flex-col justify-center items-center col-span-2">
               <label
                 for="lazyLassoSlider"
                 class="text-xs text-gray-500 mb-1"
@@ -503,6 +503,7 @@
             <button
               type="button"
               id="generateCutlineBtn"
+              style="display: none;"
               class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-4 xl:col-span-2 flex justify-center items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500"
               data-tooltip="Generate Cutline from Image Alpha"
             >
