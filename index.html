@@ -266,7 +266,7 @@
             <div
               id="canvas-legend"
               class="flex justify-center gap-2 mt-4 transition-opacity duration-300"
-              style="display: none;"
+              style="display: none"
             >
               <!-- Populated by JS -->
             </div>
@@ -290,7 +290,7 @@
               id="rotateLeftBtn"
               data-tooltip="Rotate Left 90°"
               aria-label="Rotate Left"
-              class="justify-self-center flex items-center justify-center"
+              class="justify-self-center flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy"
               style="
                 width: 3rem !important;
                 height: 3rem !important;
@@ -318,7 +318,7 @@
               id="resetBtn"
               data-tooltip="Reset Image to Original"
               aria-label="Reset Image"
-              class="justify-self-center flex flex-col items-center justify-center text-red-600 hover:text-red-800 font-medium text-xs"
+              class="justify-self-center flex flex-col items-center justify-center text-red-600 hover:text-red-800 font-medium text-xs rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-600"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -341,7 +341,7 @@
               id="rotateRightBtn"
               data-tooltip="Rotate Right 90°"
               aria-label="Rotate Right"
-              class="justify-self-center flex items-center justify-center"
+              class="justify-self-center flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy"
               style="
                 width: 3rem !important;
                 height: 3rem !important;
@@ -415,7 +415,7 @@
               data-tooltip="Apply Grayscale Filter"
               aria-pressed="false"
               class="lg:hidden xl:block focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded"
-              style="display: none;"
+              style="display: none"
             >
               Grayscale
             </button>
@@ -425,7 +425,7 @@
               data-tooltip="Apply Sepia Filter"
               aria-pressed="false"
               class="lg:hidden xl:block focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red rounded"
-              style="display: none;"
+              style="display: none"
             >
               Sepia
             </button>
@@ -452,7 +452,11 @@
                 >
               </div>
             </div>
-            <div id="cutlineSensitivityContainer" style="display: none;" class="flex flex-col justify-center items-center col-span-2">
+            <div
+              id="cutlineSensitivityContainer"
+              style="display: none"
+              class="flex flex-col justify-center items-center col-span-2"
+            >
               <label
                 for="cutlineSensitivitySlider"
                 class="text-xs text-gray-500 mb-1"
@@ -476,10 +480,12 @@
                 >
               </div>
             </div>
-            <div id="lazyLassoContainer" style="display: none;" class="flex flex-col justify-center items-center col-span-2">
-              <label
-                for="lazyLassoSlider"
-                class="text-xs text-gray-500 mb-1"
+            <div
+              id="lazyLassoContainer"
+              style="display: none"
+              class="flex flex-col justify-center items-center col-span-2"
+            >
+              <label for="lazyLassoSlider" class="text-xs text-gray-500 mb-1"
                 >Lazy Lasso</label
               >
               <div class="flex items-center gap-1 w-full px-2">
@@ -503,7 +509,7 @@
             <button
               type="button"
               id="generateCutlineBtn"
-              style="display: none;"
+              style="display: none"
               class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-4 xl:col-span-2 flex justify-center items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500"
               data-tooltip="Generate Cutline from Image Alpha"
             >
@@ -575,7 +581,7 @@
             id="text-editing-controls"
             class="my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-100"
             hidden
-            style="display: none;"
+            style="display: none"
           >
             <h3
               class="text-lg font-semibold text-splotch-navy mb-3"
