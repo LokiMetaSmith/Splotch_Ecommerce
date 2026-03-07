@@ -1007,7 +1007,7 @@ async function renderMaterialMapping(currentMappings) {
             tr.innerHTML = `
                 <td class="py-2 px-4 border">${escapeHtml(mat.name)} (${escapeHtml(mat.id)})</td>
                 <td class="py-2 px-4 border">
-                    <input type="number" class="w-full p-1 border rounded mapping-input" data-key="${mat.id}" value="${odooId}">
+                    <input type="number" class="w-full p-1 border rounded mapping-input" data-key="${mat.id}" value="${escapeHtml(odooId)}">
                 </td>
             `;
             tbody.appendChild(tr);
