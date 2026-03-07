@@ -1,5 +1,9 @@
 import { SVGParser } from "./lib/svgparser.js";
-import { calculateStickerPrice, calculatePerimeter, generateSvgFromCutline } from "./lib/pricing.js";
+import {
+  calculateStickerPrice,
+  calculatePerimeter,
+  generateSvgFromCutline,
+} from "./lib/pricing.js";
 import {
   drawRuler as drawCanvasRuler,
   drawImageWithFilters,
@@ -216,8 +220,12 @@ async function BootStrap() {
   sepiaBtnEl = document.getElementById("sepiaBtn");
   cutlineOffsetSlider = document.getElementById("cutlineOffsetSlider");
   cutlineOffsetValueDisplay = document.getElementById("cutlineOffsetValue");
-  cutlineSensitivitySlider = document.getElementById("cutlineSensitivitySlider");
-  cutlineSensitivityValueDisplay = document.getElementById("cutlineSensitivityValue");
+  cutlineSensitivitySlider = document.getElementById(
+    "cutlineSensitivitySlider",
+  );
+  cutlineSensitivityValueDisplay = document.getElementById(
+    "cutlineSensitivityValue",
+  );
   lazyLassoSlider = document.getElementById("lazyLassoSlider");
   lazyLassoValueDisplay = document.getElementById("lazyLassoValue");
 
@@ -395,33 +403,33 @@ async function BootStrap() {
   if (cutlineSensitivitySlider) {
     // Update value display immediately
     cutlineSensitivitySlider.addEventListener("input", (e) => {
-        cutlineSensitivity = parseInt(e.target.value, 10);
-        if (cutlineSensitivityValueDisplay) {
-            cutlineSensitivityValueDisplay.textContent = cutlineSensitivity;
-        }
+      cutlineSensitivity = parseInt(e.target.value, 10);
+      if (cutlineSensitivityValueDisplay) {
+        cutlineSensitivityValueDisplay.textContent = cutlineSensitivity;
+      }
     });
 
     // Trigger regeneration only on change (mouse up) to avoid lag
     cutlineSensitivitySlider.addEventListener("change", () => {
-        if (originalImage && rasterCutlinePoly) {
-            handleGenerateCutline();
-        }
+      if (originalImage && rasterCutlinePoly) {
+        handleGenerateCutline();
+      }
     });
   }
 
   if (lazyLassoSlider) {
     // Update value display immediately
     lazyLassoSlider.addEventListener("input", (e) => {
-        if (lazyLassoValueDisplay) {
-            lazyLassoValueDisplay.textContent = e.target.value;
-        }
+      if (lazyLassoValueDisplay) {
+        lazyLassoValueDisplay.textContent = e.target.value;
+      }
     });
 
     // Trigger regeneration only on change (mouse up) to avoid lag
     lazyLassoSlider.addEventListener("change", () => {
-        if (originalImage && rasterCutlinePoly) {
-            handleGenerateCutline();
-        }
+      if (originalImage && rasterCutlinePoly) {
+        handleGenerateCutline();
+      }
     });
   }
 
@@ -552,16 +560,18 @@ async function BootStrap() {
       canvas.classList.remove("border-dashed", "border-2", "border-blue-500");
 
       // Handle Mascot Drop
-      if (e.dataTransfer.getData('application/x-mascot-drag')) {
-        const mascotSrc = e.dataTransfer.getData('text/uri-list');
+      if (e.dataTransfer.getData("application/x-mascot-drag")) {
+        const mascotSrc = e.dataTransfer.getData("text/uri-list");
         if (mascotSrc) {
-            fetch(mascotSrc)
-                .then(res => res.blob())
-                .then(blob => {
-                    const file = new File([blob], "Splotch-Mascot.png", { type: blob.type });
-                    loadFileAsImage(file, true);
-                })
-                .catch(err => console.error("Failed to load mascot", err));
+          fetch(mascotSrc)
+            .then((res) => res.blob())
+            .then((blob) => {
+              const file = new File([blob], "Splotch-Mascot.png", {
+                type: blob.type,
+              });
+              loadFileAsImage(file, true);
+            })
+            .catch((err) => console.error("Failed to load mascot", err));
         }
         return;
       }
@@ -607,16 +617,18 @@ async function BootStrap() {
       canvasPlaceholder.classList.remove(...activeClasses);
 
       // Handle Mascot Drop
-      if (e.dataTransfer.getData('application/x-mascot-drag')) {
-        const mascotSrc = e.dataTransfer.getData('text/uri-list');
+      if (e.dataTransfer.getData("application/x-mascot-drag")) {
+        const mascotSrc = e.dataTransfer.getData("text/uri-list");
         if (mascotSrc) {
-            fetch(mascotSrc)
-                .then(res => res.blob())
-                .then(blob => {
-                    const file = new File([blob], "Splotch-Mascot.png", { type: blob.type });
-                    loadFileAsImage(file, true);
-                })
-                .catch(err => console.error("Failed to load mascot", err));
+          fetch(mascotSrc)
+            .then((res) => res.blob())
+            .then((blob) => {
+              const file = new File([blob], "Splotch-Mascot.png", {
+                type: blob.type,
+              });
+              loadFileAsImage(file, true);
+            })
+            .catch((err) => console.error("Failed to load mascot", err));
         }
         return;
       }
@@ -721,41 +733,46 @@ async function BootStrap() {
       const grayBtn = document.getElementById("grayscaleBtn");
       const sepBtn = document.getElementById("sepiaBtn");
       const textContainer = document.getElementById("text-editing-controls");
-      const cutlineSensitivityContainer = document.getElementById("cutlineSensitivityContainer");
+      const cutlineSensitivityContainer = document.getElementById(
+        "cutlineSensitivityContainer",
+      );
       const lazyLassoContainer = document.getElementById("lazyLassoContainer");
       const generateCutlineBtn = document.getElementById("generateCutlineBtn");
 
       if (grayBtn) {
-          grayBtn.style.display = "block";
-          grayBtn.classList.remove("lg:hidden", "xl:block");
+        grayBtn.style.display = "block";
+        grayBtn.classList.remove("lg:hidden", "xl:block");
       }
       if (sepBtn) {
-          sepBtn.style.display = "block";
-          sepBtn.classList.remove("lg:hidden", "xl:block");
+        sepBtn.style.display = "block";
+        sepBtn.classList.remove("lg:hidden", "xl:block");
       }
 
       if (cutlineSensitivityContainer) {
-          cutlineSensitivityContainer.style.display = "flex";
+        cutlineSensitivityContainer.style.display = "flex";
       }
       if (lazyLassoContainer) {
-          lazyLassoContainer.style.display = "flex";
+        lazyLassoContainer.style.display = "flex";
       }
       if (generateCutlineBtn) {
-          generateCutlineBtn.style.display = "flex";
+        generateCutlineBtn.style.display = "flex";
       }
 
-      const isDisabled = (!originalImage && basePolygons.length === 0);
+      const isDisabled = !originalImage && basePolygons.length === 0;
       if (textContainer) {
         if (isDisabled) {
           textContainer.hidden = true;
-          textContainer.setAttribute('hidden', '');
+          textContainer.setAttribute("hidden", "");
           textContainer.style.display = "none";
         } else {
           textContainer.hidden = false;
-          textContainer.removeAttribute('hidden');
+          textContainer.removeAttribute("hidden");
           textContainer.style.display = "block";
           // Also need to clear any inline style preventing display
-          textContainer.style.cssText = textContainer.style.cssText.replace(/display:\s*none;?/g, '');
+          textContainer.style.cssText = textContainer.style.cssText.replace(
+            /display:\s*none;?/g,
+            "",
+          );
         }
       }
 
@@ -956,16 +973,16 @@ async function fetchPricingInfo() {
 
     // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
     if (pricingConfig.complexity && pricingConfig.complexity.tiers) {
-        pricingConfig.complexity.tiers.sort((a, b) =>
-            a.thresholdInches === "Infinity"
-                ? 1
-                : b.thresholdInches === "Infinity"
-                    ? -1
-                    : a.thresholdInches - b.thresholdInches
-        );
+      pricingConfig.complexity.tiers.sort((a, b) =>
+        a.thresholdInches === "Infinity"
+          ? 1
+          : b.thresholdInches === "Infinity"
+            ? -1
+            : a.thresholdInches - b.thresholdInches,
+      );
     }
     if (pricingConfig.quantityDiscounts) {
-        pricingConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
+      pricingConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
     }
 
     console.log("[CLIENT] Pricing config loaded:", pricingConfig);
@@ -981,37 +998,38 @@ async function fetchPricingInfo() {
 }
 
 async function fetchInventory() {
-    try {
-        const response = await fetch(`${serverUrl}/api/inventory`);
-        if (response.ok) {
-            inventoryCache = await response.json();
-            console.log('[CLIENT] Inventory loaded:', inventoryCache);
-        }
-    } catch (error) {
-        console.error('[CLIENT] Failed to load inventory:', error);
+  try {
+    const response = await fetch(`${serverUrl}/api/inventory`);
+    if (response.ok) {
+      inventoryCache = await response.json();
+      console.log("[CLIENT] Inventory loaded:", inventoryCache);
     }
+  } catch (error) {
+    console.error("[CLIENT] Failed to load inventory:", error);
+  }
 }
 
 function checkInventoryStatus(materialId) {
-    if (!stickerMaterialSelect) return;
+  if (!stickerMaterialSelect) return;
 
-    let warningEl = document.getElementById('material-warning');
-    if (!warningEl) {
-        warningEl = document.createElement('p');
-        warningEl.id = 'material-warning';
-        warningEl.className = 'text-xs text-red-600 font-bold mt-1';
-        stickerMaterialSelect.parentNode.appendChild(warningEl);
-    }
+  let warningEl = document.getElementById("material-warning");
+  if (!warningEl) {
+    warningEl = document.createElement("p");
+    warningEl.id = "material-warning";
+    warningEl.className = "text-xs text-red-600 font-bold mt-1";
+    stickerMaterialSelect.parentNode.appendChild(warningEl);
+  }
 
-    const qty = inventoryCache[materialId];
+  const qty = inventoryCache[materialId];
 
-    // Check if quantity is 0 or less (if tracked)
-    if (typeof qty === 'number' && qty <= 0) {
-        warningEl.textContent = '⚠️ Low Stock / Out of Stock - Order may be delayed.';
-        warningEl.style.display = 'block';
-    } else {
-        warningEl.style.display = 'none';
-    }
+  // Check if quantity is 0 or less (if tracked)
+  if (typeof qty === "number" && qty <= 0) {
+    warningEl.textContent =
+      "⚠️ Low Stock / Out of Stock - Order may be delayed.";
+    warningEl.style.display = "block";
+  } else {
+    warningEl.style.display = "none";
+  }
 }
 
 async function fetchCsrfToken() {
@@ -1417,18 +1435,21 @@ function updateEditingButtonsState(disabled) {
   if (textContainer) {
     if (!easterEggUnlocked) {
       textContainer.hidden = true;
-      textContainer.setAttribute('hidden', '');
+      textContainer.setAttribute("hidden", "");
       textContainer.style.display = "none";
     } else {
       if (disabled) {
         textContainer.hidden = true;
-        textContainer.setAttribute('hidden', '');
+        textContainer.setAttribute("hidden", "");
         textContainer.style.display = "none";
       } else {
         textContainer.hidden = false;
-        textContainer.removeAttribute('hidden');
+        textContainer.removeAttribute("hidden");
         textContainer.style.display = "block";
-        textContainer.style.cssText = textContainer.style.cssText.replace(/display:\s*none;?/g, '');
+        textContainer.style.cssText = textContainer.style.cssText.replace(
+          /display:\s*none;?/g,
+          "",
+        );
       }
     }
   }
@@ -1436,34 +1457,37 @@ function updateEditingButtonsState(disabled) {
   // Update styles for filter buttons based on easterEggUnlocked
   const grayBtn = document.getElementById("grayscaleBtn");
   const sepBtn = document.getElementById("sepiaBtn");
-  const cutlineSensitivityContainer = document.getElementById("cutlineSensitivityContainer");
+  const cutlineSensitivityContainer = document.getElementById(
+    "cutlineSensitivityContainer",
+  );
   const lazyLassoContainer = document.getElementById("lazyLassoContainer");
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
 
   if (!easterEggUnlocked) {
-      if (grayBtn) grayBtn.style.display = "none";
-      if (sepBtn) sepBtn.style.display = "none";
-      if (cutlineSensitivityContainer) cutlineSensitivityContainer.style.display = "none";
-      if (lazyLassoContainer) lazyLassoContainer.style.display = "none";
-      if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
+    if (grayBtn) grayBtn.style.display = "none";
+    if (sepBtn) sepBtn.style.display = "none";
+    if (cutlineSensitivityContainer)
+      cutlineSensitivityContainer.style.display = "none";
+    if (lazyLassoContainer) lazyLassoContainer.style.display = "none";
+    if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
   } else {
-      if (grayBtn) {
-          grayBtn.style.display = "block";
-          grayBtn.classList.remove("lg:hidden", "xl:block");
-      }
-      if (sepBtn) {
-          sepBtn.style.display = "block";
-          sepBtn.classList.remove("lg:hidden", "xl:block");
-      }
-      if (cutlineSensitivityContainer) {
-          cutlineSensitivityContainer.style.display = "flex";
-      }
-      if (lazyLassoContainer) {
-          lazyLassoContainer.style.display = "flex";
-      }
-      if (generateCutlineBtn) {
-          generateCutlineBtn.style.display = "flex";
-      }
+    if (grayBtn) {
+      grayBtn.style.display = "block";
+      grayBtn.classList.remove("lg:hidden", "xl:block");
+    }
+    if (sepBtn) {
+      sepBtn.style.display = "block";
+      sepBtn.classList.remove("lg:hidden", "xl:block");
+    }
+    if (cutlineSensitivityContainer) {
+      cutlineSensitivityContainer.style.display = "flex";
+    }
+    if (lazyLassoContainer) {
+      lazyLassoContainer.style.display = "flex";
+    }
+    if (generateCutlineBtn) {
+      generateCutlineBtn.style.display = "flex";
+    }
   }
   if (canvasPlaceholder)
     canvasPlaceholder.style.display = disabled ? "flex" : "none";
@@ -1509,9 +1533,9 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   canvas.style.width = `${cssWidth}px`;
   canvas.style.height = `${cssHeight}px`;
   // Specifically remove object-fit/maxWidth to ensure visual scaling changes are absolute
-  canvas.style.maxWidth = 'none';
-  canvas.style.maxHeight = 'none';
-  canvas.style.objectFit = 'fill';
+  canvas.style.maxWidth = "none";
+  canvas.style.maxHeight = "none";
+  canvas.style.objectFit = "fill";
 }
 
 function saveCleanState() {
@@ -1521,8 +1545,27 @@ function saveCleanState() {
 
 function restoreCleanState() {
   if (!canvas || !ctx || !cleanCanvasState) return;
-  // Use putImageData to bypass transformations and draw directly to device pixels
-  ctx.putImageData(cleanCanvasState, 0, 0);
+  // If we are in raster mode and have current bounds that push left/top negative,
+  // we need to offset the clean state onto the potentially larger canvas.
+  if (
+    basePolygons.length === 0 &&
+    currentBounds &&
+    (currentBounds.left < 0 || currentBounds.top < 0)
+  ) {
+    const drawOffset = {
+      x: -currentBounds.left + 20,
+      y: -currentBounds.top + 20,
+    };
+    // Create a temporary canvas to hold the image data, as putImageData doesn't support offsets directly on scaled/resized canvases easily
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = cleanCanvasState.width;
+    tempCanvas.height = cleanCanvasState.height;
+    tempCanvas.getContext("2d").putImageData(cleanCanvasState, 0, 0);
+    ctx.drawImage(tempCanvas, drawOffset.x, drawOffset.y);
+  } else {
+    // Use putImageData to bypass transformations and draw directly to device pixels
+    ctx.putImageData(cleanCanvasState, 0, 0);
+  }
 }
 
 // --- Image Loading and Editing Functions ---
@@ -1546,8 +1589,7 @@ function loadFileAsImage(file, isMascot = false) {
     reader.onload = (e) => {
       handleSvgUpload(e.target.result);
     };
-    reader.onerror = () =>
-      showNotification("Error reading SVG file.", "error");
+    reader.onerror = () => showNotification("Error reading SVG file.", "error");
     reader.readAsText(file);
   } else if (file.type.startsWith("image/")) {
     // Reset vector state
@@ -1602,13 +1644,15 @@ function loadFileAsImage(file, isMascot = false) {
             // Update Slider UI
             const resizeSliderEl = document.getElementById("resizeSlider");
             const resizeInputNumberEl = document.getElementById("resizeInput");
-            const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
+            const resizeUnitLabelEl =
+              document.getElementById("resizeUnitLabel");
 
             if (resizeSliderEl && resizeInputNumberEl) {
               const val = isMetric ? defaultSize * 25.4 : defaultSize;
               resizeSliderEl.value = val;
               resizeInputNumberEl.value = val.toFixed(1);
-              if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
+              if (resizeUnitLabelEl)
+                resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
             }
           }
 
@@ -1713,12 +1757,6 @@ function handleSvgUpload(svgText) {
     canvas.width = currentBounds.right - currentBounds.left + 40; // Add padding
     canvas.height = currentBounds.bottom - currentBounds.top + 40;
 
-    // Create an offset for drawing, so the shape isn't at the very edge
-    const drawOffset = {
-      x: -currentBounds.left + 20,
-      y: -currentBounds.top + 20,
-    };
-
     // Initial drawing
     redrawAll();
 
@@ -1763,11 +1801,18 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
 
   // Determine current PPI from UI state to convert real-world values to image pixels
   let ppi = 300; // Default fallback
-  if (typeof pricingConfig !== 'undefined' && pricingConfig && typeof stickerResolutionSelect !== 'undefined' && stickerResolutionSelect) {
-      const selectedRes = pricingConfig.resolutions.find(r => r.id === stickerResolutionSelect.value);
-      if (selectedRes) {
-          ppi = selectedRes.ppi;
-      }
+  if (
+    typeof pricingConfig !== "undefined" &&
+    pricingConfig &&
+    typeof stickerResolutionSelect !== "undefined" &&
+    stickerResolutionSelect
+  ) {
+    const selectedRes = pricingConfig.resolutions.find(
+      (r) => r.id === stickerResolutionSelect.value,
+    );
+    if (selectedRes) {
+      ppi = selectedRes.ppi;
+    }
   }
 
   // Convert raw values (which the slider outputs, presumably representing something like 0.1mm increments)
@@ -1798,25 +1843,41 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
     // 1. Dilate to bridge gaps
     const co1 = new ClipperLib.ClipperOffset();
     const expanded_paths = new ClipperLib.Paths();
-    co1.AddPaths(scaledPolygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co1.AddPaths(
+      scaledPolygons,
+      ClipperLib.JoinType.jtRound,
+      ClipperLib.EndType.etClosedPolygon,
+    );
     co1.Execute(expanded_paths, lazyRadiusPx * scale);
 
     // 2. Erode to return to the original boundary but with closed gaps
     const co2 = new ClipperLib.ClipperOffset();
     const shrunk_paths = new ClipperLib.Paths();
-    co2.AddPaths(expanded_paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co2.AddPaths(
+      expanded_paths,
+      ClipperLib.JoinType.jtRound,
+      ClipperLib.EndType.etClosedPolygon,
+    );
     co2.Execute(shrunk_paths, -lazyRadiusPx * scale);
 
     // 3. Apply the actual requested cutline offset
     const co3 = new ClipperLib.ClipperOffset();
     final_paths = new ClipperLib.Paths();
-    co3.AddPaths(shrunk_paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co3.AddPaths(
+      shrunk_paths,
+      ClipperLib.JoinType.jtRound,
+      ClipperLib.EndType.etClosedPolygon,
+    );
     co3.Execute(final_paths, offsetPx * scale);
   } else {
     // Normal single-pass offset
     const co = new ClipperLib.ClipperOffset();
     final_paths = new ClipperLib.Paths();
-    co.AddPaths(scaledPolygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    co.AddPaths(
+      scaledPolygons,
+      ClipperLib.JoinType.jtRound,
+      ClipperLib.EndType.etClosedPolygon,
+    );
     co.Execute(final_paths, offsetPx * scale);
   }
 
@@ -1853,7 +1914,7 @@ function drawPolygonsToCanvas(
   if (stroke) {
     // Determine active state for legend highlighting
     const activeLineId = getActiveLineId();
-    const isCutlineActive = activeLineId === 'cutline';
+    const isCutlineActive = activeLineId === "cutline";
     const isOtherActive = activeLineId && !isCutlineActive;
 
     ctx.strokeStyle = style;
@@ -1886,19 +1947,46 @@ function drawPolygonsToCanvas(
 function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
   if (!bounds) return;
 
-  // In Raster Mode (where basePolygons is empty), we need to restore the clean image first to wipe old decorations.
-  if (basePolygons.length === 0 && cleanCanvasState) {
-    restoreCleanState();
+  let drawOffset = offset;
+
+  // In Raster Mode (where basePolygons is empty), we need to handle canvas resizing
+  // and restoring the clean image first to wipe old decorations.
+  if (basePolygons.length === 0) {
+    if (bounds.left < 0 || bounds.top < 0) {
+      const logicalWidth = bounds.right - bounds.left + 40; // Add padding
+      const logicalHeight = bounds.bottom - bounds.top + 40;
+      setCanvasSize(logicalWidth, logicalHeight);
+      ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+      drawOffset = {
+        x: -bounds.left + 20,
+        y: -bounds.top + 20,
+      };
+    } else if (cleanCanvasState) {
+      // Ensure canvas is at least original size
+      const dpr = window.devicePixelRatio || 1;
+      // We must compare against the display/logical dimensions, not the raw pixel dimensions
+      const logicalOrigW = cleanCanvasState.width / dpr;
+      if (canvas && canvas.width !== cleanCanvasState.width) {
+        // Need to set it back to original state if we shrank the cutline back
+        setCanvasSize(logicalOrigW, cleanCanvasState.height / dpr);
+        ctx.clearRect(0, 0, logicalOrigW, cleanCanvasState.height / dpr);
+      }
+    }
+
+    if (cleanCanvasState) restoreCleanState();
   }
 
-  drawBoundingBox(bounds, offset);
-  drawSizeIndicator(bounds, offset);
-  drawRuler(bounds, offset);
+  drawBoundingBox(bounds, drawOffset);
+  drawSizeIndicator(bounds, drawOffset);
+  drawRuler(bounds, drawOffset);
 
-  // In Raster Mode (where basePolygons is empty), we need to draw the cutline overlay manually
-  // because we don't use redrawAll().
-  if (basePolygons.length === 0 && currentCutline && currentCutline.length > 0) {
-    drawPolygonsToCanvas(currentCutline, "red", offset, true);
+  // In Raster Mode, we draw the cutline overlay manually
+  if (
+    basePolygons.length === 0 &&
+    currentCutline &&
+    currentCutline.length > 0
+  ) {
+    drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
   }
 }
 
@@ -1910,7 +1998,7 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
   ctx.save();
 
   const activeLineId = getActiveLineId();
-  const isBoxActive = activeLineId === 'box';
+  const isBoxActive = activeLineId === "box";
   const isOtherActive = activeLineId && !isBoxActive;
 
   // The user wanted a grey box with 1-inch dashes for pricing.
@@ -1997,40 +2085,52 @@ function renderLegend() {
 
   // Only show if there's an image or svg loaded
   if (!originalImage && basePolygons.length === 0) {
-    canvasLegendContainer.style.display = 'none';
+    canvasLegendContainer.style.display = "none";
     return;
   }
 
-  canvasLegendContainer.style.display = 'flex';
+  canvasLegendContainer.style.display = "flex";
 
   const tabs = [
-    { id: 'cutline', label: 'Cutline', color: 'red', borderColor: '#ef4444', bgColor: '#fee2e2' },
-    { id: 'box', label: 'Bounding Box', color: 'grey', borderColor: '#9ca3af', bgColor: '#f3f4f6' }
+    {
+      id: "cutline",
+      label: "Cutline",
+      color: "red",
+      borderColor: "#ef4444",
+      bgColor: "#fee2e2",
+    },
+    {
+      id: "box",
+      label: "Bounding Box",
+      color: "grey",
+      borderColor: "#9ca3af",
+      bgColor: "#f3f4f6",
+    },
   ];
 
   if (!legendInitialized) {
-    canvasLegendContainer.innerHTML = ''; // Clear once on init
+    canvasLegendContainer.innerHTML = ""; // Clear once on init
 
-    tabs.forEach(tab => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
+    tabs.forEach((tab) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
       btn.id = `legend-tab-${tab.id}`;
       btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`;
 
       // Default style
       btn.style.color = tab.color;
       btn.style.borderColor = tab.borderColor;
-      btn.style.fontFamily = 'var(--font-baumans)';
+      btn.style.fontFamily = "var(--font-baumans)";
       btn.textContent = tab.label;
 
       // Interactivity
-      btn.addEventListener('mouseenter', () => {
+      btn.addEventListener("mouseenter", () => {
         hoveredLegendTab = tab.id;
         updateLegendStyles();
         redrawAllForHighlight();
       });
 
-      btn.addEventListener('mouseleave', () => {
+      btn.addEventListener("mouseleave", () => {
         if (hoveredLegendTab === tab.id) {
           hoveredLegendTab = null;
           updateLegendStyles();
@@ -2038,7 +2138,7 @@ function renderLegend() {
         }
       });
 
-      btn.addEventListener('click', () => {
+      btn.addEventListener("click", () => {
         if (selectedLegendTab === tab.id) {
           selectedLegendTab = null; // Toggle off
         } else {
@@ -2060,18 +2160,18 @@ function renderLegend() {
 function updateLegendStyles() {
   if (!canvasLegendContainer) return;
   const tabs = [
-    { id: 'cutline', bgColor: '#fee2e2' },
-    { id: 'box', bgColor: '#f3f4f6' }
+    { id: "cutline", bgColor: "#fee2e2" },
+    { id: "box", bgColor: "#f3f4f6" },
   ];
 
-  tabs.forEach(tab => {
+  tabs.forEach((tab) => {
     const btn = document.getElementById(`legend-tab-${tab.id}`);
     if (btn) {
       const isActive = getActiveLineId() === tab.id;
       if (isActive) {
         btn.style.backgroundColor = tab.bgColor;
       } else {
-        btn.style.backgroundColor = 'transparent';
+        btn.style.backgroundColor = "transparent";
       }
     }
   });
@@ -2326,46 +2426,50 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
 
     // Handle Raster Cutline Rotation (Overlay Mode)
     if (rasterCutlinePoly) {
-        const angleRad = (angleDegrees * Math.PI) / 180;
-        const cos = Math.cos(angleRad);
-        const sin = Math.sin(angleRad);
-        const dpr = window.devicePixelRatio || 1;
-        const oldCenterX = (w / dpr) / 2;
-        const oldCenterY = (h / dpr) / 2;
-        const newCenterX = (newW / dpr) / 2;
-        const newCenterY = (newH / dpr) / 2;
+      const angleRad = (angleDegrees * Math.PI) / 180;
+      const cos = Math.cos(angleRad);
+      const sin = Math.sin(angleRad);
+      const dpr = window.devicePixelRatio || 1;
+      const oldCenterX = w / dpr / 2;
+      const oldCenterY = h / dpr / 2;
+      const newCenterX = newW / dpr / 2;
+      const newCenterY = newH / dpr / 2;
 
-        rasterCutlinePoly = rasterCutlinePoly.map(poly => poly.map(p => {
-            // Translate to old center
-            const tx = p.x - oldCenterX;
-            const ty = p.y - oldCenterY;
-            // Rotate
-            const rx = tx * cos - ty * sin;
-            const ry = tx * sin + ty * cos;
-            // Translate to new center
-            return { x: rx + newCenterX, y: ry + newCenterY };
-        }));
+      rasterCutlinePoly = rasterCutlinePoly.map((poly) =>
+        poly.map((p) => {
+          // Translate to old center
+          const tx = p.x - oldCenterX;
+          const ty = p.y - oldCenterY;
+          // Rotate
+          const rx = tx * cos - ty * sin;
+          const ry = tx * sin + ty * cos;
+          // Translate to new center
+          return { x: rx + newCenterX, y: ry + newCenterY };
+        }),
+      );
 
-        // Regenerate currentCutline from rotated poly
-        const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
-        currentCutline = cutline;
-        currentBounds = getPolygonsBounds(cutline);
+      // Regenerate currentCutline from rotated poly
+      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+      currentCutline = cutline;
+      currentBounds = getPolygonsBounds(cutline);
     } else {
-        // Default bounds if no cutline
-        currentBounds = {
-            left: 0,
-            top: 0,
-            right: newW,
-            bottom: newH,
-            width: newW,
-            height: newH,
-        };
-        currentCutline = [[
-            { x: 0, y: 0 },
-            { x: newW, y: 0 },
-            { x: newW, y: newH },
-            { x: 0, y: newH },
-        ]];
+      // Default bounds if no cutline
+      currentBounds = {
+        left: 0,
+        top: 0,
+        right: newW,
+        bottom: newH,
+        width: newW,
+        height: newH,
+      };
+      currentCutline = [
+        [
+          { x: 0, y: 0 },
+          { x: newW, y: 0 },
+          { x: newW, y: newH },
+          { x: 0, y: newH },
+        ],
+      ];
     }
 
     calculateAndUpdatePrice();
@@ -2537,41 +2641,43 @@ function handleStandardResize(targetInches) {
 
       // Handle Raster Cutline Scaling (Overlay Mode)
       if (rasterCutlinePoly && prevWidth > 0 && prevHeight > 0) {
-          // Bolt Fix: Calculate scale based on LOGICAL dimensions to match rasterCutlinePoly coordinate space
-          const dpr = window.devicePixelRatio || 1;
-          const prevLogicalWidth = prevWidth / dpr;
-          const prevLogicalHeight = prevHeight / dpr;
+        // Bolt Fix: Calculate scale based on LOGICAL dimensions to match rasterCutlinePoly coordinate space
+        const dpr = window.devicePixelRatio || 1;
+        const prevLogicalWidth = prevWidth / dpr;
+        const prevLogicalHeight = prevHeight / dpr;
 
-          const scaleX = newWidth / prevLogicalWidth;
-          const scaleY = newHeight / prevLogicalHeight;
+        const scaleX = newWidth / prevLogicalWidth;
+        const scaleY = newHeight / prevLogicalHeight;
 
-          rasterCutlinePoly = rasterCutlinePoly.map(poly => poly.map(p => ({
-              x: p.x * scaleX,
-              y: p.y * scaleY
-          })));
+        rasterCutlinePoly = rasterCutlinePoly.map((poly) =>
+          poly.map((p) => ({
+            x: p.x * scaleX,
+            y: p.y * scaleY,
+          })),
+        );
 
-          // Regenerate currentCutline
-          const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
-          currentCutline = cutline;
-          currentBounds = getPolygonsBounds(cutline);
+        // Regenerate currentCutline
+        const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+        currentCutline = cutline;
+        currentBounds = getPolygonsBounds(cutline);
       } else {
-          // Update the bounds and cutline for the new raster size (Default Box)
-          currentBounds = {
-            left: 0,
-            top: 0,
-            right: newWidth,
-            bottom: newHeight,
-            width: newWidth,
-            height: newHeight,
-          };
-          currentCutline = [
-            [
-              { x: 0, y: 0 },
-              { x: newWidth, y: 0 },
-              { x: newWidth, y: newHeight },
-              { x: 0, y: newHeight },
-            ],
-          ];
+        // Update the bounds and cutline for the new raster size (Default Box)
+        currentBounds = {
+          left: 0,
+          top: 0,
+          right: newWidth,
+          bottom: newHeight,
+          width: newWidth,
+          height: newHeight,
+        };
+        currentCutline = [
+          [
+            { x: 0, y: 0 },
+            { x: newWidth, y: 0 },
+            { x: newWidth, y: newHeight },
+            { x: 0, y: newHeight },
+          ],
+        ];
       }
 
       // Trigger the price update and redraw the bounding box
@@ -2629,16 +2735,22 @@ function handleGenerateCutline() {
   );
 
   const lazyLassoSlider = document.getElementById("lazyLassoSlider");
-  const lazyLassoRadius = lazyLassoSlider ? parseInt(lazyLassoSlider.value, 10) : 0;
+  const lazyLassoRadius = lazyLassoSlider
+    ? parseInt(lazyLassoSlider.value, 10)
+    : 0;
 
   // Use a timeout to allow the UI to update before the heavy computation
   setTimeout(() => {
     try {
       let imageData;
-      if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
-         imageData = cleanCanvasState;
+      if (
+        cleanCanvasState &&
+        cleanCanvasState.width === canvas.width &&
+        cleanCanvasState.height === canvas.height
+      ) {
+        imageData = cleanCanvasState;
       } else {
-         imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       }
       const contours = traceContours(imageData, cutlineSensitivity);
 
@@ -2656,24 +2768,33 @@ function handleGenerateCutline() {
       // This changes O(N*M) check to O(N*m) where m << M.
       let significantContours = contours
         .filter((c) => getPolygonArea(c) > minIslandArea)
-        .map(c => simplifyPolygon(c, 0.5)); // Epsilon of 0.5 pixels
+        .map((c) => simplifyPolygon(c, 0.5)); // Epsilon of 0.5 pixels
 
       // Suppress "island cuts" (internal holes) that are larger than 2mm.
       // Constraint: "we can have internal cuts, but they should be less than 2mm"
       // Interpretation: Keep internal cuts <= 2mm. Remove internal cuts > 2mm.
       if (significantContours.length > 0) {
-          const selectedResolutionId = stickerResolutionSelect ? stickerResolutionSelect.value : 'dpi_300';
-          const selectedResolution = pricingConfig && pricingConfig.resolutions
-            ? pricingConfig.resolutions.find((r) => r.id === selectedResolutionId)
+        const selectedResolutionId = stickerResolutionSelect
+          ? stickerResolutionSelect.value
+          : "dpi_300";
+        const selectedResolution =
+          pricingConfig && pricingConfig.resolutions
+            ? pricingConfig.resolutions.find(
+                (r) => r.id === selectedResolutionId,
+              )
             : null;
 
-          const ppi = selectedResolution ? selectedResolution.ppi : 300;
-          // Calculate 2mm in pixels for max hole size
-          const maxAllowedHoleSize = (2 / 25.4) * ppi;
-          // Calculate 0.5mm in pixels for min hole size (noise floor)
-          const minAllowedHoleSize = (0.5 / 25.4) * ppi;
+        const ppi = selectedResolution ? selectedResolution.ppi : 300;
+        // Calculate 2mm in pixels for max hole size
+        const maxAllowedHoleSize = (2 / 25.4) * ppi;
+        // Calculate 0.5mm in pixels for min hole size (noise floor)
+        const minAllowedHoleSize = (0.5 / 25.4) * ppi;
 
-          significantContours = filterInternalContours(significantContours, maxAllowedHoleSize, minAllowedHoleSize);
+        significantContours = filterInternalContours(
+          significantContours,
+          maxAllowedHoleSize,
+          minAllowedHoleSize,
+        );
       }
 
       if (significantContours.length === 0) {
@@ -2721,13 +2842,19 @@ function handleGenerateCutline() {
 
       // Set the raster cutline polygon (Overlay Mode)
       const dpr = window.devicePixelRatio || 1;
-      rasterCutlinePoly = finalContours.map(poly => poly.map(p => ({
+      rasterCutlinePoly = finalContours.map((poly) =>
+        poly.map((p) => ({
           x: p.x / dpr,
-          y: p.y / dpr
-      })));
+          y: p.y / dpr,
+        })),
+      );
 
       // Generate the cutline immediately
-      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, lazyLassoRadius);
+      const cutline = generateCutLine(
+        rasterCutlinePoly,
+        cutlineOffset,
+        lazyLassoRadius,
+      );
       currentCutline = cutline;
       currentBounds = getPolygonsBounds(cutline);
 
@@ -2757,7 +2884,9 @@ function handleGenerateCutline() {
 async function checkAuthStatus() {
   try {
     // Check localStorage for token (support both keys for backward compatibility)
-    const token = localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
+    const token =
+      localStorage.getItem("authToken") ||
+      localStorage.getItem("splotch_token");
 
     if (token) {
       const verifyRes = await fetch(`${serverUrl}/api/auth/verify-token`, {
@@ -2789,7 +2918,8 @@ async function handleCreateProduct() {
   // But `handleFileChange` just reads locally.
 
   // 1. Get auth token
-  const token = localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
+  const token =
+    localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
   if (!token) {
     showNotification("You must be logged in to sell designs.", "error");
     return;
@@ -2897,8 +3027,7 @@ async function handleRemoteImageLoad(imageUrl) {
 
     showNotification("Design loaded! You can now adjust options.", "success");
   };
-  img.onerror = () =>
-    showNotification("Failed to load design image.", "error");
+  img.onerror = () => showNotification("Failed to load design image.", "error");
   img.src = decodeURIComponent(imageUrl);
 }
 
