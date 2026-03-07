@@ -1,0 +1,11 @@
+<<<<<<< SEARCH
+  const selectedResolutionId = stickerResolutionSelect.value;
+  const selectedResolution = pricingConfig.resolutions.find(
+    (r) => r.id === selectedResolutionId,
+  );
+=======
+  const selectedResolutionId = stickerResolutionSelect.value || "dpi_300";
+  const selectedResolution = pricingConfig.resolutions.find(
+    (r) => r.id === selectedResolutionId,
+  );
+>>>>>>> REPLACE

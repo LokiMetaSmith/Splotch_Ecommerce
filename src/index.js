@@ -806,7 +806,7 @@ function calculateAndUpdatePrice() {
   const selectedMaterial = stickerMaterialSelect.value;
   checkInventoryStatus(selectedMaterial);
 
-  const selectedResolutionId = stickerResolutionSelect.value;
+  const selectedResolutionId = stickerResolutionSelect.value || "dpi_300";
   const selectedResolution = pricingConfig.resolutions.find(
     (r) => r.id === selectedResolutionId,
   );
@@ -1722,6 +1722,28 @@ function handleSvgUpload(svgText) {
     // Initial drawing
     redrawAll();
 
+    // Bolt Fix: Default to 2 inches on import
+    if (pricingConfig) {
+      const defaultSize = 2;
+
+      // Update Slider UI BEFORE resizing so state matches
+      const resizeSliderEl = document.getElementById("resizeSlider");
+      const resizeInputNumberEl = document.getElementById("resizeInput");
+      const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
+
+      if (resizeSliderEl && resizeInputNumberEl) {
+        const val = isMetric ? defaultSize * 25.4 : defaultSize;
+        resizeSliderEl.value = val;
+        resizeInputNumberEl.value = val.toFixed(1);
+        if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
+      }
+
+      handleStandardResize(defaultSize);
+
+      // Ensure price is calculated after all initializations
+      calculateAndUpdatePrice();
+    }
+
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
     showNotification("SVG processed and cutline generated.", "success");
     updateEditingButtonsState(false); // Enable editing buttons
@@ -2437,8 +2459,9 @@ function handleStandardResize(targetInches) {
     return;
   }
 
+  const resolutionId = stickerResolutionSelect.value || "dpi_300";
   const selectedResolution = pricingConfig.resolutions.find(
-    (r) => r.id === stickerResolutionSelect.value,
+    (r) => r.id === resolutionId,
   );
   if (!selectedResolution) return;
 

@@ -1,0 +1,39 @@
+<<<<<<< SEARCH
+    // Initial drawing
+    redrawAll();
+
+    if (clearFileBtn) clearFileBtn.classList.remove("hidden");
+    showNotification("SVG processed and cutline generated.", "success");
+    updateEditingButtonsState(false); // Enable editing buttons
+
+    // Show legend since SVG is loaded
+    renderLegend();
+=======
+    // Initial drawing
+    redrawAll();
+
+    // Bolt Fix: Default to 2 inches on import
+    if (pricingConfig) {
+      const defaultSize = 2;
+      handleStandardResize(defaultSize);
+
+      // Update Slider UI
+      const resizeSliderEl = document.getElementById("resizeSlider");
+      const resizeInputNumberEl = document.getElementById("resizeInput");
+      const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
+
+      if (resizeSliderEl && resizeInputNumberEl) {
+        const val = isMetric ? defaultSize * 25.4 : defaultSize;
+        resizeSliderEl.value = val;
+        resizeInputNumberEl.value = val.toFixed(1);
+        if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
+      }
+    }
+
+    if (clearFileBtn) clearFileBtn.classList.remove("hidden");
+    showNotification("SVG processed and cutline generated.", "success");
+    updateEditingButtonsState(false); // Enable editing buttons
+
+    // Show legend since SVG is loaded
+    renderLegend();
+>>>>>>> REPLACE
