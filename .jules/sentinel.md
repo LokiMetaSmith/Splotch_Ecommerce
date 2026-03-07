@@ -15,3 +15,8 @@
 **Vulnerability:** Truncating HTML escaped text with `substring(0, 8)` can cut off an HTML entity mid-way (e.g. `&quot;` becomes `&qu`) which leads to malformed rendering in the DOM.
 **Learning:** Always apply length limitations or substrings to the raw string *before* passing it into the `escapeHtml()` function.
 **Prevention:** Order of operations matters: `escapeHtml(rawString.substring(0, N))` rather than `escapeHtml(rawString).substring(0, N)`.
+
+## 2025-03-07 - XSS via Unescaped Attributes in innerHTML
+**Vulnerability:** A dynamic value (`odooId` from server config mappings) was interpolated directly into an HTML input attribute string via `.innerHTML`: `<input ... value="${odooId}">`. An attacker who modifies `currentMappings` via the admin API could inject quotes and script tags (e.g. `1"> <script>alert(1)</script>`) to perform a Stored XSS attack against admins.
+**Learning:** Even if data isn't meant to be rendered as text, placing it directly into HTML attribute strings without encoding allows attribute breakout attacks.
+**Prevention:** Always use `escapeHtml()` when interpolating any dynamic or server-provided data into `.innerHTML` template literals, including attribute values.
