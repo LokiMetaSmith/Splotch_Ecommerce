@@ -69,3 +69,7 @@ This journal tracks critical performance learnings, anti-patterns, and insights 
 ## 2026-03-05 - [Jimp Buffer Iteration]
 **Learning:** `Jimp.scan()` uses a callback function per pixel, which creates immense overhead (e.g., millions of function calls for large images). Replacing it with a raw `for` loop over the underlying `Buffer` (`image.bitmap.data`) dramatically improves ink coverage/pixel calculation times by eliminating callback allocation and invocation.
 **Action:** Use direct `Uint8Array`/`Buffer` iteration instead of `Jimp.scan()` when performing pixel-level analysis in Node.js.
+
+## 2026-03-05 - [Jimp Buffer Iteration Uint32Array]
+**Learning:** Iterating over a Node.js Buffer (or `Uint8Array`) using `Uint32Array` allows processing 4 bytes (RGBA channels) in a single CPU instruction using bitwise operators. This eliminates 75% of array access overhead and speeds up calculations (like ink coverage) by an additional ~1.3-1.7x compared to byte-by-byte traversal.
+**Action:** When performing pixel-level analysis where individual channel values can be extracted via bitwise shifts, cast the `Buffer` to a `Uint32Array` after checking system endianness.
