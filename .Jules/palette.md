@@ -17,3 +17,7 @@
 **Learning:** Components created dynamically using `document.createElement`, such as toast notifications, often lack visual focus states necessary for keyboard navigation accessibility because they don't use standard styled component templates.
 **Action:** Always append Tailwind CSS's `focus-visible` utility classes (e.g., `focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`) when dynamically generating interactive DOM elements to guarantee clear focus indicators for keyboard users.
 ## 2026-03-08 - Hiding Decorative SVGs from Screen Readers\n**Learning:** Decorative `<svg>` elements inside interactive components (like buttons) must include the `aria-hidden="true"` attribute to prevent screen readers from announcing redundant or confusing image descriptions.\n**Action:** Always add `aria-hidden="true"` to SVG icons that do not convey unique semantic meaning, especially when the parent element already has text or an `aria-label`.\n
+
+## 2024-05-16 - Explicit Aria-Hidden on SVGs inside interactive elements
+**Learning:** Decorative SVGs inside buttons and interactive components might be announced redundantly by screen readers if they lack the `aria-hidden="true"` attribute.
+**Action:** When adding interactive elements like buttons that contain an SVG icon alongside text or an `aria-label`, always ensure the `<svg>` tag has `aria-hidden="true"`.
