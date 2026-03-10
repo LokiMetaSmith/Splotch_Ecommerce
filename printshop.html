@@ -564,12 +564,20 @@
     <div
       id="login-modal"
       class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="loginModalTitle"
     >
       <div
         class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-4 sm:mx-0"
       >
         <div class="flex justify-between items-center mb-6">
-          <h2 class="text-2xl sm:text-3xl text-splotch-navy">Login</h2>
+          <h2
+            id="loginModalTitle"
+            class="text-2xl sm:text-3xl text-splotch-navy"
+          >
+            Login
+          </h2>
           <button
             id="close-modal-btn"
             class="text-2xl font-bold text-gray-500 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded"

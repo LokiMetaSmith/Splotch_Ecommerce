@@ -21,3 +21,7 @@
 ## 2024-05-16 - Explicit Aria-Hidden on SVGs inside interactive elements
 **Learning:** Decorative SVGs inside buttons and interactive components might be announced redundantly by screen readers if they lack the `aria-hidden="true"` attribute.
 **Action:** When adding interactive elements like buttons that contain an SVG icon alongside text or an `aria-label`, always ensure the `<svg>` tag has `aria-hidden="true"`.
+
+## 2026-03-10 - Explicit Modal ARIA Attributes
+**Learning:** Custom HTML modal implementations (like `#login-modal` containers) require explicit `role="dialog"`, `aria-modal="true"`, and an `aria-labelledby` attribute pointing to the modal's title ID to ensure proper screen reader accessibility. Without these, screen readers may not announce the content appropriately as an active dialog box.
+**Action:** Always include `role="dialog"`, `aria-modal="true"`, and `aria-labelledby="[TitleID]"` on dynamically toggled or custom-built modal containers.
