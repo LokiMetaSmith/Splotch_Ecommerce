@@ -373,15 +373,20 @@ export const GeometryUtil = {
 
     rotatePolygon: function(polygon, angle) {
         if (!polygon || polygon.length === 0) return [];
-        const angleRad = _degreesToRadians(angle);
+        const angleRad = angle * (Math.PI / 180); // Bolt Optimization: Inline _degreesToRadians for speed
         const cos = Math.cos(angleRad);
         const sin = Math.sin(angleRad);
-        const rotated = [];
-        for (let i = 0; i < polygon.length; i++) {
-            rotated.push({
-                x: polygon[i].x * cos - polygon[i].y * sin,
-                y: polygon[i].x * sin + polygon[i].y * cos
-            });
+
+        const len = polygon.length;
+        // Bolt Optimization: Pre-allocate array to avoid dynamic resizing pressure
+        const rotated = new Array(len);
+
+        for (let i = 0; i < len; i++) {
+            const p = polygon[i];
+            rotated[i] = {
+                x: p.x * cos - p.y * sin,
+                y: p.x * sin + p.y * cos
+            };
         }
         if (polygon.id !== undefined) rotated.id = polygon.id;
         if (polygon.source) rotated.source = polygon.source;
