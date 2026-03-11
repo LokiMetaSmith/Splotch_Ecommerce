@@ -73,3 +73,7 @@ This journal tracks critical performance learnings, anti-patterns, and insights 
 ## 2026-03-05 - [Jimp Buffer Iteration Uint32Array]
 **Learning:** Iterating over a Node.js Buffer (or `Uint8Array`) using `Uint32Array` allows processing 4 bytes (RGBA channels) in a single CPU instruction using bitwise operators. This eliminates 75% of array access overhead and speeds up calculations (like ink coverage) by an additional ~1.3-1.7x compared to byte-by-byte traversal.
 **Action:** When performing pixel-level analysis where individual channel values can be extracted via bitwise shifts, cast the `Buffer` to a `Uint32Array` after checking system endianness.
+
+## 2026-03-11 - [Array Push in Geometric Loops]
+**Learning:** `Array.prototype.push()` inside a tight geometric processing loop causes dynamic array resizing overhead and adds significant garbage collection (GC) pressure.
+**Action:** Always pre-allocate arrays (`new Array(len)`) and set elements by index for known-size array transformations like `rotatePolygon` to eliminate this overhead.
