@@ -231,11 +231,11 @@ export function setupShortcutsHelp() {
   btn.id = "shortcutsBtn";
   btn.type = "button";
   btn.className =
-    "bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors";
+    "bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500 transition-colors";
   btn.setAttribute("aria-label", "Show Keyboard Shortcuts");
   btn.setAttribute("title", "Keyboard Shortcuts");
   btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6" aria-hidden="true">
       <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
     </svg>
   `;
@@ -255,7 +255,7 @@ export function setupShortcutsHelp() {
       <div class="flex justify-between items-center mb-4 border-b pb-2">
         <h2 id="shortcutsModalTitle" class="text-xl font-bold text-splotch-navy">Keyboard Shortcuts</h2>
         <button type="button" class="close-modal text-gray-400 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded" aria-label="Close shortcuts modal">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
 
@@ -287,7 +287,7 @@ export function setupShortcutsHelp() {
       </div>
 
       <div class="mt-6 text-center">
-        <button type="button" class="close-modal-btn bg-splotch-navy text-white hover:brightness-110 font-bold py-2 px-6 rounded-full shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-splotch-navy">
+        <button type="button" class="close-modal-btn bg-splotch-navy text-white hover:brightness-110 font-bold py-2 px-6 rounded-full shadow-md transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy">
           Got it!
         </button>
       </div>
