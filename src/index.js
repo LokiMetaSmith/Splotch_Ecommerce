@@ -1773,7 +1773,8 @@ function handleSvgUpload(svgText) {
         const val = isMetric ? defaultSize * 25.4 : defaultSize;
         resizeSliderEl.value = val;
         resizeInputNumberEl.value = val.toFixed(1);
-        if (resizeUnitLabelEl) resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
+        if (resizeUnitLabelEl)
+          resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
       }
 
       handleStandardResize(defaultSize);
@@ -1831,9 +1832,18 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
   if (scaledPolyCache.has(polygons)) {
     scaledPolygons = scaledPolyCache.get(polygons);
   } else {
-    scaledPolygons = polygons.map((p) => {
-      return p.map((point) => ({ X: point.x * scale, Y: point.y * scale }));
-    });
+    // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
+    const newScaledPolygons = new Array(polygons.length);
+    for (let i = 0; i < polygons.length; i++) {
+      const p = polygons[i];
+      const newPoly = new Array(p.length);
+      for (let j = 0; j < p.length; j++) {
+        const point = p[j];
+        newPoly[j] = { X: point.x * scale, Y: point.y * scale };
+      }
+      newScaledPolygons[i] = newPoly;
+    }
+    scaledPolygons = newScaledPolygons;
     scaledPolyCache.set(polygons, scaledPolygons);
   }
 
@@ -1882,9 +1892,17 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
   }
 
   // Scale back down
-  const cutline = final_paths.map((p) => {
-    return p.map((point) => ({ x: point.X / scale, y: point.Y / scale }));
-  });
+  // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
+  const cutline = new Array(final_paths.length);
+  for (let i = 0; i < final_paths.length; i++) {
+    const p = final_paths[i];
+    const newPoly = new Array(p.length);
+    for (let j = 0; j < p.length; j++) {
+      const point = p[j];
+      newPoly[j] = { x: point.X / scale, y: point.Y / scale };
+    }
+    cutline[i] = newPoly;
+  }
 
   return cutline;
 }
@@ -2364,18 +2382,23 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
     const cos = Math.cos(angleRad);
     const sin = Math.sin(angleRad);
 
-    currentPolygons = currentPolygons.map((poly) =>
-      poly.map((point) => {
-        // Translate point to origin
+    // Bolt Optimization: Replace nested .map() with pre-allocated arrays and standard for-loops.
+    // This eliminates closure allocation overhead and reduces GC pressure in hot requestAnimationFrame paths.
+    const newPolygons = new Array(currentPolygons.length);
+    for (let i = 0; i < currentPolygons.length; i++) {
+      const poly = currentPolygons[i];
+      const newPoly = new Array(poly.length);
+      for (let j = 0; j < poly.length; j++) {
+        const point = poly[j];
         const translatedX = point.x - centerX;
         const translatedY = point.y - centerY;
-        // Rotate point
         const rotatedX = translatedX * cos - translatedY * sin;
         const rotatedY = translatedX * sin + translatedY * cos;
-        // Translate point back
-        return { x: rotatedX + centerX, y: rotatedY + centerY };
-      }),
-    );
+        newPoly[j] = { x: rotatedX + centerX, y: rotatedY + centerY };
+      }
+      newPolygons[i] = newPoly;
+    }
+    currentPolygons = newPolygons;
     redrawAll();
   } else if (originalImage) {
     // Use the current canvas dimensions, which represent the scaled image size
@@ -2435,18 +2458,23 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
       const newCenterX = newW / dpr / 2;
       const newCenterY = newH / dpr / 2;
 
-      rasterCutlinePoly = rasterCutlinePoly.map((poly) =>
-        poly.map((p) => {
-          // Translate to old center
+      // Bolt Optimization: Replace nested .map() with pre-allocated arrays and standard for-loops.
+      // This eliminates closure allocation overhead and reduces GC pressure in hot requestAnimationFrame paths.
+      const newRasterCutlinePoly = new Array(rasterCutlinePoly.length);
+      for (let i = 0; i < rasterCutlinePoly.length; i++) {
+        const poly = rasterCutlinePoly[i];
+        const newPoly = new Array(poly.length);
+        for (let j = 0; j < poly.length; j++) {
+          const p = poly[j];
           const tx = p.x - oldCenterX;
           const ty = p.y - oldCenterY;
-          // Rotate
           const rx = tx * cos - ty * sin;
           const ry = tx * sin + ty * cos;
-          // Translate to new center
-          return { x: rx + newCenterX, y: ry + newCenterY };
-        }),
-      );
+          newPoly[j] = { x: rx + newCenterX, y: ry + newCenterY };
+        }
+        newRasterCutlinePoly[i] = newPoly;
+      }
+      rasterCutlinePoly = newRasterCutlinePoly;
 
       // Regenerate currentCutline from rotated poly
       const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
@@ -2620,9 +2648,18 @@ function handleStandardResize(targetInches) {
 
   if (basePolygons.length > 0) {
     // SVG Vector Resizing - always scale from the original
-    currentPolygons = basePolygons.map((poly) =>
-      poly.map((point) => ({ x: point.x * scale, y: point.y * scale })),
-    );
+    // Bolt Optimization: Replace nested .map() with pre-allocated arrays to avoid dynamic array resizing overhead.
+    const newPolygons = new Array(basePolygons.length);
+    for (let i = 0; i < basePolygons.length; i++) {
+      const poly = basePolygons[i];
+      const newPoly = new Array(poly.length);
+      for (let j = 0; j < poly.length; j++) {
+        const point = poly[j];
+        newPoly[j] = { x: point.x * scale, y: point.y * scale };
+      }
+      newPolygons[i] = newPoly;
+    }
+    currentPolygons = newPolygons;
     redrawAll();
   } else if (originalImage) {
     const prevWidth = canvas.width;
@@ -2649,12 +2686,18 @@ function handleStandardResize(targetInches) {
         const scaleX = newWidth / prevLogicalWidth;
         const scaleY = newHeight / prevLogicalHeight;
 
-        rasterCutlinePoly = rasterCutlinePoly.map((poly) =>
-          poly.map((p) => ({
-            x: p.x * scaleX,
-            y: p.y * scaleY,
-          })),
-        );
+        // Bolt Optimization: Use pre-allocated arrays and for loops instead of nested .map()
+        const newRasterCutlinePoly = new Array(rasterCutlinePoly.length);
+        for (let i = 0; i < rasterCutlinePoly.length; i++) {
+          const poly = rasterCutlinePoly[i];
+          const newPoly = new Array(poly.length);
+          for (let j = 0; j < poly.length; j++) {
+            const p = poly[j];
+            newPoly[j] = { x: p.x * scaleX, y: p.y * scaleY };
+          }
+          newRasterCutlinePoly[i] = newPoly;
+        }
+        rasterCutlinePoly = newRasterCutlinePoly;
 
         // Regenerate currentCutline
         const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
@@ -2814,10 +2857,12 @@ function handleGenerateCutline() {
 
         // Clean the polygon to remove self-intersections and other issues before offsetting.
         // This requires scaling up for Clipper's integer math.
-        const scaledPoly = smoothedContour.map((p) => ({
-          X: p.x * scale,
-          Y: p.y * scale,
-        }));
+        // Bolt Optimization: Pre-allocate array and use for-loop instead of .map() to reduce GC pressure
+        const scaledPoly = new Array(smoothedContour.length);
+        for (let j = 0; j < smoothedContour.length; j++) {
+          const p = smoothedContour[j];
+          scaledPoly[j] = { X: p.x * scale, Y: p.y * scale };
+        }
         const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(
           scaledPoly,
           0.1,
@@ -2825,12 +2870,13 @@ function handleGenerateCutline() {
 
         // Add validation to ensure we have a usable polygon AFTER cleaning
         if (cleanedScaledPoly && cleanedScaledPoly.length >= 3) {
-          finalContours.push(
-            cleanedScaledPoly.map((p) => ({
-              x: p.X / scale,
-              y: p.Y / scale,
-            })),
-          );
+          // Bolt Optimization: Pre-allocate array and use for-loop instead of .map()
+          const newPoly = new Array(cleanedScaledPoly.length);
+          for (let j = 0; j < cleanedScaledPoly.length; j++) {
+            const p = cleanedScaledPoly[j];
+            newPoly[j] = { x: p.X / scale, y: p.Y / scale };
+          }
+          finalContours.push(newPoly);
         }
       });
 
@@ -2842,12 +2888,18 @@ function handleGenerateCutline() {
 
       // Set the raster cutline polygon (Overlay Mode)
       const dpr = window.devicePixelRatio || 1;
-      rasterCutlinePoly = finalContours.map((poly) =>
-        poly.map((p) => ({
-          x: p.x / dpr,
-          y: p.y / dpr,
-        })),
-      );
+      // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
+      const rasterCutlineOutput = new Array(finalContours.length);
+      for (let i = 0; i < finalContours.length; i++) {
+        const poly = finalContours[i];
+        const newPoly = new Array(poly.length);
+        for (let j = 0; j < poly.length; j++) {
+          const p = poly[j];
+          newPoly[j] = { x: p.x / dpr, y: p.y / dpr };
+        }
+        rasterCutlineOutput[i] = newPoly;
+      }
+      rasterCutlinePoly = rasterCutlineOutput;
 
       // Generate the cutline immediately
       const cutline = generateCutLine(
