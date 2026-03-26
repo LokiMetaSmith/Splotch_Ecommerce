@@ -278,6 +278,26 @@
           </button>
         </div>
 
+        <!-- Sales and Uptime Monitor -->
+        <div id="sales-uptime-monitor" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+                <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Sales</h3>
+                <p class="text-2xl font-bold text-gray-800 mt-1" id="metric-total-revenue">Loading...</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
+                <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Orders</h3>
+                <p class="text-2xl font-bold text-gray-800 mt-1" id="metric-total-orders">Loading...</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-purple-500">
+                <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Recent Orders (24h)</h3>
+                <p class="text-2xl font-bold text-gray-800 mt-1" id="metric-recent-orders">Loading...</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500">
+                <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Server Status</h3>
+                <p class="text-2xl font-bold text-gray-800 mt-1" id="metric-server-status">Loading...</p>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div class="lg:col-span-2">
             <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">

@@ -533,6 +533,8 @@ async function fetchAndDisplayOrders(query = '') {
         filterAndDisplayOrders(activeFilter);
 
         updateConnectionStatus('connected');
+
+        await fetchAndDisplayMetrics();
     } catch (error) {
         console.error('[SHOP] Error fetching orders:', error);
         updateConnectionStatus('error');
@@ -542,6 +544,30 @@ async function fetchAndDisplayOrders(query = '') {
         }
     } finally {
         hideLoadingIndicator();
+    }
+}
+
+async function fetchAndDisplayMetrics() {
+    try {
+        const metrics = await fetchWithAuth(`${serverUrl}/api/admin/sales-metrics`);
+        document.getElementById('metric-total-orders').textContent = metrics.totalOrders;
+        document.getElementById('metric-total-revenue').textContent = `$${metrics.totalRevenue.toFixed(2)}`;
+        document.getElementById('metric-recent-orders').textContent = metrics.recentOrders;
+
+        // Also fetch uptime
+        const uptimeRes = await fetch(`${serverUrl}/api/ping`);
+        if (uptimeRes.ok) {
+            document.getElementById('metric-server-status').textContent = 'Online / Up';
+            document.getElementById('metric-server-status').classList.remove('text-red-500');
+            document.getElementById('metric-server-status').classList.add('text-green-500');
+        } else {
+            throw new Error('Ping failed');
+        }
+    } catch (e) {
+        console.error('Error fetching metrics', e);
+        document.getElementById('metric-server-status').textContent = 'Offline';
+        document.getElementById('metric-server-status').classList.add('text-red-500');
+        document.getElementById('metric-server-status').classList.remove('text-green-500');
     }
 }
 
@@ -1264,6 +1290,13 @@ export async function init() {
             logout();
         }
     }
+
+    // Start interval to poll metrics and uptime every 15 seconds
+    setInterval(() => {
+        if (authToken) {
+            fetchAndDisplayMetrics();
+        }
+    }, 15000);
 }
 
 document.addEventListener('DOMContentLoaded', init);
