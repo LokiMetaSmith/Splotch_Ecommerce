@@ -1323,6 +1323,37 @@ async function startServer(
       res.status(200).json(allOrders.slice().reverse());
     });
 
+    app.get('/api/admin/sales-metrics', authenticateToken, async (req, res) => {
+      if (!await isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
+      }
+      const allOrders = await db.getAllOrders();
+      let totalOrders = 0;
+      let totalRevenueCents = 0;
+      let recentOrders = 0;
+
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+      allOrders.forEach(order => {
+        if (order.status !== 'CANCELED') {
+           totalOrders++;
+           totalRevenueCents += (order.amount || 0);
+        }
+
+        const receivedDate = new Date(order.receivedAt);
+        if (receivedDate >= twentyFourHoursAgo && order.status !== 'CANCELED') {
+            recentOrders++;
+        }
+      });
+
+      res.status(200).json({
+          totalOrders,
+          totalRevenue: totalRevenueCents / 100, // format to dollars
+          recentOrders
+      });
+    });
+
     app.get('/api/orders/search', authenticateToken, [
         query('q').notEmpty().withMessage('Query is required').isString().trim(),
     ], async (req, res) => {
