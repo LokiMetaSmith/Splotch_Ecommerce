@@ -49,61 +49,12 @@ export class LowDbAdapter {
     }
 
     // --- Helper to manage caches ---
-    _updateCaches(order, oldStatus) {
-        // Initialize caches if they don't exist
-        if (!this.db.activeOrders || !this.db.shippedOrders || !this.db.userOrderIndex) {
-            // If caches aren't initialized, we don't need to update them incrementally
-            // because they will be built on next access if we implement lazy loading correctly.
-            // However, existing server.js logic initialized them on startup.
-            // Let's rely on methods to initialize/use them.
-            return;
-        }
-
-        const isFinal = this.FINAL_STATUSES.includes(order.status);
-        const wasFinal = oldStatus ? this.FINAL_STATUSES.includes(oldStatus) : false;
-
-        // Active Orders
-        if (this.db.activeOrders) {
-            const idx = this.db.activeOrders.findIndex(o => o.orderId === order.orderId);
-            if (isFinal) {
-                if (idx !== -1) this.db.activeOrders.splice(idx, 1);
-            } else {
-                if (idx !== -1) {
-                    this.db.activeOrders[idx] = order;
-                } else {
-                    this.db.activeOrders.push(order);
-                }
-            }
-        }
-
-        // Shipped Orders
-        if (this.db.shippedOrders) {
-            if (order.status === 'SHIPPED') {
-                const idx = this.db.shippedOrders.findIndex(o => o.orderId === order.orderId);
-                if (idx === -1) {
-                    this.db.shippedOrders.push(order);
-                } else {
-                    this.db.shippedOrders[idx] = order;
-                }
-            } else if (oldStatus === 'SHIPPED') {
-                const idx = this.db.shippedOrders.findIndex(o => o.orderId === order.orderId);
-                if (idx !== -1) this.db.shippedOrders.splice(idx, 1);
-            }
-        }
-
-        // User Index
-        if (this.db.userOrderIndex && order.billingContact?.email) {
-            const email = order.billingContact.email;
-            if (!this.db.userOrderIndex[email]) {
-                this.db.userOrderIndex[email] = [];
-            }
-            const idx = this.db.userOrderIndex[email].findIndex(o => o.orderId === order.orderId);
-            if (idx === -1) {
-                this.db.userOrderIndex[email].push(order);
-            } else {
-                this.db.userOrderIndex[email][idx] = order;
-            }
-        }
+    _invalidateCaches() {
+        // Implement lazy loading correctly:
+        // Clear caches so they will be built on next access.
+        this.db.activeOrders = null;
+        this.db.shippedOrders = null;
+        this.db.userOrderIndex = null;
     }
 
     // --- Orders ---
@@ -113,46 +64,14 @@ export class LowDbAdapter {
 
     async createOrder(order) {
         this.db.data.orders[order.orderId] = order;
-        this._updateCaches(order);
+        this._invalidateCaches();
         await this.write();
         return order;
     }
 
     async updateOrder(order) {
         // Cache Maintenance
-
-        // Shipped Orders
-        if (this.db.shippedOrders) {
-            const idx = this.db.shippedOrders.findIndex(o => o.orderId === order.orderId);
-            if (idx !== -1) {
-                if (order.status !== 'SHIPPED') {
-                    this.db.shippedOrders.splice(idx, 1);
-                }
-            } else {
-                if (order.status === 'SHIPPED') {
-                    this.db.shippedOrders.push(order);
-                }
-            }
-        }
-
-        // Active Orders
-        if (this.db.activeOrders) {
-            const isFinal = this.FINAL_STATUSES.includes(order.status);
-            const idx = this.db.activeOrders.findIndex(o => o.orderId === order.orderId);
-            if (idx !== -1) {
-                if (isFinal) {
-                    this.db.activeOrders.splice(idx, 1);
-                }
-            } else {
-                if (!isFinal) {
-                    this.db.activeOrders.push(order);
-                }
-            }
-        }
-
-        // User Index (Updates automatically by reference, but if email changed?)
-        // Assuming email doesn't change for order.
-
+        this._invalidateCaches();
         await this.write();
         return order;
     }
@@ -224,53 +143,7 @@ export class LowDbAdapter {
 
     // Call this when an order is updated to refresh caches if they exist
     async notifyOrderUpdate(order, oldStatus) {
-         // This is called AFTER the order object is mutated but BEFORE write/save?
-         // Or just use it to fix up caches.
-         // If I use the _ensure methods, I need to keep them consistent.
-
-         // Active Orders
-         if (this.db.activeOrders) {
-             const isFinal = this.FINAL_STATUSES.includes(order.status);
-             // We don't know if it WAS final without oldStatus.
-             // If we don't have oldStatus, we might have to scan?
-             // Or just remove and re-add?
-             const idx = this.db.activeOrders.findIndex(o => o.orderId === order.orderId);
-             if (idx !== -1) {
-                 if (isFinal) {
-                     this.db.activeOrders.splice(idx, 1);
-                 } else {
-                     // Update reference (it's already same ref but strictly...)
-                     this.db.activeOrders[idx] = order;
-                 }
-             } else {
-                 if (!isFinal) {
-                     this.db.activeOrders.push(order);
-                 }
-             }
-         }
-
-         // Shipped Orders
-         if (this.db.shippedOrders) {
-             const idx = this.db.shippedOrders.findIndex(o => o.orderId === order.orderId);
-             if (order.status === 'SHIPPED') {
-                 if (idx === -1) this.db.shippedOrders.push(order);
-             } else {
-                 if (idx !== -1) this.db.shippedOrders.splice(idx, 1);
-             }
-         }
-
-         // User Index
-         if (this.db.userOrderIndex && order.billingContact?.email) {
-             const email = order.billingContact.email;
-             // Ensure list exists
-             if (!this.db.userOrderIndex[email]) this.db.userOrderIndex[email] = [];
-
-             const idx = this.db.userOrderIndex[email].findIndex(o => o.orderId === order.orderId);
-             if (idx === -1) {
-                 this.db.userOrderIndex[email].push(order);
-             }
-             // if it is there, it's updated by ref
-         }
+         this._invalidateCaches();
     }
 
     // --- Users ---
