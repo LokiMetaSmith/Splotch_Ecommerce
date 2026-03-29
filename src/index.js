@@ -288,12 +288,16 @@ async function BootStrap() {
   if (stickerResolutionSelect) {
     stickerResolutionSelect.addEventListener("change", () => {
       calculateAndUpdatePrice();
-      // Bolt Fix: Trigger visual resize when resolution changes
-      if (canvas) {
-        const dpr = window.devicePixelRatio || 1;
-        setCanvasSize(canvas.width / dpr, canvas.height / dpr);
-        if (currentBounds) {
-          drawCanvasDecorations(currentBounds);
+      if (originalImage || basePolygons.length > 0) {
+        // Re-apply current physical size to update logical dimensions for new PPI
+        const resizeSliderEl = document.getElementById("resizeSlider");
+        if (resizeSliderEl) {
+          const latestValue = parseFloat(resizeSliderEl.value);
+          if (isMetric) {
+            handleStandardResize(latestValue / 25.4);
+          } else {
+            handleStandardResize(latestValue);
+          }
         }
       }
     });
