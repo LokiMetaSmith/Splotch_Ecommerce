@@ -1420,6 +1420,7 @@ function updateEditingButtonsState(disabled) {
     textColorInput,
     addTextBtn,
     textFontFamilySelect,
+    cutlineOffsetSlider,
   ];
   const disabledClasses = ["opacity-50", "cursor-not-allowed"];
   elements.forEach((el) => {
@@ -1472,21 +1473,21 @@ function updateEditingButtonsState(disabled) {
     if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
   } else {
     if (grayBtn) {
-      grayBtn.style.display = "block";
-      grayBtn.classList.remove("lg:hidden", "xl:block");
+      grayBtn.style.display = disabled ? "none" : "block";
+      if (!disabled) grayBtn.classList.remove("lg:hidden", "xl:block");
     }
     if (sepBtn) {
-      sepBtn.style.display = "block";
-      sepBtn.classList.remove("lg:hidden", "xl:block");
+      sepBtn.style.display = disabled ? "none" : "block";
+      if (!disabled) sepBtn.classList.remove("lg:hidden", "xl:block");
     }
     if (cutlineSensitivityContainer) {
-      cutlineSensitivityContainer.style.display = "flex";
+      cutlineSensitivityContainer.style.display = disabled ? "none" : "flex";
     }
     if (lazyLassoContainer) {
-      lazyLassoContainer.style.display = "flex";
+      lazyLassoContainer.style.display = disabled ? "none" : "flex";
     }
     if (generateCutlineBtn) {
-      generateCutlineBtn.style.display = "flex";
+      generateCutlineBtn.style.display = disabled ? "none" : "flex";
     }
   }
   if (canvasPlaceholder)
@@ -1613,29 +1614,6 @@ function loadFileAsImage(file, isMascot = false) {
 
           saveCleanState(); // Save state before decorations
 
-          // For raster images, the bounds and cutline are the canvas itself.
-          currentBounds = {
-            left: 0,
-            top: 0,
-            right: newWidth,
-            bottom: newHeight,
-            width: newWidth,
-            height: newHeight,
-          };
-          currentCutline = [
-            [
-              { x: 0, y: 0 },
-              { x: newWidth, y: 0 },
-              { x: newWidth, y: newHeight },
-              { x: 0, y: newHeight },
-            ],
-          ];
-          currentPolygons = []; // Clear any previous SVG data
-
-          // Update the price now that we have dimensions
-          calculateAndUpdatePrice();
-          drawCanvasDecorations(currentBounds); // Draw the initial bounding box, size indicator, and rulers
-
           // Bolt Fix: Default to 2 inches on import (2.8 for Mascot)
           if (pricingConfig) {
             const defaultSize = isMascot ? 2.8 : 2;
@@ -1655,6 +1633,44 @@ function loadFileAsImage(file, isMascot = false) {
                 resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
             }
           }
+
+          // Generate cutline based on image transparency
+          const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const dpr = window.devicePixelRatio || 1;
+          const logicalWidth = canvas.width / dpr;
+          const logicalHeight = canvas.height / dpr;
+
+          if (imageHasTransparentBorder(currentImageData)) {
+            // Auto-generate smart cutline for transparent images
+            handleGenerateCutline(true); // Pass true to skip confirmation prompt
+          } else {
+            // Setup a rectangular rasterCutlinePoly for non-transparent images
+            rasterCutlinePoly = [
+              [
+                { x: 0, y: 0 },
+                { x: logicalWidth, y: 0 },
+                { x: logicalWidth, y: logicalHeight },
+                { x: 0, y: logicalHeight },
+              ],
+            ];
+
+            // Set slider to 10 (1mm) offset
+            cutlineOffset = 10;
+            if (cutlineOffsetSlider) {
+              cutlineOffsetSlider.value = 10;
+            }
+            if (cutlineOffsetValueDisplay) {
+              cutlineOffsetValueDisplay.textContent = cutlineOffset;
+            }
+
+            const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+            currentCutline = cutline;
+            currentBounds = getPolygonsBounds(cutline);
+
+            calculateAndUpdatePrice();
+            drawCanvasDecorations(currentBounds);
+          }
+          currentPolygons = []; // Clear any previous SVG data
 
           // Show the legend tabs since an image is loaded
           renderLegend();
@@ -2308,22 +2324,36 @@ function handleResetImage() {
 
       saveCleanState(); // Save state before decorations
 
-      currentBounds = {
-        left: 0,
-        top: 0,
-        right: newWidth,
-        bottom: newHeight,
-        width: newWidth,
-        height: newHeight,
-      };
-      currentCutline = [
-        [
-          { x: 0, y: 0 },
-          { x: newWidth, y: 0 },
-          { x: newWidth, y: newHeight },
-          { x: 0, y: newHeight },
-        ],
-      ];
+      // Generate cutline based on image transparency
+      const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const dpr = window.devicePixelRatio || 1;
+      const logicalWidth = canvas.width / dpr;
+      const logicalHeight = canvas.height / dpr;
+
+      if (imageHasTransparentBorder(currentImageData)) {
+        handleGenerateCutline(true);
+      } else {
+        rasterCutlinePoly = [
+          [
+            { x: 0, y: 0 },
+            { x: logicalWidth, y: 0 },
+            { x: logicalWidth, y: logicalHeight },
+            { x: 0, y: logicalHeight },
+          ],
+        ];
+
+        cutlineOffset = 10;
+        if (cutlineOffsetSlider) {
+          cutlineOffsetSlider.value = 10;
+        }
+        if (cutlineOffsetValueDisplay) {
+          cutlineOffsetValueDisplay.textContent = cutlineOffset;
+        }
+
+        const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+        currentCutline = cutline;
+        currentBounds = getPolygonsBounds(cutline);
+      }
 
       updateFilterButtonVisuals();
 
@@ -3051,24 +3081,36 @@ async function handleRemoteImageLoad(imageUrl) {
 
     saveCleanState(); // Save state before decorations
 
-    // Default bounds and cutline
-    currentBounds = {
-      left: 0,
-      top: 0,
-      right: newWidth,
-      bottom: newHeight,
-      width: newWidth,
-      height: newHeight,
-    };
-    rasterCutlinePoly = null; // Clear raster cutline
-    currentCutline = [
-      [
-        { x: 0, y: 0 },
-        { x: newWidth, y: 0 },
-        { x: newWidth, y: newHeight },
-        { x: 0, y: newHeight },
-      ],
-    ];
+    // Generate cutline based on image transparency
+    const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth = canvas.width / dpr;
+    const logicalHeight = canvas.height / dpr;
+
+    if (imageHasTransparentBorder(currentImageData)) {
+      handleGenerateCutline(true);
+    } else {
+      rasterCutlinePoly = [
+        [
+          { x: 0, y: 0 },
+          { x: logicalWidth, y: 0 },
+          { x: logicalWidth, y: logicalHeight },
+          { x: 0, y: logicalHeight },
+        ],
+      ];
+
+      cutlineOffset = 10;
+      if (cutlineOffsetSlider) {
+        cutlineOffsetSlider.value = 10;
+      }
+      if (cutlineOffsetValueDisplay) {
+        cutlineOffsetValueDisplay.textContent = cutlineOffset;
+      }
+
+      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+      currentCutline = cutline;
+      currentBounds = getPolygonsBounds(cutline);
+    }
 
     calculateAndUpdatePrice();
     drawCanvasDecorations(currentBounds);
@@ -3118,24 +3160,36 @@ async function loadProductForBuyer(productId) {
       // Better: If we have the image, we can just treat it as a fresh load.
       // But we should "Lock" the UI.
 
-      // Generate basic bounds
-      currentBounds = {
-        left: 0,
-        top: 0,
-        right: newWidth,
-        bottom: newHeight,
-        width: newWidth,
-        height: newHeight,
-      };
-      rasterCutlinePoly = null; // Clear raster cutline
-      currentCutline = [
-        [
-          { x: 0, y: 0 },
-          { x: newWidth, y: 0 },
-          { x: newWidth, y: newHeight },
-          { x: 0, y: newHeight },
-        ],
-      ];
+      // Generate cutline based on image transparency
+      const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const dpr = window.devicePixelRatio || 1;
+      const logicalWidth = canvas.width / dpr;
+      const logicalHeight = canvas.height / dpr;
+
+      if (imageHasTransparentBorder(currentImageData)) {
+        handleGenerateCutline(true);
+      } else {
+        rasterCutlinePoly = [
+          [
+            { x: 0, y: 0 },
+            { x: logicalWidth, y: 0 },
+            { x: logicalWidth, y: logicalHeight },
+            { x: 0, y: logicalHeight },
+          ],
+        ];
+
+        cutlineOffset = 10;
+        if (cutlineOffsetSlider) {
+          cutlineOffsetSlider.value = 10;
+        }
+        if (cutlineOffsetValueDisplay) {
+          cutlineOffsetValueDisplay.textContent = cutlineOffset;
+        }
+
+        const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+        currentCutline = cutline;
+        currentBounds = getPolygonsBounds(cutline);
+      }
       // If the product had a complex cutline, we aren't loading it visually here for the buyer
       // unless we fetch and parse the SVG.
       // For this MVP, let's trigger the "Smart Cutline" automatically if it looks transparent?
