@@ -1164,7 +1164,6 @@ async function handlePaymentFormSubmit(event) {
     showPaymentStatus("Uploading design...", "info");
     const uploadFormData = new FormData();
     uploadFormData.append("designImage", designImageBlob, "design.png");
-    uploadFormData.append("_csrf", csrfToken); // Add CSRF token to form data
 
     const cutLineFileInput = document.getElementById("cutLineFile");
     if (cutLineFileInput && cutLineFileInput.files[0]) {
@@ -2988,7 +2987,6 @@ async function handleCreateProduct() {
     );
     const uploadFormData = new FormData();
     uploadFormData.append("designImage", designImageBlob, "design.png");
-    uploadFormData.append("_csrf", csrfToken);
 
     // Use existing upload endpoint
     const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {
