@@ -858,6 +858,13 @@ async function startServer(
             }
         }
         logger.info(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
+
+        // Fallback for plain-text SVGs which lack magic numbers
+        if (!designFileType && designImageFile.originalname.toLowerCase().endsWith('.svg') && designImageFile.mimetype.includes('svg')) {
+             designFileType = { ext: 'svg', mime: 'image/svg+xml' };
+             logger.info(`[DEBUG] Fallback SVG detection applied for ${designImageFile.path}`);
+        }
+
         if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
             // It's good practice to remove the invalid file
             storageProvider.deleteFile(designImageFile.path).catch((err) => {
@@ -896,6 +903,11 @@ async function startServer(
                 } catch (e) {
                     logger.error('Error in SVG fallback detection for cutLineFile:', e);
                 }
+            }
+            // Fallback for plain-text SVGs which lack magic numbers
+            if (!edgecutLineFileType && edgecutLineFile.originalname.toLowerCase().endsWith('.svg') && edgecutLineFile.mimetype.includes('svg')) {
+                 edgecutLineFileType = { ext: 'svg', mime: 'image/svg+xml' };
+                 logger.info(`[DEBUG] Fallback SVG detection applied for ${edgecutLineFile.path}`);
             }
 
             // Allow 'svg' extension or 'xml' extension if mime is application/xml (common for SVGs)

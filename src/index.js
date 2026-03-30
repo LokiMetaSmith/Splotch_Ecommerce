@@ -69,8 +69,7 @@ let stickerMaterialSelect,
 let paymentStatusContainer,
   ipfsLinkContainer,
   fileInputGlobalRef,
-  paymentFormGlobalRef,
-  fileNameDisplayEl;
+  paymentFormGlobalRef;
 let rotateLeftBtnEl,
   rotateRightBtnEl,
   resetBtnEl,
@@ -200,7 +199,6 @@ async function BootStrap() {
   paymentStatusContainer = document.getElementById("payment-status-container");
   ipfsLinkContainer = document.getElementById("ipfsLinkContainer"); // This might be deprecated if IPFS is handled server-side
   fileInputGlobalRef = document.getElementById("file");
-  fileNameDisplayEl = document.getElementById("fileNameDisplay");
   paymentFormGlobalRef = document.getElementById("payment-form");
   submitPaymentBtn = document.getElementById("submitPaymentBtn");
   canvasPlaceholder = document.getElementById("canvas-placeholder");
@@ -288,12 +286,16 @@ async function BootStrap() {
   if (stickerResolutionSelect) {
     stickerResolutionSelect.addEventListener("change", () => {
       calculateAndUpdatePrice();
-      // Bolt Fix: Trigger visual resize when resolution changes
-      if (canvas) {
-        const dpr = window.devicePixelRatio || 1;
-        setCanvasSize(canvas.width / dpr, canvas.height / dpr);
-        if (currentBounds) {
-          drawCanvasDecorations(currentBounds);
+      if (originalImage || basePolygons.length > 0) {
+        // Re-apply current physical size to update logical dimensions for new PPI
+        const resizeSliderEl = document.getElementById("resizeSlider");
+        if (resizeSliderEl) {
+          const latestValue = parseFloat(resizeSliderEl.value);
+          if (isMetric) {
+            handleStandardResize(latestValue / 25.4);
+          } else {
+            handleStandardResize(latestValue);
+          }
         }
       }
     });
@@ -1577,9 +1579,13 @@ function handleFileChange(event) {
 }
 
 function loadFileAsImage(file, isMascot = false) {
+  if (file && fileInputGlobalRef) {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    fileInputGlobalRef.files = dataTransfer.files;
+  }
   if (!file) return;
 
-  if (fileNameDisplayEl) fileNameDisplayEl.textContent = file.name;
   const reader = new FileReader();
 
   // Handle SVGs differently from other images
@@ -2255,8 +2261,6 @@ function handleClearImage() {
   cleanCanvasState = null;
 
   if (fileInputGlobalRef) fileInputGlobalRef.value = "";
-  if (fileNameDisplayEl) fileNameDisplayEl.textContent = "";
-
   if (canvas && ctx) {
     // Reset to default size (matches HTML)
     setCanvasSize(500, 400);
