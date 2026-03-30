@@ -840,8 +840,15 @@ async function startServer(
         }
 
         const designImageFile = req.files.designImage[0];
-        const designFileType = await fileTypeFromFile(designImageFile.path);
+        let designFileType = await fileTypeFromFile(designImageFile.path);
         logger.info(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
+
+        // Fallback for plain-text SVGs which lack magic numbers
+        if (!designFileType && designImageFile.originalname.toLowerCase().endsWith('.svg') && designImageFile.mimetype.includes('svg')) {
+             designFileType = { ext: 'svg', mime: 'image/svg+xml' };
+             logger.info(`[DEBUG] Fallback SVG detection applied for ${designImageFile.path}`);
+        }
+
         if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
             // It's good practice to remove the invalid file
             storageProvider.deleteFile(designImageFile.path).catch((err) => {
@@ -864,7 +871,13 @@ async function startServer(
         let cutLinePath = null;
         if (req.files.cutLineFile && req.files.cutLineFile[0]) {
             const edgecutLineFile = req.files.cutLineFile[0];
-            const edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
+            let edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
+
+            // Fallback for plain-text SVGs which lack magic numbers
+            if (!edgecutLineFileType && edgecutLineFile.originalname.toLowerCase().endsWith('.svg') && edgecutLineFile.mimetype.includes('svg')) {
+                 edgecutLineFileType = { ext: 'svg', mime: 'image/svg+xml' };
+                 logger.info(`[DEBUG] Fallback SVG detection applied for ${edgecutLineFile.path}`);
+            }
 
             // Allow 'svg' extension or 'xml' extension if mime is application/xml (common for SVGs)
             const isValidCutLine = edgecutLineFileType && (edgecutLineFileType.ext === 'svg' || (edgecutLineFileType.ext === 'xml' && edgecutLineFileType.mime === 'application/xml'));
