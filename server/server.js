@@ -840,7 +840,23 @@ async function startServer(
         }
 
         const designImageFile = req.files.designImage[0];
-        const designFileType = await fileTypeFromFile(designImageFile.path);
+        let designFileType = await fileTypeFromFile(designImageFile.path);
+
+        // Fallback for valid SVGs lacking the XML prolog (which fileTypeFromFile returns undefined for)
+        if (!designFileType && designImageFile.originalname.toLowerCase().endsWith('.svg')) {
+            try {
+                const buffer = Buffer.alloc(100);
+                const fd = await fs.promises.open(designImageFile.path, 'r');
+                const { bytesRead } = await fd.read(buffer, 0, 100, 0);
+                await fd.close();
+                const str = buffer.toString('utf-8', 0, bytesRead).toLowerCase();
+                if (str.includes('<svg')) {
+                    designFileType = { ext: 'svg', mime: 'image/svg+xml' };
+                }
+            } catch (e) {
+                logger.error('Error in SVG fallback detection for designImageFile:', e);
+            }
+        }
         logger.info(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
         if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
             // It's good practice to remove the invalid file
@@ -864,7 +880,23 @@ async function startServer(
         let cutLinePath = null;
         if (req.files.cutLineFile && req.files.cutLineFile[0]) {
             const edgecutLineFile = req.files.cutLineFile[0];
-            const edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
+            let edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
+
+            // Fallback for valid SVGs lacking the XML prolog
+            if (!edgecutLineFileType && edgecutLineFile.originalname.toLowerCase().endsWith('.svg')) {
+                try {
+                    const buffer = Buffer.alloc(100);
+                    const fd = await fs.promises.open(edgecutLineFile.path, 'r');
+                    const { bytesRead } = await fd.read(buffer, 0, 100, 0);
+                    await fd.close();
+                    const str = buffer.toString('utf-8', 0, bytesRead).toLowerCase();
+                    if (str.includes('<svg')) {
+                        edgecutLineFileType = { ext: 'svg', mime: 'image/svg+xml' };
+                    }
+                } catch (e) {
+                    logger.error('Error in SVG fallback detection for cutLineFile:', e);
+                }
+            }
 
             // Allow 'svg' extension or 'xml' extension if mime is application/xml (common for SVGs)
             const isValidCutLine = edgecutLineFileType && (edgecutLineFileType.ext === 'svg' || (edgecutLineFileType.ext === 'xml' && edgecutLineFileType.mime === 'application/xml'));
