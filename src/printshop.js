@@ -538,9 +538,17 @@ async function fetchAndDisplayOrders(query = '') {
     } catch (error) {
         console.error('[SHOP] Error fetching orders:', error);
         updateConnectionStatus('error');
-        // Error is already shown by fetchWithAuth on 401, this handles other network errors
-        if (error.message !== 'Authentication failed') {
-           showErrorToast(`Could not fetch orders: ${error.message}`);
+        // Clear orders but keep message on error
+        ui.ordersList.innerHTML = '';
+        ui.ordersList.appendChild(ui.noOrdersMessage);
+
+        const noOrdersTextErr = document.getElementById('no-orders-text');
+
+        if (error.message.includes('Forbidden') || error.message.includes('permission')) {
+            if (noOrdersTextErr) noOrdersTextErr.textContent = 'Access Denied: You must be an administrator to view orders.';
+        } else if (error.message !== 'Authentication failed') {
+            if (noOrdersTextErr) noOrdersTextErr.textContent = `Error: Could not load orders (${error.message})`;
+            showErrorToast(`Could not fetch orders: ${error.message}`);
         }
     } finally {
         hideLoadingIndicator();
@@ -565,6 +573,11 @@ async function fetchAndDisplayMetrics() {
         }
     } catch (e) {
         console.error('Error fetching metrics', e);
+        if (e.message.includes('Forbidden') || e.message.includes('permission')) {
+            document.getElementById('metric-total-orders').textContent = 'N/A';
+            document.getElementById('metric-total-revenue').textContent = 'N/A';
+            document.getElementById('metric-recent-orders').textContent = 'N/A';
+        }
         document.getElementById('metric-server-status').textContent = 'Offline';
         document.getElementById('metric-server-status').classList.add('text-red-500');
         document.getElementById('metric-server-status').classList.remove('text-green-500');
