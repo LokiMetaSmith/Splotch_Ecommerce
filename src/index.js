@@ -743,11 +743,9 @@ async function BootStrap() {
 
       if (grayBtn) {
         grayBtn.style.display = "block";
-        grayBtn.classList.remove("lg:hidden", "xl:block");
       }
       if (sepBtn) {
         sepBtn.style.display = "block";
-        sepBtn.classList.remove("lg:hidden", "xl:block");
       }
 
       if (cutlineSensitivityContainer) {
@@ -1475,11 +1473,9 @@ function updateEditingButtonsState(disabled) {
   } else {
     if (grayBtn) {
       grayBtn.style.display = disabled ? "none" : "block";
-      if (!disabled) grayBtn.classList.remove("lg:hidden", "xl:block");
     }
     if (sepBtn) {
       sepBtn.style.display = disabled ? "none" : "block";
-      if (!disabled) sepBtn.classList.remove("lg:hidden", "xl:block");
     }
     if (cutlineSensitivityContainer) {
       cutlineSensitivityContainer.style.display = disabled ? "none" : "flex";
