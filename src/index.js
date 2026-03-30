@@ -69,8 +69,7 @@ let stickerMaterialSelect,
 let paymentStatusContainer,
   ipfsLinkContainer,
   fileInputGlobalRef,
-  paymentFormGlobalRef,
-  fileNameDisplayEl;
+  paymentFormGlobalRef;
 let rotateLeftBtnEl,
   rotateRightBtnEl,
   resetBtnEl,
@@ -200,7 +199,6 @@ async function BootStrap() {
   paymentStatusContainer = document.getElementById("payment-status-container");
   ipfsLinkContainer = document.getElementById("ipfsLinkContainer"); // This might be deprecated if IPFS is handled server-side
   fileInputGlobalRef = document.getElementById("file");
-  fileNameDisplayEl = document.getElementById("fileNameDisplay");
   paymentFormGlobalRef = document.getElementById("payment-form");
   submitPaymentBtn = document.getElementById("submitPaymentBtn");
   canvasPlaceholder = document.getElementById("canvas-placeholder");
@@ -1581,9 +1579,13 @@ function handleFileChange(event) {
 }
 
 function loadFileAsImage(file, isMascot = false) {
+  if (file && fileInputGlobalRef) {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    fileInputGlobalRef.files = dataTransfer.files;
+  }
   if (!file) return;
 
-  if (fileNameDisplayEl) fileNameDisplayEl.textContent = file.name;
   const reader = new FileReader();
 
   // Handle SVGs differently from other images
@@ -2259,8 +2261,6 @@ function handleClearImage() {
   cleanCanvasState = null;
 
   if (fileInputGlobalRef) fileInputGlobalRef.value = "";
-  if (fileNameDisplayEl) fileNameDisplayEl.textContent = "";
-
   if (canvas && ctx) {
     // Reset to default size (matches HTML)
     setCanvasSize(500, 400);
