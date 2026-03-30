@@ -46,7 +46,8 @@ program
     .description('Add a new user')
     .argument('<username>', 'username')
     .argument('<password>', 'password')
-    .action(async (username, password) => {
+    .option('--admin', 'Grant admin privileges to the user')
+    .action(async (username, password, options) => {
         const existing = await db.getUser(username);
         if (existing) {
             console.log('User already exists');
@@ -60,11 +61,12 @@ program
             username,
             password: hashedPassword,
             credentials: [],
+            ...(options.admin ? { role: 'admin' } : {})
         };
 
         await db.createUser(user);
 
-        console.log(`User ${username} added successfully`);
+        console.log(`User ${username} added successfully${options.admin ? ' with admin privileges' : ''}`);
     });
 
 program
