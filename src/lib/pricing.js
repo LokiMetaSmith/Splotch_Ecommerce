@@ -142,7 +142,7 @@ export function generateSvgFromCutline(cutline, bounds) {
   // Explicitly trim the length of chunks in case of empty polygons skipped
   chunks.length = chunkIdx;
 
-  return `
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
     <path d="${chunks.join(" ")}" fill="none" stroke="black" stroke-width="1" />
 </svg>

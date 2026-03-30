@@ -841,6 +841,22 @@ async function startServer(
 
         const designImageFile = req.files.designImage[0];
         let designFileType = await fileTypeFromFile(designImageFile.path);
+
+        // Fallback for valid SVGs lacking the XML prolog (which fileTypeFromFile returns undefined for)
+        if (!designFileType && designImageFile.originalname.toLowerCase().endsWith('.svg')) {
+            try {
+                const buffer = Buffer.alloc(100);
+                const fd = await fs.promises.open(designImageFile.path, 'r');
+                const { bytesRead } = await fd.read(buffer, 0, 100, 0);
+                await fd.close();
+                const str = buffer.toString('utf-8', 0, bytesRead).toLowerCase();
+                if (str.includes('<svg')) {
+                    designFileType = { ext: 'svg', mime: 'image/svg+xml' };
+                }
+            } catch (e) {
+                logger.error('Error in SVG fallback detection for designImageFile:', e);
+            }
+        }
         logger.info(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
 
         // Fallback for plain-text SVGs which lack magic numbers
@@ -873,6 +889,21 @@ async function startServer(
             const edgecutLineFile = req.files.cutLineFile[0];
             let edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
 
+            // Fallback for valid SVGs lacking the XML prolog
+            if (!edgecutLineFileType && edgecutLineFile.originalname.toLowerCase().endsWith('.svg')) {
+                try {
+                    const buffer = Buffer.alloc(100);
+                    const fd = await fs.promises.open(edgecutLineFile.path, 'r');
+                    const { bytesRead } = await fd.read(buffer, 0, 100, 0);
+                    await fd.close();
+                    const str = buffer.toString('utf-8', 0, bytesRead).toLowerCase();
+                    if (str.includes('<svg')) {
+                        edgecutLineFileType = { ext: 'svg', mime: 'image/svg+xml' };
+                    }
+                } catch (e) {
+                    logger.error('Error in SVG fallback detection for cutLineFile:', e);
+                }
+            }
             // Fallback for plain-text SVGs which lack magic numbers
             if (!edgecutLineFileType && edgecutLineFile.originalname.toLowerCase().endsWith('.svg') && edgecutLineFile.mimetype.includes('svg')) {
                  edgecutLineFileType = { ext: 'svg', mime: 'image/svg+xml' };
