@@ -281,7 +281,7 @@
           <!-- Basic Image Editing Controls -->
           <div
             id="editing-controls"
-            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-12 xl:grid-cols-12 gap-3 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
+            class="flex flex-wrap justify-center items-center gap-4 my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-50"
           >
             <button
               type="button"
@@ -365,7 +365,7 @@
                 />
               </svg>
             </button>
-            <div class="flex flex-col col-span-2">
+            <div class="flex flex-col">
               <label for="resizeInput" class="text-sm text-center block mb-1"
                 >Size:</label
               >
@@ -392,7 +392,7 @@
                 aria-label="Size slider"
               />
             </div>
-            <div class="flex flex-col justify-center items-center col-span-2">
+            <div class="flex flex-col justify-center items-center">
               <span class="text-xs text-gray-500 mb-1">Dimensions</span>
               <div class="flex items-center space-x-1">
                 <span
@@ -415,7 +415,7 @@
               id="grayscaleBtn"
               data-tooltip="Apply Grayscale Filter"
               aria-pressed="false"
-              class="lg:hidden xl:block focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded"
+              class="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded"
               style="display: none"
             >
               Grayscale
@@ -425,12 +425,12 @@
               id="sepiaBtn"
               data-tooltip="Apply Sepia Filter"
               aria-pressed="false"
-              class="lg:hidden xl:block focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red rounded"
+              class="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red rounded"
               style="display: none"
             >
               Sepia
             </button>
-            <div class="flex flex-col justify-center items-center col-span-2">
+            <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
               <label
                 for="cutlineOffsetSlider"
                 class="text-xs text-gray-500 mb-1"
@@ -440,7 +440,7 @@
                 <input
                   type="range"
                   id="cutlineOffsetSlider"
-                  min="0"
+                  min="-50"
                   max="50"
                   value="10"
                   step="1"
@@ -456,7 +456,7 @@
             <div
               id="cutlineSensitivityContainer"
               style="display: none"
-              class="flex flex-col justify-center items-center col-span-2"
+              class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
             >
               <label
                 for="cutlineSensitivitySlider"
@@ -484,7 +484,7 @@
             <div
               id="lazyLassoContainer"
               style="display: none"
-              class="flex flex-col justify-center items-center col-span-2"
+              class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
             >
               <label for="lazyLassoSlider" class="text-xs text-gray-500 mb-1"
                 >Lazy Lasso</label
@@ -511,7 +511,7 @@
               type="button"
               id="generateCutlineBtn"
               style="display: none"
-              class="bg-teal-500 text-white col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-4 xl:col-span-2 flex justify-center items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500"
+              class="bg-teal-500 text-white flex justify-center items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500 w-full sm:w-auto"
               data-tooltip="Generate Cutline from Image Alpha"
             >
               Generate Smart Cutline
