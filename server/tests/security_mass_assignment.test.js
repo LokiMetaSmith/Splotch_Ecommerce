@@ -76,12 +76,12 @@ describe('Security: Mass Assignment in Create Order', () => {
     await new Promise(resolve => serverInstance.close(resolve));
     try {
       await fs.unlink(testDbPath);
-    } catch (error) {
+    } catch (error) { // eslint-disable-line no-unused-vars
        // ignore
     }
     try {
         await fs.unlink(path.join(__dirname, '../uploads/test.png'));
-    } catch (error) {
+    } catch (error) { // eslint-disable-line no-unused-vars
         // ignore
     }
   });

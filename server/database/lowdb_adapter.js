@@ -5,21 +5,36 @@ import path from 'path';
 export class LowDbAdapter {
     constructor(db) {
         this.db = db;
+        this._lastInternalWrite = 0;
 
         // lowdb instances usually don't publicly expose the filename in v7 but we can try
         // passing it in from server.js or assume default 'db.json'
         // If we want a reliable file watcher for CLI updates:
         const isTestEnv = process.env.NODE_ENV === 'test' && process.env.TEST_USE_REAL_DB !== 'true';
         if (!isTestEnv) {
-            // Assume 'db.json' in the current working directory,
-            // since the main server.js resolves it to the server directory
-            const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'db.json');
+            // Usually we are passed the LowDB instance which might have an adapter that has a filename.
+            // If not, we fallback to process.env.DB_PATH or db.json
+            let dbPath = process.env.DB_PATH || path.join(process.cwd(), 'db.json');
+            if (this.db.adapter && this.db.adapter.filename) {
+                dbPath = this.db.adapter.filename;
+            }
+
+            // Allow override for tests that write to their own DB path
+            if (process.env.TEST_DB_PATH) {
+                dbPath = process.env.TEST_DB_PATH;
+            }
+
             if (fs.existsSync(dbPath)) {
                 logger.info(`[LowDbAdapter] Watching ${dbPath} for changes...`);
                 fs.watchFile(dbPath, { interval: 1000 }, async (curr, prev) => {
                     if (curr.mtimeMs !== prev.mtimeMs) {
+                        // Protect against data-loss: ignore events triggered by our own internal writes.
+                        if (Date.now() - this._lastInternalWrite < 2000) {
+                            return;
+                        }
+
                         try {
-                            logger.info('[LowDbAdapter] db.json changed on disk. Reloading...');
+                            logger.info('[LowDbAdapter] db.json changed externally on disk. Reloading...');
                             await this.db.read();
                             this._ensureStructure();
                             // Rebuild caches upon reload
@@ -31,6 +46,10 @@ export class LowDbAdapter {
                         }
                     }
                 });
+                // Attach cleanup helper for tests
+                this._watcher = {
+                    unref: () => fs.unwatchFile(dbPath)
+                };
             } else {
                 logger.warn(`[LowDbAdapter] File not found for watching: ${dbPath}`);
             }
@@ -82,6 +101,7 @@ export class LowDbAdapter {
     }
 
     async write() {
+        this._lastInternalWrite = Date.now();
         await this.db.write();
     }
 
@@ -260,6 +280,7 @@ export class LowDbAdapter {
     }
 
     // Call this when an order is updated to refresh caches if they exist
+    // eslint-disable-next-line no-unused-vars
     async notifyOrderUpdate(order, oldStatus) {
          // This is called AFTER the order object is mutated but BEFORE write/save?
          // Or just use it to fix up caches.

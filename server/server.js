@@ -2264,6 +2264,9 @@ async function startServer(
       sessionTokenTimer.unref();
       keyRotationTimer.unref();
       metricsTimer.unref();
+      if (db && db._watcher) {
+          db._watcher.unref();
+      }
     }
     
     // --- Global Error Handlers ---

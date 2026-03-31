@@ -46,6 +46,7 @@ export class MongoDbAdapter {
     }
 
     async updateOrder(order) {
+        // eslint-disable-next-line no-unused-vars
         const { _id, ...doc } = order;
         await this.db.collection('orders').replaceOne({ orderId: order.orderId }, doc);
         return order;
@@ -122,6 +123,7 @@ export class MongoDbAdapter {
     }
 
     async updateUser(user) {
+        // eslint-disable-next-line no-unused-vars
         const { _id, ...doc } = user;
         if (user.id) {
              await this.db.collection('users').replaceOne({ id: user.id }, doc);
@@ -151,6 +153,7 @@ export class MongoDbAdapter {
     }
 
     async saveCredential(credential) {
+        // eslint-disable-next-line no-unused-vars
         const { _id, ...doc } = credential;
         await this.db.collection('credentials').updateOne(
             { credentialID: credential.credentialID },
