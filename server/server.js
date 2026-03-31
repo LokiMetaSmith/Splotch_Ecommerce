@@ -2096,6 +2096,69 @@ async function startServer(
       }
     });
 
+    // --- User Management Endpoints ---
+    app.post('/api/admin/users', authenticateToken, [
+      ...validateUsername,
+      body('password').notEmpty().withMessage('password is required').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
+      body('role').optional().isIn(['admin', 'user']).withMessage('Invalid role'),
+    ], async (req, res) => {
+      if (!await isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+      const { username, password, role } = req.body;
+
+      const existingUser = await db.getUser(username);
+      if (existingUser) {
+        return res.status(400).json({ error: 'User already exists' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = {
+        id: randomUUID(),
+        username,
+        password: hashedPassword,
+        credentials: [],
+        ...(role === 'admin' ? { role: 'admin' } : {})
+      };
+      await db.createUser(user);
+
+      logger.info(`[SERVER] Admin ${req.user.username || req.user.email} created new user: ${username}`);
+      res.status(201).json({ success: true, message: 'User created successfully' });
+    });
+
+    app.get('/api/admin/users', authenticateToken, async (req, res) => {
+      if (!await isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+      const usernames = await db.listUsernames();
+      res.status(200).json({ usernames });
+    });
+
+    app.delete('/api/admin/users/:username', authenticateToken, async (req, res) => {
+      if (!await isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+      const { username } = req.params;
+
+      // Prevent deleting self (basic safeguard)
+      if (req.user.username === username) {
+          return res.status(400).json({ error: 'Cannot delete your own admin account.' });
+      }
+
+      const deleted = await db.deleteUser(username);
+      if (!deleted) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      logger.info(`[SERVER] Admin ${req.user.username || req.user.email} deleted user: ${username}`);
+      res.status(200).json({ success: true, message: 'User deleted successfully' });
+    });
+
     // --- Data Compliance Endpoints ---
     app.get('/api/auth/user/data', authenticateToken, async (req, res) => {
         if (req.user.isGuest) {

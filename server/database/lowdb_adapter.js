@@ -1,8 +1,47 @@
 import logger from '../logger.js';
+import fs from 'fs';
+import path from 'path';
 
 export class LowDbAdapter {
     constructor(db) {
         this.db = db;
+
+        // lowdb instances usually don't publicly expose the filename in v7 but we can try
+        // passing it in from server.js or assume default 'db.json'
+        // If we want a reliable file watcher for CLI updates:
+        const isTestEnv = process.env.NODE_ENV === 'test' && process.env.TEST_USE_REAL_DB !== 'true';
+        if (!isTestEnv) {
+            // Assume 'db.json' in the current working directory,
+            // since the main server.js resolves it to the server directory
+            const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'db.json');
+            if (fs.existsSync(dbPath)) {
+                logger.info(`[LowDbAdapter] Watching ${dbPath} for changes...`);
+                fs.watchFile(dbPath, { interval: 1000 }, async (curr, prev) => {
+                    if (curr.mtimeMs !== prev.mtimeMs) {
+                        try {
+                            logger.info('[LowDbAdapter] db.json changed on disk. Reloading...');
+                            await this.db.read();
+                            this._ensureStructure();
+                            // Rebuild caches upon reload
+                            this.db.activeOrders = null;
+                            this.db.shippedOrders = null;
+                            this.db.userOrderIndex = null;
+                        } catch (err) {
+                            logger.error('[LowDbAdapter] Error reloading db.json:', err);
+                        }
+                    }
+                });
+            } else {
+                logger.warn(`[LowDbAdapter] File not found for watching: ${dbPath}`);
+            }
+        }
+
+        this._ensureStructure();
+
+        this.FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+    }
+
+    _ensureStructure() {
         // Ensure structure exists
         if (!this.db.data) this.db.data = {};
         if (!this.db.data.orders) this.db.data.orders = {};
@@ -36,8 +75,6 @@ export class LowDbAdapter {
         if (!this.db.data.config) this.db.data.config = {};
         if (!this.db.data.emailIndex) this.db.data.emailIndex = {};
         if (!this.db.data.inventory_cache) this.db.data.inventory_cache = {};
-
-        this.FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
     }
 
     async connect() {
