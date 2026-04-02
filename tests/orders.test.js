@@ -112,9 +112,9 @@ describe('Order API Endpoints', () => {
         }
     });
 
-    const getAuthToken = (username = 'testuser', email = 'test@example.com') => {
+    const getAuthToken = (username = 'testuser', email = 'test@example.com', role = 'user') => {
         const { privateKey, kid } = getCurrentSigningKey();
-        return jwt.sign({ username, email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
+        return jwt.sign({ username, email, role }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
     };
 
     // Helper to rebuild the userOrderIndex since we bypass the server logic when injecting data directly

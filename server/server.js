@@ -1416,6 +1416,7 @@ async function startServer(
         return res.status(401).json({ error: 'User not found' });
       }
 
+      // isAdmin is defined in this file (server.js) as an async function since line 719.
       const isUserAdmin = await isAdmin(req.user);
       const filteredOrders = await db.searchOrders(q, user.email, isUserAdmin);
 
