@@ -562,16 +562,24 @@ async function fetchAndDisplayOrders(query = '') {
 async function fetchAndDisplayMetrics() {
     try {
         const metrics = await fetchWithAuth(`${serverUrl}/api/admin/sales-metrics`);
-        document.getElementById('metric-total-orders').textContent = metrics.totalOrders;
-        document.getElementById('metric-total-revenue').textContent = `$${metrics.totalRevenue.toFixed(2)}`;
-        document.getElementById('metric-recent-orders').textContent = metrics.recentOrders;
+        const elTotalOrders = document.getElementById('metric-total-orders');
+        if (elTotalOrders) elTotalOrders.textContent = metrics.totalOrders;
+
+        const elTotalRevenue = document.getElementById('metric-total-revenue');
+        if (elTotalRevenue) elTotalRevenue.textContent = `$${metrics.totalRevenue.toFixed(2)}`;
+
+        const elRecentOrders = document.getElementById('metric-recent-orders');
+        if (elRecentOrders) elRecentOrders.textContent = metrics.recentOrders;
 
         // Also fetch uptime
         const uptimeRes = await fetch(`${serverUrl}/api/ping`);
         if (uptimeRes.ok) {
-            document.getElementById('metric-server-status').textContent = 'Online / Up';
-            document.getElementById('metric-server-status').classList.remove('text-red-500');
-            document.getElementById('metric-server-status').classList.add('text-green-500');
+            const elServerStatus = document.getElementById('metric-server-status');
+            if (elServerStatus) {
+                elServerStatus.textContent = 'Online / Up';
+                elServerStatus.classList.remove('text-red-500');
+                elServerStatus.classList.add('text-green-500');
+            }
         } else {
             throw new Error('Ping failed');
         }
@@ -585,9 +593,12 @@ async function fetchAndDisplayMetrics() {
             const elRecentOrders = document.getElementById('metric-recent-orders');
             if (elRecentOrders) elRecentOrders.textContent = 'N/A';
         }
-        document.getElementById('metric-server-status').textContent = 'Offline';
-        document.getElementById('metric-server-status').classList.add('text-red-500');
-        document.getElementById('metric-server-status').classList.remove('text-green-500');
+        const elServerStatus = document.getElementById('metric-server-status');
+        if (elServerStatus) {
+            elServerStatus.textContent = 'Offline';
+            elServerStatus.classList.add('text-red-500');
+            elServerStatus.classList.remove('text-green-500');
+        }
     }
 }
 
