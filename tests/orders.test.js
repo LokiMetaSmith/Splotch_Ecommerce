@@ -530,14 +530,16 @@ describe('Order API Endpoints', () => {
 
         it('should not find other users orders even if ID matches query', async () => {
              const email = 'user1@example.com';
-             db.data.users['user1'] = { email, username: 'user1' };
+             // Explicitly make sure this user is not admin
+             db.data.users['user1'] = { email, username: 'user1', role: 'user' };
              db.data.emailIndex = { [email]: 'user1' };
              const secret123 = '550e8400-e29b-41d4-a716-446655440012';
              db.data.orders[secret123] = { orderId: secret123, billingContact: { email: 'admin@example.com' } };
              await db.write();
              rebuildIndex();
 
-             const token = getAuthToken('user1', email);
+             // Ensure the user role is accurately placed in token
+             const token = getAuthToken('user1', email, 'user');
              const res = await request(app)
                 .get('/api/orders/search?q=0012')
                 .set('Authorization', `Bearer ${token}`);
@@ -545,6 +547,24 @@ describe('Order API Endpoints', () => {
              // The search filters by user email first, then by query.
              // If filteredOrders is empty, it returns 404.
              expect(res.statusCode).toBe(404);
+        });
+
+        it('should find other users orders if user is admin', async () => {
+             const email = 'admin1@example.com';
+             db.data.users['admin1'] = { email, username: 'admin1', role: 'admin' };
+             db.data.emailIndex = { [email]: 'admin1' };
+             const secret123 = '550e8400-e29b-41d4-a716-446655440012';
+             db.data.orders[secret123] = { orderId: secret123, billingContact: { email: 'customer@example.com' } };
+             await db.write();
+             rebuildIndex();
+
+             const token = getAuthToken('admin1', email, 'admin');
+             const res = await request(app)
+                .get('/api/orders/search?q=0012')
+                .set('Authorization', `Bearer ${token}`);
+
+             expect(res.statusCode).toBe(200);
+             expect(res.body[0].orderId).toBe(secret123);
         });
 
         it('should return 404 if no order matches', async () => {
