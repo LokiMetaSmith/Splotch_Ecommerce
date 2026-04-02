@@ -1416,7 +1416,9 @@ async function startServer(
         return res.status(401).json({ error: 'User not found' });
       }
 
-      const filteredOrders = await db.searchOrders(q, user.email);
+      const isUserAdmin = await isAdmin(req.user);
+      const filteredOrders = await db.searchOrders(q, user.email, isUserAdmin);
+
       if (filteredOrders.length === 0) {
         return res.status(404).json({ error: 'Order not found' });
       }

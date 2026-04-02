@@ -266,8 +266,13 @@ export class LowDbAdapter {
         return Object.values(this.db.data.orders).filter(o => statuses.includes(o.status));
     }
 
-    async searchOrders(query, email) {
-        const orders = await this.getUserOrders(email);
+    async searchOrders(query, email, isAdmin = false) {
+        let orders;
+        if (isAdmin) {
+            orders = await this.getAllOrders();
+        } else {
+            orders = await this.getUserOrders(email);
+        }
         return orders.filter(order => order.orderId.includes(query));
     }
 
