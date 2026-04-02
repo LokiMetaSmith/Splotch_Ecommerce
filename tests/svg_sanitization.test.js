@@ -106,7 +106,8 @@ describe('SVG Sanitization', () => {
         fs.unlinkSync(maliciousSvgPath);
 
         expect(res.statusCode).toEqual(400);
-        expect(res.body.error).toContain('Invalid file type');
+        // The error message changed to be more descriptive about sanitization/security
+        expect(res.body.error).toMatch(/Invalid file type|potentially malicious content/i);
     });
 
     it('should sanitize an SVG file with mixed content (remove script, keep safe)', async () => {

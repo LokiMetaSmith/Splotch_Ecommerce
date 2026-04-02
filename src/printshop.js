@@ -249,7 +249,11 @@ async function fetchWithAuth(url, options = {}) {
     }
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'An unknown server error occurred.' }));
+        const errorData = await response.json().catch(() => {
+            // Provide a more descriptive error if we can't parse JSON (e.g. proxy returned 500 without a body)
+            console.error(`[fetchWithAuth] Received non-JSON error response. HTTP Status: ${response.status}`);
+            return { error: `Server error: Could not process response (Status ${response.status})` };
+        });
         throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
     }
 
@@ -574,9 +578,12 @@ async function fetchAndDisplayMetrics() {
     } catch (e) {
         console.error('Error fetching metrics', e);
         if (e.message.includes('Forbidden') || e.message.includes('permission')) {
-            document.getElementById('metric-total-orders').textContent = 'N/A';
-            document.getElementById('metric-total-revenue').textContent = 'N/A';
-            document.getElementById('metric-recent-orders').textContent = 'N/A';
+            const elTotalOrders = document.getElementById('metric-total-orders');
+            if (elTotalOrders) elTotalOrders.textContent = 'N/A';
+            const elTotalRevenue = document.getElementById('metric-total-revenue');
+            if (elTotalRevenue) elTotalRevenue.textContent = 'N/A';
+            const elRecentOrders = document.getElementById('metric-recent-orders');
+            if (elRecentOrders) elRecentOrders.textContent = 'N/A';
         }
         document.getElementById('metric-server-status').textContent = 'Offline';
         document.getElementById('metric-server-status').classList.add('text-red-500');
@@ -1124,6 +1131,9 @@ async function testOdooConnection(e) {
 async function getServerSessionToken() {
     try {
         const response = await fetch(`${serverUrl}/api/server-info`, { credentials: 'include' });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const { serverSessionToken } = await response.json();
         localStorage.setItem('serverSessionToken', serverSessionToken);
         console.log('[CLIENT] Initial server session token acquired.');
@@ -1167,6 +1177,9 @@ async function verifyInitialToken() {
 async function getCsrfToken() {
     try {
         const response = await fetch(`${serverUrl}/api/csrf-token`, { credentials: 'include' });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const data = await response.json();
         csrfToken = data.csrfToken;
     } catch (error) {
