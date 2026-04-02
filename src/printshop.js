@@ -98,18 +98,22 @@ function updateConnectionStatus(status) {
         case 'connected':
             dot.classList.add('bg-green-500');
             text.textContent = 'Connected';
+            dot.setAttribute('aria-label', 'Connection Status: Connected');
             break;
         case 'error':
             dot.classList.add('bg-red-500');
             text.textContent = 'Error';
+            dot.setAttribute('aria-label', 'Connection Status: Error');
             break;
         case 'connecting':
             dot.classList.add('bg-yellow-500');
             text.textContent = 'Connecting...';
+            dot.setAttribute('aria-label', 'Connection Status: Connecting...');
             break;
         default: // idle
             dot.classList.add('bg-yellow-500');
             text.textContent = 'Status';
+            dot.setAttribute('aria-label', 'Connection Status: Idle');
             break;
     }
 }
