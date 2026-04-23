@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test-setup.js';
 
 test('placeholder should be contenteditable to allow context menu paste', async ({ page }) => {
   await page.goto('/');

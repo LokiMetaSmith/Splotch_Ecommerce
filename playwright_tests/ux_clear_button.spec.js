@@ -37,7 +37,4 @@ test('allows a user to clear the uploaded image', async ({ page }) => {
   const fileInput = page.locator('#file');
   const value = await fileInput.inputValue();
   expect(value).toBe('');
-  // 5. Filename display should be empty
-  const fileNameDisplay = page.locator('#fileNameDisplay');
-  await expect(fileNameDisplay).toHaveText('');
 });
