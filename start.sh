@@ -1,5 +1,11 @@
 #!/bin/bash
 
+echo "Installing root dependencies..."
+pnpm install
+
+echo "Installing server dependencies..."
+(cd server && pnpm install)
+
 echo "Starting backend server..."
 (cd server && pnpm start) &
 BACKEND_PID=$!
