@@ -3,8 +3,15 @@ import { resolve } from 'path';
 import tailwindcss from '@tailwindcss/postcss';
 import autoprefixer from 'autoprefixer';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import fs from 'fs';
+
+const packageJson = JSON.parse(fs.readFileSync('./package.json'));
+process.env.VITE_APP_VERSION = packageJson.version;
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version)
+  },
   plugins: [
     basicSsl()
   ],
