@@ -382,20 +382,6 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
     will-change: filter;
 }
 
-#mascot-container:hover #mascot-img,
-#mascot-container:focus-visible #mascot-img {
-    filter: brightness(0.8)
-            drop-shadow(0 2px 0 #fff)
-            drop-shadow(0 -2px 0 #fff)
-            drop-shadow(2px 0 0 #fff)
-            drop-shadow(-2px 0 0 #fff)
-            drop-shadow(2px 2px 0 #fff)
-            drop-shadow(-2px 2px 0 #fff)
-            drop-shadow(2px -2px 0 #fff)
-            drop-shadow(-2px -2px 0 #fff)
-            drop-shadow(3px 5px 5px rgba(0,0,0,0.4));
-}
-
 /* Speech bubble */
 .speech-bubble {
 	position: absolute;
