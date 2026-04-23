@@ -139,7 +139,7 @@ If you need to restore your application's state from a backup:
 
 2.  **Stop the Application:** Ensure your application server is stopped to prevent data corruption. If using the `docker-compose.yml` from the `cloud-config`, you can run:
     ```bash
-    cd /path/to/project && docker-compose down
+    cd /path/to/project && docker compose down
     ```
 
 3.  **Extract the Backup:** From the **root of your project directory**, extract the archive. This will overwrite the existing `server/db.json` and `server/uploads/` directory.
@@ -151,7 +151,7 @@ If you need to restore your application's state from a backup:
 
 4.  **Restart the Application:**
     ```bash
-    cd /path/to/project && docker-compose up -d
+    cd /path/to/project && docker compose up -d
     ```
 
 Your application is now restored to the state of the backup.

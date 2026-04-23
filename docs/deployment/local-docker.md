@@ -61,7 +61,7 @@ Once the setup is complete, you can start the application.
     Run the following command from the project root directory:
 
     ```bash
-    docker-compose up --build
+    docker compose up --build
     ```
 
     - The `--build` flag is recommended on the first run to ensure the images are built correctly.
@@ -78,5 +78,5 @@ To stop the containers, press `CTRL+C` in the terminal where `docker-compose` is
 To stop the containers and remove the networks and volumes created, run:
 
 ```bash
-docker-compose down
+docker compose down
 ```

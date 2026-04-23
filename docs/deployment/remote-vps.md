@@ -114,10 +114,10 @@ The server is now running, but you must perform a few manual steps to finalize t
     cd /home/loki/lokimetasmith.github.io
 
     # For Standard Deployment:
-    docker-compose -f docker-compose.prod.yml restart
+    docker compose -f docker-compose.prod.yml restart
 
     # For Lite Deployment:
-    docker-compose -f docker-compose.lite.yml restart
+    docker compose -f docker-compose.lite.yml restart
     ```
 
 4.  **Update DNS (Optional but Recommended)**:

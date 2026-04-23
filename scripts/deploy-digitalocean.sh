@@ -261,9 +261,9 @@ echo
 echo "3. After SSHing in, you may need to restart the services for the changes to take effect:"
 echo
 if [ "$USE_LITE" = true ]; then
-  echo "   cd /home/loki/lokimetasmith.github.io && docker-compose -f docker-compose.lite.yml restart"
+  echo "   cd /home/loki/lokimetasmith.github.io && docker compose -f docker-compose.lite.yml restart"
 else
-  echo "   cd /home/loki/lokimetasmith.github.io && docker-compose -f docker-compose.prod.yml restart"
+  echo "   cd /home/loki/lokimetasmith.github.io && docker compose -f docker-compose.prod.yml restart"
 fi
 echo
 echo "Deployment script finished."
