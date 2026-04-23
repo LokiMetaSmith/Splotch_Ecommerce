@@ -384,7 +384,8 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
 
 #mascot-container:hover #mascot-img,
 #mascot-container:focus-visible #mascot-img {
-    filter: drop-shadow(0 2px 0 #fff)
+    filter: brightness(0.8)
+            drop-shadow(0 2px 0 #fff)
             drop-shadow(0 -2px 0 #fff)
             drop-shadow(2px 0 0 #fff)
             drop-shadow(-2px 0 0 #fff)
@@ -392,8 +393,7 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
             drop-shadow(-2px 2px 0 #fff)
             drop-shadow(2px -2px 0 #fff)
             drop-shadow(-2px -2px 0 #fff)
-            drop-shadow(3px 5px 5px rgba(0,0,0,0.4))
-            brightness(0.8);
+            drop-shadow(3px 5px 5px rgba(0,0,0,0.4));
 }
 
 /* Speech bubble */
