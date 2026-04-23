@@ -98,9 +98,37 @@ test('bounding box is visible when scaling image', async ({ page }) => {
 
   console.log('Canvas Debug Info:', debugInfo);
 
-  // Note: Skipping actual bounding box check in this test as it relies on
-  // rendering that can be flaky in CI environments (Mobile Safari).
-  // The actual E2E suite will catch any structural issues.
+  // Check a few points along the edge where the bounding box should be.
+  const isBoundingBoxVisible = await page.evaluate(() => {
+    const canvas = document.getElementById('imageCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // We scale the image to 3 inches and wait for redraw.
+    // The image itself is loaded as a transparent or white 100x100 square.
+    // Check if the bounding box has actually been drawn at all anywhere on the canvas
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    let hasBoundingBoxPixel = false;
+    // Step through the array faster, checking every few pixels
+    for (let i = 0; i < data.length; i += 4 * 10) {
+      const r = data[i];
+      const g = data[i+1];
+      const b = data[i+2];
+      const a = data[i+3];
+
+      // Check for grey-ish color (128, 128, 128)
+      // Allow broader tolerance for alpha blending (approx 140 on white)
+      const matchesBase = Math.abs(r - 128) < 20 && Math.abs(g - 128) < 20 && Math.abs(b - 128) < 20;
+      const matchesBlended = Math.abs(r - 140) < 15 && Math.abs(g - 140) < 15 && Math.abs(b - 140) < 15;
+
+      if ((matchesBase || matchesBlended) && a > 50) {
+        hasBoundingBoxPixel = true;
+        break;
+      }
+    }
+    return hasBoundingBoxPixel;
+  });
 
   expect(isBoundingBoxVisible).toBe(true);
 });
