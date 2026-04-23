@@ -364,9 +364,6 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
 #mascot-container:focus-visible {
     animation: none;
     transform: scale(1.15) rotate(0deg); /* Straighten up on hover/focus */
-    outline: 4px solid var(--splotch-teal) !important;
-    outline-offset: 4px;
-    border-radius: 50%;
 }
 
 #mascot-img {
@@ -383,6 +380,20 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
             drop-shadow(-2px -2px 0 #fff)
             drop-shadow(3px 5px 5px rgba(0,0,0,0.4));
     will-change: filter;
+}
+
+#mascot-container:hover #mascot-img,
+#mascot-container:focus-visible #mascot-img {
+    filter: drop-shadow(0 2px 0 #fff)
+            drop-shadow(0 -2px 0 #fff)
+            drop-shadow(2px 0 0 #fff)
+            drop-shadow(-2px 0 0 #fff)
+            drop-shadow(2px 2px 0 #fff)
+            drop-shadow(-2px 2px 0 #fff)
+            drop-shadow(2px -2px 0 #fff)
+            drop-shadow(-2px -2px 0 #fff)
+            drop-shadow(3px 5px 5px rgba(0,0,0,0.4))
+            brightness(0.8);
 }
 
 /* Speech bubble */
