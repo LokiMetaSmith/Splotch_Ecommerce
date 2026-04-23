@@ -56,7 +56,7 @@ test.describe('Bolt Optimization Verification', () => {
             localStorage.setItem('authToken', 'mock-jwt-token');
         });
 
-        await page.goto('http://localhost:5173/printshop.html');
+        await page.goto('/printshop.html');
 
         // Wait for orders to load
         await expect(page.locator('.order-card')).toHaveCount(2);

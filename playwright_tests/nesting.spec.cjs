@@ -46,7 +46,7 @@ test.describe('Nesting Functionality', () => {
             localStorage.setItem('authToken', 'mock-jwt-token');
         });
 
-        await page.goto('http://localhost:5173/printshop.html');
+        await page.goto('/printshop.html');
 
         // Wait for orders to load
         await expect(page.locator('#order-card-order-nest-1')).toBeVisible();
