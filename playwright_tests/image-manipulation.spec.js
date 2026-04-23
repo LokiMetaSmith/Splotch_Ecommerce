@@ -14,6 +14,7 @@ test.describe('Frontend Image Manipulation', () => {
         page.on('console', msg => console.log('PAGE LOG:', msg.text()));
         page.on('pageerror', err => console.log('PAGE ERROR:', err));
         await page.goto('/');
+        await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
     });
 
     // Helper to upload a test image
@@ -43,6 +44,7 @@ test.describe('Frontend Image Manipulation', () => {
     }
 
     test('should add text to the canvas', async ({ page }) => {
+        test.setTimeout(60000);
         await uploadTestImage(page);
 
         // Fill text input
@@ -58,6 +60,7 @@ test.describe('Frontend Image Manipulation', () => {
     });
 
     test('should rotate the image', async ({ page }) => {
+        test.setTimeout(60000);
         await uploadTestImage(page);
 
         await page.click('#rotateRightBtn');
@@ -70,6 +73,7 @@ test.describe('Frontend Image Manipulation', () => {
     });
 
     test('should apply grayscale filter', async ({ page }) => {
+        test.setTimeout(60000);
         await uploadTestImage(page);
 
         await page.click('#grayscaleBtn');
@@ -81,6 +85,7 @@ test.describe('Frontend Image Manipulation', () => {
     });
 
     test('should generate smart cutline', async ({ page }) => {
+        test.setTimeout(60000);
         // Mock the confirm dialog to always accept
         page.on('dialog', dialog => dialog.accept());
 

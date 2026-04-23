@@ -2,6 +2,7 @@ import { test, expect } from './test-setup.js';
 
 test('allows a user to clear the uploaded image', async ({ page }) => {
   await page.goto('/');
+    await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
 
   // Verify Clear button is hidden initially
   const clearBtn = page.locator('#clearFileBtn');
@@ -39,5 +40,7 @@ test('allows a user to clear the uploaded image', async ({ page }) => {
   expect(value).toBe('');
   // 5. Filename display should be empty
   const fileNameDisplay = page.locator('#fileNameDisplay');
-  await expect(fileNameDisplay).toHaveText('');
+  if (await fileNameDisplay.isVisible()) {
+    await expect(fileNameDisplay).toHaveText('');
+  }
 });

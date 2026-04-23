@@ -52,14 +52,14 @@ test.describe('Payment Form Flow', () => {
     await page.fill('#postalCode', '12345');
 
     // 4. Submit the form
-    await page.click('button[type="submit"]');
+    await page.click('form#payment-form button[type="submit"]');
 
     // 5. Verify processing status
     // Wait for the status container to be visible (it might be visible from previous step, so we check content)
-    await expect(page.locator('.message-content')).toBeVisible();
+    await expect(page.locator('.message-content').last()).toBeVisible();
 
     // 6. Verify success message
-    await expect(page.locator('.message-content')).toContainText('Order successfully placed!', { timeout: 10000 });
+    await expect(page.locator('.message-content').last()).toContainText('Order successfully placed!', { timeout: 10000 });
 
     // 7. Verify redirection to orders page
     await page.waitForURL('**/orders.html?token=mock-temp-auth-token-xyz', { timeout: 10000 });

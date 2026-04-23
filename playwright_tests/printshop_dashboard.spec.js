@@ -125,6 +125,6 @@ test.describe('Printshop Dashboard E2E', () => {
     // Wait for success toast
     const successToast = page.locator('#success-toast');
     await expect(successToast).toBeVisible();
-    await expect(page.locator('#success-message')).toContainText('Order status updated');
+    await expect(page.locator('#success-message').last()).toContainText('Order status updated');
   });
 });
