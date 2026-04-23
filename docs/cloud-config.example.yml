@@ -19,7 +19,7 @@ users:
 # 3. Install Docker and Docker Compose
 packages:
   - docker.io
-  - docker-compose
+  - docker-compose-v2
 
 # 4. Define the files to be created on the server
 write_files:
@@ -124,4 +124,4 @@ runcmd:
   # Build the frontend assets
   - cd /home/loki/lokimetasmith.github.io && npm install && npm run build
   # Launch the application using Docker Compose
-  - cd /home/loki/lokimetasmith.github.io && docker-compose up -d
+  - cd /home/loki/lokimetasmith.github.io && docker compose up -d
