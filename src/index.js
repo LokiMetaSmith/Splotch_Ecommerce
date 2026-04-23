@@ -22,7 +22,7 @@ import { showNotification } from "./notifications.js";
 
 const appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
 const locationId = "LTS82DEX24XR0";
-const serverUrl = "http://localhost:3000"; // Define server URL once
+const serverUrl = ""; // Define server URL once
 
 // Declare globals for SDK objects and key DOM elements
 let payments, card, csrfToken;
@@ -1507,7 +1507,7 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   let ppi = 96;
   if (pricingConfig && stickerResolutionSelect) {
     const selectedRes = pricingConfig.resolutions.find(
-      (r) => r.id === stickerResolutionSelect.value,
+      (r) => r.id === (stickerResolutionSelect.value || "dpi_300"),
     );
     if (selectedRes) {
       ppi = selectedRes.ppi;
@@ -1825,7 +1825,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
     stickerResolutionSelect
   ) {
     const selectedRes = pricingConfig.resolutions.find(
-      (r) => r.id === stickerResolutionSelect.value,
+      (r) => r.id === (stickerResolutionSelect.value || "dpi_300"),
     );
     if (selectedRes) {
       ppi = selectedRes.ppi;
@@ -2079,7 +2079,7 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
 
   const ppi =
     pricingConfig.resolutions.find(
-      (r) => r.id === stickerResolutionSelect.value,
+      (r) => r.id === (stickerResolutionSelect.value || "dpi_300"),
     )?.ppi || 96;
   let width = bounds.width / ppi;
   let height = bounds.height / ppi;
@@ -2233,7 +2233,7 @@ function drawRuler(bounds, offset = { x: 0, y: 0 }) {
   if (!ctx || !bounds || !pricingConfig || !stickerResolutionSelect) return;
   const ppi =
     pricingConfig.resolutions.find(
-      (r) => r.id === stickerResolutionSelect.value,
+      (r) => r.id === (stickerResolutionSelect.value || "dpi_300"),
     )?.ppi || 96;
   drawCanvasRuler(ctx, bounds, offset, ppi, isMetric);
 }
@@ -2362,7 +2362,7 @@ function handleResetImage() {
       if (resizeSliderEl) {
         if (pricingConfig && stickerResolutionSelect) {
           const selectedResolution = pricingConfig.resolutions.find(
-            (r) => r.id === stickerResolutionSelect.value,
+            (r) => r.id === (stickerResolutionSelect.value || "dpi_300"),
           );
           const ppi = selectedResolution ? selectedResolution.ppi : 96;
           let maxDimPixels = Math.max(newWidth, newHeight);
@@ -2845,7 +2845,7 @@ function handleGenerateCutline() {
       // Constraint: "we can have internal cuts, but they should be less than 2mm"
       // Interpretation: Keep internal cuts <= 2mm. Remove internal cuts > 2mm.
       if (significantContours.length > 0) {
-        const selectedResolutionId = stickerResolutionSelect
+        const selectedResolutionId = (stickerResolutionSelect && stickerResolutionSelect.value)
           ? stickerResolutionSelect.value
           : "dpi_300";
         const selectedResolution =
