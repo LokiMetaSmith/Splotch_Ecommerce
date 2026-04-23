@@ -123,7 +123,7 @@ Once the LXC is running, open its console from the Proxmox UI.
 3.  **Install Docker Compose:**
 
     ```bash
-    apt install docker-compose -y
+    apt install docker-compose-v2 -y
     ```
 
     > **Note on Podman:** As a more secure, daemonless alternative to Docker, you can install `podman` and `podman-compose` instead. The commands used in this guide are interchangeable.
@@ -157,7 +157,7 @@ Once the LXC is running, open its console from the Proxmox UI.
 4.  **Save the file** (`CTRL+X`, then `Y`, then `Enter`).
 5.  **Start the container:**
     ```bash
-    docker-compose up -d
+    docker compose up -d
     ```
 
 ### Initial Configuration
@@ -214,7 +214,7 @@ Open the console for your new app container.
     sh get-docker.sh
 
     # Install other tools
-    apt install docker-compose git nodejs npm -y
+    apt install docker-compose-v2 git nodejs npm -y
     ```
 
     > **Note on Podman:** You can use `podman` and `podman-compose` here as well. The rest of the steps remain the same.
@@ -246,7 +246,7 @@ With all the files in place, start the application using Docker Compose.
 
 ```bash
 # From the project root (/opt/print-shop)
-docker-compose up -d
+docker compose up -d
 ```
 
 The application is now running. The frontend is accessible within your local network at `http://192.168.1.20:8080`.
