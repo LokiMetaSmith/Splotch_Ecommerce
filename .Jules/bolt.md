@@ -61,3 +61,19 @@ This journal tracks critical performance learnings, anti-patterns, and insights 
 ## 2026-03-01 - [Fast Perimeter Calculation]
 **Learning:** The `calculatePerimeter` function (used for pricing based on complexity tiers) was inefficiently calculating polygon perimeters by creating a closure `distance()` for every point and repeatedly doing bounds and type checks inside array iteration (`forEach`). Iterating with a normal `for` loop and tracking previous validity states cut computation time by ~50%.
 **Action:** Replaced `forEach` and closures with a traditional `for` loop, eliminating array accesses via modulo and unneeded redundant checks.
+
+## 2026-03-02 - [SVG Path Generation String Builder]
+**Learning:** In `generateSvgFromCutline`, generating the `d` attribute of an SVG `<path>` by repeatedly appending strings (e.g., `pathD += "M ..."` and `pathD += "L ..."`) inside a loop for thousands of polygon points is highly inefficient. It creates massive Garbage Collection (GC) pressure by constantly creating and discarding new string objects for each concatenation step.
+**Action:** Replace string concatenation inside tight geometry processing loops with a pre-allocated Array and use `.join(' ')`. For `generateSvgFromCutline`, this improved SVG generation speed by ~15-20%. Calculate the required array size (`total points + number of polygons`) beforehand to avoid dynamic array resizing overhead.
+
+## 2026-03-05 - [Jimp Buffer Iteration]
+**Learning:** `Jimp.scan()` uses a callback function per pixel, which creates immense overhead (e.g., millions of function calls for large images). Replacing it with a raw `for` loop over the underlying `Buffer` (`image.bitmap.data`) dramatically improves ink coverage/pixel calculation times by eliminating callback allocation and invocation.
+**Action:** Use direct `Uint8Array`/`Buffer` iteration instead of `Jimp.scan()` when performing pixel-level analysis in Node.js.
+
+## 2026-03-05 - [Jimp Buffer Iteration Uint32Array]
+**Learning:** Iterating over a Node.js Buffer (or `Uint8Array`) using `Uint32Array` allows processing 4 bytes (RGBA channels) in a single CPU instruction using bitwise operators. This eliminates 75% of array access overhead and speeds up calculations (like ink coverage) by an additional ~1.3-1.7x compared to byte-by-byte traversal.
+**Action:** When performing pixel-level analysis where individual channel values can be extracted via bitwise shifts, cast the `Buffer` to a `Uint32Array` after checking system endianness.
+
+## 2026-03-13 - [Array Mapping Hot Path]
+**Learning:** In performance-critical hot paths for array transformations (like scaling or rotating polygon coordinates), avoid nested `.map()` or `.forEach()` calls. Creating arrays and closure functions per element creates massive garbage collection (GC) pressure and function call overhead in JS engines.
+**Action:** Use pre-allocated arrays (`new Array(length)`) and standard `for` loops to eliminate dynamic resizing and closure allocation.

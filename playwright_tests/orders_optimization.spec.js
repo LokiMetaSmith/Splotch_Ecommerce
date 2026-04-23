@@ -44,5 +44,5 @@ test('orders list renders correctly and reorder button works', async ({ page }) 
   await reorderBtn.click();
 
   // Wait for URL to contain the design parameter
-  await page.waitForURL(/\/\?design=%2Fuploads%2Ftest-design\.png/);
+  await page.waitForURL('**/?design=%2Fuploads%2Ftest-design.png');
 });

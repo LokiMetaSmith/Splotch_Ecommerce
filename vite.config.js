@@ -2,8 +2,12 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import tailwindcss from '@tailwindcss/postcss';
 import autoprefixer from 'autoprefixer';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig({
+  plugins: [
+    basicSsl()
+  ],
   build: {
     rollupOptions: {
       input: {

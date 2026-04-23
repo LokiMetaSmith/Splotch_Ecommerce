@@ -38,8 +38,8 @@ test.describe('Payment Form Flow', () => {
 
     // 2. Wait for image processing to complete
     // The app shows a success message when the image is loaded
-    await expect(page.locator('.message-content')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.message-content')).toContainText('Image loaded successfully');
+    await expect(page.locator('.message-content').last()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.message-content').last()).toContainText('Image loaded successfully');
 
     // 3. Fill out the billing form
     await page.fill('#firstName', 'Test');

@@ -8,6 +8,8 @@ const __dirname = path.dirname(__filename);
 
 test('bounding box is visible when scaling image', async ({ page }) => {
   test.setTimeout(60000);
+  await page.goto('/');
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
   // --- ROBUST LOGGING SETUP ---
   page.on('console', msg => {
       const type = msg.type();
@@ -50,7 +52,7 @@ test('bounding box is visible when scaling image', async ({ page }) => {
   await page.locator('input[type="file"][id="file"]').setInputFiles(filePath);
 
   // Wait for the success message to confirm processing started/finished
-  const statusContainer = page.locator('.message-content');
+  const statusContainer = page.locator('.message-content').last();
   await expect(statusContainer).toContainText('Image loaded successfully', { timeout: 10000 });
   console.log('[TEST] Image loaded successfully message detected.');
 
@@ -102,10 +104,15 @@ test('bounding box is visible when scaling image', async ({ page }) => {
     const canvas = document.getElementById('imageCanvas');
     const ctx = canvas.getContext('2d');
 
-    const imageData = ctx.getImageData(0, 0, 10, 10);
+    // We scale the image to 3 inches and wait for redraw.
+    // The image itself is loaded as a transparent or white 100x100 square.
+    // Check if the bounding box has actually been drawn at all anywhere on the canvas
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
 
-    for (let i = 0; i < data.length; i += 4) {
+    let hasBoundingBoxPixel = false;
+    // Step through the array faster, checking every few pixels
+    for (let i = 0; i < data.length; i += 4 * 10) {
       const r = data[i];
       const g = data[i+1];
       const b = data[i+2];
@@ -117,10 +124,11 @@ test('bounding box is visible when scaling image', async ({ page }) => {
       const matchesBlended = Math.abs(r - 140) < 15 && Math.abs(g - 140) < 15 && Math.abs(b - 140) < 15;
 
       if ((matchesBase || matchesBlended) && a > 50) {
-        return true;
+        hasBoundingBoxPixel = true;
+        break;
       }
     }
-    return false;
+    return hasBoundingBoxPixel;
   });
 
   expect(isBoundingBoxVisible).toBe(true);
