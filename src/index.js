@@ -248,7 +248,6 @@ async function BootStrap() {
     }
     showPaymentStatus(msg, "error");
     console.error("[CLIENT] Failed to initialize Square payments SDK:", error);
-    return;
   }
 
   // Attach event listeners

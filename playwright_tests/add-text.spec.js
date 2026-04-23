@@ -2,6 +2,7 @@ import { test, expect } from './test-setup.js';
 
 test('allows a user to add text to an image', async ({ page }) => {
   await page.goto('/');
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
 
   // Wait for the app to initialize (BootStrap runs and disables/hides controls)
   // This prevents the race condition where we try to upload before listeners are attached.
@@ -23,7 +24,7 @@ test('allows a user to add text to an image', async ({ page }) => {
 
   // --- Step 4: Verify the text was added ---
   // Verify the success message appears in the payment status container.
-  const statusContainer = page.locator('.message-content');
+  const statusContainer = page.locator('.message-content').last();
   await expect(statusContainer).toBeVisible({ timeout: 10000 });
   await expect(statusContainer).toContainText('Text "Hello, World!" added.', { timeout: 10000 });
 
