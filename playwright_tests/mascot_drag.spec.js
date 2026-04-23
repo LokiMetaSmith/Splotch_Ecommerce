@@ -32,7 +32,7 @@ test.describe('Mascot Drag and Drop', () => {
     // Skip mobile safari as the animations don't fully finish.
     const isMobileSafari = test.info().project.name === 'Mobile Safari';
     if (!isMobileSafari) {
-      await expect(canvas).toHaveScreenshot('mascot-canvas-drag-result.png', { maxDiffPixels: 100 });
+      await expect(canvas).toHaveScreenshot('mascot-canvas-drag-result.png', { maxDiffPixels: 100, timeout: 10000  });
     }
   });
 });

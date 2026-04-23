@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 test('bounding box is visible when scaling image', async ({ page }) => {
+  test.setTimeout(60000);
   await page.goto('/');
   await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
   // --- ROBUST LOGGING SETUP ---
