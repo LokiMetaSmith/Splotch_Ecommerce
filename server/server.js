@@ -2086,7 +2086,11 @@ async function startServer(
         const { verified } = verification;
         if (verified) {
           const { privateKey, kid } = getCurrentSigningKey();
-          const token = jwt.sign({ username: user.username }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
+          const payload = { username: user.username };
+          if (user.email) {
+              payload.email = user.email;
+          }
+          const token = jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
           res.json({ verified, token });
         } else {
           res.json({ verified });
