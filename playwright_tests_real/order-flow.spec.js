@@ -69,7 +69,7 @@ test.describe('Real Backend Order Flow', () => {
         await expect(statusContainer).toContainText('Order successfully placed!', { timeout: 30000 });
 
         // 7. Verify redirect
-        await expect(page).toHaveURL(/orders\.html\?token=/, { timeout: 10000 });
+        await expect(page).toHaveURL(/.*\/orders\.html\?requires_login=true$/, { timeout: 10000 });
 
         // 8. Verify order in history via Real Login (since Guest token cannot view history)
         // Request Magic Link

@@ -1301,7 +1301,7 @@ async function handlePaymentFormSubmit(event) {
 
     // Redirect to the order history page with the token
     setTimeout(() => {
-      window.location.href = `/orders.html?token=${tempAuthToken}`;
+      window.location.href = `/orders.html?requires_login=true`;
     }, 2000);
   } catch (error) {
     console.error("[CLIENT] Error during payment form submission:", error);
@@ -1635,7 +1635,12 @@ function loadFileAsImage(file, isMascot = false) {
           }
 
           // Generate cutline based on image transparency
-          const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const currentImageData = ctx.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+          );
           const dpr = window.devicePixelRatio || 1;
           const logicalWidth = canvas.width / dpr;
           const logicalHeight = canvas.height / dpr;
@@ -1855,7 +1860,10 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
       const newPoly = new Array(p.length);
       for (let j = 0; j < p.length; j++) {
         const point = p[j];
-        newPoly[j] = { X: Math.round(point.x * scale), Y: Math.round(point.y * scale) };
+        newPoly[j] = {
+          X: Math.round(point.x * scale),
+          Y: Math.round(point.y * scale),
+        };
       }
       newScaledPolygons[i] = newPoly;
     }
@@ -2323,7 +2331,12 @@ function handleResetImage() {
       saveCleanState(); // Save state before decorations
 
       // Generate cutline based on image transparency
-      const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const currentImageData = ctx.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
       const dpr = window.devicePixelRatio || 1;
       const logicalWidth = canvas.width / dpr;
       const logicalHeight = canvas.height / dpr;
@@ -2845,9 +2858,10 @@ function handleGenerateCutline(skipPrompt = false) {
       // Constraint: "we can have internal cuts, but they should be less than 2mm"
       // Interpretation: Keep internal cuts <= 2mm. Remove internal cuts > 2mm.
       if (significantContours.length > 0) {
-        const selectedResolutionId = (stickerResolutionSelect && stickerResolutionSelect.value)
-          ? stickerResolutionSelect.value
-          : "dpi_300";
+        const selectedResolutionId =
+          stickerResolutionSelect && stickerResolutionSelect.value
+            ? stickerResolutionSelect.value
+            : "dpi_300";
         const selectedResolution =
           pricingConfig && pricingConfig.resolutions
             ? pricingConfig.resolutions.find(
@@ -3079,7 +3093,12 @@ async function handleRemoteImageLoad(imageUrl) {
     saveCleanState(); // Save state before decorations
 
     // Generate cutline based on image transparency
-    const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const currentImageData = ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
     const dpr = window.devicePixelRatio || 1;
     const logicalWidth = canvas.width / dpr;
     const logicalHeight = canvas.height / dpr;
@@ -3158,7 +3177,12 @@ async function loadProductForBuyer(productId) {
       // But we should "Lock" the UI.
 
       // Generate cutline based on image transparency
-      const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const currentImageData = ctx.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
       const dpr = window.devicePixelRatio || 1;
       const logicalWidth = canvas.width / dpr;
       const logicalHeight = canvas.height / dpr;
