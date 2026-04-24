@@ -1855,7 +1855,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
       const newPoly = new Array(p.length);
       for (let j = 0; j < p.length; j++) {
         const point = p[j];
-        newPoly[j] = { X: point.x * scale, Y: point.y * scale };
+        newPoly[j] = { X: Math.round(point.x * scale), Y: Math.round(point.y * scale) };
       }
       newScaledPolygons[i] = newPoly;
     }
@@ -1874,7 +1874,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
       ClipperLib.JoinType.jtRound,
       ClipperLib.EndType.etClosedPolygon,
     );
-    co1.Execute(expanded_paths, lazyRadiusPx * scale);
+    co1.Execute(expanded_paths, Math.round(lazyRadiusPx * scale));
 
     // 2. Erode to return to the original boundary but with closed gaps
     const co2 = new ClipperLib.ClipperOffset();
@@ -1884,7 +1884,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
       ClipperLib.JoinType.jtRound,
       ClipperLib.EndType.etClosedPolygon,
     );
-    co2.Execute(shrunk_paths, -lazyRadiusPx * scale);
+    co2.Execute(shrunk_paths, Math.round(-lazyRadiusPx * scale));
 
     // 3. Apply the actual requested cutline offset
     const co3 = new ClipperLib.ClipperOffset();
@@ -1894,7 +1894,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
       ClipperLib.JoinType.jtRound,
       ClipperLib.EndType.etClosedPolygon,
     );
-    co3.Execute(final_paths, offsetPx * scale);
+    co3.Execute(final_paths, Math.round(offsetPx * scale));
   } else {
     // Normal single-pass offset
     const co = new ClipperLib.ClipperOffset();
@@ -1904,7 +1904,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
       ClipperLib.JoinType.jtRound,
       ClipperLib.EndType.etClosedPolygon,
     );
-    co.Execute(final_paths, offsetPx * scale);
+    co.Execute(final_paths, Math.round(offsetPx * scale));
   }
 
   // Scale back down
@@ -2760,7 +2760,7 @@ function handleStandardResize(targetInches) {
 
 // --- Smart Cutline Generation ---
 
-function handleGenerateCutline() {
+function handleGenerateCutline(skipPrompt = false) {
   if (!canvas || !ctx || !originalImage) {
     showNotification(
       "Smart cutline requires a raster image (PNG, JPG). Please upload one.",
@@ -2772,7 +2772,7 @@ function handleGenerateCutline() {
   // --- Feedforward Check ---
   // Pass the imageData to the function
   const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  if (!imageHasTransparentBorder(currentImageData)) {
+  if (!skipPrompt && !imageHasTransparentBorder(currentImageData)) {
     const proceed = confirm(
       "This image does not appear to have a transparent or white background. The 'Smart Cutline' feature may not produce a good result. Proceed anyway?",
     );
