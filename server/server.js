@@ -2288,6 +2288,15 @@ async function startServer(
             return res.status(400).json({ error: 'Bad Request: Malformed JSON' });
         }
 
+        // Handle Multer errors
+        if (err instanceof multer.MulterError) {
+            logger.error(`[SERVER] Multer Error: ${err.message}`, err);
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: 'File too large' });
+            }
+            return res.status(400).json({ error: err.message });
+        }
+
         logger.error('[SERVER] Unhandled Error:', err);
 
         // Hide stack trace in production (and generally in API responses)
