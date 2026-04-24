@@ -491,7 +491,7 @@ async function startServer(
     ];
     
     if (process.env.NODE_ENV !== 'production') {
-      allowedOrigins.push(/http:\/\/localhost:\d+/);
+      allowedOrigins.push(/https?:\/\/(localhost|127\.0\.0\.1):\d+/);
     }
     
     const corsOptions = {
