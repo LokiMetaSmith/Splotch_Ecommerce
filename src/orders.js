@@ -188,9 +188,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Check for magic link token in URL
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
+  const requiresLogin = urlParams.get("requires_login");
 
   if (token) {
     verifyTokenAndFetchOrders(token);
+  } else if (requiresLogin === "true") {
+    loginStatus.textContent =
+      "Please verify your email via the magic link below to view your order history.";
+    loginStatus.style.color = "blue";
   }
 
   // Privacy Event Listeners

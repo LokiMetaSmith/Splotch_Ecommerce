@@ -62,6 +62,6 @@ test.describe('Payment Form Flow', () => {
     await expect(page.locator('#payment-status-container')).toContainText('Order successfully placed!', { timeout: 10000 });
 
     // 7. Verify redirection to orders page
-    await page.waitForURL('**/orders.html?token=mock-temp-auth-token-xyz', { timeout: 10000 });
+    await page.waitForURL('**/orders.html?requires_login=true', { timeout: 10000 });
   });
 });
