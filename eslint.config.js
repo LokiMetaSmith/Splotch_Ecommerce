@@ -15,7 +15,8 @@ export default [
         ...globals.jest,
         myCustomGlobal: "readonly",
         ClipperLib: "readonly",
-        SVGNest: "readonly"
+        SVGNest: "readonly",
+        __APP_VERSION__: "readonly"
       }
     },
     rules: {
