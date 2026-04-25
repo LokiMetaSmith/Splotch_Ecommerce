@@ -70,13 +70,18 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
  * @param {number} width - The width to draw.
  * @param {number} height - The height to draw.
  * @param {object} options - Filter options { grayscale: boolean, sepia: boolean }.
+ * @param {Object} offset - Translation offset.
  */
-export function drawImageWithFilters(ctx, image, width, height, { grayscale, sepia } = {}) {
+export function drawImageWithFilters(ctx, image, width, height, { grayscale, sepia } = {}, offset = { x: 0, y: 0 }) {
     if (!ctx || !image) return;
 
     ctx.clearRect(0, 0, width, height);
 
     ctx.save();
+
+    // Apply translation before drawing
+    ctx.translate(offset.x, offset.y);
+
     if (grayscale) {
         ctx.filter = 'grayscale(100%)';
     } else if (sepia) {
