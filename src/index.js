@@ -73,6 +73,7 @@ let paymentStatusContainer,
 let rotateLeftBtnEl,
   rotateRightBtnEl,
   resetBtnEl,
+  centerImageBtnEl,
   clearFileBtn,
   resizeInputEl,
   resizeBtnEl,
@@ -87,6 +88,13 @@ let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
 let creatorProfitCents = 0; // The markup for the current product
 let cutlineOffset = 10; // Default offset
+
+// --- Drag and Center State ---
+let imageOffsetX = 0;
+let imageOffsetY = 0;
+let isDraggingImage = false;
+let dragStartX = 0;
+let dragStartY = 0;
 
 // Memoization globals for pricing
 let lastCalculatedPerimeter = 0;
@@ -210,6 +218,7 @@ async function BootStrap() {
   rotateLeftBtnEl = document.getElementById("rotateLeftBtn");
   rotateRightBtnEl = document.getElementById("rotateRightBtn");
   resetBtnEl = document.getElementById("resetBtn");
+  centerImageBtnEl = document.getElementById("centerImageBtn");
   clearFileBtn = document.getElementById("clearFileBtn");
   const resizeSliderEl = document.getElementById("resizeSlider");
   const resizeInputNumberEl = document.getElementById("resizeInput");
@@ -321,6 +330,7 @@ async function BootStrap() {
       rotateCanvasContentFixedBounds(90),
     );
   if (resetBtnEl) resetBtnEl.addEventListener("click", handleResetImage);
+  if (centerImageBtnEl) centerImageBtnEl.addEventListener("click", handleCenterImage);
   if (clearFileBtn) clearFileBtn.addEventListener("click", handleClearImage);
   if (grayscaleBtnEl)
     grayscaleBtnEl.addEventListener("click", toggleGrayscaleFilter);
@@ -546,6 +556,37 @@ async function BootStrap() {
 
   // Add drag-and-drop and paste listeners to the canvas
   if (canvas) {
+    // Styling for grabbability
+    canvas.style.cursor = "grab";
+
+    // --- Drag and Center Listeners ---
+    canvas.addEventListener("mousedown", (e) => {
+      // Allow drag if we have an image
+      if (!originalImage && basePolygons.length === 0) return;
+      isDraggingImage = true;
+      dragStartX = e.clientX - imageOffsetX;
+      dragStartY = e.clientY - imageOffsetY;
+      canvas.style.cursor = "grabbing";
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+      if (!isDraggingImage) return;
+      imageOffsetX = e.clientX - dragStartX;
+      imageOffsetY = e.clientY - dragStartY;
+      redrawAll();
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      isDraggingImage = false;
+      canvas.style.cursor = "grab";
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      isDraggingImage = false;
+      canvas.style.cursor = "grab";
+    });
+    // --- End Drag Listeners ---
+
     canvas.addEventListener("dragover", (e) => {
       e.preventDefault();
       canvas.classList.add("border-dashed", "border-2", "border-blue-500");
@@ -1540,29 +1581,32 @@ function saveCleanState() {
   cleanCanvasState = ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-function restoreCleanState() {
+function restoreCleanState(dragOffset = { x: 0, y: 0 }) {
   if (!canvas || !ctx || !cleanCanvasState) return;
+
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = cleanCanvasState.width;
+  tempCanvas.height = cleanCanvasState.height;
+  tempCanvas.getContext("2d").putImageData(cleanCanvasState, 0, 0);
+
   // If we are in raster mode and have current bounds that push left/top negative,
   // we need to offset the clean state onto the potentially larger canvas.
+  let drawOffset = { x: 0, y: 0 };
   if (
     basePolygons.length === 0 &&
     currentBounds &&
     (currentBounds.left < 0 || currentBounds.top < 0)
   ) {
-    const drawOffset = {
+    drawOffset = {
       x: -currentBounds.left + 20,
       y: -currentBounds.top + 20,
     };
-    // Create a temporary canvas to hold the image data, as putImageData doesn't support offsets directly on scaled/resized canvases easily
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = cleanCanvasState.width;
-    tempCanvas.height = cleanCanvasState.height;
-    tempCanvas.getContext("2d").putImageData(cleanCanvasState, 0, 0);
-    ctx.drawImage(tempCanvas, drawOffset.x, drawOffset.y);
-  } else {
-    // Use putImageData to bypass transformations and draw directly to device pixels
-    ctx.putImageData(cleanCanvasState, 0, 0);
   }
+
+  ctx.save();
+  ctx.translate(dragOffset.x, dragOffset.y);
+  ctx.drawImage(tempCanvas, drawOffset.x, drawOffset.y);
+  ctx.restore();
 }
 
 // --- Image Loading and Editing Functions ---
@@ -1697,7 +1741,13 @@ function loadFileAsImage(file, isMascot = false) {
 
 function redrawAll() {
   if (currentPolygons.length === 0) {
-    // Handle raster image redrawing if necessary (or do nothing if canvas is source of truth)
+    // Handle raster image redrawing if necessary
+    if (originalImage) {
+        // Redraw decorations using the current offset. The base image is handled inside drawCanvasDecorations via restoreCleanState
+        const offset = { x: imageOffsetX, y: imageOffsetY };
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // wipe it
+        drawCanvasDecorations(currentBounds, offset);
+    }
     return;
   }
 
@@ -1728,8 +1778,8 @@ function redrawAll() {
 
   // Create an offset for drawing, so the shape isn't at the very edge
   const drawOffset = {
-    x: -currentBounds.left + 20,
-    y: -currentBounds.top + 20,
+    x: -currentBounds.left + 20 + imageOffsetX,
+    y: -currentBounds.top + 20 + imageOffsetY,
   };
 
   // Draw everything
@@ -2015,7 +2065,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
       }
     }
 
-    if (cleanCanvasState) restoreCleanState();
+    if (cleanCanvasState) restoreCleanState({ x: imageOffsetX, y: imageOffsetY });
   }
 
   drawBoundingBox(bounds, drawOffset);
@@ -2263,7 +2313,7 @@ function handleAddText() {
   ctx.fillStyle = color;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  ctx.fillText(text, (canvas.width / 2) + imageOffsetX, (canvas.height / 2) + imageOffsetY);
   showNotification(`Text "${text}" added.`, "success");
 }
 
@@ -2297,6 +2347,16 @@ function handleClearImage() {
   showNotification("Image removed.", "info");
 }
 
+function handleCenterImage() {
+  if (imageOffsetX === 0 && imageOffsetY === 0) {
+    showNotification("Image is already centered.", "info");
+    return;
+  }
+  imageOffsetX = 0;
+  imageOffsetY = 0;
+  redrawAll();
+}
+
 function handleResetImage() {
   if (!originalImage && basePolygons.length === 0) {
     showNotification("Nothing to reset.", "info");
@@ -2319,6 +2379,8 @@ function handleResetImage() {
     currentPolygons = [];
     currentCutline = [];
     rasterCutlinePoly = null; // Bolt Fix: Clear raster cutline on reset
+    imageOffsetX = 0; // Reset offset
+    imageOffsetY = 0; // Reset offset
 
     let newWidth = originalImage.width,
       newHeight = originalImage.height;
@@ -2550,6 +2612,7 @@ function redrawOriginalImageWithFilters() {
   if (!originalImage || !ctx || !canvas) return;
 
   // Bolt Optimization: Use hardware-accelerated Canvas filters via helper
+  // We draw without offset here so the clean state is saved at the origin
   drawImageWithFilters(ctx, originalImage, canvas.width, canvas.height, {
     grayscale: isGrayscale,
     sepia: isSepia,
@@ -2563,6 +2626,10 @@ function redrawOriginalImageWithFilters() {
 
   // Also redraw the bounding box and size indicator, which are cleared by the operation.
   if (currentBounds) {
+    // We must pass the current drag offset down to the drawing functions,
+    // but the decorations function handles the drag offset for the image,
+    // so we can just call it to rebuild the scene correctly
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawCanvasDecorations(currentBounds);
   }
 }
