@@ -243,20 +243,32 @@ async function BootStrap() {
   console.log(
     `[CLIENT] Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`,
   );
-  try {
-    if (!window.Square || !window.Square.payments) {
-      throw new Error("Square SDK is not loaded.");
+  let retryCount = 0;
+  const maxRetries = 3;
+  while (retryCount < maxRetries) {
+    try {
+      if (!window.Square || !window.Square.payments) {
+        throw new Error("Square SDK is not loaded.");
+      }
+      payments = window.Square.payments(appId, locationId);
+      card = await initializeCard(payments);
+      break; // Success
+    } catch (error) {
+      retryCount++;
+      console.warn(`[CLIENT] Square SDK init failed (attempt ${retryCount}/${maxRetries}):`, error);
+      if (retryCount >= maxRetries) {
+        let msg = `Failed to initialize payments: ${error.message}`;
+        if (error.message.includes("Network") || typeof Square === "undefined") {
+          msg += " (Check your AdBlocker)";
+          showAdBlockerWarning();
+        }
+        showPaymentStatus(msg, "error");
+        console.error("[CLIENT] Failed to initialize Square payments SDK:", error);
+      } else {
+        // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
-    payments = window.Square.payments(appId, locationId);
-    card = await initializeCard(payments);
-  } catch (error) {
-    let msg = `Failed to initialize payments: ${error.message}`;
-    if (error.message.includes("Network") || typeof Square === "undefined") {
-      msg += " (Check your AdBlocker)";
-      showAdBlockerWarning();
-    }
-    showPaymentStatus(msg, "error");
-    console.error("[CLIENT] Failed to initialize Square payments SDK:", error);
   }
 
   // Attach event listeners
