@@ -2246,7 +2246,7 @@ async function startServer(
     // Start background workers
     if (process.env.NODE_ENV !== 'test') {
         try {
-            startEmailWorker(oauth2Client, sendEmail);
+            startEmailWorker(oauth2Client, sendEmail, db);
             if (bot) {
                 startTelegramWorker(bot, db);
             }
