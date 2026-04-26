@@ -4,7 +4,7 @@ import logger from '../logger.js';
 
 let worker;
 
-export const startEmailWorker = (oauth2Client, emailSender = sendEmail) => {
+export const startEmailWorker = (oauth2Client, emailSender = sendEmail, db = null) => {
     if (worker) return worker;
 
     worker = new Worker('email-queue', async (job) => {
@@ -17,6 +17,21 @@ export const startEmailWorker = (oauth2Client, emailSender = sendEmail) => {
             logger.info(`[WORKER] Email job ${job.id} completed.`);
         } catch (error) {
             logger.error(`[WORKER] Email job ${job.id} failed:`, error);
+
+            if (error.message === 'invalid_grant' || (error.response?.data?.error === 'invalid_grant')) {
+                if (db) {
+                    logger.warn('[WORKER] Google OAuth2 token is invalid or revoked. Clearing stored token.');
+                    try {
+                        await db.setConfig('google_refresh_token', null);
+                        if (oauth2Client) {
+                            oauth2Client.setCredentials({});
+                        }
+                    } catch (dbErr) {
+                        logger.error('[WORKER] Failed to clear invalid google_refresh_token:', dbErr);
+                    }
+                }
+            }
+
             throw error; // Let BullMQ handle retries
         }
     }, {
