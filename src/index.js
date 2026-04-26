@@ -34,6 +34,7 @@ let basePolygons = []; // The original, unscaled polygons from the SVG
 let currentPolygons = [];
 let rasterCutlinePoly = null; // New global for Raster Mode cutline
 let cleanCanvasState = null; // To store clean image state (pixels + filters + rotation)
+let cachedTempCanvas = null; // To avoid memory leaks in restoreCleanState
 let isMetric = false; // To track unit preference
 let currentCutline = [];
 let currentBounds = null;
@@ -1591,15 +1592,19 @@ function setCanvasSize(logicalWidth, logicalHeight) {
 function saveCleanState() {
   if (!canvas || !ctx) return;
   cleanCanvasState = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  cachedTempCanvas = null; // Invalidate cache
 }
 
 function restoreCleanState(dragOffset = { x: 0, y: 0 }) {
   if (!canvas || !ctx || !cleanCanvasState) return;
 
-  const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = cleanCanvasState.width;
-  tempCanvas.height = cleanCanvasState.height;
-  tempCanvas.getContext("2d").putImageData(cleanCanvasState, 0, 0);
+  if (!cachedTempCanvas || cachedTempCanvas.width !== cleanCanvasState.width || cachedTempCanvas.height !== cleanCanvasState.height) {
+    cachedTempCanvas = document.createElement("canvas");
+    cachedTempCanvas.width = cleanCanvasState.width;
+    cachedTempCanvas.height = cleanCanvasState.height;
+    cachedTempCanvas.getContext("2d").putImageData(cleanCanvasState, 0, 0);
+  }
+  const tempCanvas = cachedTempCanvas;
 
   // If we are in raster mode and have current bounds that push left/top negative,
   // we need to offset the clean state onto the potentially larger canvas.
@@ -2075,6 +2080,8 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
         // Need to set it back to original state if we shrank the cutline back
         setCanvasSize(logicalOrigW, cleanCanvasState.height / dpr);
         ctx.clearRect(0, 0, logicalOrigW, cleanCanvasState.height / dpr);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
     }
 
@@ -2340,6 +2347,7 @@ function handleClearImage() {
   currentCutline = [];
   currentBounds = null;
   cleanCanvasState = null;
+  cachedTempCanvas = null;
 
   if (fileInputGlobalRef) fileInputGlobalRef.value = "";
   if (canvas && ctx) {
