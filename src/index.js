@@ -1922,6 +1922,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
   }
 
   let final_paths;
+  const joinType = offsetPx <= 0 ? ClipperLib.JoinType.jtMiter : ClipperLib.JoinType.jtRound;
 
   if (lazyRadiusPx > 0) {
     // 1. Dilate to bridge gaps
@@ -1949,7 +1950,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
     final_paths = new ClipperLib.Paths();
     co3.AddPaths(
       shrunk_paths,
-      ClipperLib.JoinType.jtRound,
+      joinType,
       ClipperLib.EndType.etClosedPolygon,
     );
     co3.Execute(final_paths, Math.round(offsetPx * scale));
@@ -1959,7 +1960,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
     final_paths = new ClipperLib.Paths();
     co.AddPaths(
       scaledPolygons,
-      ClipperLib.JoinType.jtRound,
+      joinType,
       ClipperLib.EndType.etClosedPolygon,
     );
     co.Execute(final_paths, Math.round(offsetPx * scale));

@@ -13,6 +13,7 @@ describe('Canvas Utils - drawImageWithFilters', () => {
             save: jest.fn(),
             restore: jest.fn(),
             drawImage: jest.fn(),
+            translate: jest.fn(),
             // Mock the property 'filter' with a setter to spy on it
             _filter: 'none',
             set filter(val) { this._filter = val; },
