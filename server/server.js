@@ -2301,6 +2301,12 @@ async function startServer(
             return res.status(400).json({ error: err.message });
         }
 
+        // Handle CSRF errors
+        if (err.message === 'CSRF token missing' || err.message === 'CSRF token mismatch') {
+            logger.warn(`[SECURITY] ${err.message} from ${req.ip}`);
+            return res.status(403).json({ error: err.message });
+        }
+
         logger.error('[SERVER] Unhandled Error:', err);
 
         // Hide stack trace in production (and generally in API responses)

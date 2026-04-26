@@ -135,4 +135,25 @@ describe('Security: Error Handling and Information Leakage', () => {
 
     expect(res.body.message).toEqual('An unexpected error occurred.');
   });
+
+  it('should handle CSRF missing error gracefully with 403 instead of 500', async () => {
+    const agent = request.agent(app);
+
+    const res = await agent.post('/api/auth/login')
+      .send({ username: 'tester', password: 'password123' });
+
+    expect(res.statusCode).toEqual(403);
+    expect(res.body).toEqual({ error: 'CSRF token missing' });
+  });
+
+  it('should handle CSRF mismatch error gracefully with 403 instead of 500', async () => {
+    const agent = request.agent(app);
+
+    const res = await agent.post('/api/auth/login')
+      .set('X-CSRF-Token', 'invalid_token')
+      .send({ username: 'tester', password: 'password123' });
+
+    expect(res.statusCode).toEqual(403);
+    expect(res.body).toEqual({ error: 'CSRF token mismatch' });
+  });
 });
