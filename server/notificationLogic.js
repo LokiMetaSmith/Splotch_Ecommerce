@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 const serverRoot = __dirname;
 
 export const sendNewOrderNotification = async (bot, db, orderId) => {
+    if (!bot || !bot.telegram) return;
     const CHANNEL_ID = getSecret('TELEGRAM_CHANNEL_ID');
     if (!CHANNEL_ID) return;
 
@@ -84,6 +85,7 @@ ${statusChecklist}
 };
 
 export const updateOrderStatusNotification = async (bot, db, orderId, status) => {
+    if (!bot || !bot.telegram) return;
     const CHANNEL_ID = getSecret('TELEGRAM_CHANNEL_ID');
     if (!CHANNEL_ID) return;
 
