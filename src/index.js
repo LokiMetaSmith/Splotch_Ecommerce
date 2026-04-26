@@ -2527,8 +2527,21 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
   } else if (originalImage) {
     // Use the current canvas dimensions, which represent the scaled image size
     const dpr = window.devicePixelRatio || 1;
-    const w = canvas.width;
-    const h = canvas.height;
+    let w = canvas.width;
+    let h = canvas.height;
+    let sourceCanvas = canvas;
+
+    if (cleanCanvasState) {
+      if (!cachedTempCanvas || cachedTempCanvas.width !== cleanCanvasState.width || cachedTempCanvas.height !== cleanCanvasState.height) {
+        cachedTempCanvas = document.createElement("canvas");
+        cachedTempCanvas.width = cleanCanvasState.width;
+        cachedTempCanvas.height = cleanCanvasState.height;
+        cachedTempCanvas.getContext("2d").putImageData(cleanCanvasState, 0, 0);
+      }
+      sourceCanvas = cachedTempCanvas;
+      w = cleanCanvasState.width;
+      h = cleanCanvasState.height;
+    }
 
     // Swap dimensions for 90/270 degree rotations
     const newW = angleDegrees === 90 || angleDegrees === -90 ? h : w;
@@ -2554,7 +2567,7 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
     // Draw the image from the main canvas onto the temp canvas
     // This preserves all current transformations (scale, filters)
     // We draw the physical canvas directly
-    tempCtx.drawImage(canvas, -w / 2, -h / 2);
+    tempCtx.drawImage(sourceCanvas, -w / 2, -h / 2);
 
     // Now, update the main canvas with the rotated image
     // Pass LOGICAL dimensions
