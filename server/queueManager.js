@@ -134,3 +134,9 @@ if (useRedis) {
     telegramQueue.on('error', (err) => logger.error('[QUEUE] Telegram Queue Error:', err));
     odooQueue.on('error', (err) => logger.error('[QUEUE] Odoo Queue Error:', err));
 }
+
+export const closeQueues = async () => {
+    await emailQueue.close();
+    await telegramQueue.close();
+    await odooQueue.close();
+};

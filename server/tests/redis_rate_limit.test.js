@@ -99,7 +99,9 @@ describe('Distributed Rate Limiting', () => {
         };
 
         const server = await startServer(db, null);
-        if (server.timers) server.timers.forEach(t => clearInterval(t));
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
 
         // Verify Redis Client created and connected
         expect(mockCreateClient).toHaveBeenCalledWith({ url: 'redis://localhost:6379' });

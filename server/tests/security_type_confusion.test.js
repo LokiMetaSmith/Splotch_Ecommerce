@@ -94,7 +94,9 @@ describe('Security: Type Confusion', () => {
 
   afterAll(async () => {
     if (server && server.timers) {
-        server.timers.forEach(t => clearInterval(t));
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
     }
     if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
   });

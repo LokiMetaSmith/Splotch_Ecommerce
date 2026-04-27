@@ -61,7 +61,7 @@ describe('Security: Mass Assignment in Create Order', () => {
     app = server.app;
     timers = server.timers;
     bot = server.bot;
-    serverInstance = app.listen();
+    // serverInstance = app.listen(); // REMOVED
   });
 
   beforeEach(async () => {
@@ -71,9 +71,14 @@ describe('Security: Mass Assignment in Create Order', () => {
   });
 
   afterAll(async () => {
+    if (typeof serverInstance !== "undefined" && serverInstance && typeof serverInstance.close === "function") { await new Promise(resolve => serverInstance.close(resolve)); }
+    serverInstance = null;
+
     if (bot) await bot.stop('test');
-    timers.forEach(timer => clearInterval(timer));
-    await new Promise(resolve => serverInstance.close(resolve));
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
+
     try {
       await fs.unlink(testDbPath);
     } catch (error) { // eslint-disable-line no-unused-vars

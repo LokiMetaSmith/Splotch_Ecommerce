@@ -60,7 +60,7 @@ describe('Security: Strict ID Validation', () => {
     const server = await startServer(db, null, mockSendEmail, testDbPath, mockSquareClient);
     app = server.app;
     timers = server.timers;
-    serverInstance = app.listen();
+    // serverInstance = app.listen(); // REMOVED
 
     // Register and Login to get token
     const agent = request.agent(app);
@@ -81,8 +81,13 @@ describe('Security: Strict ID Validation', () => {
   });
 
   afterAll(async () => {
-    timers.forEach(timer => clearInterval(timer));
-    await new Promise(resolve => serverInstance.close(resolve));
+    if (typeof serverInstance !== "undefined" && serverInstance && typeof serverInstance.close === "function") { await new Promise(resolve => serverInstance.close(resolve)); }
+    serverInstance = null;
+
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
+
     try {
       await fs.unlink(testDbPath);
     } catch (error) {
