@@ -404,6 +404,13 @@ async function BootStrap() {
       if (cutlineOffsetValueDisplay)
         cutlineOffsetValueDisplay.textContent = cutlineOffset;
 
+      // If the user goes negative, and they haven't explicitly generated a smart edge
+      // yet (meaning they have the default 4-point rectangle), auto-generate it.
+      if (cutlineOffset < 0 && rasterCutlinePoly && rasterCutlinePoly.length === 1 && rasterCutlinePoly[0].length === 4 && hasImage) {
+        handleGenerateCutline(true); // pass true for skipToast
+        return; // handleGenerateCutline will trigger the redraw
+      }
+
       if (!pendingCutlineUpdate) {
         pendingCutlineUpdate = true;
         requestAnimationFrame(() => {
@@ -1963,7 +1970,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
     co2.Execute(shrunk_paths, Math.round(-lazyRadiusPx * scale));
 
     // 3. Apply the actual requested cutline offset
-    const co3 = new ClipperLib.ClipperOffset();
+    const co3 = new ClipperLib.ClipperOffset(10, 0.25);
     final_paths = new ClipperLib.Paths();
     co3.AddPaths(
       shrunk_paths,
@@ -1973,7 +1980,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
     co3.Execute(final_paths, Math.round(offsetPx * scale));
   } else {
     // Normal single-pass offset
-    const co = new ClipperLib.ClipperOffset();
+    const co = new ClipperLib.ClipperOffset(10, 0.25);
     final_paths = new ClipperLib.Paths();
     co.AddPaths(
       scaledPolygons,
@@ -2008,6 +2015,10 @@ function drawPolygonsToCanvas(
   if (!ctx || polygons.length === 0) return;
 
   ctx.save();
+
+  ctx.lineJoin = "miter";
+  ctx.miterLimit = 10;
+
   // Bolt Optimization: Batch all polygons into a single path to reduce draw calls
   ctx.beginPath();
 
