@@ -60,7 +60,9 @@ describe('Security: Uploads CSP', () => {
       fs.unlinkSync(testFile);
     }
     if (bot) await bot.stop('test');
-    if (timers) timers.forEach(timer => clearInterval(timer));
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
     // serverInstance is not used here because supertest takes 'app'
   });
 

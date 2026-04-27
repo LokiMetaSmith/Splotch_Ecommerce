@@ -35,7 +35,9 @@ describe('Admin Users API', () => {
 
     afterAll(async () => {
         if (serverData && serverData.timers) {
-            serverData.timers.forEach(t => clearInterval(t));
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
         }
         if (fs.existsSync(testDbPath)) {
             fs.unlinkSync(testDbPath);

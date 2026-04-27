@@ -2317,8 +2317,20 @@ async function startServer(
         res.status(500).json(response);
     });
 
-    // Return the app and the timers so they can be managed by the caller
-    return { app, timers: [sessionTokenTimer, keyRotationTimer, metricsTimer], bot };
+    // Create a close method to gracefully tear down the server instance, timers, and watchers
+    const close = async () => {
+      clearInterval(sessionTokenTimer);
+      clearInterval(keyRotationTimer);
+      clearInterval(metricsTimer);
+      if (db && db._watcher) {
+          db._watcher.unref();
+          if (db._watcher.close) db._watcher.close();
+      }
+      const { closeQueues } = await import('./queueManager.js');
+      await closeQueues();
+    };
+
+    return { app, timers: [sessionTokenTimer, keyRotationTimer, metricsTimer], bot, close };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');

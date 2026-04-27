@@ -31,12 +31,17 @@ describe('GET /api/metrics', () => {
     const server = await startServer(db, null, mockSendEmail);
     app = server.app;
     timers = server.timers;
-    serverInstance = app.listen();
+    // serverInstance = app.listen(); // REMOVED
   });
 
   afterAll(async () => {
-    timers.forEach(timer => clearInterval(timer));
-    await new Promise(resolve => serverInstance.close(resolve));
+    if (typeof serverInstance !== "undefined" && serverInstance && typeof serverInstance.close === "function") { await new Promise(resolve => serverInstance.close(resolve)); }
+    serverInstance = null;
+
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
+
   });
 
   it('should deny access to unauthenticated users', async () => {

@@ -75,7 +75,9 @@ describe('Security: Email HTML Injection', () => {
     const dbPath = path.join(__dirname, 'test-db-security.json');
     if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
     if (serverInstance && serverInstance.timers) {
-        serverInstance.timers.forEach(t => clearInterval(t));
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
     }
 
     // Cleanup uploaded files

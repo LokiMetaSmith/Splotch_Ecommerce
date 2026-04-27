@@ -73,7 +73,7 @@ describe('Security: Price Manipulation & Logic', () => {
         const server = await startServer(db, bot, mockSendEmail, testDbPath, mockSquareClient);
         app = server.app;
         timers = server.timers;
-        serverInstance = app.listen();
+        // serverInstance = app.listen(); // REMOVED
     });
 
     beforeEach(async () => {
@@ -86,8 +86,13 @@ describe('Security: Price Manipulation & Logic', () => {
     });
 
     afterAll(async () => {
-        if (timers) timers.forEach(timer => clearInterval(timer));
-        if (serverInstance) await new Promise(resolve => serverInstance.close(resolve));
+    if (typeof serverInstance !== "undefined" && serverInstance && typeof serverInstance.close === "function") { await new Promise(resolve => serverInstance.close(resolve)); }
+    serverInstance = null;
+
+    if (typeof server !== "undefined" && server.close) await server.close();
+
+    if (typeof serverData !== "undefined" && serverData.close) await serverData.close();
+        if (serverInstance)
         if (fs.existsSync(testDbPath)) {
             fs.unlinkSync(testDbPath);
         }
