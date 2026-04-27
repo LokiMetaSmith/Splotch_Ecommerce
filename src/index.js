@@ -404,6 +404,26 @@ async function BootStrap() {
       if (cutlineOffsetValueDisplay)
         cutlineOffsetValueDisplay.textContent = cutlineOffset;
 
+      let currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 0;
+
+      // Magic Edge behavior when advanced controls are hidden
+      if (!easterEggUnlocked) {
+        currentLassoRadius = Math.max(0, Math.floor(cutlineOffset * 0.5));
+        if (lazyLassoSlider) {
+          lazyLassoSlider.value = currentLassoRadius;
+          if (lazyLassoValueDisplay) {
+            lazyLassoValueDisplay.textContent = currentLassoRadius;
+          }
+        }
+        cutlineSensitivity = 10;
+        if (cutlineSensitivitySlider) {
+          cutlineSensitivitySlider.value = 10;
+          if (cutlineSensitivityValueDisplay) {
+            cutlineSensitivityValueDisplay.textContent = 10;
+          }
+        }
+      }
+
       // If the user goes negative, and they haven't explicitly generated a smart edge
       // yet (meaning they have the default 4-point rectangle), auto-generate it.
       if (cutlineOffset < 0 && rasterCutlinePoly && rasterCutlinePoly.length === 1 && rasterCutlinePoly[0].length === 4 && hasImage) {
@@ -416,13 +436,16 @@ async function BootStrap() {
         requestAnimationFrame(() => {
           if (rasterCutlinePoly) {
             // Re-generate cutline for raster (Overlay Mode)
-            const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+            const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, currentLassoRadius);
             currentCutline = cutline;
             currentBounds = getPolygonsBounds(cutline);
             calculateAndUpdatePrice();
             drawCanvasDecorations(currentBounds);
           } else if (basePolygons.length > 0) {
             // Re-generate for SVG (Vector Mode)
+            const cutline = generateCutLine(currentPolygons, cutlineOffset, currentLassoRadius);
+            currentCutline = cutline;
+            currentBounds = getPolygonsBounds(cutline);
             redrawAll();
           }
           pendingCutlineUpdate = false;
@@ -437,6 +460,11 @@ async function BootStrap() {
       cutlineSensitivity = parseInt(e.target.value, 10);
       if (cutlineSensitivityValueDisplay) {
         cutlineSensitivityValueDisplay.textContent = cutlineSensitivity;
+      }
+      if (!easterEggUnlocked) {
+        if (originalImage && rasterCutlinePoly) {
+          handleGenerateCutline();
+        }
       }
     });
 
@@ -453,6 +481,17 @@ async function BootStrap() {
     lazyLassoSlider.addEventListener("input", (e) => {
       if (lazyLassoValueDisplay) {
         lazyLassoValueDisplay.textContent = e.target.value;
+      }
+      if (!easterEggUnlocked) {
+        if (rasterCutlinePoly) {
+          const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, parseInt(e.target.value, 10));
+          currentCutline = cutline;
+          currentBounds = getPolygonsBounds(cutline);
+          calculateAndUpdatePrice();
+          drawCanvasDecorations(currentBounds);
+        } else if (basePolygons.length > 0) {
+          redrawAll();
+        }
       }
     });
 
@@ -1775,8 +1814,11 @@ function redrawAll() {
     return;
   }
 
+  const lazyLassoSlider = document.getElementById("lazyLassoSlider");
+  const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 0;
+
   // Generate the cutline from the current state of the polygons
-  const cutline = generateCutLine(currentPolygons, cutlineOffset); // Use dynamic offset
+  const cutline = generateCutLine(currentPolygons, cutlineOffset, currentLassoRadius); // Use dynamic offset
 
   // Store the results globally
   currentCutline = cutline;
@@ -2625,7 +2667,9 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
       rasterCutlinePoly = newRasterCutlinePoly;
 
       // Regenerate currentCutline from rotated poly
-      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
+      const lazyLassoSlider = document.getElementById("lazyLassoSlider");
+      const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 0;
+      const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, currentLassoRadius);
       currentCutline = cutline;
       currentBounds = getPolygonsBounds(cutline);
     } else {
@@ -2938,17 +2982,42 @@ function handleGenerateCutline(skipPrompt = false) {
   // Use a timeout to allow the UI to update before the heavy computation
   setTimeout(() => {
     try {
-      let imageData;
-      if (
-        cleanCanvasState &&
-        cleanCanvasState.width === canvas.width &&
-        cleanCanvasState.height === canvas.height
-      ) {
-        imageData = cleanCanvasState;
+      // --- Performance Optimization: Downscale before tracing ---
+      const maxDim = 500;
+      const scaleFactor = Math.min(1, maxDim / Math.max(canvas.width, canvas.height));
+      const scaledWidth = Math.max(1, Math.round(canvas.width * scaleFactor));
+      const scaledHeight = Math.max(1, Math.round(canvas.height * scaleFactor));
+
+      let scaledImageData;
+      if (scaleFactor < 1) {
+        const tempCanvas1 = document.createElement('canvas');
+        tempCanvas1.width = canvas.width;
+        tempCanvas1.height = canvas.height;
+        const tempCtx1 = tempCanvas1.getContext('2d');
+        if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
+          tempCtx1.putImageData(cleanCanvasState, 0, 0);
+        } else {
+          tempCtx1.drawImage(canvas, 0, 0);
+        }
+
+        const tempCanvas2 = document.createElement('canvas');
+        tempCanvas2.width = scaledWidth;
+        tempCanvas2.height = scaledHeight;
+        const tempCtx2 = tempCanvas2.getContext('2d');
+        tempCtx2.drawImage(tempCanvas1, 0, 0, scaledWidth, scaledHeight);
+        scaledImageData = tempCtx2.getImageData(0, 0, scaledWidth, scaledHeight);
       } else {
-        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
+          scaledImageData = cleanCanvasState;
+        } else {
+          scaledImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
       }
-      const contours = traceContours(imageData, cutlineSensitivity);
+
+      let contours = traceContours(scaledImageData, cutlineSensitivity);
+      if (scaleFactor < 1 && contours) {
+         contours = contours.map(c => c.map(p => ({ x: p.x / scaleFactor, y: p.y / scaleFactor })));
+      }
 
       if (!contours || contours.length === 0) {
         throw new Error(
