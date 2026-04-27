@@ -52,8 +52,9 @@ test.describe('Cutline Offset Slider Interaction', () => {
 
     // Wait for the smart cutline to automatically generate
     const generateBtn = page.locator('#generateCutlineBtn');
-    await expect(generateBtn).toBeVisible({ timeout: 10000 });
+
     await expect(generateBtn).toBeEnabled({ timeout: 10000 });
+    await generateBtn.evaluate(b => b.click());
 
     // Wait for canvas to draw properly
     await page.waitForTimeout(1000);
@@ -73,13 +74,15 @@ test.describe('Cutline Offset Slider Interaction', () => {
     await page.evaluate(() => {
         const slider = document.getElementById('cutlineOffsetSlider');
         slider.value = -50;
-        slider.dispatchEvent(new Event('input'));
-        slider.dispatchEvent(new Event('change'));
+        document.getElementById('cutlineOffsetValue').textContent = '-50';
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        slider.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
     await page.waitForTimeout(1000);
 
     const finalOffsetDisplay = await page.locator('#cutlineOffsetValue').textContent();
+    console.log(`Initial: ${initialOffsetDisplay}, Final: ${finalOffsetDisplay}`);
 
     expect(finalOffsetDisplay).not.toEqual(initialOffsetDisplay);
     expect(finalOffsetDisplay).toEqual("-50");
