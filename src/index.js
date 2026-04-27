@@ -408,7 +408,8 @@ async function BootStrap() {
 
       // Magic Edge behavior when advanced controls are hidden
       if (!easterEggUnlocked) {
-        currentLassoRadius = Math.max(0, Math.floor(cutlineOffset * 0.5));
+        // Map 1-to-1 to lazy lasso
+        currentLassoRadius = Math.max(0, Math.floor(Math.abs(cutlineOffset)));
         if (lazyLassoSlider) {
           lazyLassoSlider.value = currentLassoRadius;
           if (lazyLassoValueDisplay) {
@@ -3052,9 +3053,13 @@ function handleGenerateCutline(skipPrompt = false) {
 
         const ppi = selectedResolution ? selectedResolution.ppi : 300;
         // Calculate 2mm in pixels for max hole size
-        const maxAllowedHoleSize = (2 / 25.4) * ppi;
+        let maxAllowedHoleSize = (2 / 25.4) * ppi;
         // Calculate 0.5mm in pixels for min hole size (noise floor)
         const minAllowedHoleSize = (0.5 / 25.4) * ppi;
+
+        if (lazyLassoRadius >= 50) {
+            maxAllowedHoleSize = -1;
+        }
 
         significantContours = filterInternalContours(
           significantContours,
