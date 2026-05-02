@@ -61,7 +61,7 @@ let textInput,
   cutlineSensitivityValueDisplay,
   lazyLassoSlider,
   lazyLassoValueDisplay;
-let cutlineSensitivity = 10; // Default sensitivity
+let cutlineSensitivity = 42; // Default sensitivity
 let stickerMaterialSelect,
   stickerResolutionSelect,
   designMarginNote,
@@ -88,7 +88,7 @@ let canvasLegendContainer;
 let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
 let creatorProfitCents = 0; // The markup for the current product
-let cutlineOffset = 10; // Default offset
+let cutlineOffset = 5; // Default offset
 
 // --- Drag and Center State ---
 let imageOffsetX = 0;
@@ -404,26 +404,7 @@ async function BootStrap() {
       if (cutlineOffsetValueDisplay)
         cutlineOffsetValueDisplay.textContent = cutlineOffset;
 
-      let currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 0;
-
-      // Magic Edge behavior when advanced controls are hidden
-      if (!easterEggUnlocked) {
-        // Map 1-to-1 to lazy lasso
-        currentLassoRadius = Math.max(0, Math.floor(Math.abs(cutlineOffset)));
-        if (lazyLassoSlider) {
-          lazyLassoSlider.value = currentLassoRadius;
-          if (lazyLassoValueDisplay) {
-            lazyLassoValueDisplay.textContent = currentLassoRadius;
-          }
-        }
-        cutlineSensitivity = 10;
-        if (cutlineSensitivitySlider) {
-          cutlineSensitivitySlider.value = 10;
-          if (cutlineSensitivityValueDisplay) {
-            cutlineSensitivityValueDisplay.textContent = 10;
-          }
-        }
-      }
+      let currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
 
       // If the user goes negative, and they haven't explicitly generated a smart edge
       // yet (meaning they have the default 4-point rectangle), auto-generate it.
@@ -1768,9 +1749,9 @@ function loadFileAsImage(file, isMascot = false) {
             ];
 
             // Set slider to 10 (1mm) offset
-            cutlineOffset = 10;
+            cutlineOffset = 5;
             if (cutlineOffsetSlider) {
-              cutlineOffsetSlider.value = 10;
+              cutlineOffsetSlider.value = 5;
             }
             if (cutlineOffsetValueDisplay) {
               cutlineOffsetValueDisplay.textContent = cutlineOffset;
@@ -1816,7 +1797,7 @@ function redrawAll() {
   }
 
   const lazyLassoSlider = document.getElementById("lazyLassoSlider");
-  const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 0;
+  const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
 
   // Generate the cutline from the current state of the polygons
   const cutline = generateCutLine(currentPolygons, cutlineOffset, currentLassoRadius); // Use dynamic offset
@@ -2490,9 +2471,9 @@ function handleResetImage() {
           ],
         ];
 
-        cutlineOffset = 10;
+        cutlineOffset = 5;
         if (cutlineOffsetSlider) {
-          cutlineOffsetSlider.value = 10;
+          cutlineOffsetSlider.value = 5;
         }
         if (cutlineOffsetValueDisplay) {
           cutlineOffsetValueDisplay.textContent = cutlineOffset;
@@ -2669,7 +2650,7 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
 
       // Regenerate currentCutline from rotated poly
       const lazyLassoSlider = document.getElementById("lazyLassoSlider");
-      const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 0;
+      const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
       const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, currentLassoRadius);
       currentCutline = cutline;
       currentBounds = getPolygonsBounds(cutline);
@@ -2942,14 +2923,6 @@ function handleGenerateCutline(skipPrompt = false) {
   // --- Feedforward Check ---
   // Pass the imageData to the function
   const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  if (!skipPrompt && !imageHasTransparentBorder(currentImageData)) {
-    const proceed = confirm(
-      "This image does not appear to have a transparent or white background. The 'Smart Cutline' feature may not produce a good result. Proceed anyway?",
-    );
-    if (!proceed) {
-      return;
-    }
-  }
 
   showNotification("Generating smart cutline...", "info");
 
@@ -2978,7 +2951,7 @@ function handleGenerateCutline(skipPrompt = false) {
   const lazyLassoSlider = document.getElementById("lazyLassoSlider");
   const lazyLassoRadius = lazyLassoSlider
     ? parseInt(lazyLassoSlider.value, 10)
-    : 0;
+    : 50;
 
   // Use a timeout to allow the UI to update before the heavy computation
   setTimeout(() => {
@@ -3301,9 +3274,9 @@ async function handleRemoteImageLoad(imageUrl) {
         ],
       ];
 
-      cutlineOffset = 10;
+      cutlineOffset = 5;
       if (cutlineOffsetSlider) {
-        cutlineOffsetSlider.value = 10;
+        cutlineOffsetSlider.value = 5;
       }
       if (cutlineOffsetValueDisplay) {
         cutlineOffsetValueDisplay.textContent = cutlineOffset;
@@ -3385,9 +3358,9 @@ async function loadProductForBuyer(productId) {
           ],
         ];
 
-        cutlineOffset = 10;
+        cutlineOffset = 5;
         if (cutlineOffsetSlider) {
-          cutlineOffsetSlider.value = 10;
+          cutlineOffsetSlider.value = 5;
         }
         if (cutlineOffsetValueDisplay) {
           cutlineOffsetValueDisplay.textContent = cutlineOffset;
