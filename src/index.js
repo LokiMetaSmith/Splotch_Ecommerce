@@ -406,25 +406,6 @@ async function BootStrap() {
 
       let currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
 
-      // Magic Edge behavior when advanced controls are hidden
-      if (!easterEggUnlocked) {
-        // Map 1-to-1 to lazy lasso
-        currentLassoRadius = Math.max(0, Math.floor(Math.abs(cutlineOffset)));
-        if (lazyLassoSlider) {
-          lazyLassoSlider.value = currentLassoRadius;
-          if (lazyLassoValueDisplay) {
-            lazyLassoValueDisplay.textContent = currentLassoRadius;
-          }
-        }
-        cutlineSensitivity = 42;
-        if (cutlineSensitivitySlider) {
-          cutlineSensitivitySlider.value = 42;
-          if (cutlineSensitivityValueDisplay) {
-            cutlineSensitivityValueDisplay.textContent = 42;
-          }
-        }
-      }
-
       // If the user goes negative, and they haven't explicitly generated a smart edge
       // yet (meaning they have the default 4-point rectangle), auto-generate it.
       if (cutlineOffset < 0 && rasterCutlinePoly && rasterCutlinePoly.length === 1 && rasterCutlinePoly[0].length === 4 && hasImage) {
