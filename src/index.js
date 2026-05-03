@@ -2956,14 +2956,18 @@ function handleGenerateCutline(skipPrompt = false) {
   // Use a timeout to allow the UI to update before the heavy computation
   setTimeout(() => {
     try {
+      const dpr = window.devicePixelRatio || 1;
+      const logicalCanvasWidth = canvas.width / dpr;
+      const logicalCanvasHeight = canvas.height / dpr;
+
       // --- Performance Optimization: Downscale before tracing ---
       const maxDim = 500;
-      const scaleFactor = Math.min(1, maxDim / Math.max(canvas.width, canvas.height));
-      const scaledWidth = Math.max(1, Math.round(canvas.width * scaleFactor));
-      const scaledHeight = Math.max(1, Math.round(canvas.height * scaleFactor));
+      const scaleFactor = Math.min(1, maxDim / Math.max(logicalCanvasWidth, logicalCanvasHeight));
+      const scaledWidth = Math.max(1, Math.round(logicalCanvasWidth * scaleFactor));
+      const scaledHeight = Math.max(1, Math.round(logicalCanvasHeight * scaleFactor));
 
       let scaledImageData;
-      if (scaleFactor < 1) {
+      if (scaleFactor < 1 || dpr !== 1) {
         const tempCanvas1 = document.createElement('canvas');
         tempCanvas1.width = canvas.width;
         tempCanvas1.height = canvas.height;
@@ -2978,7 +2982,7 @@ function handleGenerateCutline(skipPrompt = false) {
         tempCanvas2.width = scaledWidth;
         tempCanvas2.height = scaledHeight;
         const tempCtx2 = tempCanvas2.getContext('2d');
-        tempCtx2.drawImage(tempCanvas1, 0, 0, scaledWidth, scaledHeight);
+        tempCtx2.drawImage(tempCanvas1, 0, 0, tempCanvas1.width, tempCanvas1.height, 0, 0, scaledWidth, scaledHeight);
         scaledImageData = tempCtx2.getImageData(0, 0, scaledWidth, scaledHeight);
       } else {
         if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
@@ -2989,8 +2993,11 @@ function handleGenerateCutline(skipPrompt = false) {
       }
 
       let contours = traceContours(scaledImageData, cutlineSensitivity);
-      if (scaleFactor < 1 && contours) {
-         contours = contours.map(c => c.map(p => ({ x: p.x / scaleFactor, y: p.y / scaleFactor })));
+      if (contours) {
+         contours = contours.map(c => c.map(p => ({
+           x: p.x / scaleFactor,
+           y: p.y / scaleFactor
+         })));
       }
 
       if (!contours || contours.length === 0) {
@@ -3088,7 +3095,6 @@ function handleGenerateCutline(skipPrompt = false) {
       }
 
       // Set the raster cutline polygon (Overlay Mode)
-      const dpr = window.devicePixelRatio || 1;
       // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
       const rasterCutlineOutput = new Array(finalContours.length);
       for (let i = 0; i < finalContours.length; i++) {
