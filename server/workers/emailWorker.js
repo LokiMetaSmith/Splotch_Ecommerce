@@ -30,6 +30,12 @@ export const startEmailWorker = (oauth2Client, emailSender = sendEmail, db = nul
                         logger.error('[WORKER] Failed to clear invalid google_refresh_token:', dbErr);
                     }
                 }
+                return; // Do not retry if the token is revoked
+            }
+
+            if (error.message === 'No access, refresh token, API key or refresh handler callback is set.') {
+                logger.warn('[WORKER] No Google OAuth2 credentials. Cannot send email.');
+                return; // Do not retry if there are no credentials
             }
 
             throw error; // Let BullMQ handle retries
