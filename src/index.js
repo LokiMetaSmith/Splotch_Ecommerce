@@ -408,7 +408,7 @@ async function BootStrap() {
 
       // If the user goes negative, and they haven't explicitly generated a smart edge
       // yet (meaning they have the default 4-point rectangle), auto-generate it.
-      if (cutlineOffset < 0 && rasterCutlinePoly && rasterCutlinePoly.length === 1 && rasterCutlinePoly[0].length === 4 && hasImage) {
+      if (cutlineOffset < 0 && rasterCutlinePoly && rasterCutlinePoly.length === 1 && rasterCutlinePoly[0].length === 4 && originalImage) {
         handleGenerateCutline(true); // pass true for skipToast
         return; // handleGenerateCutline will trigger the redraw
       }
