@@ -34,6 +34,8 @@ let basePolygons = []; // The original, unscaled polygons from the SVG
 let currentPolygons = [];
 let rasterCutlinePoly = null; // New global for Raster Mode cutline
 let cleanCanvasState = null; // To store clean image state (pixels + filters + rotation)
+let baseCanvasWidth = 500; // Fixed bounding box frame width
+let baseCanvasHeight = 400; // Fixed bounding box frame height
 let cachedTempCanvas = null; // To avoid memory leaks in restoreCleanState
 let isMetric = false; // To track unit preference
 let currentCutline = [];
@@ -1574,6 +1576,8 @@ function updateEditingButtonsState(disabled) {
 
 function setCanvasSize(logicalWidth, logicalHeight) {
   if (!canvas || !ctx) return;
+  baseCanvasWidth = logicalWidth;
+  baseCanvasHeight = logicalHeight;
   const dpr = window.devicePixelRatio || 1;
 
   // Set the "actual" size of the canvas in device pixels
@@ -1634,8 +1638,6 @@ function restoreCleanState(dragOffset = { x: 0, y: 0 }) {
   }
   const tempCanvas = cachedTempCanvas;
 
-  // If we are in raster mode and have current bounds that push left/top negative,
-  // we need to offset the clean state onto the potentially larger canvas.
   let drawOffset = { x: 0, y: 0 };
   if (
     basePolygons.length === 0 &&
@@ -1649,6 +1651,11 @@ function restoreCleanState(dragOffset = { x: 0, y: 0 }) {
   }
 
   ctx.save();
+  // Clip the canvas to the bounding box to visually crop the image
+  ctx.beginPath();
+  ctx.rect(drawOffset.x, drawOffset.y, baseCanvasWidth, baseCanvasHeight);
+  ctx.clip();
+
   ctx.translate(dragOffset.x, dragOffset.y);
   ctx.drawImage(tempCanvas, drawOffset.x, drawOffset.y);
   ctx.restore();
@@ -1785,22 +1792,45 @@ function loadFileAsImage(file, isMascot = false) {
 }
 
 function redrawAll() {
+  const lazyLassoSlider = document.getElementById("lazyLassoSlider");
+  const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
+
   if (currentPolygons.length === 0) {
-    // Handle raster image redrawing if necessary
+    // Handle raster image redrawing
     if (originalImage) {
-        // Redraw decorations using the current offset. The base image is handled inside drawCanvasDecorations via restoreCleanState
-        const offset = { x: imageOffsetX, y: imageOffsetY };
+        if (rasterCutlinePoly) {
+          // Translate the raster cutline poly by the drag offset
+          const translatedRasterPoly = rasterCutlinePoly.map(poly =>
+            poly.map(p => ({ x: p.x + imageOffsetX, y: p.y + imageOffsetY }))
+          );
+
+          let cutline = generateCutLine(translatedRasterPoly, cutlineOffset, currentLassoRadius);
+
+          // Clip to bounding box
+          cutline = clipPolygonToBoundingBox(cutline, baseCanvasWidth, baseCanvasHeight);
+
+          currentCutline = cutline;
+          currentBounds = getPolygonsBounds(cutline);
+        }
+
+        const offset = { x: 0, y: 0 };
         ctx.clearRect(0, 0, canvas.width, canvas.height); // wipe it
         drawCanvasDecorations(currentBounds, offset);
     }
     return;
   }
 
-  const lazyLassoSlider = document.getElementById("lazyLassoSlider");
-  const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
+  // Vector SVG Mode
+  // Translate the vector polygons by the drag offset
+  const translatedPolygons = currentPolygons.map(poly =>
+    poly.map(p => ({ x: p.x + imageOffsetX, y: p.y + imageOffsetY }))
+  );
 
-  // Generate the cutline from the current state of the polygons
-  const cutline = generateCutLine(currentPolygons, cutlineOffset, currentLassoRadius); // Use dynamic offset
+  // Generate the cutline from the translated polygons
+  let cutline = generateCutLine(translatedPolygons, cutlineOffset, currentLassoRadius); // Use dynamic offset
+
+  // Clip to bounding box
+  cutline = clipPolygonToBoundingBox(cutline, baseCanvasWidth, baseCanvasHeight);
 
   // Store the results globally
   currentCutline = cutline;
@@ -1862,19 +1892,19 @@ function handleSvgUpload(svgText) {
       throw new Error("No parsable shapes found in the SVG.");
     }
 
-    // Generate the cutline
-    const cutline = generateCutLine(polygons, cutlineOffset); // Use dynamic offset
-
     // Store the results globally
     basePolygons = polygons; // Store the original, unscaled polygons
     currentPolygons = polygons;
-    currentCutline = cutline;
-    // Calculate the bounds of the final cutline for pricing and display
-    currentBounds = getPolygonsBounds(cutline);
 
-    // Set canvas size based on the final cutline bounds
-    canvas.width = currentBounds.right - currentBounds.left + 40; // Add padding
-    canvas.height = currentBounds.bottom - currentBounds.top + 40;
+  const bounds = getPolygonsBounds(polygons);
+  setCanvasSize(bounds.width, bounds.height);
+
+  // Generate the cutline
+  let cutline = generateCutLine(polygons, cutlineOffset); // Use dynamic offset
+  cutline = clipPolygonToBoundingBox(cutline, baseCanvasWidth, baseCanvasHeight);
+
+    currentCutline = cutline;
+    currentBounds = getPolygonsBounds(cutline);
 
     // Initial drawing
     redrawAll();
@@ -1912,6 +1942,54 @@ function handleSvgUpload(svgText) {
     showNotification(`SVG Processing Error: ${error.message}`, "error");
     console.error(error);
   }
+}
+
+function clipPolygonToBoundingBox(polygons, boxWidth, boxHeight) {
+  if (!polygons || polygons.length === 0) return [];
+  const scale = 100;
+
+  // Create clipping box polygon
+  const clipBox = [
+    {X: 0, Y: 0},
+    {X: Math.round(boxWidth * scale), Y: 0},
+    {X: Math.round(boxWidth * scale), Y: Math.round(boxHeight * scale)},
+    {X: 0, Y: Math.round(boxHeight * scale)}
+  ];
+
+  const clipper = new ClipperLib.Clipper();
+
+  // Add subject paths (the offset cutline)
+  const subjPaths = [];
+  for (let i = 0; i < polygons.length; i++) {
+    const p = polygons[i];
+    const newPoly = new Array(p.length);
+    for (let j = 0; j < p.length; j++) {
+      newPoly[j] = {
+        X: Math.round(p[j].x * scale),
+        Y: Math.round(p[j].y * scale)
+      };
+    }
+    subjPaths.push(newPoly);
+  }
+
+  clipper.AddPaths(subjPaths, ClipperLib.PolyType.ptSubject, true);
+  clipper.AddPath([clipBox], ClipperLib.PolyType.ptClip, true);
+
+  const solution = new ClipperLib.Paths();
+  clipper.Execute(ClipperLib.ClipType.ctIntersection, solution);
+
+  // Convert back to normal scale
+  const result = new Array(solution.length);
+  for (let i = 0; i < solution.length; i++) {
+    const p = solution[i];
+    const newPoly = new Array(p.length);
+    for (let j = 0; j < p.length; j++) {
+      newPoly[j] = { x: p[j].X / scale, y: p[j].Y / scale };
+    }
+    result[i] = newPoly;
+  }
+
+  return result;
 }
 
 const scaledPolyCache = new WeakMap();
@@ -2879,9 +2957,7 @@ function handleStandardResize(targetInches) {
         rasterCutlinePoly = newRasterCutlinePoly;
 
         // Regenerate currentCutline
-        const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
-        currentCutline = cutline;
-        currentBounds = getPolygonsBounds(cutline);
+        redrawAll();
       } else {
         // Update the bounds and cutline for the new raster size (Default Box)
         currentBounds = {
@@ -3108,19 +3184,8 @@ function handleGenerateCutline(skipPrompt = false) {
       }
       rasterCutlinePoly = rasterCutlineOutput;
 
-      // Generate the cutline immediately
-      const cutline = generateCutLine(
-        rasterCutlinePoly,
-        cutlineOffset,
-        lazyLassoRadius,
-      );
-      currentCutline = cutline;
-      currentBounds = getPolygonsBounds(cutline);
-
-      // Redraw decorations (which will now include the cutline overlay)
-      // Note: We are drawing on top of the existing canvas. Previous decorations might be baked in if not cleared,
-      // but this preserves the raster image state (rotation, etc).
-      drawCanvasDecorations(currentBounds);
+      // Redraw the canvas to generate the cutline and update the bounds
+      redrawAll();
 
       calculateAndUpdatePrice();
       showNotification("Smart cutline generated successfully.", "success");
