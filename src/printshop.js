@@ -180,6 +180,7 @@ function setButtonLoading(btn, isLoading, loadingText = 'Processing...') {
 }
 
 function bufferEncode(value) {
+    if (typeof value === 'string') return value;
     return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
@@ -344,13 +345,13 @@ async function handleWebAuthnLogin(e) {
         const verificationPayload = {
             username,
             id: authResp.id,
-            rawId: bufferEncode(authResp.rawId),
+            rawId: authResp.rawId,
             type: authResp.type,
             response: {
-                clientDataJSON: bufferEncode(authResp.response.clientDataJSON),
-                authenticatorData: bufferEncode(authResp.response.authenticatorData),
-                signature: bufferEncode(authResp.response.signature),
-                userHandle: authResp.response.userHandle ? bufferEncode(authResp.response.userHandle) : null,
+                clientDataJSON: authResp.response.clientDataJSON,
+                authenticatorData: authResp.response.authenticatorData,
+                signature: authResp.response.signature,
+                userHandle: authResp.response.userHandle,
             },
         };
 
@@ -454,11 +455,11 @@ async function handleRegistration(e) {
         const verificationPayload = {
             username,
             id: regResp.id,
-            rawId: bufferEncode(regResp.rawId),
+            rawId: regResp.rawId,
             type: regResp.type,
             response: {
-                clientDataJSON: bufferEncode(regResp.response.clientDataJSON),
-                attestationObject: bufferEncode(regResp.response.attestationObject),
+                clientDataJSON: regResp.response.clientDataJSON,
+                attestationObject: regResp.response.attestationObject,
             },
         };
         
