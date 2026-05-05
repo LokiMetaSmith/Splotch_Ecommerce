@@ -1,53 +1,238 @@
 
-Running 1 test using 1 worker
+> lokimetasmith.github.io@1.0.0 start /app
+> serve dist
 
-[MOCK] Intercepted API request for: /api/pricing-info
-[MOCK] Intercepted API request for: /api/csrf-token
-  ✘  1 playwright_tests/bounding-box.spec.js:3:1 › bounding box is visible when scaling image (30.5s)
-
-
-  1) playwright_tests/bounding-box.spec.js:3:1 › bounding box is visible when scaling image ────────
-
-    [31mTest timeout of 30000ms exceeded.[39m
-
-    Error: locator.fill: Test timeout of 30000ms exceeded.
-    Call log:
-    [2m  - waiting for locator('#resizeSlider')[22m
-    [2m    - locator resolved to <input min="1" max="8" disabled value="3" step="0.1" type="range" id="resizeSlider" class="w-full opacity-50 cursor-not-allowed"/>[22m
-    [2m    - fill("3")[22m
-    [2m  - attempting fill action[22m
-    [2m    2 × waiting for element to be visible, enabled and editable[22m
-    [2m      - element is not enabled[22m
-    [2m    - retrying fill action[22m
-    [2m    - waiting 20ms[22m
-    [2m    2 × waiting for element to be visible, enabled and editable[22m
-    [2m      - element is not enabled[22m
-    [2m    - retrying fill action[22m
-    [2m      - waiting 100ms[22m
-    [2m    56 × waiting for element to be visible, enabled and editable[22m
-    [2m       - element is not enabled[22m
-    [2m     - retrying fill action[22m
-    [2m       - waiting 500ms[22m
-
-
-      19 |   // Use the slider to resize
-      20 |   const slider = page.locator('#resizeSlider');
-    > 21 |   await slider.fill('3'); // Resize to 3 inches (or whatever unit)
-         |                ^
-      22 |   // Trigger input event
-      23 |   await slider.dispatchEvent('input');
-      24 |
-        at /app/playwright_tests/bounding-box.spec.js:21:16
-
-    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
-    test-results/bounding-box-bounding-box-is-visible-when-scaling-image/test-failed-1.png
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-
-    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
-    test-results/bounding-box-bounding-box-is-visible-when-scaling-image/video.webm
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-
-    Error Context: test-results/bounding-box-bounding-box-is-visible-when-scaling-image/error-context.md
-
-  1 failed
-    playwright_tests/bounding-box.spec.js:3:1 › bounding box is visible when scaling image ─────────
+ UPDATE  The latest version of `serve` is 14.2.6
+ INFO  Accepting connections at http://localhost:3000
+ HTTP  5/5/2026 3:43:53 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:43:53 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 3:43:53 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 3:43:53 AM 127.0.0.1 Returned 404 in 466 ms
+ HTTP  5/5/2026 3:43:53 AM 127.0.0.1 Returned 404 in 17 ms
+ HTTP  5/5/2026 3:43:53 AM 127.0.0.1 Returned 404 in 13 ms
+ HTTP  5/5/2026 3:44:05 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 3:44:05 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 3:44:27 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:44:27 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 3:44:27 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 3:44:27 AM 127.0.0.1 Returned 404 in 10 ms
+ HTTP  5/5/2026 3:44:27 AM 127.0.0.1 Returned 404 in 10 ms
+ HTTP  5/5/2026 3:44:27 AM 127.0.0.1 Returned 404 in 10 ms
+ HTTP  5/5/2026 3:44:29 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 3:44:29 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 3:44:30 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:44:30 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 3:45:03 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:45:03 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 3:45:03 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 3:45:03 AM 127.0.0.1 Returned 404 in 9 ms
+ HTTP  5/5/2026 3:45:03 AM 127.0.0.1 Returned 404 in 8 ms
+ HTTP  5/5/2026 3:45:03 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 3:45:21 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 3:45:21 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 3:45:46 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:45:46 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 3:45:46 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 3:45:46 AM 127.0.0.1 Returned 404 in 6 ms
+ HTTP  5/5/2026 3:45:46 AM 127.0.0.1 Returned 404 in 8 ms
+ HTTP  5/5/2026 3:45:46 AM 127.0.0.1 Returned 404 in 7 ms
+ HTTP  5/5/2026 3:45:48 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 3:45:48 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 3:45:50 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:45:50 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 3:47:04 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:47:04 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 3:47:04 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 3:47:04 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 3:47:04 AM 127.0.0.1 Returned 404 in 12 ms
+ HTTP  5/5/2026 3:47:04 AM 127.0.0.1 Returned 404 in 12 ms
+ HTTP  5/5/2026 3:47:27 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 3:47:27 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 3:48:22 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:48:22 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 3:48:22 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 3:48:22 AM 127.0.0.1 Returned 404 in 17 ms
+ HTTP  5/5/2026 3:48:22 AM 127.0.0.1 Returned 404 in 14 ms
+ HTTP  5/5/2026 3:48:22 AM 127.0.0.1 Returned 404 in 15 ms
+ HTTP  5/5/2026 3:48:38 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 3:48:38 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 3:48:42 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 3:48:42 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 3:56:08 AM ::1 GET /printshop.html
+ HTTP  5/5/2026 3:56:08 AM ::1 Returned 301 in 1 ms
+ HTTP  5/5/2026 3:56:08 AM ::1 GET /printshop
+ HTTP  5/5/2026 3:56:08 AM ::1 Returned 404 in 1 ms
+ HTTP  5/5/2026 3:59:14 AM ::1 GET /index.html
+ HTTP  5/5/2026 3:59:14 AM ::1 Returned 301 in 1 ms
+ HTTP  5/5/2026 3:59:14 AM ::1 GET /index
+ HTTP  5/5/2026 3:59:14 AM ::1 Returned 301 in 1 ms
+ HTTP  5/5/2026 3:59:14 AM ::1 GET /
+ HTTP  5/5/2026 3:59:14 AM ::1 Returned 404 in 2 ms
+ HTTP  5/5/2026 3:59:40 AM ::1 GET /index.html
+ HTTP  5/5/2026 3:59:40 AM ::1 Returned 301 in 0 ms
+ HTTP  5/5/2026 3:59:40 AM ::1 GET /index
+ HTTP  5/5/2026 3:59:40 AM ::1 Returned 301 in 0 ms
+ HTTP  5/5/2026 3:59:40 AM ::1 GET /
+ HTTP  5/5/2026 3:59:40 AM ::1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:05:19 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:05:19 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:05:19 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:05:19 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:05:19 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:05:19 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:05:35 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:05:35 AM 127.0.0.1 Returned 404 in 23 ms
+ HTTP  5/5/2026 4:06:00 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:06:00 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:06:00 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:06:00 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:06:00 AM 127.0.0.1 Returned 404 in 6 ms
+ HTTP  5/5/2026 4:06:00 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:06:02 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:06:02 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:06:03 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:06:03 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:06:36 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:06:36 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:06:36 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:06:36 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:06:36 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 4:06:36 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:06:52 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:06:52 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:07:21 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:07:21 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:07:21 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:07:21 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:07:21 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:07:21 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:07:24 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:07:24 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:07:26 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:07:26 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:08:28 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:08:28 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:08:28 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:08:28 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:08:28 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:08:28 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:09:01 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:09:01 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:09:46 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:09:46 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:09:46 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:09:46 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:09:46 AM 127.0.0.1 Returned 404 in 10 ms
+ HTTP  5/5/2026 4:09:46 AM 127.0.0.1 Returned 404 in 11 ms
+ HTTP  5/5/2026 4:10:04 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:10:04 AM 127.0.0.1 Returned 404 in 12 ms
+ HTTP  5/5/2026 4:10:07 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:10:07 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:24:23 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:24:23 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:24:23 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:24:23 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 4:24:23 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:24:23 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:24:35 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:24:35 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 4:24:57 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:24:57 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:24:57 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:24:57 AM 127.0.0.1 Returned 404 in 6 ms
+ HTTP  5/5/2026 4:24:57 AM 127.0.0.1 Returned 404 in 6 ms
+ HTTP  5/5/2026 4:24:57 AM 127.0.0.1 Returned 404 in 6 ms
+ HTTP  5/5/2026 4:25:01 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:25:01 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:25:02 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:25:02 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:25:34 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:25:34 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:25:34 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:25:34 AM 127.0.0.1 Returned 404 in 7 ms
+ HTTP  5/5/2026 4:25:34 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:25:34 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:25:51 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:25:51 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:26:28 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:26:28 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:26:28 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:26:28 AM 127.0.0.1 Returned 404 in 6 ms
+ HTTP  5/5/2026 4:26:28 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 4:26:28 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:26:30 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:26:30 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:26:31 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:26:31 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 4:27:29 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:27:29 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:27:29 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:27:29 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:27:29 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:27:29 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:27:53 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:27:53 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:28:40 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:28:40 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:28:40 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:28:40 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:28:40 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:28:40 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:28:56 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:28:56 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:28:59 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:28:59 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:33:33 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:33:33 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:33:33 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:33:33 AM 127.0.0.1 Returned 404 in 6 ms
+ HTTP  5/5/2026 4:33:33 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 4:33:33 AM 127.0.0.1 Returned 404 in 6 ms
+ HTTP  5/5/2026 4:33:45 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:33:45 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:34:06 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:34:06 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:34:06 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:34:06 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:34:06 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:34:06 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:34:11 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:34:11 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:34:12 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:34:12 AM 127.0.0.1 Returned 404 in 7 ms
+ HTTP  5/5/2026 4:34:43 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:34:43 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:34:43 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:34:43 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:34:43 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:34:43 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:35:00 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:35:00 AM 127.0.0.1 Returned 404 in 7 ms
+ HTTP  5/5/2026 4:35:36 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:35:36 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:35:36 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:35:36 AM 127.0.0.1 Returned 404 in 5 ms
+ HTTP  5/5/2026 4:35:36 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:35:36 AM 127.0.0.1 Returned 404 in 3 ms
+ HTTP  5/5/2026 4:35:48 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:35:48 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:35:50 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:35:50 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:36:38 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:36:38 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:36:38 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:36:38 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:36:38 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:36:38 AM 127.0.0.1 Returned 404 in 4 ms
+ HTTP  5/5/2026 4:37:07 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:37:07 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:37:58 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:37:58 AM 127.0.0.1 GET /api/pricing-info
+ HTTP  5/5/2026 4:37:58 AM 127.0.0.1 GET /api/inventory
+ HTTP  5/5/2026 4:37:58 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/5/2026 4:37:58 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:37:58 AM 127.0.0.1 Returned 404 in 1 ms
+ HTTP  5/5/2026 4:38:13 AM 127.0.0.1 GET /api/admin/sales-metrics
+ HTTP  5/5/2026 4:38:13 AM 127.0.0.1 Returned 404 in 7 ms
+ HTTP  5/5/2026 4:38:16 AM 127.0.0.1 GET /api/csrf-token
+ HTTP  5/5/2026 4:38:16 AM 127.0.0.1 Returned 404 in 2 ms

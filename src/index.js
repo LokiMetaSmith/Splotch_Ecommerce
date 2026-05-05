@@ -1799,21 +1799,18 @@ function redrawAll() {
     // Handle raster image redrawing
     if (originalImage) {
         if (rasterCutlinePoly) {
-          // Translate the raster cutline poly by the drag offset
-          const translatedRasterPoly = rasterCutlinePoly.map(poly =>
-            poly.map(p => ({ x: p.x + imageOffsetX, y: p.y + imageOffsetY }))
-          );
+          // Generate the cutline without translation first
+          let cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, currentLassoRadius);
 
-          let cutline = generateCutLine(translatedRasterPoly, cutlineOffset, currentLassoRadius);
-
-          // Clip to bounding box
+          // Clip to bounding box (also without translation since bounding box is fixed)
           cutline = clipPolygonToBoundingBox(cutline, baseCanvasWidth, baseCanvasHeight);
 
           currentCutline = cutline;
           currentBounds = getPolygonsBounds(cutline);
         }
 
-        const offset = { x: 0, y: 0 };
+        // Apply translation offset during drawing decorations
+        const offset = { x: imageOffsetX, y: imageOffsetY };
         ctx.clearRect(0, 0, canvas.width, canvas.height); // wipe it
         drawCanvasDecorations(currentBounds, offset);
     }
@@ -1821,13 +1818,8 @@ function redrawAll() {
   }
 
   // Vector SVG Mode
-  // Translate the vector polygons by the drag offset
-  const translatedPolygons = currentPolygons.map(poly =>
-    poly.map(p => ({ x: p.x + imageOffsetX, y: p.y + imageOffsetY }))
-  );
-
-  // Generate the cutline from the translated polygons
-  let cutline = generateCutLine(translatedPolygons, cutlineOffset, currentLassoRadius); // Use dynamic offset
+  // Generate the cutline without translation first
+  let cutline = generateCutLine(currentPolygons, cutlineOffset, currentLassoRadius); // Use dynamic offset
 
   // Clip to bounding box
   cutline = clipPolygonToBoundingBox(cutline, baseCanvasWidth, baseCanvasHeight);
@@ -1949,11 +1941,12 @@ function clipPolygonToBoundingBox(polygons, boxWidth, boxHeight) {
   const scale = 100;
 
   // Create clipping box polygon
+  // Apply image offset to the clipping box so it clips correctly relative to the local cutline coordinates
   const clipBox = [
-    {X: 0, Y: 0},
-    {X: Math.round(boxWidth * scale), Y: 0},
-    {X: Math.round(boxWidth * scale), Y: Math.round(boxHeight * scale)},
-    {X: 0, Y: Math.round(boxHeight * scale)}
+    {X: Math.round(-imageOffsetX * scale), Y: Math.round(-imageOffsetY * scale)},
+    {X: Math.round((boxWidth - imageOffsetX) * scale), Y: Math.round(-imageOffsetY * scale)},
+    {X: Math.round((boxWidth - imageOffsetX) * scale), Y: Math.round((boxHeight - imageOffsetY) * scale)},
+    {X: Math.round(-imageOffsetX * scale), Y: Math.round((boxHeight - imageOffsetY) * scale)}
   ];
 
   const clipper = new ClipperLib.Clipper();
@@ -2181,8 +2174,8 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
       setCanvasSize(logicalWidth, logicalHeight);
       ctx.clearRect(0, 0, logicalWidth, logicalHeight);
       drawOffset = {
-        x: -bounds.left + 20,
-        y: -bounds.top + 20,
+        x: -bounds.left + 20 + offset.x,
+        y: -bounds.top + 20 + offset.y,
       };
     } else if (cleanCanvasState) {
       // Ensure canvas is at least original size
@@ -2407,8 +2400,8 @@ function redrawAllForHighlight() {
   if (basePolygons.length > 0) {
     // For SVG Vector Mode
     const drawOffset = {
-      x: -currentBounds.left + 20,
-      y: -currentBounds.top + 20,
+      x: -currentBounds.left + 20 + imageOffsetX,
+      y: -currentBounds.top + 20 + imageOffsetY,
     };
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawPolygonsToCanvas(currentPolygons, "black", drawOffset);
@@ -2416,7 +2409,8 @@ function redrawAllForHighlight() {
     drawCanvasDecorations(currentBounds, drawOffset);
   } else if (originalImage) {
     // For Raster Mode, we can just call drawCanvasDecorations which first restores the clean state
-    drawCanvasDecorations(currentBounds);
+    const offset = { x: imageOffsetX, y: imageOffsetY };
+    drawCanvasDecorations(currentBounds, offset);
   }
 }
 

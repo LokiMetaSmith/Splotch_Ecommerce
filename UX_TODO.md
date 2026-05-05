@@ -9,7 +9,7 @@ This is a list of proposed UX improvements for the Print Shop interface, ordered
 - [x] **ARIA Attributes and Tooltips:** Ensure all icon-only buttons (like modal close buttons) have proper `aria-label` attributes and consider adding hover/focus tooltips for small utility buttons to clarify their purpose.
 
 ## Sticker Editor & Cropping UX
-- [ ] **Bug Fix: Image Dragging & Cutline:** Bind the red cutline's position to the image's (x, y) coordinates during the drag event so they move together.
+- [x] **Bug Fix: Image Dragging & Cutline:** Bind the red cutline's position to the image's (x, y) coordinates during the drag event so they move together.
 - [ ] **Clipping Logic (Print Window):** Implement a rectangular clip-path based on the fixed Bounding Box dimensions to visually mask the image outside the box.
 - [ ] **Path Boolean Operation:** Ensure the generated SVG cutline is intersected with the Bounding Box edges so it has flat edges when a breach occurs.
 - [ ] **UX Enhancement (Safety Zone):** Add a subtle visual hint (like a "Safety Zone") that appears when the image is dragged near or past the bounding box edges.
