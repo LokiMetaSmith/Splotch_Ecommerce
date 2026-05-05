@@ -59,6 +59,7 @@ let textInput,
   textEditingControlsContainer,
   cutlineOffsetSlider,
   cutlineOffsetValueDisplay,
+  cutTypeToggle,
   cutlineSensitivitySlider,
   cutlineSensitivityValueDisplay,
   lazyLassoSlider,
@@ -228,6 +229,7 @@ async function BootStrap() {
   const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
   grayscaleBtnEl = document.getElementById("grayscaleBtn");
   sepiaBtnEl = document.getElementById("sepiaBtn");
+  cutTypeToggle = document.getElementById("cutTypeToggle");
   cutlineOffsetSlider = document.getElementById("cutlineOffsetSlider");
   cutlineOffsetValueDisplay = document.getElementById("cutlineOffsetValue");
   cutlineSensitivitySlider = document.getElementById(
@@ -408,13 +410,6 @@ async function BootStrap() {
 
       let currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
 
-      // If the user goes negative, and they haven't explicitly generated a smart edge
-      // yet (meaning they have the default 4-point rectangle), auto-generate it.
-      if (cutlineOffset < 0 && rasterCutlinePoly && rasterCutlinePoly.length === 1 && rasterCutlinePoly[0].length === 4 && originalImage) {
-        handleGenerateCutline(true); // pass true for skipToast
-        return; // handleGenerateCutline will trigger the redraw
-      }
-
       if (!pendingCutlineUpdate) {
         pendingCutlineUpdate = true;
         requestAnimationFrame(() => {
@@ -434,6 +429,37 @@ async function BootStrap() {
           }
           pendingCutlineUpdate = false;
         });
+      }
+    });
+  }
+
+  if (cutTypeToggle) {
+    cutTypeToggle.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        // Contour Cut
+        handleGenerateCutline(true);
+      } else {
+        // Edge Cut
+        if (originalImage && canvas) {
+          const dpr = window.devicePixelRatio || 1;
+          const logicalWidth = canvas.width / dpr;
+          const logicalHeight = canvas.height / dpr;
+          rasterCutlinePoly = [
+            [
+              { x: 0, y: 0 },
+              { x: logicalWidth, y: 0 },
+              { x: logicalWidth, y: logicalHeight },
+              { x: 0, y: logicalHeight },
+            ],
+          ];
+          const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
+          const currentOffset = cutlineOffsetSlider && cutlineOffsetSlider.value ? parseInt(cutlineOffsetSlider.value, 10) : cutlineOffset;
+          const cutline = generateCutLine(rasterCutlinePoly, currentOffset, currentLassoRadius);
+          currentCutline = cutline;
+          currentBounds = getPolygonsBounds(cutline);
+          redrawAll();
+          calculateAndUpdatePrice();
+        }
       }
     });
   }
@@ -1503,6 +1529,7 @@ function updateEditingButtonsState(disabled) {
     addTextBtn,
     textFontFamilySelect,
     cutlineOffsetSlider,
+    cutTypeToggle,
   ];
   const disabledClasses = ["opacity-50", "cursor-not-allowed"];
   elements.forEach((el) => {
@@ -1742,9 +1769,11 @@ function loadFileAsImage(file, isMascot = false) {
           const logicalHeight = canvas.height / dpr;
 
           if (imageHasTransparentBorder(currentImageData)) {
+            if (cutTypeToggle) cutTypeToggle.checked = true;
             // Auto-generate smart cutline for transparent images
             handleGenerateCutline(true); // Pass true to skip confirmation prompt
           } else {
+            if (cutTypeToggle) cutTypeToggle.checked = false;
             // Setup a rectangular rasterCutlinePoly for non-transparent images
             rasterCutlinePoly = [
               [
@@ -1927,6 +1956,12 @@ function handleSvgUpload(svgText) {
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
     showNotification("SVG processed and cutline generated.", "success");
     updateEditingButtonsState(false); // Enable editing buttons
+
+    // Explicitly disable the cutTypeToggle for SVG files
+    if (cutTypeToggle) {
+      cutTypeToggle.disabled = true;
+      cutTypeToggle.checked = false;
+    }
 
     // Show legend since SVG is loaded
     renderLegend();
@@ -2532,8 +2567,10 @@ function handleResetImage() {
       const logicalHeight = canvas.height / dpr;
 
       if (imageHasTransparentBorder(currentImageData)) {
+        if (cutTypeToggle) cutTypeToggle.checked = true;
         handleGenerateCutline(true);
       } else {
+        if (cutTypeToggle) cutTypeToggle.checked = false;
         rasterCutlinePoly = [
           [
             { x: 0, y: 0 },
@@ -3328,8 +3365,10 @@ async function handleRemoteImageLoad(imageUrl) {
     const logicalHeight = canvas.height / dpr;
 
     if (imageHasTransparentBorder(currentImageData)) {
+      if (cutTypeToggle) cutTypeToggle.checked = true;
       handleGenerateCutline(true);
     } else {
+      if (cutTypeToggle) cutTypeToggle.checked = false;
       rasterCutlinePoly = [
         [
           { x: 0, y: 0 },
@@ -3412,8 +3451,10 @@ async function loadProductForBuyer(productId) {
       const logicalHeight = canvas.height / dpr;
 
       if (imageHasTransparentBorder(currentImageData)) {
+        if (cutTypeToggle) cutTypeToggle.checked = true;
         handleGenerateCutline(true);
       } else {
+        if (cutTypeToggle) cutTypeToggle.checked = false;
         rasterCutlinePoly = [
           [
             { x: 0, y: 0 },
