@@ -2120,6 +2120,22 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
     co.Execute(final_paths, Math.round(offsetPx * scale));
   }
 
+  // Filter for positive offsets to ensure a single contiguous boundary
+  if (offsetPx > 0 && final_paths.length > 1) {
+    let maxArea = -Infinity;
+    let maxPathIndex = 0;
+    // Find the largest polygon area
+    for (let i = 0; i < final_paths.length; i++) {
+      // Clipper.Area returns positive for outer polygons
+      const area = Math.abs(ClipperLib.Clipper.Area(final_paths[i]));
+      if (area > maxArea) {
+        maxArea = area;
+        maxPathIndex = i;
+      }
+    }
+    final_paths = [final_paths[maxPathIndex]];
+  }
+
   // Scale back down
   // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
   const cutline = new Array(final_paths.length);
