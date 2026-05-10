@@ -68,6 +68,10 @@ test.describe('Contour Edge Toggle and Offset Logic', () => {
 
     await page.waitForTimeout(2000);
 
+    // Explicitly click the label to test its clickability
+    await page.locator('label[for="cutTypeToggle"]').click({ force: true });
+    await page.waitForTimeout(1000);
+
     // Try to toggle it if not checked
     const toggle = page.locator('#cutTypeToggle');
     await page.evaluate(() => {

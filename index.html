@@ -81,6 +81,9 @@
       }
 
       /* Specific override for cutTypeToggle, so it translates 100% of w-10 minus padding, which is 1.5rem / 24px */
+      label[for="cutTypeToggle"] .dot {
+        pointer-events: none;
+      }
       #cutTypeToggle:checked ~ .dot {
         transform: translateX(1.5rem);
         background-color: #0d9488; /* teal-600 */
@@ -344,26 +347,6 @@
             </button>
             <button
               type="button"
-              id="centerImageBtn"
-              data-tooltip="Center Image in Box"
-              aria-label="Center Image"
-              class="justify-self-center flex flex-col items-center justify-center text-blue-600 hover:text-blue-800 font-medium text-xs rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-600 px-2 py-1 transition-all"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="2"
-                stroke="currentColor"
-                class="w-6 h-6 mb-1"
-                aria-hidden="true"
-              >
-                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-              </svg>
-              Center
-            </button>
-            <button
-              type="button"
               id="rotateRightBtn"
               data-tooltip="Rotate Right 90°"
               aria-label="Rotate Right"
@@ -461,9 +444,9 @@
               <div class="flex items-center space-x-2">
                 <span class="text-xs font-bold text-gray-600">Edge</span>
                 <label for="cutTypeToggle" class="flex items-center cursor-pointer">
-                  <div class="relative">
+                  <div class="relative w-10 h-6">
                     <input type="checkbox" id="cutTypeToggle" class="sr-only peer" role="switch" aria-label="Toggle Cut Type">
-                    <div class="block bg-gray-600 w-10 h-6 rounded-full peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 transition-shadow"></div>
+                    <div class="block bg-gray-600 w-full h-full rounded-full peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 transition-shadow"></div>
                     <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition peer-checked:translate-x-full peer-checked:bg-teal-500"></div>
                   </div>
                 </label>
