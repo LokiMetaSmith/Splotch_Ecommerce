@@ -81,9 +81,6 @@
       }
 
       /* Specific override for cutTypeToggle, so it translates 100% of w-10 minus padding, which is 1.5rem / 24px */
-      label[for="cutTypeToggle"] .dot {
-        pointer-events: none;
-      }
       #cutTypeToggle:checked ~ .dot {
         transform: translateX(1.5rem);
         background-color: #0d9488; /* teal-600 */
@@ -441,17 +438,15 @@
             </button>
             <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
               <span class="text-xs text-gray-500 mb-1">Cut Type</span>
-              <div class="flex items-center space-x-2">
+              <label for="cutTypeToggle" class="flex items-center cursor-pointer space-x-2">
                 <span class="text-xs font-bold text-gray-600">Edge</span>
-                <label for="cutTypeToggle" class="flex items-center cursor-pointer">
-                  <div class="relative w-10 h-6">
-                    <input type="checkbox" id="cutTypeToggle" class="sr-only peer" role="switch" aria-label="Toggle Cut Type">
-                    <div class="block bg-gray-600 w-full h-full rounded-full peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 transition-shadow"></div>
-                    <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition peer-checked:translate-x-full peer-checked:bg-teal-500"></div>
-                  </div>
-                </label>
+                <div class="relative flex items-center">
+                  <input type="checkbox" id="cutTypeToggle" class="opacity-0 w-0 h-0 absolute peer pointer-events-none" role="switch" aria-label="Toggle Cut Type">
+                  <div class="block bg-gray-600 w-10 h-6 rounded-full peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 transition-shadow pointer-events-none"></div>
+                  <div class="dot absolute left-1 bg-white w-4 h-4 rounded-full transition peer-checked:translate-x-full peer-checked:bg-teal-500 pointer-events-none"></div>
+                </div>
                 <span class="text-xs font-bold text-gray-600">Contour</span>
-              </div>
+              </label>
             </div>
             <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
               <label
