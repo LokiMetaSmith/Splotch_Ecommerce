@@ -4,7 +4,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit",
+    "test": "NODE_OPTIONS='--max-old-space-size=4096' node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --forceExit --workerIdleMemoryLimit=512MB",
     "start": "node index.js",
     "build": "pnpm install"
   },

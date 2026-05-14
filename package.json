@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "test": "pnpm run test:unit && pnpm run test:e2e",
-    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit",
+    "test:unit": "NODE_OPTIONS='--max-old-space-size=4096' node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --forceExit --workerIdleMemoryLimit=512MB",
     "test:server": "cd server && pnpm test",
     "test:e2e": "playwright test",
     "test:e2e:real": "playwright test --config playwright.real.config.js",
