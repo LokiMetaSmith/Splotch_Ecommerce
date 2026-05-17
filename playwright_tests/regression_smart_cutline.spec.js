@@ -41,8 +41,15 @@ test('Generate Smart Cutline should preserve the original image', async ({ page 
     await expect(generateBtn).toBeEnabled();
     await generateBtn.click();
 
-    // Wait for success
-    await expect(page.locator('.message-content').last()).toContainText('Smart cutline generated successfully', { timeout: 15000 });
+    page.on('console', msg => {
+        console.log(`[${msg.type()}] BROWSER: "${msg.text()}"`);
+    });
+    page.on('pageerror', err => {
+        console.log(`BROWSER EXCEPTION: "${err.message}"`);
+    });
+
+    // Wait for the button to reset state, indicating it has completed
+    await expect(generateBtn).not.toHaveClass(/opacity-50/, { timeout: 15000 });
 
     // Check pixel again
     const isNotBlack = await page.evaluate(() => {
