@@ -24,6 +24,22 @@ const appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
 const locationId = "LTS82DEX24XR0";
 const serverUrl = ""; // Define server URL once
 
+// Web Workers for heavy processing
+const traceWorker = new Worker(new URL('./workers/trace-worker.js', import.meta.url));
+const offsetWorker = new Worker(new URL('./workers/offset-worker.js', import.meta.url));
+
+// Catch Worker Errors
+traceWorker.onerror = (error) => {
+    console.error("Trace Worker Error:", error.message, "at", error.filename, ":", error.lineno);
+    import("./notifications.js").then(({ showNotification }) => {
+        showNotification(`Worker initialization failed: ${error.message}`, "error");
+    });
+};
+
+offsetWorker.onerror = (error) => {
+    console.error("Offset Worker Error:", error.message, "at", error.filename, ":", error.lineno);
+};
+
 // Declare globals for SDK objects and key DOM elements
 let payments, card, csrfToken;
 let originalImage = null;
@@ -391,36 +407,46 @@ async function BootStrap() {
   if (generateCutlineBtn)
     generateCutlineBtn.addEventListener("click", handleGenerateCutline);
 
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+  }
+
   if (cutlineOffsetSlider) {
-    let pendingCutlineUpdate = false;
-    cutlineOffsetSlider.addEventListener("input", (e) => {
+    const handleSliderInput = debounce((e) => {
       cutlineOffset = parseInt(e.target.value, 10);
       if (cutlineOffsetValueDisplay)
         cutlineOffsetValueDisplay.textContent = cutlineOffset;
 
       let currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
 
-      if (!pendingCutlineUpdate) {
-        pendingCutlineUpdate = true;
-        requestAnimationFrame(() => {
-          if (rasterCutlinePoly) {
-            // Re-generate cutline for raster (Overlay Mode)
-            const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, currentLassoRadius);
+      if (rasterCutlinePoly) {
+        generateCutLineAsync(rasterCutlinePoly, cutlineOffset, currentLassoRadius).then(cutline => {
             currentCutline = cutline;
             currentBounds = getPolygonsBounds(cutline);
             calculateAndUpdatePrice();
             drawCanvasDecorations(currentBounds);
-          } else if (basePolygons.length > 0) {
-            // Re-generate for SVG (Vector Mode)
-            const cutline = generateCutLine(currentPolygons, cutlineOffset, currentLassoRadius);
+        });
+      } else if (basePolygons.length > 0) {
+        generateCutLineAsync(currentPolygons, cutlineOffset, currentLassoRadius).then(cutline => {
             currentCutline = cutline;
             currentBounds = getPolygonsBounds(cutline);
             redrawAll();
-          }
-          pendingCutlineUpdate = false;
         });
       }
-    });
+    }, 100);
+
+    cutlineOffsetSlider.addEventListener("input", handleSliderInput);
+
+    // Fallback for tests that fire change without input
+    cutlineOffsetSlider.addEventListener("change", handleSliderInput);
   }
 
   if (cutTypeToggle) {
@@ -444,11 +470,12 @@ async function BootStrap() {
           ];
           const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
           const currentOffset = cutlineOffsetSlider && cutlineOffsetSlider.value ? parseInt(cutlineOffsetSlider.value, 10) : cutlineOffset;
-          const cutline = generateCutLine(rasterCutlinePoly, currentOffset, currentLassoRadius);
-          currentCutline = cutline;
-          currentBounds = getPolygonsBounds(cutline);
-          redrawAll();
-          calculateAndUpdatePrice();
+          generateCutLineAsync(rasterCutlinePoly, currentOffset, currentLassoRadius).then(cutline => {
+              currentCutline = cutline;
+              currentBounds = getPolygonsBounds(cutline);
+              redrawAll();
+              calculateAndUpdatePrice();
+          });
         }
       }
     });
@@ -477,23 +504,25 @@ async function BootStrap() {
   }
 
   if (lazyLassoSlider) {
-    // Update value display immediately
-    lazyLassoSlider.addEventListener("input", (e) => {
+    const handleLassoInput = debounce((e) => {
       if (lazyLassoValueDisplay) {
         lazyLassoValueDisplay.textContent = e.target.value;
       }
       if (!easterEggUnlocked) {
         if (rasterCutlinePoly) {
-          const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, parseInt(e.target.value, 10));
-          currentCutline = cutline;
-          currentBounds = getPolygonsBounds(cutline);
-          calculateAndUpdatePrice();
-          drawCanvasDecorations(currentBounds);
+          generateCutLineAsync(rasterCutlinePoly, cutlineOffset, parseInt(e.target.value, 10)).then(cutline => {
+              currentCutline = cutline;
+              currentBounds = getPolygonsBounds(cutline);
+              calculateAndUpdatePrice();
+              drawCanvasDecorations(currentBounds);
+          });
         } else if (basePolygons.length > 0) {
           redrawAll();
         }
       }
-    });
+    }, 100);
+
+    lazyLassoSlider.addEventListener("input", handleLassoInput);
 
     // Trigger regeneration only on change (mouse up) to avoid lag
     lazyLassoSlider.addEventListener("change", () => {
@@ -1980,6 +2009,60 @@ function clipPolygonToBoundingBox(polygons, boxWidth, boxHeight) {
 
 const scaledPolyCache = new WeakMap();
 
+let currentOffsetMessageId = 0;
+
+function generateCutLineAsync(polygons, rawOffset, rawLazyRadius = 0) {
+    return new Promise((resolve, reject) => {
+      // Determine current PPI from UI state to convert real-world values to image pixels
+      let ppi = 300; // Default fallback
+      if (
+        typeof pricingConfig !== "undefined" &&
+        pricingConfig &&
+        typeof stickerResolutionSelect !== "undefined" &&
+        stickerResolutionSelect
+      ) {
+        const selectedRes = pricingConfig.resolutions.find(
+          (r) => r.id === (stickerResolutionSelect.value || "dpi_300"),
+        );
+        if (selectedRes) {
+          ppi = selectedRes.ppi;
+        }
+      }
+
+      // Convert raw values (which the slider outputs, presumably representing something like 0.1mm increments)
+      // Let's assume the slider values represent 0.1mm (so slider value 10 = 1mm).
+      // Then physical offset in mm is (sliderValue / 10).
+      const offsetMm = rawOffset / 10;
+      const lazyRadiusMm = rawLazyRadius / 10;
+
+      // Convert mm to logical pixels using the current PPI
+      const offsetPx = (offsetMm / 25.4) * ppi;
+      const lazyRadiusPx = (lazyRadiusMm / 25.4) * ppi;
+
+      const messageId = ++currentOffsetMessageId;
+
+      const handleMessage = function(e) {
+          if (e.data.messageId !== messageId) return; // Ignore old messages
+          offsetWorker.removeEventListener('message', handleMessage);
+
+          if (e.data.success) {
+              resolve(e.data.cutline);
+          } else {
+              reject(new Error(e.data.error));
+          }
+      };
+
+      offsetWorker.addEventListener('message', handleMessage);
+
+      offsetWorker.postMessage({
+          messageId: messageId,
+          polygons: polygons,
+          offsetAmount: offsetPx,
+          lassoRadius: lazyRadiusPx
+      });
+    });
+}
+
 function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
   const scale = 100; // Scale for integer precision
 
@@ -3020,179 +3103,226 @@ function handleGenerateCutline(skipPrompt = false) {
     ? parseInt(lazyLassoSlider.value, 10)
     : 50;
 
-  // Use a timeout to allow the UI to update before the heavy computation
-  setTimeout(() => {
-    try {
-      const dpr = window.devicePixelRatio || 1;
-      const logicalCanvasWidth = canvas.width / dpr;
-      const logicalCanvasHeight = canvas.height / dpr;
+  try {
+    const dpr = window.devicePixelRatio || 1;
+    const logicalCanvasWidth = canvas.width / dpr;
+    const logicalCanvasHeight = canvas.height / dpr;
 
-      // --- Performance Optimization: Downscale before tracing ---
-      const maxDim = 500;
-      const scaleFactor = Math.min(1, maxDim / Math.max(logicalCanvasWidth, logicalCanvasHeight));
-      const scaledWidth = Math.max(1, Math.round(logicalCanvasWidth * scaleFactor));
-      const scaledHeight = Math.max(1, Math.round(logicalCanvasHeight * scaleFactor));
+    // --- Performance Optimization: Downscale before tracing ---
+    const maxDim = 500;
+    const scaleFactor = Math.min(1, maxDim / Math.max(logicalCanvasWidth, logicalCanvasHeight));
+    const scaledWidth = Math.max(1, Math.round(logicalCanvasWidth * scaleFactor));
+    const scaledHeight = Math.max(1, Math.round(logicalCanvasHeight * scaleFactor));
 
-      let scaledImageData;
-      if (scaleFactor < 1 || dpr !== 1) {
-        const tempCanvas1 = document.createElement('canvas');
-        tempCanvas1.width = canvas.width;
-        tempCanvas1.height = canvas.height;
-        const tempCtx1 = tempCanvas1.getContext('2d');
-        if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
-          tempCtx1.putImageData(cleanCanvasState, 0, 0);
-        } else {
-          tempCtx1.drawImage(canvas, 0, 0);
-        }
-
-        const tempCanvas2 = document.createElement('canvas');
-        tempCanvas2.width = scaledWidth;
-        tempCanvas2.height = scaledHeight;
-        const tempCtx2 = tempCanvas2.getContext('2d');
-        tempCtx2.drawImage(tempCanvas1, 0, 0, tempCanvas1.width, tempCanvas1.height, 0, 0, scaledWidth, scaledHeight);
-        scaledImageData = tempCtx2.getImageData(0, 0, scaledWidth, scaledHeight);
+    let scaledImageData;
+    if (scaleFactor < 1 || dpr !== 1) {
+      const tempCanvas1 = document.createElement('canvas');
+      tempCanvas1.width = canvas.width;
+      tempCanvas1.height = canvas.height;
+      const tempCtx1 = tempCanvas1.getContext('2d');
+      if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
+        tempCtx1.putImageData(cleanCanvasState, 0, 0);
       } else {
-        if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
-          scaledImageData = cleanCanvasState;
-        } else {
-          scaledImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        }
+        tempCtx1.drawImage(canvas, 0, 0);
       }
 
-      let contours = traceContours(scaledImageData, cutlineSensitivity);
-      if (contours) {
-         contours = contours.map(c => c.map(p => ({
-           x: p.x / scaleFactor,
-           y: p.y / scaleFactor
-         })));
-      }
-
-      if (!contours || contours.length === 0) {
-        throw new Error(
-          "Could not find any distinct contour. Image may be empty.",
-        );
-      }
-
-      // Filter contours to remove noise (e.g. area < 100 pixels)
-      // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
-      const imageArea = canvas.width * canvas.height;
-      const minIslandArea = Math.max(100, imageArea * 0.0001); // At least 100px, or 0.01% of image
-      // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
-      // This changes O(N*M) check to O(N*m) where m << M.
-      let significantContours = contours
-        .filter((c) => getPolygonArea(c) > minIslandArea)
-        .map((c) => simplifyPolygon(c, 0.5)); // Epsilon of 0.5 pixels
-
-      // Suppress "island cuts" (internal holes) that are larger than 2mm.
-      // Constraint: "we can have internal cuts, but they should be less than 2mm"
-      // Interpretation: Keep internal cuts <= 2mm. Remove internal cuts > 2mm.
-      if (significantContours.length > 0) {
-        const selectedResolutionId =
-          stickerResolutionSelect && stickerResolutionSelect.value
-            ? stickerResolutionSelect.value
-            : "dpi_300";
-        const selectedResolution =
-          pricingConfig && pricingConfig.resolutions
-            ? pricingConfig.resolutions.find(
-                (r) => r.id === selectedResolutionId,
-              )
-            : null;
-
-        const ppi = selectedResolution ? selectedResolution.ppi : 300;
-        // Calculate 2mm in pixels for max hole size
-        let maxAllowedHoleSize = (2 / 25.4) * ppi;
-        // Calculate 0.5mm in pixels for min hole size (noise floor)
-        const minAllowedHoleSize = (0.5 / 25.4) * ppi;
-
-        if (lazyLassoRadius >= 50) {
-            maxAllowedHoleSize = -1;
-        }
-
-        significantContours = filterInternalContours(
-          significantContours,
-          maxAllowedHoleSize,
-          minAllowedHoleSize,
-        );
-      }
-
-      if (significantContours.length === 0) {
-        throw new Error(
-          "No significant shapes found. Image may be too noisy or empty.",
-        );
-      }
-
-      const scale = 100;
-      const finalContours = [];
-
-      significantContours.forEach((contour) => {
-        // Bolt Optimization: Apply smoothing to round sharp corners ("surface energy minimization")
-        // 2 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
-        // Note: contour is already simplified.
-        const smoothedContour = smoothPolygon(contour, 2);
-
-        // Clean the polygon to remove self-intersections and other issues before offsetting.
-        // This requires scaling up for Clipper's integer math.
-        // Bolt Optimization: Pre-allocate array and use for-loop instead of .map() to reduce GC pressure
-        const scaledPoly = new Array(smoothedContour.length);
-        for (let j = 0; j < smoothedContour.length; j++) {
-          const p = smoothedContour[j];
-          scaledPoly[j] = { X: p.x * scale, Y: p.y * scale };
-        }
-        const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(
-          scaledPoly,
-          0.1,
-        );
-
-        // Add validation to ensure we have a usable polygon AFTER cleaning
-        if (cleanedScaledPoly && cleanedScaledPoly.length >= 3) {
-          // Bolt Optimization: Pre-allocate array and use for-loop instead of .map()
-          const newPoly = new Array(cleanedScaledPoly.length);
-          for (let j = 0; j < cleanedScaledPoly.length; j++) {
-            const p = cleanedScaledPoly[j];
-            newPoly[j] = { x: p.X / scale, y: p.Y / scale };
-          }
-          finalContours.push(newPoly);
-        }
-      });
-
-      if (finalContours.length === 0) {
-        throw new Error(
-          "Could not detect a usable outline. Try an image with a transparent background.",
-        );
-      }
-
-      // Set the raster cutline polygon (Overlay Mode)
-      // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
-      const rasterCutlineOutput = new Array(finalContours.length);
-      for (let i = 0; i < finalContours.length; i++) {
-        const poly = finalContours[i];
-        const newPoly = new Array(poly.length);
-        for (let j = 0; j < poly.length; j++) {
-          const p = poly[j];
-          newPoly[j] = { x: p.x / dpr, y: p.y / dpr };
-        }
-        rasterCutlineOutput[i] = newPoly;
-      }
-      rasterCutlinePoly = rasterCutlineOutput;
-
-      // Redraw the canvas to generate the cutline and update the bounds
-      redrawAll();
-
-      calculateAndUpdatePrice();
-      showNotification("Smart cutline generated successfully.", "success");
-    } catch (error) {
-      // Restore the original canvas if the process failed
-      ctx.putImageData(originalCanvasData, 0, 0);
-      showNotification(`Error: ${error.message}`, "error");
-      console.error(error);
-    } finally {
-      // RESTORE BUTTON STATE
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
+      const tempCanvas2 = document.createElement('canvas');
+      tempCanvas2.width = scaledWidth;
+      tempCanvas2.height = scaledHeight;
+      const tempCtx2 = tempCanvas2.getContext('2d');
+      tempCtx2.drawImage(tempCanvas1, 0, 0, tempCanvas1.width, tempCanvas1.height, 0, 0, scaledWidth, scaledHeight);
+      scaledImageData = tempCtx2.getImageData(0, 0, scaledWidth, scaledHeight);
+    } else {
+      if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
+        scaledImageData = cleanCanvasState;
+      } else {
+        scaledImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       }
     }
-  }, 50);
+
+    traceWorker.onmessage = function(e) {
+      console.log('Trace worker message received:', e.data.success);
+      if (!e.data.success) { console.error('Trace error: ', e.data.error); }
+      if (e.data.success) {
+        let contours = e.data.contours;
+
+        // Filter contours to remove noise (e.g. area < 100 pixels)
+        // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
+        const imageArea = canvas.width * canvas.height;
+        const minIslandArea = Math.max(100, imageArea * 0.0001); // At least 100px, or 0.01% of image
+        // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
+        // This changes O(N*M) check to O(N*m) where m << M.
+        let significantContours = contours
+          .filter((c) => getPolygonArea(c) > minIslandArea)
+          .map((c) => simplifyPolygon(c, 0.5)); // Epsilon of 0.5 pixels
+
+        // Suppress "island cuts" (internal holes) that are larger than 2mm.
+        // Constraint: "we can have internal cuts, but they should be less than 2mm"
+        // Interpretation: Keep internal cuts <= 2mm. Remove internal cuts > 2mm.
+        if (significantContours.length > 0) {
+          const selectedResolutionId =
+            stickerResolutionSelect && stickerResolutionSelect.value
+              ? stickerResolutionSelect.value
+              : "dpi_300";
+          const selectedResolution =
+            pricingConfig && pricingConfig.resolutions
+              ? pricingConfig.resolutions.find(
+                  (r) => r.id === selectedResolutionId,
+                )
+              : null;
+
+          const ppi = selectedResolution ? selectedResolution.ppi : 300;
+          // Calculate 2mm in pixels for max hole size
+          let maxAllowedHoleSize = (2 / 25.4) * ppi;
+          // Calculate 0.5mm in pixels for min hole size (noise floor)
+          const minAllowedHoleSize = (0.5 / 25.4) * ppi;
+
+          if (lazyLassoRadius >= 50) {
+              maxAllowedHoleSize = -1;
+          }
+
+          significantContours = filterInternalContours(
+            significantContours,
+            maxAllowedHoleSize,
+            minAllowedHoleSize,
+          );
+        }
+
+        if (significantContours.length === 0) {
+           ctx.putImageData(originalCanvasData, 0, 0);
+           showNotification("Could not detect a usable outline. Try an image with a transparent background.", "error");
+           if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = originalText;
+           }
+           return;
+        }
+
+        const scale = 100;
+        const finalContours = [];
+
+        significantContours.forEach((contour) => {
+          // Bolt Optimization: Apply smoothing to round sharp corners ("surface energy minimization")
+          // 2 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
+          // Note: contour is already simplified.
+          const smoothedContour = smoothPolygon(contour, 2);
+
+          // Clean the polygon to remove self-intersections and other issues before offsetting.
+          // This requires scaling up for Clipper's integer math.
+          // Bolt Optimization: Pre-allocate array and use for-loop instead of .map() to reduce GC pressure
+          const scaledPoly = new Array(smoothedContour.length);
+          for (let j = 0; j < smoothedContour.length; j++) {
+            const p = smoothedContour[j];
+            scaledPoly[j] = { X: p.x * scale, Y: p.y * scale };
+          }
+          const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(
+            scaledPoly,
+            0.1,
+          );
+
+          // Add validation to ensure we have a usable polygon AFTER cleaning
+          if (cleanedScaledPoly && cleanedScaledPoly.length >= 3) {
+            // Bolt Optimization: Pre-allocate array and use for-loop instead of .map()
+            const newPoly = new Array(cleanedScaledPoly.length);
+            for (let j = 0; j < cleanedScaledPoly.length; j++) {
+              const p = cleanedScaledPoly[j];
+              newPoly[j] = { x: p.X / scale, y: p.Y / scale };
+            }
+            finalContours.push(newPoly);
+          }
+        });
+
+        if (finalContours.length === 0) {
+           ctx.putImageData(originalCanvasData, 0, 0);
+           showNotification("Could not detect a usable outline. Try an image with a transparent background.", "error");
+           if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = originalText;
+           }
+           return;
+        }
+
+        // Set the raster cutline polygon (Overlay Mode)
+        // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
+        const rasterCutlineOutput = new Array(finalContours.length);
+        for (let i = 0; i < finalContours.length; i++) {
+          const poly = finalContours[i];
+          const newPoly = new Array(poly.length);
+          for (let j = 0; j < poly.length; j++) {
+            const p = poly[j];
+            newPoly[j] = { x: p.x / dpr, y: p.y / dpr };
+          }
+          rasterCutlineOutput[i] = newPoly;
+        }
+        rasterCutlinePoly = rasterCutlineOutput;
+
+        // Set the offset according to the current UI value before redraw
+        let curRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
+        const currentOffset = cutlineOffsetSlider && cutlineOffsetSlider.value ? parseInt(cutlineOffsetSlider.value, 10) : cutlineOffset;
+
+        console.log('Sending to generateCutLineAsync');
+        generateCutLineAsync(rasterCutlinePoly, currentOffset, curRadius).then(cutline => {
+            currentCutline = cutline;
+            currentBounds = getPolygonsBounds(cutline);
+            redrawAll();
+            calculateAndUpdatePrice();
+            updateEditingButtonsState(false);
+            const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+            if (generateCutlineBtn) {
+              generateCutlineBtn.disabled = false;
+              generateCutlineBtn.classList.remove("opacity-50", "cursor-not-allowed");
+              generateCutlineBtn.innerHTML = "Generate Smart Cutline";
+            }
+            showNotification("Smart cutline generated successfully.", "success");
+        }).catch(err => {
+            console.error('generateCutLineAsync failed:', err);
+            showNotification(`Error: ${err.message}`, "error");
+            updateEditingButtonsState(false);
+            const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+            if (generateCutlineBtn) {
+              generateCutlineBtn.disabled = false;
+              generateCutlineBtn.classList.remove("opacity-50", "cursor-not-allowed");
+              generateCutlineBtn.innerHTML = "Generate Smart Cutline";
+            }
+        });
+
+      } else {
+        ctx.putImageData(originalCanvasData, 0, 0);
+        showNotification(`Error: ${e.data.error}`, "error");
+        console.error(e.data.error);
+
+        updateEditingButtonsState(false);
+        const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+        if (generateCutlineBtn) {
+          generateCutlineBtn.disabled = false;
+          generateCutlineBtn.classList.remove("opacity-50", "cursor-not-allowed");
+          generateCutlineBtn.innerHTML = "Generate Smart Cutline";
+        }
+      }
+    };
+
+    traceWorker.postMessage({
+      imageData: scaledImageData,
+      cutlineSensitivity: cutlineSensitivity,
+      scaleFactor: scaleFactor,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height
+    });
+
+  } catch (error) {
+    // Restore the original canvas if the process failed
+    ctx.putImageData(originalCanvasData, 0, 0);
+    showNotification(`Error: ${error.message}`, "error");
+    console.error(error);
+
+    updateEditingButtonsState(false);
+    const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+    if (generateCutlineBtn) {
+      generateCutlineBtn.disabled = false;
+      generateCutlineBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      generateCutlineBtn.innerHTML = "Generate Smart Cutline";
+    }
+  }
 }
 
 // --- Creator / Product Functions ---
