@@ -106,7 +106,7 @@ let canvasLegendContainer;
 let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
 let creatorProfitCents = 0; // The markup for the current product
-let cutlineOffset = 5; // Default offset
+let cutlineOffset = 15; // Default offset
 
 // Memoization globals for pricing
 let lastCalculatedPerimeter = 0;
@@ -421,9 +421,21 @@ async function BootStrap() {
 
   if (cutlineOffsetSlider) {
     const handleSliderInput = debounce((e) => {
-      cutlineOffset = parseInt(e.target.value, 10);
+      const step = parseInt(e.target.value, 10);
+      let textLabel = "A little white";
+      if (step === 0) {
+        cutlineOffset = 0;
+        textLabel = "No bleed";
+      } else if (step === 1) {
+        cutlineOffset = 15;
+        textLabel = "A little white";
+      } else if (step === 2) {
+        cutlineOffset = 35;
+        textLabel = "Pillowy outline";
+      }
+
       if (cutlineOffsetValueDisplay)
-        cutlineOffsetValueDisplay.textContent = cutlineOffset;
+        cutlineOffsetValueDisplay.textContent = textLabel;
 
       let currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
 
@@ -469,7 +481,13 @@ async function BootStrap() {
             ],
           ];
           const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
-          const currentOffset = cutlineOffsetSlider && cutlineOffsetSlider.value ? parseInt(cutlineOffsetSlider.value, 10) : cutlineOffset;
+          let currentOffset = cutlineOffset;
+          if (cutlineOffsetSlider && cutlineOffsetSlider.value) {
+            const step = parseInt(cutlineOffsetSlider.value, 10);
+            if (step === 0) currentOffset = 0;
+            else if (step === 1) currentOffset = 15;
+            else if (step === 2) currentOffset = 35;
+          }
           generateCutLineAsync(rasterCutlinePoly, currentOffset, currentLassoRadius).then(cutline => {
               currentCutline = cutline;
               currentBounds = getPolygonsBounds(cutline);
@@ -1773,12 +1791,12 @@ function loadFileAsImage(file, isMascot = false) {
             ];
 
             // Set slider to 10 (1mm) offset
-            cutlineOffset = 5;
+            cutlineOffset = 15;
             if (cutlineOffsetSlider) {
-              cutlineOffsetSlider.value = 5;
+              cutlineOffsetSlider.value = 1;
             }
             if (cutlineOffsetValueDisplay) {
-              cutlineOffsetValueDisplay.textContent = cutlineOffset;
+              cutlineOffsetValueDisplay.textContent = "A little white";
             }
 
             const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
@@ -2623,12 +2641,12 @@ function handleResetImage() {
           ],
         ];
 
-        cutlineOffset = 5;
+        cutlineOffset = 15;
         if (cutlineOffsetSlider) {
-          cutlineOffsetSlider.value = 5;
+          cutlineOffsetSlider.value = 1;
         }
         if (cutlineOffsetValueDisplay) {
-          cutlineOffsetValueDisplay.textContent = cutlineOffset;
+          cutlineOffsetValueDisplay.textContent = "A little white";
         }
 
         const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
@@ -3258,7 +3276,13 @@ function handleGenerateCutline(skipPrompt = false) {
 
         // Set the offset according to the current UI value before redraw
         let curRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
-        const currentOffset = cutlineOffsetSlider && cutlineOffsetSlider.value ? parseInt(cutlineOffsetSlider.value, 10) : cutlineOffset;
+        let currentOffset = cutlineOffset;
+        if (cutlineOffsetSlider && cutlineOffsetSlider.value) {
+          const step = parseInt(cutlineOffsetSlider.value, 10);
+          if (step === 0) currentOffset = 0;
+          else if (step === 1) currentOffset = 15;
+          else if (step === 2) currentOffset = 35;
+        }
 
         console.log('Sending to generateCutLineAsync');
         generateCutLineAsync(rasterCutlinePoly, currentOffset, curRadius).then(cutline => {
@@ -3468,12 +3492,12 @@ async function handleRemoteImageLoad(imageUrl) {
         ],
       ];
 
-      cutlineOffset = 5;
+      cutlineOffset = 15;
       if (cutlineOffsetSlider) {
-        cutlineOffsetSlider.value = 5;
+        cutlineOffsetSlider.value = 1;
       }
       if (cutlineOffsetValueDisplay) {
-        cutlineOffsetValueDisplay.textContent = cutlineOffset;
+        cutlineOffsetValueDisplay.textContent = "A little white";
       }
 
       const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
@@ -3554,12 +3578,12 @@ async function loadProductForBuyer(productId) {
           ],
         ];
 
-        cutlineOffset = 5;
+        cutlineOffset = 15;
         if (cutlineOffsetSlider) {
-          cutlineOffsetSlider.value = 5;
+          cutlineOffsetSlider.value = 1;
         }
         if (cutlineOffsetValueDisplay) {
-          cutlineOffsetValueDisplay.textContent = cutlineOffset;
+          cutlineOffsetValueDisplay.textContent = "A little white";
         }
 
         const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
