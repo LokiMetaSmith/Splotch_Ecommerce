@@ -1,238 +1,220 @@
 
-> lokimetasmith.github.io@1.0.0 start /app
+> lokimetasmith.github.io@1.0.0 start
 > serve dist
 
  UPDATE  The latest version of `serve` is 14.2.6
  INFO  Accepting connections at http://localhost:3000
- HTTP  5/5/2026 3:43:53 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:43:53 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 3:43:53 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 3:43:53 AM 127.0.0.1 Returned 404 in 466 ms
- HTTP  5/5/2026 3:43:53 AM 127.0.0.1 Returned 404 in 17 ms
- HTTP  5/5/2026 3:43:53 AM 127.0.0.1 Returned 404 in 13 ms
- HTTP  5/5/2026 3:44:05 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 3:44:05 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 3:44:27 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:44:27 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 3:44:27 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 3:44:27 AM 127.0.0.1 Returned 404 in 10 ms
- HTTP  5/5/2026 3:44:27 AM 127.0.0.1 Returned 404 in 10 ms
- HTTP  5/5/2026 3:44:27 AM 127.0.0.1 Returned 404 in 10 ms
- HTTP  5/5/2026 3:44:29 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 3:44:29 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 3:44:30 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:44:30 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 3:45:03 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:45:03 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 3:45:03 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 3:45:03 AM 127.0.0.1 Returned 404 in 9 ms
- HTTP  5/5/2026 3:45:03 AM 127.0.0.1 Returned 404 in 8 ms
- HTTP  5/5/2026 3:45:03 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 3:45:21 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 3:45:21 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 3:45:46 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:45:46 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 3:45:46 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 3:45:46 AM 127.0.0.1 Returned 404 in 6 ms
- HTTP  5/5/2026 3:45:46 AM 127.0.0.1 Returned 404 in 8 ms
- HTTP  5/5/2026 3:45:46 AM 127.0.0.1 Returned 404 in 7 ms
- HTTP  5/5/2026 3:45:48 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 3:45:48 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 3:45:50 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:45:50 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 3:47:04 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:47:04 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 3:47:04 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 3:47:04 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 3:47:04 AM 127.0.0.1 Returned 404 in 12 ms
- HTTP  5/5/2026 3:47:04 AM 127.0.0.1 Returned 404 in 12 ms
- HTTP  5/5/2026 3:47:27 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 3:47:27 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 3:48:22 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:48:22 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 3:48:22 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 3:48:22 AM 127.0.0.1 Returned 404 in 17 ms
- HTTP  5/5/2026 3:48:22 AM 127.0.0.1 Returned 404 in 14 ms
- HTTP  5/5/2026 3:48:22 AM 127.0.0.1 Returned 404 in 15 ms
- HTTP  5/5/2026 3:48:38 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 3:48:38 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 3:48:42 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 3:48:42 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 3:56:08 AM ::1 GET /printshop.html
- HTTP  5/5/2026 3:56:08 AM ::1 Returned 301 in 1 ms
- HTTP  5/5/2026 3:56:08 AM ::1 GET /printshop
- HTTP  5/5/2026 3:56:08 AM ::1 Returned 404 in 1 ms
- HTTP  5/5/2026 3:59:14 AM ::1 GET /index.html
- HTTP  5/5/2026 3:59:14 AM ::1 Returned 301 in 1 ms
- HTTP  5/5/2026 3:59:14 AM ::1 GET /index
- HTTP  5/5/2026 3:59:14 AM ::1 Returned 301 in 1 ms
- HTTP  5/5/2026 3:59:14 AM ::1 GET /
- HTTP  5/5/2026 3:59:14 AM ::1 Returned 404 in 2 ms
- HTTP  5/5/2026 3:59:40 AM ::1 GET /index.html
- HTTP  5/5/2026 3:59:40 AM ::1 Returned 301 in 0 ms
- HTTP  5/5/2026 3:59:40 AM ::1 GET /index
- HTTP  5/5/2026 3:59:40 AM ::1 Returned 301 in 0 ms
- HTTP  5/5/2026 3:59:40 AM ::1 GET /
- HTTP  5/5/2026 3:59:40 AM ::1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:05:19 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:05:19 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:05:19 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:05:19 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:05:19 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:05:19 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:05:35 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:05:35 AM 127.0.0.1 Returned 404 in 23 ms
- HTTP  5/5/2026 4:06:00 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:06:00 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:06:00 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:06:00 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:06:00 AM 127.0.0.1 Returned 404 in 6 ms
- HTTP  5/5/2026 4:06:00 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:06:02 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:06:02 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:06:03 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:06:03 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:06:36 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:06:36 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:06:36 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:06:36 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:06:36 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 4:06:36 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:06:52 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:06:52 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:07:21 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:07:21 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:07:21 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:07:21 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:07:21 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:07:21 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:07:24 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:07:24 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:07:26 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:07:26 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:08:28 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:08:28 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:08:28 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:08:28 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:08:28 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:08:28 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:09:01 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:09:01 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:09:46 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:09:46 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:09:46 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:09:46 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:09:46 AM 127.0.0.1 Returned 404 in 10 ms
- HTTP  5/5/2026 4:09:46 AM 127.0.0.1 Returned 404 in 11 ms
- HTTP  5/5/2026 4:10:04 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:10:04 AM 127.0.0.1 Returned 404 in 12 ms
- HTTP  5/5/2026 4:10:07 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:10:07 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:24:23 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:24:23 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:24:23 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:24:23 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 4:24:23 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:24:23 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:24:35 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:24:35 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 4:24:57 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:24:57 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:24:57 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:24:57 AM 127.0.0.1 Returned 404 in 6 ms
- HTTP  5/5/2026 4:24:57 AM 127.0.0.1 Returned 404 in 6 ms
- HTTP  5/5/2026 4:24:57 AM 127.0.0.1 Returned 404 in 6 ms
- HTTP  5/5/2026 4:25:01 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:25:01 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:25:02 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:25:02 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:25:34 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:25:34 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:25:34 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:25:34 AM 127.0.0.1 Returned 404 in 7 ms
- HTTP  5/5/2026 4:25:34 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:25:34 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:25:51 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:25:51 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:26:28 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:26:28 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:26:28 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:26:28 AM 127.0.0.1 Returned 404 in 6 ms
- HTTP  5/5/2026 4:26:28 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 4:26:28 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:26:30 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:26:30 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:26:31 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:26:31 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 4:27:29 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:27:29 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:27:29 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:27:29 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:27:29 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:27:29 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:27:53 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:27:53 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:28:40 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:28:40 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:28:40 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:28:40 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:28:40 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:28:40 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:28:56 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:28:56 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:28:59 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:28:59 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:33:33 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:33:33 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:33:33 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:33:33 AM 127.0.0.1 Returned 404 in 6 ms
- HTTP  5/5/2026 4:33:33 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 4:33:33 AM 127.0.0.1 Returned 404 in 6 ms
- HTTP  5/5/2026 4:33:45 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:33:45 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:34:06 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:34:06 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:34:06 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:34:06 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:34:06 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:34:06 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:34:11 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:34:11 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:34:12 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:34:12 AM 127.0.0.1 Returned 404 in 7 ms
- HTTP  5/5/2026 4:34:43 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:34:43 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:34:43 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:34:43 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:34:43 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:34:43 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:35:00 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:35:00 AM 127.0.0.1 Returned 404 in 7 ms
- HTTP  5/5/2026 4:35:36 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:35:36 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:35:36 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:35:36 AM 127.0.0.1 Returned 404 in 5 ms
- HTTP  5/5/2026 4:35:36 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:35:36 AM 127.0.0.1 Returned 404 in 3 ms
- HTTP  5/5/2026 4:35:48 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:35:48 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:35:50 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:35:50 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:36:38 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:36:38 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:36:38 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:36:38 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:36:38 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:36:38 AM 127.0.0.1 Returned 404 in 4 ms
- HTTP  5/5/2026 4:37:07 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:37:07 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:37:58 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:37:58 AM 127.0.0.1 GET /api/pricing-info
- HTTP  5/5/2026 4:37:58 AM 127.0.0.1 GET /api/inventory
- HTTP  5/5/2026 4:37:58 AM 127.0.0.1 Returned 404 in 2 ms
- HTTP  5/5/2026 4:37:58 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:37:58 AM 127.0.0.1 Returned 404 in 1 ms
- HTTP  5/5/2026 4:38:13 AM 127.0.0.1 GET /api/admin/sales-metrics
- HTTP  5/5/2026 4:38:13 AM 127.0.0.1 Returned 404 in 7 ms
- HTTP  5/5/2026 4:38:16 AM 127.0.0.1 GET /api/csrf-token
- HTTP  5/5/2026 4:38:16 AM 127.0.0.1 Returned 404 in 2 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 21 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /lib/clipper.js
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /assets/version-BXU_fLYu.css
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /assets/splotch-theme-BV8SOxFX.css
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /assets/main-CgutWy2x.js
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /assets/version-Cg7atczZ.js
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 7 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 9 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 8 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 8 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 14 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 12 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /assets/svgparser-CFVdj02A.js
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /assets/a11y-improvements-DardMKrZ.js
+ HTTP  5/22/2026 9:24:57 PM ::1 GET /mascot.png
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 16 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 16 ms
+ HTTP  5/22/2026 9:24:57 PM ::1 Returned 200 in 35 ms
+ HTTP  5/22/2026 9:24:58 PM ::1 GET /cookie-consent.js
+ HTTP  5/22/2026 9:24:58 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:24:58 PM ::1 GET /assets/trace-worker-DJdWh8SA.js
+ HTTP  5/22/2026 9:24:58 PM ::1 GET /assets/offset-worker-d0labMay.js
+ HTTP  5/22/2026 9:24:58 PM ::1 Returned 200 in 5 ms
+ HTTP  5/22/2026 9:24:58 PM ::1 Returned 200 in 5 ms
+ HTTP  5/22/2026 9:24:58 PM ::1 GET /api/csrf-token
+ HTTP  5/22/2026 9:24:58 PM ::1 GET /api/pricing-info
+ HTTP  5/22/2026 9:24:58 PM ::1 Returned 404 in 5 ms
+ HTTP  5/22/2026 9:24:58 PM ::1 GET /api/inventory
+ HTTP  5/22/2026 9:24:58 PM ::1 Returned 404 in 5 ms
+ HTTP  5/22/2026 9:24:58 PM ::1 Returned 404 in 2 ms
+ HTTP  5/22/2026 9:24:58 PM ::1 GET /sw.js
+ HTTP  5/22/2026 9:24:58 PM ::1 Returned 404 in 5 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /lib/clipper.js
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 3 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /assets/version-BXU_fLYu.css
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /assets/splotch-theme-BV8SOxFX.css
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /assets/main-CgutWy2x.js
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /assets/version-Cg7atczZ.js
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /assets/svgparser-CFVdj02A.js
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /assets/a11y-improvements-DardMKrZ.js
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /mascot.png
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:25:34 PM ::1 GET /cookie-consent.js
+ HTTP  5/22/2026 9:25:34 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:25:35 PM ::1 GET /assets/trace-worker-DJdWh8SA.js
+ HTTP  5/22/2026 9:25:35 PM ::1 GET /mascot-6.png
+ HTTP  5/22/2026 9:25:35 PM ::1 GET /assets/offset-worker-d0labMay.js
+ HTTP  5/22/2026 9:25:35 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:25:35 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:25:35 PM ::1 GET /api/csrf-token
+ HTTP  5/22/2026 9:25:35 PM ::1 GET /api/pricing-info
+ HTTP  5/22/2026 9:25:35 PM ::1 GET /api/inventory
+ HTTP  5/22/2026 9:25:35 PM ::1 Returned 404 in 8 ms
+ HTTP  5/22/2026 9:25:35 PM ::1 Returned 404 in 8 ms
+ HTTP  5/22/2026 9:25:35 PM ::1 Returned 404 in 8 ms
+ HTTP  5/22/2026 9:25:35 PM ::1 Returned 200 in 39 ms
+ HTTP  5/22/2026 9:25:35 PM ::1 GET /sw.js
+ HTTP  5/22/2026 9:25:35 PM ::1 Returned 404 in 2 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /lib/clipper.js
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/version-BXU_fLYu.css
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/splotch-theme-BV8SOxFX.css
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/main-CgutWy2x.js
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/version-Cg7atczZ.js
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 5 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 3 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/svgparser-CFVdj02A.js
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/a11y-improvements-DardMKrZ.js
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /mascot.png
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 5 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 6 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /cookie-consent.js
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/trace-worker-DJdWh8SA.js
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /assets/offset-worker-d0labMay.js
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /mascot-3.png
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /api/csrf-token
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /api/pricing-info
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /api/inventory
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 404 in 5 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 404 in 6 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 404 in 5 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 200 in 44 ms
+ HTTP  5/22/2026 9:26:12 PM ::1 GET /sw.js
+ HTTP  5/22/2026 9:26:12 PM ::1 Returned 404 in 3 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /lib/clipper.js
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 3 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /assets/version-BXU_fLYu.css
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /assets/splotch-theme-BV8SOxFX.css
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /assets/main-CgutWy2x.js
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /assets/version-Cg7atczZ.js
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 3 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 3 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /assets/svgparser-CFVdj02A.js
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /assets/a11y-improvements-DardMKrZ.js
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /mascot.png
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 8 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 11 ms
+ HTTP  5/22/2026 9:27:14 PM ::1 GET /cookie-consent.js
+ HTTP  5/22/2026 9:27:14 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:27:15 PM ::1 GET /assets/trace-worker-DJdWh8SA.js
+ HTTP  5/22/2026 9:27:15 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:27:15 PM ::1 GET /mascot-5.png
+ HTTP  5/22/2026 9:27:15 PM ::1 GET /assets/offset-worker-d0labMay.js
+ HTTP  5/22/2026 9:27:15 PM ::1 GET /api/csrf-token
+ HTTP  5/22/2026 9:27:15 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:27:15 PM ::1 GET /api/pricing-info
+ HTTP  5/22/2026 9:27:15 PM ::1 GET /api/inventory
+ HTTP  5/22/2026 9:27:15 PM ::1 Returned 404 in 7 ms
+ HTTP  5/22/2026 9:27:15 PM ::1 Returned 404 in 4 ms
+ HTTP  5/22/2026 9:27:15 PM ::1 Returned 404 in 3 ms
+ HTTP  5/22/2026 9:27:15 PM ::1 Returned 200 in 27 ms
+ HTTP  5/22/2026 9:27:15 PM ::1 GET /sw.js
+ HTTP  5/22/2026 9:27:15 PM ::1 Returned 404 in 13 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /lib/clipper.js
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/main-CgutWy2x.js
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/version-BXU_fLYu.css
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/splotch-theme-BV8SOxFX.css
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/version-Cg7atczZ.js
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/svgparser-CFVdj02A.js
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/a11y-improvements-DardMKrZ.js
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /mascot.png
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /cookie-consent.js
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/trace-worker-DJdWh8SA.js
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /mascot-1.png
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /assets/offset-worker-d0labMay.js
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 2 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 GET /api/csrf-token
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 404 in 3 ms
+ HTTP  5/22/2026 9:28:54 PM ::1 GET /api/pricing-info
+ HTTP  5/22/2026 9:28:54 PM ::1 GET /api/inventory
+ HTTP  5/22/2026 9:28:54 PM ::1 Returned 404 in 3 ms
+ HTTP  5/22/2026 9:28:54 PM ::1 Returned 404 in 3 ms
+ HTTP  5/22/2026 9:28:53 PM ::1 Returned 200 in 38 ms
+ HTTP  5/22/2026 9:28:54 PM ::1 GET /sw.js
+ HTTP  5/22/2026 9:28:54 PM ::1 Returned 404 in 7 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /lib/clipper.js
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /assets/version-BXU_fLYu.css
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /assets/splotch-theme-BV8SOxFX.css
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /assets/main-CgutWy2x.js
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /assets/modulepreload-polyfill-B5Qt9EMX.js
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /assets/version-Cg7atczZ.js
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 3 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 4 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 3 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 8 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /assets/svgparser-CFVdj02A.js
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /assets/a11y-improvements-DardMKrZ.js
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 11 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /mascot.png
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 3 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 7 ms
+ HTTP  5/22/2026 9:29:25 PM ::1 GET /cookie-consent.js
+ HTTP  5/22/2026 9:29:25 PM ::1 Returned 200 in 1 ms
+ HTTP  5/22/2026 9:29:26 PM ::1 GET /assets/trace-worker-DJdWh8SA.js
+ HTTP  5/22/2026 9:29:26 PM ::1 GET /mascot-7.png
+ HTTP  5/22/2026 9:29:26 PM ::1 GET /assets/offset-worker-d0labMay.js
+ HTTP  5/22/2026 9:29:26 PM ::1 Returned 200 in 8 ms
+ HTTP  5/22/2026 9:29:26 PM ::1 Returned 200 in 8 ms
+ HTTP  5/22/2026 9:29:26 PM ::1 GET /api/csrf-token
+ HTTP  5/22/2026 9:29:26 PM ::1 GET /api/pricing-info
+ HTTP  5/22/2026 9:29:26 PM ::1 GET /api/inventory
+ HTTP  5/22/2026 9:29:26 PM ::1 Returned 404 in 4 ms
+ HTTP  5/22/2026 9:29:26 PM ::1 Returned 404 in 5 ms
+ HTTP  5/22/2026 9:29:26 PM ::1 Returned 404 in 4 ms
+ HTTP  5/22/2026 9:29:26 PM ::1 Returned 200 in 39 ms
+ HTTP  5/22/2026 9:29:26 PM ::1 GET /sw.js
+ HTTP  5/22/2026 9:29:26 PM ::1 Returned 404 in 3 ms
