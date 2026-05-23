@@ -4,7 +4,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "NODE_OPTIONS='--max-old-space-size=4096' node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --forceExit --workerIdleMemoryLimit=512MB",
+    "test": "cross-env NODE_OPTIONS='--max-old-space-size=4096' node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --forceExit --workerIdleMemoryLimit=512MB",
     "start": "node index.js",
     "build": "pnpm install"
   },
@@ -53,6 +53,7 @@
     "xmlrpc": "^1.3.2"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "jest": "^29.7.0",
     "jest-mock-extended": "^3.0.7",
     "supertest": "^7.0.0"
