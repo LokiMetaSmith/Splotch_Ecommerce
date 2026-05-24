@@ -108,7 +108,7 @@ describe('Shipment Tracker', () => {
 
         expect(order.status).toBe('DELIVERED');
         expect(mockDb.write).toHaveBeenCalled();
-        expect(mockDb.shippedOrders).toHaveLength(0); // Should be removed from shipped cache
+        expect(mockDb.shippedOrders).toBeNull(); // Should be removed from shipped cache by invalidation
     });
 
     it('should not update status if tracker says not delivered', async () => {

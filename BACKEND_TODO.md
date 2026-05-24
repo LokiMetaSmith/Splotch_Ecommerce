@@ -1,0 +1,4 @@
+# Backend TODO List
+
+- [x] **Lazy Loading Cache:** `lowdb_adapter.js` has a comment about correctly implementing lazy loading instead of updating caches incrementally. The existing incremental update logic in `updateOrder` and `_updateCaches` is complex and prone to bugs. Refactor `lowdb_adapter.js` to clear caches (`activeOrders`, `shippedOrders`, `userOrderIndex`) on any order mutation and allow `_ensure...Cache` methods to lazily rebuild them.
+- [x] **Clean up Dummy Test Scripts:** Several scripts in `server/` (e.g., `test_start_server.js`, `test_imports.js`, `test_jimp_methods.js`) are just manual test stubs or `console.log` wrappers. These should be removed and converted into actual Jest integration tests if their functionality isn't already covered.
