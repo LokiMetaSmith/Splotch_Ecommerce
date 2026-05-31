@@ -13,10 +13,17 @@ export class LowDbAdapter {
         const isTestEnv = process.env.NODE_ENV === 'test' && process.env.TEST_USE_REAL_DB !== 'true';
         if (!isTestEnv) {
             // Usually we are passed the LowDB instance which might have an adapter that has a filename.
-            // If not, we fallback to process.env.DB_PATH or db.json
-            let dbPath = process.env.DB_PATH || path.join(process.cwd(), 'db.json');
-            if (this.db.adapter && this.db.adapter.filename) {
-                dbPath = this.db.adapter.filename;
+            // If not, we fallback to process.env.DB_PATH or db.json in the server directory
+            let dbPath = process.env.DB_PATH;
+            if (!dbPath) {
+                // If the adapter has a filename, use it
+                if (this.db.adapter && this.db.adapter.filename) {
+                    dbPath = this.db.adapter.filename;
+                } else {
+                    // Fallback to server/db.json relative to this file
+                    // This file is in server/database/lowdb_adapter.js
+                    dbPath = path.resolve(__dirname, '..', 'db.json');
+                }
             }
 
             // Allow override for tests that write to their own DB path

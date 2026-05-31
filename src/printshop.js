@@ -667,22 +667,33 @@ export function displayOrder(order) {
     const orderId = escapeHtml(order.orderId);
     // Truncate BEFORE escaping would be safer for logic, but since orderId is UUID (safe chars),
     // and escapeHtml changes '&' to '&amp;', we should truncate the raw ID if we want exactly 8 chars.
-    // However, orderId is usually safe. Let's do it right:
     const orderIdShort = escapeHtml(order.orderId.substring(0, 8));
 
     // Status badges styling class
-    const statusClass = `status-${status.toLowerCase()}`;
+    const statusColors = {
+        'NEW': 'bg-blue-600 text-white',
+        'ACCEPTED': 'bg-amber-700 text-white',
+        'PRINTING': 'bg-violet-600 text-white',
+        'SHIPPED': 'bg-emerald-700 text-white',
+        'DELIVERED': 'bg-indigo-600 text-white',
+        'COMPLETED': 'bg-green-700 text-white',
+        'CANCELED': 'bg-red-600 text-white'
+    };
+    const statusClass = statusColors[status.toUpperCase()] || 'bg-gray-500 text-white';
 
     const designImagePath = `${serverUrl}${escapeHtml(order.designImagePath)}`;
     const cutFilePath = escapeHtml(order.cutLinePath || '');
 
-    // Action buttons
+    const stickerName = escapeHtml(order.orderDetails?.stickerName || 'Custom Sticker');
+    const material = escapeHtml(order.orderDetails?.material || 'unknown');
+
+    // Action Dropdown
     const statuses = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELED'];
-    const buttonsHtml = statuses.map(s => `
-        <button class="action-btn" data-order-id="${orderId}" data-status="${s}">
-            ${s.charAt(0) + s.slice(1).toLowerCase()}
-        </button>
-    `).join('');
+    const dropdownHtml = `
+        <select class="action-dropdown border rounded p-1 text-sm font-bold ${statusClass} mt-4" data-order-id="${orderId}">
+            ${statuses.map(s => `<option value="${s}" ${status === s ? 'selected' : ''}>${s.charAt(0) + s.slice(1).toLowerCase()}</option>`).join('')}
+        </select>
+    `;
 
     // Tracking section
     const trackingDisplay = order.status === 'SHIPPED' ? 'block' : 'none';
@@ -691,11 +702,14 @@ export function displayOrder(order) {
     ).join('');
 
     const html = `
-    <div class="order-card" id="order-card-${orderId}">
+    <div class="order-card border-l-4 ${statusClass.split(' ')[0].replace('bg-', 'border-')}" id="order-card-${orderId}">
         <div class="flex justify-between items-start">
-            <div>
-                <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${orderIdShort}...</span></h3>
-                <p class="text-sm text-gray-600">Received: ${escapeHtml(receivedDate)}</p>
+            <div class="flex items-start">
+                <input type="checkbox" class="order-select-checkbox mt-1 mr-3 w-5 h-5 cursor-pointer rounded text-blue-600 focus:ring-blue-500 shadow-sm" data-order-id="${orderId}" checked>
+                <div>
+                    <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${orderIdShort}...</span></h3>
+                    <p class="text-sm text-gray-600">Received: ${escapeHtml(receivedDate)}</p>
+                </div>
             </div>
             <div class="${statusClass} font-bold py-1 px-3 rounded-full text-sm" id="status-badge-${orderId}">${status}</div>
         </div>
@@ -710,6 +724,10 @@ export function displayOrder(order) {
                 <dt>Shipping Email:</dt><dd>${shippingEmail}</dd>
             </div>
             <div>
+                <dt>Sticker Name:</dt><dd>${stickerName}</dd>
+                <dt>Material:</dt><dd>${material}</dd>
+            </div>
+            <div>
                 <dt>Quantity:</dt><dd>${quantity}</dd>
                 <dt>Amount:</dt><dd>${escapeHtml(formattedAmount)}</dd>
             </div>
@@ -720,10 +738,11 @@ export function displayOrder(order) {
             <a class="sticker-peel-container" href="${designImagePath}" target="_blank">
                 <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" loading="lazy" decoding="async">
             </a>
+            ${cutFilePath ? `<div class="mt-2"><dt>Cut File:</dt><dd><a href="${serverUrl}${cutFilePath}" class="text-blue-500 underline text-sm" target="_blank" download>Download SVG / XML</a></dd></div>` : ''}
         </div>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-            ${buttonsHtml}
+        <div class="mt-2 flex flex-wrap gap-2">
+            ${dropdownHtml}
         </div>
 
         <div class="mt-4" id="tracking-info-${orderId}" style="display: ${trackingDisplay};">
@@ -757,22 +776,6 @@ export function displayOrder(order) {
  * @param {Event} e - The click event.
  */
 function handleOrderListClick(e) {
-    const actionBtn = e.target.closest('.action-btn');
-    if (actionBtn) {
-        const orderId = actionBtn.dataset.orderId;
-        const status = actionBtn.dataset.status;
-
-        if (status === 'CANCELED') {
-            const confirmed = window.confirm('Are you sure you want to cancel this order? This action cannot be undone.');
-            if (!confirmed) {
-                return;
-            }
-        }
-
-        updateOrderStatus(orderId, status, actionBtn);
-        return;
-    }
-
     const trackingBtn = e.target.closest('.add-tracking-btn');
     if (trackingBtn) {
         const orderId = trackingBtn.dataset.orderId;
@@ -785,6 +788,25 @@ function handleOrderListClick(e) {
         const orderId = timeLogBtn.dataset.orderId;
         handleTimeLog(orderId, timeLogBtn);
         return;
+    }
+}
+
+function handleOrderListChange(e) {
+    const actionDropdown = e.target.closest('.action-dropdown');
+    if (actionDropdown) {
+        const orderId = actionDropdown.dataset.orderId;
+        const status = actionDropdown.value;
+
+        if (status === 'CANCELED') {
+            const confirmed = window.confirm('Are you sure you want to cancel this order? This action cannot be undone.');
+            if (!confirmed) {
+                // Revert selection visually by re-rendering
+                filterAndDisplayOrders(document.querySelector('#filter-container .filter-btn.active')?.dataset.status || 'ALL');
+                return;
+            }
+        }
+
+        updateOrderStatus(orderId, status, actionDropdown);
     }
 }
 
@@ -871,9 +893,15 @@ async function handleNesting(e) {
     setButtonLoading(btn, true, 'Nesting...');
     ui.nestedSvgContainer.innerHTML = '<p>Nesting in progress...</p>';
 
-    const svgElements = Array.from(ui.ordersList.querySelectorAll('.sticker-design'));
+    // Grab all checked order cards and then find their sticker-design elements
+    const checkedCheckboxes = Array.from(ui.ordersList.querySelectorAll('.order-select-checkbox:checked'));
+    const svgElements = checkedCheckboxes.map(cb => {
+        const orderCard = cb.closest('.order-card');
+        return orderCard.querySelector('.sticker-design');
+    }).filter(img => img !== null);
+
     if (svgElements.length === 0) {
-        ui.nestedSvgContainer.innerHTML = '<p>No designs to nest.</p>';
+        ui.nestedSvgContainer.innerHTML = '<p class="text-red-500 font-bold">Please select at least one order to nest.</p>';
         hideLoadingIndicator();
         return;
     }
@@ -1234,6 +1262,7 @@ export async function init() {
 
     // Attach event listeners immediately so UI is responsive
     ui.ordersList?.addEventListener('click', handleOrderListClick);
+    ui.ordersList?.addEventListener('change', handleOrderListChange);
     ui.refreshOrdersBtn?.addEventListener('click', () => fetchAndDisplayOrders());
     ui.registerBtn?.addEventListener('click', handleRegistration);
     ui.closeErrorToast?.addEventListener('click', hideErrorToast);
@@ -1245,6 +1274,20 @@ export async function init() {
     ui.searchInput?.addEventListener('keyup', (e) => {
         if (e.key === 'Enter') handleSearch();
     });
+
+    // Select/Deselect All buttons
+    const selectAllBtn = document.getElementById('selectAllOrdersBtn');
+    const deselectAllBtn = document.getElementById('deselectAllOrdersBtn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', () => {
+            document.querySelectorAll('.order-select-checkbox').forEach(cb => cb.checked = true);
+        });
+    }
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', () => {
+            document.querySelectorAll('.order-select-checkbox').forEach(cb => cb.checked = false);
+        });
+    }
 
     // Login Modal Listeners
     ui.closeModalBtn?.addEventListener('click', hideLoginModal);

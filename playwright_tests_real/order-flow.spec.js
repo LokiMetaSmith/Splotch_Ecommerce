@@ -29,8 +29,15 @@ test.describe('Real Backend Order Flow', () => {
 
     test('should upload image, verify price, and create order', async ({ page }) => {
         test.setTimeout(60000);
+        
+        page.on('console', msg => console.log('BROWSER CONSOLE:', msg.type(), msg.text()));
+        page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
+
         // 1. Navigate to home
         await page.goto('/');
+
+        // Wait for BootStrap to complete async initialization
+        await page.waitForFunction(() => window.__appInitialized === true);
 
         // 2. Upload image
         // Wait for input to be ready? It's usually ready.
@@ -38,6 +45,8 @@ test.describe('Real Backend Order Flow', () => {
         await fileInput.setInputFiles('public/mascot.png');
 
         // 3. Wait for upload/processing
+        await page.waitForTimeout(3000);
+        
         // Wait for price to be visible and not $0.00
         const priceDisplay = page.locator('#calculatedPriceDisplay');
         await expect(priceDisplay).toBeVisible({ timeout: 10000 });

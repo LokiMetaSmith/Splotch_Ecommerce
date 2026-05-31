@@ -249,7 +249,9 @@ async function BootStrap() {
   lazyLassoValueDisplay = document.getElementById("lazyLassoValue");
 
   // Fetch CSRF token and pricing info
-  await Promise.all([fetchCsrfToken(), fetchPricingInfo(), fetchInventory()]);
+  // Fetch CSRF token first to establish the session cookie, avoiding race conditions with other requests
+  await fetchCsrfToken();
+  await Promise.all([fetchPricingInfo(), fetchInventory()]);
 
   // Initialize Square Payments SDK
   console.log(
@@ -903,6 +905,9 @@ async function BootStrap() {
     updateEditingButtonsState(!originalImage);
   }
   if (designMarginNote) designMarginNote.style.display = "none";
+  
+  // Signal for E2E tests that initialization is fully complete
+  window.__appInitialized = true;
 }
 
 // --- Main execution ---
@@ -1151,7 +1156,11 @@ function checkInventoryStatus(materialId) {
 async function fetchCsrfToken() {
   try {
     const response = await fetch(`${serverUrl}/api/csrf-token`, {
-      credentials: "include", // Important for cookies
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      credentials: "same-origin", // MUST save the session cookie for the token to be valid!
     });
     if (!response.ok) {
       throw new Error(`Server responded with ${response.status}`);
@@ -1347,12 +1356,16 @@ async function handlePaymentFormSubmit(event) {
       sourceId,
     );
 
+    const fileInput = document.getElementById("fileInput");
+    const stickerName = fileInput && fileInput.files && fileInput.files.length > 0 ? fileInput.files[0].name : "Custom Sticker";
+
     // 4. Create JSON payload for the order
     const orderDetails = {
       quantity: stickerQuantityInput
         ? parseInt(stickerQuantityInput.value, 10)
         : 0,
       material: stickerMaterialSelect ? stickerMaterialSelect.value : "unknown",
+      stickerName: stickerName,
     };
     if (cutLinePath) {
       orderDetails.cutLinePath = cutLinePath;
@@ -1396,6 +1409,8 @@ async function handlePaymentFormSubmit(event) {
     const responseData = await response.json();
 
     if (!response.ok) {
+      console.error("[CLIENT] Server returned an error:", responseData);
+      
       // Check if the error is a CSRF token error, and if so, fetch a new one
       if (responseData.error && responseData.error.includes("csrf")) {
         showPaymentStatus(
@@ -1405,8 +1420,14 @@ async function handlePaymentFormSubmit(event) {
         console.warn("[CLIENT] CSRF token was invalid. Fetching a new one.");
         await fetchCsrfToken(); // Fetch a new token for the next attempt
       }
+
+      let errorMsg = responseData.error;
+      if (!errorMsg && responseData.errors && Array.isArray(responseData.errors)) {
+          errorMsg = responseData.errors.map(err => err.msg).join(', ');
+      }
+
       throw new Error(
-        responseData.error || "Failed to create order on server.",
+        errorMsg || "Failed to create order on server.",
       );
     }
 
@@ -3164,15 +3185,17 @@ function handleGenerateCutline(skipPrompt = false) {
       if (e.data.success) {
         let contours = e.data.contours;
 
-        // Filter contours to remove noise (e.g. area < 100 pixels)
+        // Filter contours to remove noise (e.g. area < 400 pixels)
         // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
+        // INCREASED threshold to 0.1% to aggressively filter alpha noise spots before they are magnified by offset.
         const imageArea = canvas.width * canvas.height;
-        const minIslandArea = Math.max(100, imageArea * 0.0001); // At least 100px, or 0.01% of image
+        const minIslandArea = Math.max(400, imageArea * 0.001); 
         // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
         // This changes O(N*M) check to O(N*m) where m << M.
+        // INCREASED epsilon to 1.5 to smooth out fractal/jagged edges on soft alpha gradients.
         let significantContours = contours
           .filter((c) => getPolygonArea(c) > minIslandArea)
-          .map((c) => simplifyPolygon(c, 0.5)); // Epsilon of 0.5 pixels
+          .map((c) => simplifyPolygon(c, 1.5)); 
 
         // Suppress "island cuts" (internal holes) that are larger than 2mm.
         // Constraint: "we can have internal cuts, but they should be less than 2mm"
@@ -3221,9 +3244,9 @@ function handleGenerateCutline(skipPrompt = false) {
 
         significantContours.forEach((contour) => {
           // Bolt Optimization: Apply smoothing to round sharp corners ("surface energy minimization")
-          // 2 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
+          // 3 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
           // Note: contour is already simplified.
-          const smoothedContour = smoothPolygon(contour, 2);
+          const smoothedContour = smoothPolygon(contour, 3);
 
           // Clean the polygon to remove self-intersections and other issues before offsetting.
           // This requires scaling up for Clipper's integer math.

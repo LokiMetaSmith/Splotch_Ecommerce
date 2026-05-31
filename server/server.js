@@ -1801,8 +1801,16 @@ async function startServer(
       }
       const { token } = req.body;
 
-      const { publicKey } = getCurrentSigningKey();
-      jwt.verify(token, publicKey, { algorithms: ['RS256'] }, async (err, decoded) => {
+      const decodedHeader = jwt.decode(token, { complete: true });
+      if (!decodedHeader || !decodedHeader.header || !decodedHeader.header.kid) {
+          return res.status(401).json({ error: 'Invalid token structure' });
+      }
+      const key = getKey(decodedHeader.header.kid);
+      if (!key) {
+          return res.status(401).json({ error: 'Key not found' });
+      }
+
+      jwt.verify(token, key.publicKey, { algorithms: ['RS256'] }, async (err, decoded) => {
         if (err) {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }

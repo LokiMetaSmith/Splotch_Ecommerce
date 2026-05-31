@@ -9,6 +9,7 @@ db.json
 *.bak
 dist/
 server/error.log
+.deepsec/
 
 # Playwright
 test-results/

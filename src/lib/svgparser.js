@@ -177,17 +177,19 @@ export class SVGParser {
         let startX = 0, startY = 0; // start of current subpath
 
         let command = '';
-        while(tokens.length > 0) {
-            let token = tokens.shift();
+        let i = 0;
+
+        while(i < tokens.length) {
+            let token = tokens[i++];
             const isCommand = token.match(COMMAND);
             if (isCommand) {
                 command = token;
             } else {
-                tokens.unshift(token); // put it back
+                i--; // put it back
             }
 
             // Helper to get the next number from tokens
-            const next = () => parseFloat(tokens.shift());
+            const next = () => parseFloat(tokens[i++]);
 
             // Handle parsing errors or missing tokens
             const safeNext = () => {
