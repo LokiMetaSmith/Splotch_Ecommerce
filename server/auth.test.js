@@ -236,7 +236,7 @@ describe('Auth Endpoints', () => {
             .send({ token: 'invalid-token' });
 
         expect(res.statusCode).toEqual(401);
-        expect(res.body.error).toEqual('Invalid or expired token');
+        expect(res.body.error).toEqual('Invalid token structure');
     });
 
     it('should create a user when verifying a valid token for a new email', async () => {
