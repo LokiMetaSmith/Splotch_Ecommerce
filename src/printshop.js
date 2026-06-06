@@ -638,6 +638,18 @@ function filterAndDisplayOrders(status) {
         // Update innerHTML and restore the message element (hidden)
         ui.ordersList.innerHTML = html;
         ui.ordersList.appendChild(ui.noOrdersMessage);
+
+        // Render QR codes for all displayed orders
+        if (window.QRCode) {
+            ordersToDisplay.forEach(order => {
+                const canvas = document.getElementById(`qr-${order.orderId}`);
+                if (canvas) {
+                    QRCode.toCanvas(canvas, order.orderId, { width: 100, margin: 1 }, function (error) {
+                        if (error) console.error('Error rendering QR Code:', error);
+                    });
+                }
+            });
+        }
     }
 }
 
@@ -759,6 +771,16 @@ export function displayOrder(order) {
                 <input type="text" class="border rounded p-1 text-sm flex-grow time-log-desc" data-order-id="${orderId}" placeholder="Task Description">
                 <input type="number" class="border rounded p-1 text-sm w-20 time-log-duration" data-order-id="${orderId}" placeholder="Mins">
                 <button class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm log-time-btn" data-order-id="${orderId}">Log</button>
+            </div>
+        </div>
+
+        <div class="mt-4 border-t pt-2 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+                <strong>QR Tracking Code</strong>
+            </div>
+            <div class="qr-code-container bg-white p-1 rounded border shadow-sm" data-order-id="${orderId}">
+                <!-- QR Code will be injected here after render -->
+                <canvas id="qr-${orderId}" width="100" height="100"></canvas>
             </div>
         </div>
     </div>
@@ -885,7 +907,66 @@ async function handleSearch() {
         fetchAndDisplayOrders(); // Fetch all orders if search is cleared
         return;
     }
-    fetchAndDisplayOrders(query);
+    await fetchAndDisplayOrders(query);
+
+    // If Scan Mode is active and we found an order, automatically update it
+    if (document.getElementById('scan-mode-banner') && !document.getElementById('scan-mode-banner').classList.contains('hidden')) {
+        const matchingOrders = allOrders.filter(o => o.orderId.includes(query) || o.orderId === query);
+        if (matchingOrders.length === 1) {
+            const targetStatus = document.getElementById('scanTargetStatus').value;
+            const orderId = matchingOrders[0].orderId;
+            try {
+                const response = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
+                    method: 'POST',
+                    body: JSON.stringify({ status: targetStatus }),
+                });
+
+                const orderIndex = allOrders.findIndex(o => o.orderId === orderId);
+                if (orderIndex !== -1) {
+                    allOrders[orderIndex].status = targetStatus;
+                }
+                showSuccessToast(`Scan Mode: Updated ${orderId.substring(0, 8)} to ${targetStatus}`);
+
+                // Refresh display
+                const activeFilter = document.querySelector('#filter-container .filter-btn.active')?.dataset.status || 'ALL';
+                filterAndDisplayOrders(activeFilter);
+
+                // Clear input for next scan
+                ui.searchInput.value = '';
+                ui.searchInput.focus();
+
+            } catch (error) {
+                showErrorToast(`Scan Mode Update Failed: ${error.message}`);
+            }
+        } else if (matchingOrders.length > 1) {
+            showErrorToast('Scan Mode: Multiple orders match. Please refine search.');
+        } else {
+             showErrorToast('Scan Mode: No order found.');
+        }
+    }
+}
+
+let scanBuffer = '';
+let scanTimeout;
+
+function handleBarcodeScan(e) {
+    if (document.getElementById('scan-mode-banner') && !document.getElementById('scan-mode-banner').classList.contains('hidden')) {
+        // Only intercept if we are NOT already typing in an input box
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            if (e.key === 'Enter') {
+                if (scanBuffer.length > 0) {
+                    ui.searchInput.value = scanBuffer;
+                    handleSearch();
+                    scanBuffer = '';
+                }
+            } else if (e.key.length === 1) { // Normal character
+                scanBuffer += e.key;
+                clearTimeout(scanTimeout);
+                // Clear buffer if pause is more than 500ms (not a scanner)
+                scanTimeout = setTimeout(() => { scanBuffer = ''; }, 500);
+            }
+        }
+    }
 }
 
 async function handleNesting(e) {
@@ -990,8 +1071,54 @@ async function handleNesting(e) {
 
         const resultSvg = nest.start();
 
-        // 4. Display result
-        const sanitizedSvg = DOMPurify.sanitize(resultSvg, { USE_PROFILES: { svg: true } });
+        // Generate a combined Tracking Batch ID
+        const batchIds = checkedCheckboxes.map(cb => cb.dataset.orderId.substring(0, 8)).join('-');
+        const trackingCode = `BATCH-${batchIds.substring(0, 30)}`; // limit length
+
+        // 4. Inject QR Code into SVG
+        let finalSvg = resultSvg;
+        if (window.QRCode) {
+            try {
+                // Generate QR as data URI
+                const qrCanvas = document.createElement('canvas');
+                await QRCode.toCanvas(qrCanvas, trackingCode, { width: 100, margin: 1 });
+                const qrDataUri = qrCanvas.toDataURL('image/png');
+
+                // Parse the nested SVG string back to DOM to inject the QR
+                const parser = new DOMParser();
+                const svgDoc = parser.parseFromString(finalSvg, 'image/svg+xml');
+                const rootSvg = svgDoc.documentElement;
+
+                // Create an image element for the QR code
+                const qrImg = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'image');
+                qrImg.setAttribute('href', qrDataUri);
+                // Place it in the bottom left corner (assuming binWidth/Height are logical dimensions)
+                qrImg.setAttribute('x', '10');
+                qrImg.setAttribute('y', String((binHeight) - 110)); // 110px from bottom
+                qrImg.setAttribute('width', '100');
+                qrImg.setAttribute('height', '100');
+
+                // Add text label
+                const textNode = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'text');
+                textNode.setAttribute('x', '10');
+                textNode.setAttribute('y', String((binHeight) - 115));
+                textNode.setAttribute('font-family', 'sans-serif');
+                textNode.setAttribute('font-size', '12');
+                textNode.setAttribute('fill', 'black');
+                textNode.textContent = trackingCode;
+
+                rootSvg.appendChild(qrImg);
+                rootSvg.appendChild(textNode);
+
+                // Serialize back to string
+                finalSvg = new XMLSerializer().serializeToString(svgDoc);
+            } catch (qrErr) {
+                console.error("Failed to inject QR code into SVG", qrErr);
+            }
+        }
+
+        // 5. Display result
+        const sanitizedSvg = DOMPurify.sanitize(finalSvg, { USE_PROFILES: { svg: true } });
         ui.nestedSvgContainer.innerHTML = sanitizedSvg;
         window.nestedSvg = sanitizedSvg;
         showSuccessToast('Nesting complete.');
@@ -1274,6 +1401,26 @@ export async function init() {
     ui.searchInput?.addEventListener('keyup', (e) => {
         if (e.key === 'Enter') handleSearch();
     });
+
+    const scanModeBtn = document.getElementById('scanModeBtn');
+    const scanModeBanner = document.getElementById('scan-mode-banner');
+    const closeScanModeBtn = document.getElementById('closeScanModeBtn');
+
+    if (scanModeBtn) {
+        scanModeBtn.addEventListener('click', () => {
+            scanModeBanner.classList.remove('hidden');
+            ui.searchInput.focus();
+        });
+    }
+
+    if (closeScanModeBtn) {
+        closeScanModeBtn.addEventListener('click', () => {
+            scanModeBanner.classList.add('hidden');
+        });
+    }
+
+    // Global listener for barcode scanner
+    document.addEventListener('keydown', handleBarcodeScan);
 
     // Select/Deselect All buttons
     const selectAllBtn = document.getElementById('selectAllOrdersBtn');

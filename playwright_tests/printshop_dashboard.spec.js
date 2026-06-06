@@ -119,8 +119,8 @@ test.describe('Printshop Dashboard E2E', () => {
     await expect(order11111).toContainText('ORDER-11');
 
     // Update status to PRINTING (Fulfilling order)
-    const printButton = order11111.locator('button.action-btn[data-status="PRINTING"]');
-    await printButton.click();
+    const printDropdown = order11111.locator('select.action-dropdown');
+    await printDropdown.selectOption('PRINTING');
 
     // Wait for success toast
     const successToast = page.locator('#success-toast');
