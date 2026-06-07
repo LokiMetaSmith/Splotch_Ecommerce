@@ -26,7 +26,7 @@ test.describe('Data Compliance Flow', () => {
         await expect(page.locator('#login-status')).toContainText('Magic link sent');
 
         // Fetch the token from the server's test endpoint
-        const tokenResponse = await request.get(`http://localhost:3000/api/test/last-magic-link?email=${encodeURIComponent(email)}`);
+        const tokenResponse = await request.get(`http://127.0.0.1:3000/api/test/last-magic-link?email=${encodeURIComponent(email)}`);
         expect(tokenResponse.ok()).toBeTruthy();
         const { token } = await tokenResponse.json();
         console.log('Retrieved magic link token:', token);
@@ -74,7 +74,7 @@ test.describe('Data Compliance Flow', () => {
 
         // 6. Verify User Deletion via API
         // We use the same token (which is still valid signature-wise) to try to fetch data
-        const dataResponse = await request.get('http://localhost:3000/api/auth/user/data', {
+        const dataResponse = await request.get('http://127.0.0.1:3000/api/auth/user/data', {
             headers: {
                 Authorization: `Bearer ${token}` // Re-use the token we got earlier
             }

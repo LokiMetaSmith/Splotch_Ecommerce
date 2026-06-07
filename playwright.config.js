@@ -14,7 +14,7 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
   }, */
   use: {
-    baseURL: 'https://localhost:5173', // Match the webServer port
+    baseURL: 'https://127.0.0.1:5173', // Match the webServer port
     headless: true,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

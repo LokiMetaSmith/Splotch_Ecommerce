@@ -40,6 +40,9 @@ async function main() {
     // db, bot, sendEmail, dbPath, injectedSquareClient
     const { app } = await startServer(db, null, undefined, dbPath, mockSquareClient);
 
+    // Make sure NODE_ENV is set to test when starting the test server.
+    process.env.NODE_ENV = 'test';
+
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
         console.log(`[TEST-SERVER] Listening on ${port}`);

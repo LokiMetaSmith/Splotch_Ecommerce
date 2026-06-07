@@ -459,7 +459,7 @@ async function startServer(
 
     const authLimiter = rateLimit({
       windowMs: 60 * 60 * 1000, // 1 hour
-      max: (process.env.ENABLE_RATE_LIMIT_TEST) ? 5000 :
+      max: (process.env.ENABLE_RATE_LIMIT_TEST === 'true') ? 10 :
            (process.env.NODE_ENV === 'test') ? 1000 :
            (process.env.NODE_ENV === 'production' ? 10 : 100),
       message: 'Too many login attempts from this IP, please try again after 15 minutes',
@@ -474,7 +474,7 @@ async function startServer(
     // SECURITY: Stricter rate limiter for endpoints that trigger emails or temporary tokens
     const emailTriggerLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: (process.env.ENABLE_RATE_LIMIT_TEST) ? 3 :
+      max: (process.env.ENABLE_RATE_LIMIT_TEST === 'true') ? 3 :
            (process.env.NODE_ENV === 'test' || process.env.NODE_ENV !== 'production') ? 1000 : 3, // Very strict in production to prevent email spam
       message: 'Too many requests from this IP, please try again after 15 minutes',
       standardHeaders: true,
