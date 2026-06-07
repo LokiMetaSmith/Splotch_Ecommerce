@@ -3,9 +3,9 @@ export function generateCutFile(svgString) {
     const doc = parser.parseFromString(svgString, 'image/svg+xml');
     const svgElement = doc.documentElement;
     const cutFileSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    cutFileSvg.setAttribute('width', svgElement.getAttribute('width'));
-    cutFileSvg.setAttribute('height', svgElement.getAttribute('height'));
-    cutFileSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox'));
+    if (svgElement.hasAttribute('width')) cutFileSvg.setAttribute('width', svgElement.getAttribute('width'));
+    if (svgElement.hasAttribute('height')) cutFileSvg.setAttribute('height', svgElement.getAttribute('height'));
+    if (svgElement.hasAttribute('viewBox')) cutFileSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox'));
 
     // Support multiple shapes
     svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline').forEach(el => {

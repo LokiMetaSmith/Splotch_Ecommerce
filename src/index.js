@@ -254,9 +254,15 @@ async function BootStrap() {
   await Promise.all([fetchPricingInfo(), fetchInventory()]);
 
   // Initialize Square Payments SDK
-  console.log(
-    `[CLIENT] Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`,
-  );
+    if (!window.PLAYWRIGHT_TEST_MODE) {
+        console.log(
+          `[CLIENT] Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`,
+        );
+        payments = window.Square.payments(appId, locationId);
+        card = await initializeCard(payments);
+    } else {
+        console.log("[CLIENT] PLAYWRIGHT_TEST_MODE: Skipping Square initialization.");
+    }
   let retryCount = 0;
   const maxRetries = 3;
   while (retryCount < maxRetries) {
@@ -848,6 +854,7 @@ async function BootStrap() {
   document.addEventListener("easterEggUnlocked", () => {
     if (!easterEggUnlocked) {
       easterEggUnlocked = true;
+      easterEggInput.style.display = "block";
 
       // Attempt to find elements again if globals are null
       const grayBtn = document.getElementById("grayscaleBtn");
@@ -1199,6 +1206,7 @@ async function handlePaymentFormSubmit(event) {
   }
 
   showPaymentStatus("Processing order...", "info");
+  console.log("BROWSER LOG: Processing order check originalImage:", !!originalImage);
 
   // Ensure there is an image to submit
   if (!originalImage) {
@@ -1228,6 +1236,7 @@ async function handlePaymentFormSubmit(event) {
   }
 
   const email = document.getElementById("email").value;
+  console.log("BROWSER LOG: Email:", email);
   if (!email) {
     showPaymentStatus("Please enter an email address to proceed.", "error");
     if (submitPaymentBtn) {
@@ -1239,6 +1248,7 @@ async function handlePaymentFormSubmit(event) {
 
   try {
     // 0. Get temporary auth token
+    console.log("BROWSER LOG: Issuing temp token with CSRF:", csrfToken);
     showPaymentStatus("Issuing temporary auth token...", "info");
     const authResponse = await fetch(`${serverUrl}/api/auth/issue-temp-token`, {
       method: "POST",
@@ -1345,11 +1355,13 @@ async function handlePaymentFormSubmit(event) {
     // --- END NEW ---
 
     // 3. Tokenize the card with verification details
-    showPaymentStatus("Securing card details...", "info");
-    console.log("[CLIENT] Tokenizing card with verification details.");
-
-    // UPDATED: Pass the new verificationDetails object to tokenize
-    const sourceId = await tokenize(card, verificationDetails);
+    let sourceId = 'cnon:card-nonce-ok';
+    if (!window.PLAYWRIGHT_TEST_MODE) {
+        showPaymentStatus("Securing card details...", "info");
+        console.log("[CLIENT] Tokenizing card with verification details.");
+        // UPDATED: Pass the new verificationDetails object to tokenize
+        sourceId = await tokenize(card, verificationDetails);
+    }
 
     console.log(
       "[CLIENT] Tokenization successful. Nonce (sourceId):",

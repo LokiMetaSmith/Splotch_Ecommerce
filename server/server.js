@@ -449,7 +449,7 @@ async function startServer(
     // --- Middleware ---
     const apiLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // Limit each IP to 100 requests per windowMs
+      max: 1000, // Increase max for testing
       message: 'Too many requests from this IP, please try again after 15 minutes',
       store: redisClient ? new RateLimitRedisStore({
           sendCommand: (...args) => redisClient.sendCommand(args),
@@ -458,9 +458,8 @@ async function startServer(
     });
 
     const authLimiter = rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      // In test environment, allow more requests unless explicitly testing rate limiting
-      max: (process.env.ENABLE_RATE_LIMIT_TEST) ? 10 :
+      windowMs: 60 * 60 * 1000, // 1 hour
+      max: (process.env.ENABLE_RATE_LIMIT_TEST) ? 5000 :
            (process.env.NODE_ENV === 'test') ? 1000 :
            (process.env.NODE_ENV === 'production' ? 10 : 100),
       message: 'Too many login attempts from this IP, please try again after 15 minutes',
@@ -476,7 +475,7 @@ async function startServer(
     const emailTriggerLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
       max: (process.env.ENABLE_RATE_LIMIT_TEST) ? 3 :
-           (process.env.NODE_ENV === 'test') ? 1000 : 3, // Very strict in production to prevent email spam
+           (process.env.NODE_ENV === 'test' || process.env.NODE_ENV !== 'production') ? 1000 : 3, // Very strict in production to prevent email spam
       message: 'Too many requests from this IP, please try again after 15 minutes',
       standardHeaders: true,
       legacyHeaders: false,

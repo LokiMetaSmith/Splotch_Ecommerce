@@ -694,7 +694,7 @@ export function displayOrder(order) {
     const statusClass = statusColors[status.toUpperCase()] || 'bg-gray-500 text-white';
 
     const designImagePath = `${serverUrl}${escapeHtml(order.designImagePath)}`;
-    const cutFilePath = escapeHtml(order.cutLinePath || '');
+    const cutFilePath = escapeHtml(order.orderDetails?.cutLinePath || order.cutLinePath || '');
 
     const stickerName = escapeHtml(order.orderDetails?.stickerName || 'Custom Sticker');
     const material = escapeHtml(order.orderDetails?.material || 'unknown');
@@ -1035,6 +1035,7 @@ async function handleNesting(e) {
         // 2. Fetch and prepare the sticker SVGs
         const svgPromises = svgElements.map(async (img) => {
             const cutFilePath = img.dataset.cutFilePath;
+            console.log("BROWSER LOG: Processing img.src=", img.src, "cutFilePath=", cutFilePath);
             const cacheKey = cutFilePath || img.src;
 
             if (svgCache.has(cacheKey)) {
@@ -1157,8 +1158,19 @@ async function handleExportPdf() {
 
     try {
         const svgElement = new DOMParser().parseFromString(window.nestedSvg, "image/svg+xml").documentElement;
-        const width = parseFloat(svgElement.getAttribute('width'));
-        const height = parseFloat(svgElement.getAttribute('height'));
+        let width = parseFloat(svgElement.getAttribute('width'));
+        let height = parseFloat(svgElement.getAttribute('height'));
+
+        if (isNaN(width) || isNaN(height)) {
+            const viewBox = svgElement.getAttribute('viewBox');
+            if (viewBox) {
+                const parts = viewBox.split(/[\s,]+/);
+                if (parts.length === 4) {
+                    width = parseFloat(parts[2]);
+                    height = parseFloat(parts[3]);
+                }
+            }
+        }
 
         if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
             showErrorToast('Invalid SVG dimensions for PDF export.');
@@ -1529,6 +1541,8 @@ export async function init() {
             fetchAndDisplayMetrics();
         }
     }, 15000);
+
+    window.__printshopInitialized = true;
 }
 
 document.addEventListener('DOMContentLoaded', init);
