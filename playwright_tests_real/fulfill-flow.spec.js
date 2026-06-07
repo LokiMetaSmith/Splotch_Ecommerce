@@ -85,7 +85,7 @@ test.describe('Order and Fulfillment Flow', () => {
         await expect(page.locator('#login-status')).toContainText('Magic link sent!', { timeout: 10000 });
 
         // Fetch token from test endpoint
-        const response = await page.request.get(`/api/test/last-magic-link?email=${encodeURIComponent('admin@example.com')}`);
+        const response = await page.request.get(`http://127.0.0.1:3000/api/test/last-magic-link?email=${encodeURIComponent('admin@example.com')}`);
         expect(response.ok()).toBeTruthy();
         const { token } = await response.json();
 

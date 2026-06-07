@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/postcss';
 import autoprefixer from 'autoprefixer';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import fs from 'fs';
+import dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
 
 const packageJson = JSON.parse(fs.readFileSync('./package.json'));
 process.env.VITE_APP_VERSION = packageJson.version;
