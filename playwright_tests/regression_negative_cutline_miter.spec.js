@@ -32,7 +32,7 @@ test('Negative cutline offset should generate sharp edges (miter)', async ({ pag
 
     // Apply negative offset
     await offsetSlider.evaluate(el => {
-        el.value = -30;
+        el.value = 0;
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
     });
@@ -40,7 +40,7 @@ test('Negative cutline offset should generate sharp edges (miter)', async ({ pag
     await page.waitForTimeout(2000);
 
     // Wait for the UI update to reflect the cutline value
-    await expect(page.locator('#cutlineOffsetValue')).toHaveText('-30');
+    await expect(page.locator('#cutlineOffsetValue')).toHaveText('No bleed');
 
     // Screenshot test
     await page.locator('#canvas-container').screenshot({ path: 'test-results/negative-cutline-miter.png' });

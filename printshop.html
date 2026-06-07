@@ -119,6 +119,8 @@
     <script src="https://cdn.jsdelivr.net/npm/svgnest@1.0.3/dist/svgnest.js"></script>
     <script src="/lib/clipper.js"></script>
     <script src="/lib/parallel.js"></script>
+    <!-- Lightweight QR Code generator -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script type="module" src="/src/printshop.js"></script>
   </head>
   <body class="bg-slate-200 text-slate-800">
@@ -153,6 +155,13 @@
               aria-label="Search Orders"
             >
               Search
+            </button>
+            <button
+              id="scanModeBtn"
+              class="ml-2 px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+              aria-label="Toggle Scan to Update Mode"
+            >
+              Scan Mode
             </button>
             <button
               id="refreshOrdersBtn"
@@ -213,6 +222,28 @@
     </div>
 
     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+      <!-- Scan to Update Banner -->
+      <div id="scan-mode-banner" class="hidden bg-purple-100 border-l-4 border-purple-500 text-purple-700 p-4 mb-6 rounded shadow-md flex items-center justify-between">
+        <div>
+            <h3 class="font-bold text-lg">Scan Mode Active</h3>
+            <p>Scan a QR code or barcode. It will automatically search and update the status.</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div>
+                <label for="scanTargetStatus" class="font-bold text-sm">Target Status:</label>
+                <select id="scanTargetStatus" class="ml-2 p-2 border rounded">
+                    <option value="ACCEPTED">Accepted</option>
+                    <option value="PRINTING" selected>Printing</option>
+                    <option value="SHIPPED">Shipped</option>
+                    <option value="DELIVERED">Delivered</option>
+                    <option value="COMPLETED">Completed</option>
+                </select>
+            </div>
+            <button id="closeScanModeBtn" class="text-purple-700 hover:text-purple-900 font-bold">&times; Close</button>
+        </div>
+      </div>
+
       <!-- Dashboard View -->
       <div id="dashboard-view">
         <!-- Filter Buttons -->
