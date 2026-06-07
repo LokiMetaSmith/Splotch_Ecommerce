@@ -854,7 +854,8 @@ async function BootStrap() {
   document.addEventListener("easterEggUnlocked", () => {
     if (!easterEggUnlocked) {
       easterEggUnlocked = true;
-      easterEggInput.style.display = "block";
+      const easterEggInput = document.getElementById("easterEggInput");
+      if (easterEggInput) easterEggInput.style.display = "block";
 
       // Attempt to find elements again if globals are null
       const grayBtn = document.getElementById("grayscaleBtn");
