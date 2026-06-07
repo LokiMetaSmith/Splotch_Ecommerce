@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  /* webServer: {
+  webServer: {
     command: 'npm run dev',
     url: 'https://localhost:5173', // Vite's default port
     reuseExistingServer: !process.env.CI, // Reuse server in local dev for speed
@@ -12,7 +12,7 @@ export default defineConfig({
       NODE_ENV: 'test',
     },
     ignoreHTTPSErrors: true,
-  }, */
+  },
   use: {
     baseURL: 'https://localhost:5173', // Match the webServer port
     headless: true,

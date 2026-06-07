@@ -717,7 +717,7 @@ export function displayOrder(order) {
     <div class="order-card border-l-4 ${statusClass.split(' ')[0].replace('bg-', 'border-')}" id="order-card-${orderId}">
         <div class="flex justify-between items-start">
             <div class="flex items-start">
-                <input type="checkbox" class="order-select-checkbox mt-1 mr-3 w-5 h-5 cursor-pointer rounded text-blue-600 focus:ring-blue-500 shadow-sm" data-order-id="${orderId}" checked>
+                <input type="checkbox" class="order-select-checkbox mt-1 mr-3 w-5 h-5 cursor-pointer rounded text-blue-600 focus:ring-blue-500 shadow-sm" data-order-id="${orderId}">
                 <div>
                     <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${orderIdShort}...</span></h3>
                     <p class="text-sm text-gray-600">Received: ${escapeHtml(receivedDate)}</p>
