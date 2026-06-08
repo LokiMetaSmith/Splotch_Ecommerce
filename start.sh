@@ -9,10 +9,10 @@ then
 fi
 
 echo "Installing root dependencies..."
-pnpm install
+HUSKY=0 pnpm install
 
 echo "Installing server dependencies..."
-(cd server && pnpm install)
+(cd server && HUSKY=0 pnpm install)
 
 echo "Starting backend server..."
 (cd server && pnpm start) &

@@ -6,10 +6,12 @@ if (-not (Get-Command "pnpm" -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "Installing root dependencies..."
+$env:HUSKY=0
 pnpm install
 
 Write-Host "Installing server dependencies..."
 Push-Location server
+$env:HUSKY=0
 pnpm install
 Pop-Location
 
