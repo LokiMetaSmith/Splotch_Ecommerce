@@ -1,3 +1,10 @@
+# Check if pnpm is installed
+if (-not (Get-Command "pnpm" -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: pnpm is not installed." -ForegroundColor Red
+    Write-Host "Please install it by running: npm install -g pnpm" -ForegroundColor Yellow
+    exit 1
+}
+
 Write-Host "Installing root dependencies..."
 pnpm install
 
