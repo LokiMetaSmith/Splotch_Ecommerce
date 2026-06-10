@@ -1,7 +1,9 @@
 allowBuilds:
-  '@parcel/watcher': set this to true or false
-  bcrypt: set this to true or false
-  core-js: set this to true or false
-  esbuild: set this to true or false
-  nodent-runtime: set this to true or false
-  unrs-resolver: set this to true or false
+  - "@parcel/watcher"
+  - "bcrypt"
+  - "core-js"
+  - "esbuild"
+  - "nodent-runtime"
+  - "unrs-resolver"
+  - "@sentry-internal/node-cpu-profiler"
+  - "msgpackr-extract"
