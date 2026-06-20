@@ -31,6 +31,21 @@ test.describe('Data Compliance Flow', () => {
         const { token } = await tokenResponse.json();
         console.log('Retrieved magic link token:', token);
 
+        // Verify the token first so the backend actually creates the user in the database
+        await page.evaluate(async (magicToken) => {
+            const csrfResponse = await fetch('/api/csrf-token');
+            const { csrfToken } = await csrfResponse.json();
+
+            await fetch('/api/auth/verify-magic-link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ token: magicToken })
+            });
+        }, token);
+
         // Visit the orders page directly with the token
         // (Simulating if the user was redirected or if we unify the pages later)
         await page.goto(`/orders.html?token=${token}`);
@@ -70,7 +85,7 @@ test.describe('Data Compliance Flow', () => {
         await deleteBtn.click();
 
         // Expect redirect to home (regex to match base URL /)
-        await expect(page).toHaveURL(/http:\/\/localhost:\d+\/$/);
+        await expect(page).toHaveURL(/https?:\/\/(localhost|127\.0\.0\.1):\d+\/$/);
 
         // 6. Verify User Deletion via API
         // We use the same token (which is still valid signature-wise) to try to fetch data
