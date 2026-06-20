@@ -2181,7 +2181,13 @@ async function startServer(
             return res.status(403).json({ error: 'Forbidden' });
         }
         try {
-            const user = await getUserByEmail(req.user.email) || await db.getUser(req.user.username);
+            let user;
+            if (req.user.email) {
+                user = await getUserByEmail(req.user.email);
+            }
+            if (!user && req.user.username) {
+                user = await db.getUser(req.user.username);
+            }
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
@@ -2207,7 +2213,13 @@ async function startServer(
             return res.status(403).json({ error: 'Forbidden' });
         }
         try {
-            const user = await getUserByEmail(req.user.email) || await db.getUser(req.user.username);
+            let user;
+            if (req.user.email) {
+                user = await getUserByEmail(req.user.email);
+            }
+            if (!user && req.user.username) {
+                user = await db.getUser(req.user.username);
+            }
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }

@@ -1,4 +1,5 @@
 let csrfToken;
+let authToken = null;
 
 export function escapeHtml(unsafe) {
   if (unsafe == null) return "";
@@ -191,7 +192,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const requiresLogin = urlParams.get("requires_login");
 
   if (token) {
-    verifyTokenAndFetchOrders(token);
+    authToken = token;
+    verifyTokenAndFetchOrders(authToken);
+    // Remove token from URL to prevent accidental sharing
+    window.history.replaceState({}, document.title, window.location.pathname);
   } else if (requiresLogin === "true") {
     loginStatus.textContent =
       "Please verify your email via the magic link below to view your order history.";
@@ -207,13 +211,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       privacyStatus.textContent = "Exporting data...";
       privacyStatus.style.color = "blue";
       try {
-        const currentToken = new URLSearchParams(window.location.search).get(
-          "token",
-        );
-
         const response = await fetch("/api/auth/user/data", {
           headers: {
-            Authorization: `Bearer ${currentToken}`,
+            Authorization: `Bearer ${authToken}`,
           },
         });
         if (!response.ok) throw new Error("Failed to fetch data");
@@ -255,13 +255,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       privacyStatus.textContent = "Deleting account...";
       privacyStatus.style.color = "red";
       try {
-        const currentToken = new URLSearchParams(window.location.search).get(
-          "token",
-        );
         const response = await fetch("/api/auth/user", {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${currentToken}`,
+            Authorization: `Bearer ${authToken}`,
             "X-CSRF-Token": csrfToken,
           },
         });

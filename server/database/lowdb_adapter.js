@@ -349,11 +349,13 @@ export class LowDbAdapter {
 
     // --- Users ---
     async getUser(username) {
+        if (!username) return undefined;
         if (this.db.data.users[username]) return this.db.data.users[username];
         return Object.values(this.db.data.users).find(u => u.username === username);
     }
 
     async getUserById(id) {
+         if (!id) return undefined;
          // Check if id is used as key
          if (this.db.data.users[id]) return this.db.data.users[id];
          return Object.values(this.db.data.users).find(u => u.id === id);
