@@ -103,7 +103,19 @@ export class LowDbAdapter {
         if (!this.db.data.products) this.db.data.products = {};
         if (!this.db.data.credentials) this.db.data.credentials = {};
         if (!this.db.data.config) this.db.data.config = {};
-        if (!this.db.data.emailIndex) this.db.data.emailIndex = {};
+
+        if (!this.db.data.emailIndex) {
+            this.db.data.emailIndex = {};
+            if (this.db.data.users) {
+                logger.info('[LowDbAdapter] Backfilling emailIndex...');
+                for (const [key, user] of Object.entries(this.db.data.users)) {
+                    if (user.email) {
+                        this.db.data.emailIndex[user.email] = key;
+                    }
+                }
+            }
+        }
+
         if (!this.db.data.inventory_cache) this.db.data.inventory_cache = {};
     }
 
@@ -362,6 +374,7 @@ export class LowDbAdapter {
     }
 
     async getUserByEmail(email) {
+        if (!email) return undefined;
         if (this.db.data.emailIndex && this.db.data.emailIndex[email]) {
             const id = this.db.data.emailIndex[email];
             const user = this.db.data.users[id];
@@ -392,6 +405,9 @@ export class LowDbAdapter {
         // We should ensure we update the correct entry.
         // But for LowDbAdapter simplicity, let's assume standard key usage.
         this.db.data.users[key] = user;
+        if (user.email) {
+            this.db.data.emailIndex[user.email] = key;
+        }
         await this.write();
         return user;
     }
