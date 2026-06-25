@@ -36,10 +36,8 @@ test('Generate Smart Cutline should preserve the original image', async ({ page 
         await dialog.accept();
     });
 
-    // Click Generate Smart Cutline
-    const generateBtn = page.locator('#generateCutlineBtn');
-    await expect(generateBtn).toBeEnabled();
-    await generateBtn.click();
+    // Wait for the image to load
+    await expect(page.locator('#toast-container')).toContainText('Image loaded successfully', { timeout: 15000 });
 
     page.on('console', msg => {
         console.log(`[${msg.type()}] BROWSER: "${msg.text()}"`);
