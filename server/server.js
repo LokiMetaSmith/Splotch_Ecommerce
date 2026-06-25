@@ -2339,6 +2339,12 @@ async function startServer(
             return res.status(403).json({ error: err.message });
         }
 
+        // Handle Stream/Multipart errors (like truncated forms)
+        if (err.message === 'Unexpected end of form' || err.message === 'Multipart: Boundary not found') {
+            logger.warn(`[SERVER] Form Data Error: ${err.message}`);
+            return res.status(400).json({ error: 'Invalid or truncated form data' });
+        }
+
         logger.error('[SERVER] Unhandled Error:', err);
 
         // Hide stack trace in production (and generally in API responses)

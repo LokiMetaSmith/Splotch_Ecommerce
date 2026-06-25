@@ -2,7 +2,12 @@ import { test, expect } from './test-setup.js';
 
 test.describe('Mascot Drag and Drop', () => {
   test('drag mascot test', async ({ page }) => {
+    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
     await page.goto('/');
+
+    // Wait for pricingConfig to be fully loaded and applied
+    await page.waitForSelector('#stickerResolution option', { state: 'attached' });
+
     await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
 
     // Dispatch a drop event manually

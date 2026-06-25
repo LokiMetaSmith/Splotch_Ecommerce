@@ -21,3 +21,7 @@ server/logs/
 # Logs
 *.log
 server/db.test.json
+e2e_out.txt
+e2e_pid.txt
+benchmark_index.js
+test_run.txt

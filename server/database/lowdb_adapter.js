@@ -130,15 +130,6 @@ export class LowDbAdapter {
 
     // --- Helper to manage caches ---
     _updateCaches(order, oldStatus) {
-        // Initialize caches if they don't exist
-        if (!this.db.activeOrders || !this.db.shippedOrders || !this.db.userOrderIndex) {
-            // If caches aren't initialized, we don't need to update them incrementally
-            // because they will be built on next access if we implement lazy loading correctly.
-            // However, existing server.js logic initialized them on startup.
-            // Let's rely on methods to initialize/use them.
-            return;
-        }
-
         const isFinal = this.FINAL_STATUSES.includes(order.status);
         const wasFinal = oldStatus ? this.FINAL_STATUSES.includes(oldStatus) : false;
 
