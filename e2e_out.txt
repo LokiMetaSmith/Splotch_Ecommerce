@@ -1,0 +1,2409 @@
+
+> lokimetasmith.github.io@1.0.0 test:e2e /app
+> playwright test
+
+[2m[WebServer] [22mnpm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+[2m[WebServer] [22mnpm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+[2m[WebServer] [22mnpm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+[2m[WebServer] [22mBrowserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+[2m[WebServer] [22m  npx update-browserslist-db@latest
+[2m[WebServer] [22m  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+Running 123 tests using 2 workers
+
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[BROWSER LOG] Square SDK blocked by test
+  ✓    2 [chromium] › playwright_tests/add-text.spec.js:3:1 › allows a user to add text to an image (9.9s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓    3 [chromium] › playwright_tests/canvas-ruler.spec.js:16:5 › Canvas Ruler › should display ruler after loading an image (4.7s)
+  ✓    4 [chromium] › playwright_tests/contour_edge.spec.js:34:3 › Contour Edge Toggle and Offset Logic › Toggle state reflects correctly and positive offset produces a single contour (10.2s)
+[BROWSER LOG] [vite] connecting...
+[MOCK] Intercepted API request for: /api/csrf-token
+[BROWSER LOG] [CLIENT] CSRF Token fetched and stored.
+[BROWSER LOG] [vite] connected.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[BROWSER LOG] [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+[BROWSER LOG] [CLIENT] Inventory loaded: {}
+[BROWSER LOG] [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+[BROWSER LOG] [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+Initial: A little white, Final: -50
+[BROWSER LOG] [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[TEST] Uploading file from: /app/verification/test.png
+[TEST] Image loaded successfully message detected.
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[TEST] UI buttons are enabled.
+[TEST] Filling resize slider...
+[TEST] Dispatching input event to slider...
+  ✓    5 [chromium] › playwright_tests/cutline_offset.spec.js:34:3 › Cutline Offset Slider Interaction › generates smart edge cuts when slider moves negative into sticker (6.9s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[BROWSER LOG] [vite] css hot updated: /styles.css
+Canvas Debug Info: {
+  pixels: [
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[44, 44, 44, 255]'[39m,    [32m'[0, 0, 0, 255]'[39m,
+    [32m'[0, 0, 0, 255]'[39m,       [32m'[0, 0, 0, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[44, 44, 44, 255]'[39m,    [32m'[0, 0, 0, 255]'[39m,
+    [32m'[0, 0, 0, 255]'[39m,       [32m'[0, 0, 0, 255]'[39m
+  ],
+  width: [33m900[39m,
+  height: [33m900[39m,
+  lineWidth: [33m1[39m,
+  strokeStyle: [32m'#000000'[39m,
+  pricingConfigLoaded: [33mfalse[39m
+}
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓    1 [chromium] › playwright_tests/bounding-box.spec.js:9:1 › bounding box is visible when scaling image (36.9s)
+  ✓    6 [chromium] › playwright_tests/e2e.spec.js:3:1 › has title (4.5s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: Square SDK blocked by test
+PAGE LOG: [vite] connecting...
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [vite] connected.
+PAGE LOG: [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+PAGE LOG: [CLIENT] Inventory loaded: {}
+PAGE LOG: [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+PAGE LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+PAGE LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+  ✓    7 [chromium] › playwright_tests/image-manipulation.spec.js:48:5 › Frontend Image Manipulation › should add text to the canvas (14.3s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: Square SDK blocked by test
+  ✓    8 [chromium] › playwright_tests/image-upload.spec.js:3:1 › allows a user to upload an image (15.4s)
+PAGE LOG: [vite] connecting...
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: [vite] connected.
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+PAGE LOG: [CLIENT] Inventory loaded: {}
+PAGE LOG: [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+PAGE LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+PAGE LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [vite] css hot updated: /styles.css
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+[2m[WebServer] [22m[2m1:43:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/csrf-token[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:43:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/pricing-info[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:43:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/inventory[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+  ✓   10 [chromium] › playwright_tests/image-upload.spec.js:26:1 › allows user to click the placeholder to upload (10.7s)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/auth/magic-login
+  ✓    9 [chromium] › playwright_tests/image-manipulation.spec.js:64:5 › Frontend Image Manipulation › should rotate the image (13.5s)
+  ✓   11 [chromium] › playwright_tests/magic-login-flow.spec.js:3:1 › magic link login form (1.8s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: Square SDK blocked by test
+PAGE LOG: [vite] connecting...
+PAGE LOG: [vite] connected.
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+PAGE LOG: [CLIENT] Inventory loaded: {}
+PAGE LOG: [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+PAGE LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+PAGE LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+  ✓   12 [chromium] › playwright_tests/image-manipulation.spec.js:77:5 › Frontend Image Manipulation › should apply grayscale filter (25.6s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: Square SDK blocked by test
+PAGE LOG: [vite] connecting...
+PAGE LOG: [vite] connected.
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+PAGE LOG: [CLIENT] Inventory loaded: {}
+PAGE LOG: [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+PAGE LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+PAGE LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+  ✓   14 [chromium] › playwright_tests/image-manipulation.spec.js:89:5 › Frontend Image Manipulation › should generate smart cutline (4.8s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓   15 [chromium] › playwright_tests/mascot_drag.spec.js:4:3 › Mascot Drag and Drop › drag mascot test (4.6s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓   16 [chromium] › playwright_tests/mascot.spec.js:4:3 › Mascot Integration › should load a random mascot image (3.6s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✘   13 [chromium] › playwright_tests/mascot_a11y.spec.js:4:3 › Mascot Accessibility › Mascot speech bubble should be visible on keyboard focus and accessible (43.3s)
+  ✓   17 [chromium] › playwright_tests/mascot.spec.js:27:3 › Mascot Integration › should wiggle when mouse is near (5.9s)
+[2m[WebServer] [22m[2m1:44:36 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/admin/sales-metrics[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:44:38 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/admin/sales-metrics[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[2m[WebServer] [22m[2m1:44:42 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/csrf-token[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+  ✓   19 [chromium] › playwright_tests/mobile-responsiveness.spec.js:5:3 › Mobile Responsiveness › Critical elements should be visible on mobile (4.2s)
+  -   20 [chromium] › playwright_tests/mobile-responsiveness.spec.js:32:3 › Mobile Responsiveness › Navigation buttons should not obscure critical controls
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  ✘   18 [chromium] › playwright_tests/nesting.spec.cjs:44:5 › Nesting Functionality › should generate nested layout when "Nest Stickers" is clicked (12.6s)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Intercepted API request for: /api/server-info
+[MOCK] Intercepted API request for: /api/csrf-token
+  ✓   22 [chromium] › playwright_tests/order-status.spec.js:3:1 › has title (1.3s)
+[MOCK] Intercepted API request for: /api/csrf-token
+[2m[WebServer] [22m[2m1:44:53 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /uploads/test-design.png[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:44:53 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /uploads/test-design-2.png[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+  ✓   21 [chromium] › playwright_tests/mobile-responsiveness.spec.js:75:3 › Mobile Responsiveness › Small mobile viewport (320px) overlap check (9.0s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  -   24 [chromium] › playwright_tests/mobile-responsiveness.spec.js:103:3 › Mobile Responsiveness › Anchor navigation should not be obscured by fixed elements
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[2m[WebServer] [22m[2m1:44:54 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /uploads/test-design.png[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓   25 [chromium] › playwright_tests/paste-context-menu.spec.js:3:1 › placeholder should be contenteditable to allow context menu paste (2.0s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  ✓   23 [chromium] › playwright_tests/orders_optimization.spec.js:3:1 › orders list renders correctly and reorder button works (3.7s)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Intercepted API request for: /api/server-info
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/auth/verify-token
+[MOCK] Intercepted API request for: /api/admin/sales-metrics
+[MOCK] Unhandled API route: /api/admin/sales-metrics
+[2m[WebServer] [22m[2m1:44:57 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /uploads/design.svg[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[MOCK] Intercepted API request for: /api/auth/issue-temp-token
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/upload-design
+[MOCK] Intercepted API request for: /api/create-order
+[MOCK] Intercepted API request for: /api/csrf-token
+  ✓   26 [chromium] › playwright_tests/payment-form.spec.js:29:3 › Payment Form Flow › allows a user to submit the payment form (6.0s)
+[MOCK] Intercepted API request for: /api/server-info
+[MOCK] Intercepted API request for: /api/csrf-token
+  ✘   27 [chromium] › playwright_tests/printshop_cache.spec.js:3:1 › printshop caches SVG fetches during nesting (6.6s)
+[MOCK] Intercepted API request for: /api/server-info
+[MOCK] Intercepted API request for: /api/csrf-token
+  ✓   28 [chromium] › playwright_tests/printshop_dashboard.spec.js:90:3 › Printshop Dashboard E2E › should load printshop, display orders, and fulfill order (2.7s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+BROWSER LOG: [vite] connecting...
+BROWSER LOG: [vite] connected.
+[2m[WebServer] [22m[2m1:45:06 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/csrf-token[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: Failed to load resource: the server responded with a status of 500 ()
+BROWSER LOG: [CLIENT] Error fetching CSRF token: Error: Server responded with 500
+    at fetchCsrfToken (https://127.0.0.1:5173/src/index.js:1174:13)
+    at async BootStrap (https://127.0.0.1:5173/src/index.js:253:3)
+[2m[WebServer] [22m[2m1:45:06 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/pricing-info[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:45:06 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/inventory[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+BROWSER LOG: Failed to load resource: the server responded with a status of 500 ()
+BROWSER LOG: [CLIENT] Error fetching pricing info: Error: Server responded with 500
+    at fetchPricingInfo (https://127.0.0.1:5173/src/index.js:1099:13)
+    at async Promise.all (index 0)
+    at async BootStrap (https://127.0.0.1:5173/src/index.js:254:3)
+BROWSER LOG: Failed to load resource: the server responded with a status of 500 ()
+BROWSER LOG: [CLIENT] PLAYWRIGHT_TEST_MODE: Skipping Square initialization.
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: Loading the font 'https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Regular.woff2' violates the following Content Security Policy directive: "font-src https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net/fonts/sqmarket/ 'report-sample'". The action has been blocked.
+BROWSER LOG: Loading the font 'https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Semibold.woff2' violates the following Content Security Policy directive: "font-src https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net/fonts/sqmarket/ 'report-sample'". The action has been blocked.
+BROWSER LOG: Loading the font 'https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Regular.woff2' violates the following Content Security Policy directive: "font-src https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net/fonts/sqmarket/ 'report-sample'". The action has been blocked.
+BROWSER LOG: Loading the font 'https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Semibold.woff2' violates the following Content Security Policy directive: "font-src https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net/fonts/sqmarket/ 'report-sample'". The action has been blocked.
+BROWSER LOG: Loading the font 'https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Regular.woff2' violates the following Content Security Policy directive: "font-src https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net/fonts/sqmarket/ 'report-sample'". The action has been blocked.
+BROWSER LOG: Loading the font 'https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Semibold.woff2' violates the following Content Security Policy directive: "font-src https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net/fonts/sqmarket/ 'report-sample'". The action has been blocked.
+BROWSER LOG: Loading the font 'https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Regular.woff2' violates the following Content Security Policy directive: "font-src https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net/fonts/sqmarket/ 'report-sample'". The action has been blocked.
+BROWSER LOG: Loading the font 'https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Semibold.woff2' violates the following Content Security Policy directive: "font-src https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net/fonts/sqmarket/ 'report-sample'". The action has been blocked.
+BROWSER LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+BROWSER LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+  ✓   29 [chromium] › playwright_tests/regression_cutline_slider.spec.js:7:1 › Cutline Slider features - Magic Edge / Offset / Lazy Lasso (3.7s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: Trace worker message received: true
+BROWSER LOG: Sending to generateCutLineAsync
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: Trace worker message received: true
+BROWSER LOG: Sending to generateCutLineAsync
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: Form validity: VALID
+BROWSER LOG: [CLIENT] handlePaymentFormSubmit triggered.
+BROWSER LOG: BROWSER LOG: Processing order check originalImage: true
+BROWSER LOG: [CLIENT] Aborting submission: CSRF token is missing.
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+  ✓   31 [chromium] › playwright_tests/regression_negative_cutline_miter.spec.js:3:1 › Negative cutline offset should generate sharp edges (miter) (10.9s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+Initial Physical: 1350 950
+Initial Logical (Style): [33m216.141[39m [33m152.141[39m
+New Physical: 950 1350
+New Logical (Style): [33m152.144[39m [33m216.141[39m
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+BROWSER LOG: [vite] css hot updated: /styles.css
+  ✘   30 [chromium] › playwright_tests/qa_flow.spec.js:10:5 › QA Flow requested by user › create sticker pack, scale, contour bleedless, and fulfill in printshop (22.6s)
+  ✓   32 [chromium] › playwright_tests/regression_rotation_dpr.spec.js:5:1 › verify rotation behavior with DPR=2 (9.3s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[log] BROWSER: "Trace worker message received: true"
+[log] BROWSER: "Sending to generateCutLineAsync"
+  ✓   33 [chromium] › playwright_tests/ux_clear_button.spec.js:3:1 › allows a user to clear the uploaded image (5.6s)
+  ✓   34 [chromium] › playwright_tests/regression_smart_cutline.spec.js:8:1 › Generate Smart Cutline should preserve the original image (4.8s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[2m[WebServer] [22m[2m1:45:35 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/csrf-token[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:45:35 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/pricing-info[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:45:35 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/inventory[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓   35 [chromium] › playwright_tests/verify_css.spec.js:4:1 › Verify Splotch Theme and Tailwind CSS are applied (3.2s)
+[2m[WebServer] [22m[2m1:45:38 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/admin/sales-metrics[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+  ✓   37 [chromium] › playwright_tests/verify_optimization.spec.cjs:53:5 › Bolt Optimization Verification › should display orders correctly with DocumentFragment optimization (2.1s)
+[2m[WebServer] [22m[2m1:45:40 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/csrf-token[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+  ✓   36 [chromium] › playwright_tests/verify_features.spec.js:27:5 › Standard Size Buttons and Unit Selection › Standard Size Buttons update resize slider (5.4s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  ✓   38 [chromium] › playwright_tests/verify_ux_icons.spec.js:3:1 › Verify UX icons and required attribute in orders.html (1.3s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓   39 [chromium] › playwright_tests/verify_features.spec.js:77:5 › Standard Size Buttons and Unit Selection › Unit Selection toggle updates display (2.9s)
+  ✓   40 [chromium] › playwright_tests/visual_bugs.spec.js:4:3 › Visual Bug Reproduction › Top menu bar should not overlap with main title (3.0s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+Label width: 128, height: 20
+  ✓   41 [chromium] › playwright_tests/visual_bugs.spec.js:30:3 › Visual Bug Reproduction › Set max dimension label should not be squashed (1.7s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[BROWSER LOG] Square SDK blocked by test
+[BROWSER LOG] [vite] connecting...
+[BROWSER LOG] [vite] connected.
+[MOCK] Intercepted API request for: /api/csrf-token
+[BROWSER LOG] [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[BROWSER LOG] [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+[BROWSER LOG] [CLIENT] Inventory loaded: {}
+[BROWSER LOG] [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+[BROWSER LOG] [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+[BROWSER LOG] [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[MOCK] Intercepted API request for: /api/csrf-token
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[TEST] Uploading file from: /app/verification/test.png
+[TEST] Image loaded successfully message detected.
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[TEST] UI buttons are enabled.
+[TEST] Filling resize slider...
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[TEST] Dispatching input event to slider...
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+Canvas Debug Info: {
+  pixels: [
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m,
+    [32m'[115, 115, 115, 255]'[39m, [32m'[115, 115, 115, 255]'[39m
+  ],
+  width: [33m2475[39m,
+  height: [33m2475[39m,
+  lineWidth: [33m1[39m,
+  strokeStyle: [32m'#000000'[39m,
+  pricingConfigLoaded: [33mfalse[39m
+}
+[BROWSER LOG] [vite] css hot updated: /styles.css
+[BROWSER LOG] [vite] css hot updated: /styles.css
+  ✓   43 [Mobile Chrome] › playwright_tests/bounding-box.spec.js:9:1 › bounding box is visible when scaling image (26.0s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  ✓   42 [Mobile Chrome] › playwright_tests/add-text.spec.js:3:1 › allows a user to add text to an image (28.4s)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓   44 [Mobile Chrome] › playwright_tests/canvas-ruler.spec.js:16:5 › Canvas Ruler › should display ruler after loading an image (5.9s)
+Initial: A little white, Final: -50
+  ✓   46 [Mobile Chrome] › playwright_tests/cutline_offset.spec.js:34:3 › Cutline Offset Slider Interaction › generates smart edge cuts when slider moves negative into sticker (3.2s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓   45 [Mobile Chrome] › playwright_tests/contour_edge.spec.js:34:3 › Contour Edge Toggle and Offset Logic › Toggle state reflects correctly and positive offset produces a single contour (9.5s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: Square SDK blocked by test
+  ✓   47 [Mobile Chrome] › playwright_tests/e2e.spec.js:3:1 › has title (1.3s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓   49 [Mobile Chrome] › playwright_tests/image-upload.spec.js:3:1 › allows a user to upload an image (7.0s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [vite] connecting...
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [vite] connected.
+PAGE LOG: [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+PAGE LOG: [CLIENT] Inventory loaded: {}
+PAGE LOG: [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+PAGE LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+PAGE LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+  ✓   50 [Mobile Chrome] › playwright_tests/image-upload.spec.js:26:1 › allows user to click the placeholder to upload (8.0s)
+  ✓   48 [Mobile Chrome] › playwright_tests/image-manipulation.spec.js:48:5 › Frontend Image Manipulation › should add text to the canvas (17.6s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: Square SDK blocked by test
+PAGE LOG: [vite] connecting...
+PAGE LOG: [vite] connected.
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+PAGE LOG: [CLIENT] Inventory loaded: {}
+PAGE LOG: [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+PAGE LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+PAGE LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+  ✓   52 [Mobile Chrome] › playwright_tests/image-manipulation.spec.js:64:5 › Frontend Image Manipulation › should rotate the image (10.0s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: Square SDK blocked by test
+PAGE LOG: [vite] connecting...
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [vite] connected.
+PAGE LOG: [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+PAGE LOG: [CLIENT] Inventory loaded: {}
+PAGE LOG: [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+PAGE LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+PAGE LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+  ✓   53 [Mobile Chrome] › playwright_tests/image-manipulation.spec.js:77:5 › Frontend Image Manipulation › should apply grayscale filter (9.7s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+PAGE LOG: Square SDK blocked by test
+PAGE LOG: [vite] connecting...
+PAGE LOG: [vite] connected.
+[MOCK] Intercepted API request for: /api/csrf-token
+PAGE LOG: [CLIENT] CSRF Token fetched and stored.
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [CLIENT] Pricing config loaded: {pricePerSquareInchCents: 15, resolutions: Array(4), materials: Array(2), complexity: Object, quantityDiscounts: Array(3)}
+PAGE LOG: [CLIENT] Inventory loaded: {}
+PAGE LOG: [CLIENT] Initializing Square SDK with appId: sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA, locationId: LTS82DEX24XR0
+PAGE LOG: [CLIENT] BootStrap: Checking paymentFormGlobalRef before attaching listener. paymentFormGlobalRef: JSHandle@node
+PAGE LOG: [CLIENT] BootStrap: paymentFormGlobalRef found. Attaching submit event listener.
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+PAGE LOG: [vite] css hot updated: /styles.css
+  ✓   54 [Mobile Chrome] › playwright_tests/image-manipulation.spec.js:89:5 › Frontend Image Manipulation › should generate smart cutline (5.9s)
+[2m[WebServer] [22m[2m1:47:07 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/csrf-token[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:47:07 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/pricing-info[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m[WebServer] [22m[2m1:47:07 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/inventory[39m
+[2m[WebServer] [22mError: connect ECONNREFUSED 127.0.0.1:3000
+[2m[WebServer] [22m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+  ✓   55 [Mobile Chrome] › playwright_tests/mascot_a11y.spec.js:4:3 › Mascot Accessibility › Mascot speech bubble should be visible on keyboard focus and accessible (6.6s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  ✘   51 [Mobile Chrome] › playwright_tests/magic-login-flow.spec.js:3:1 › magic link login form (35.1s)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  BROWSER LOG: Failed to load resource: Could not connect to 127.0.0.1: Connection refused
+  ✘  111 [Mobile Safari] › playwright_tests/qa_flow.spec.js:10:5 › QA Flow requested by user › create sticker pack, scale, contour bleedless, and fulfill in printshop (618ms)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✘  105 [Mobile Safari] › playwright_tests/orders_optimization.spec.js:3:1 › orders list renders correctly and reorder button works (32.9s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  ✓  112 [Mobile Safari] › playwright_tests/regression_cutline_slider.spec.js:7:1 › Cutline Slider features - Magic Edge / Offset / Lazy Lasso (8.2s)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+Initial Physical: 1350 950
+Initial Logical (Style): [33m216.1408[39m [33m152.1408[39m
+New Physical: 950 1350
+New Logical (Style): [33m152.144[39m [33m216.1408[39m
+  ✓  114 [Mobile Safari] › playwright_tests/regression_rotation_dpr.spec.js:5:1 › verify rotation behavior with DPR=2 (29.7s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+[log] BROWSER: "Trace worker message received: true"
+[log] BROWSER: "Sending to generateCutLineAsync"
+[debug] BROWSER: "[vite] css hot updated: /styles.css"
+  ✘  113 [Mobile Safari] › playwright_tests/regression_negative_cutline_miter.spec.js:3:1 › Negative cutline offset should generate sharp edges (miter) (46.8s)
+  ✓  115 [Mobile Safari] › playwright_tests/regression_smart_cutline.spec.js:8:1 › Generate Smart Cutline should preserve the original image (26.0s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  ✓  116 [Mobile Safari] › playwright_tests/verify_css.spec.js:4:1 › Verify Splotch Theme and Tailwind CSS are applied (7.9s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✘  118 [Mobile Safari] › playwright_tests/verify_features.spec.js:27:5 › Standard Size Buttons and Unit Selection › Standard Size Buttons update resize slider (31.5s)
+  ✘  117 [Mobile Safari] › playwright_tests/ux_clear_button.spec.js:3:1 › allows a user to clear the uploaded image (38.4s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓  119 [Mobile Safari] › playwright_tests/verify_features.spec.js:77:5 › Standard Size Buttons and Unit Selection › Unit Selection toggle updates display (8.7s)
+  ✓  120 [Mobile Safari] › playwright_tests/verify_optimization.spec.cjs:53:5 › Bolt Optimization Verification › should display orders correctly with DocumentFragment optimization (8.4s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+  ✓  121 [Mobile Safari] › playwright_tests/verify_ux_icons.spec.js:3:1 › Verify UX icons and required attribute in orders.html (2.9s)
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+  ✓  122 [Mobile Safari] › playwright_tests/visual_bugs.spec.js:4:3 › Visual Bug Reproduction › Top menu bar should not overlap with main title (4.5s)
+[MOCK] Blocking external script: https://sandbox.web.squarecdn.com/v1/square.js
+[MOCK] Intercepted API request for: /api/csrf-token
+[MOCK] Intercepted API request for: /api/pricing-info
+[MOCK] Intercepted API request for: /api/inventory
+Label width: 130.734375, height: 20
+  ✓  123 [Mobile Safari] › playwright_tests/visual_bugs.spec.js:30:3 › Visual Bug Reproduction › Set max dimension label should not be squashed (3.9s)
+
+
+  1) [chromium] › playwright_tests/add-text.spec.js:3:1 › allows a user to add text to an image ────
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.fill: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('#textInput')[22m
+    [2m    - locator resolved to <input type="text" id="textInput" class="input mt-1 w-full" placeholder="Your Text Here"/>[22m
+    [2m    - fill("Hello, World!")[22m
+    [2m  - attempting fill action[22m
+    [2m    2 × waiting for element to be visible, enabled and editable[22m
+    [2m      - element is not visible[22m
+    [2m    - retrying fill action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and editable[22m
+    [2m      - element is not visible[22m
+    [2m    - retrying fill action[22m
+    [2m      - waiting 100ms[22m
+    [2m    58 × waiting for element to be visible, enabled and editable[22m
+    [2m       - element is not visible[22m
+    [2m     - retrying fill action[22m
+    [2m       - waiting 500ms[22m
+    [2m    - waiting for element to be visible, enabled and editable[22m
+
+
+      20 |
+      21 |   // --- Step 3: Add text ---
+    > 22 |   await page.locator('#textInput').fill('Hello, World!');
+         |                                    ^
+      23 |   await page.locator('#addTextBtn').click();
+      24 |
+      25 |   // --- Step 4: Verify the text was added ---
+        at /app/playwright_tests/add-text.spec.js:22:36
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/add-text-allows-a-user-to-add-text-to-an-image-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/add-text-allows-a-user-to-add-text-to-an-image-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/add-text-allows-a-user-to-add-text-to-an-image-chromium/error-context.md
+
+  2) [chromium] › playwright_tests/mascot_drag.spec.js:4:3 › Mascot Drag and Drop › drag mascot test
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      3 | test.describe('Mascot Drag and Drop', () => {
+      4 |   test('drag mascot test', async ({ page }) => {
+    > 5 |     await page.goto('/');
+        |                ^
+      6 |     await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+      7 |
+      8 |     // Dispatch a drop event manually
+        at /app/playwright_tests/mascot_drag.spec.js:5:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/mascot_drag-Mascot-Drag-and-Drop-drag-mascot-test-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/mascot_drag-Mascot-Drag-and-Drop-drag-mascot-test-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › playwright_tests/mascot.spec.js:4:3 › Mascot Integration › should load a random mascot image
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      3 | test.describe('Mascot Integration', () => {
+      4 |   test('should load a random mascot image', async ({ page }) => {
+    > 5 |     await page.goto('/');
+        |                ^
+      6 |
+      7 |     const mascotImg = page.locator('#mascot-img');
+      8 |     await expect(mascotImg).toBeVisible();
+        at /app/playwright_tests/mascot.spec.js:5:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/mascot-Mascot-Integration-should-load-a-random-mascot-image-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/mascot-Mascot-Integration-should-load-a-random-mascot-image-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › playwright_tests/mascot.spec.js:27:3 › Mascot Integration › should wiggle when mouse is near
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      26 |
+      27 |   test('should wiggle when mouse is near', async ({ page }) => {
+    > 28 |     await page.goto('/');
+         |                ^
+      29 |     const mascotContainer = page.locator('#mascot-container');
+      30 |
+      31 |     // Get mascot position
+        at /app/playwright_tests/mascot.spec.js:28:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/mascot-Mascot-Integration-should-wiggle-when-mouse-is-near-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/mascot-Mascot-Integration-should-wiggle-when-mouse-is-near-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › playwright_tests/mobile-responsiveness.spec.js:5:3 › Mobile Responsiveness › Critical elements should be visible on mobile
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      4 |
+      5 |   test('Critical elements should be visible on mobile', async ({ page }) => {
+    > 6 |     await page.goto('/');
+        |                ^
+      7 |
+      8 |     // Wait for the page to be ready
+      9 |     await page.waitForLoadState('domcontentloaded');
+        at /app/playwright_tests/mobile-responsiveness.spec.js:6:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/mobile-responsiveness-Mobi-ba891-should-be-visible-on-mobile-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/mobile-responsiveness-Mobi-ba891-should-be-visible-on-mobile-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › playwright_tests/mobile-responsiveness.spec.js:75:3 › Mobile Responsiveness › Small mobile viewport (320px) overlap check
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      76 |     // Explicitly set a small viewport
+      77 |     await page.setViewportSize({ width: 320, height: 600 });
+    > 78 |     await page.goto('/');
+         |                ^
+      79 |     await page.waitForLoadState('networkidle');
+      80 |
+      81 |     const jumpButton = page.locator('nav.top-menu-bar .menu-item').filter({ hasText: 'Jump to Sticker Editor' });
+        at /app/playwright_tests/mobile-responsiveness.spec.js:78:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/mobile-responsiveness-Mobi-c5e70-iewport-320px-overlap-check-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/mobile-responsiveness-Mobi-c5e70-iewport-320px-overlap-check-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › playwright_tests/nesting.spec.cjs:44:5 › Nesting Functionality › should generate nested layout when "Nest Stickers" is clicked
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/printshop.html
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/printshop.html", waiting until "load"[22m
+
+
+      47 |         });
+      48 |
+    > 49 |         await page.goto('/printshop.html');
+         |                    ^
+      50 |
+      51 |         // Wait for orders to load
+      52 |         await expect(page.locator('#order-card-order-nest-1')).toBeVisible();
+        at /app/playwright_tests/nesting.spec.cjs:49:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/nesting-Nesting-Functional-3551f-en-Nest-Stickers-is-clicked-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/nesting-Nesting-Functional-3551f-en-Nest-Stickers-is-clicked-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) [chromium] › playwright_tests/order-status.spec.js:3:1 › has title ────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/printshop.html
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/printshop.html", waiting until "load"[22m
+
+
+      2 |
+      3 | test('has title', async ({ page }) => {
+    > 4 |   await page.goto('/printshop.html');
+        |              ^
+      5 |
+      6 |   // Expect a title "to contain" a substring.
+      7 |   await expect(page).toHaveTitle(/Print Shop - Order Dashboard/);
+        at /app/playwright_tests/order-status.spec.js:4:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/order-status-has-title-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/order-status-has-title-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) [chromium] › playwright_tests/orders_optimization.spec.js:3:1 › orders list renders correctly and reorder button works
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/orders.html?token=test-token
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/orders.html?token=test-token", waiting until "load"[22m
+
+
+      24 |
+      25 |   // Navigate to orders page with a mock token
+    > 26 |   await page.goto('/orders.html?token=test-token');
+         |              ^
+      27 |
+      28 |   // Check if orders are displayed
+      29 |   const ordersList = page.locator('#orders-list');
+        at /app/playwright_tests/orders_optimization.spec.js:26:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/orders_optimization-orders-68b64-ly-and-reorder-button-works-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/orders_optimization-orders-68b64-ly-and-reorder-button-works-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) [chromium] › playwright_tests/paste-context-menu.spec.js:3:1 › placeholder should be contenteditable to allow context menu paste
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      2 |
+      3 | test('placeholder should be contenteditable to allow context menu paste', async ({ page }) => {
+    > 4 |   await page.goto('/');
+        |              ^
+      5 |
+      6 |   const placeholder = page.locator('#canvas-placeholder');
+      7 |   await expect(placeholder).toBeVisible();
+        at /app/playwright_tests/paste-context-menu.spec.js:4:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/paste-context-menu-placeho-d3c14-to-allow-context-menu-paste-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/paste-context-menu-placeho-d3c14-to-allow-context-menu-paste-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  11) [chromium] › playwright_tests/payment-form.spec.js:29:3 › Payment Form Flow › allows a user to submit the payment form
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      28 |
+      29 |   test('allows a user to submit the payment form', async ({ page }) => {
+    > 30 |     await page.goto('/');
+         |                ^
+      31 |
+      32 |     // 1. Upload an image
+      33 |     // Ensure the file input is ready
+        at /app/playwright_tests/payment-form.spec.js:30:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/payment-form-Payment-Form--f71fd--to-submit-the-payment-form-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/payment-form-Payment-Form--f71fd--to-submit-the-payment-form-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  12) [chromium] › playwright_tests/printshop_cache.spec.js:3:1 › printshop caches SVG fetches during nesting
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/printshop.html
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/printshop.html", waiting until "load"[22m
+
+
+      35 |
+      36 |     // 4. Go to Printshop
+    > 37 |     await page.goto('/printshop.html');
+         |                ^
+      38 |
+      39 |     // 5. Wait for orders to load
+      40 |     await expect(page.locator('#order-card-12345678')).toBeVisible();
+        at /app/playwright_tests/printshop_cache.spec.js:37:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/printshop_cache-printshop-caches-SVG-fetches-during-nesting-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/printshop_cache-printshop-caches-SVG-fetches-during-nesting-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  13) [chromium] › playwright_tests/printshop_dashboard.spec.js:90:3 › Printshop Dashboard E2E › should load printshop, display orders, and fulfill order
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/printshop.html
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/printshop.html", waiting until "load"[22m
+
+
+      85 |
+      86 |
+    > 87 |       await page.goto('/printshop.html');
+         |                  ^
+      88 |   });
+      89 |
+      90 |   test('should load printshop, display orders, and fulfill order', async ({ page }) => {
+        at /app/playwright_tests/printshop_dashboard.spec.js:87:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/printshop_dashboard-Prints-7c616-ay-orders-and-fulfill-order-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/printshop_dashboard-Prints-7c616-ay-orders-and-fulfill-order-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  14) [chromium] › playwright_tests/qa_flow.spec.js:10:5 › QA Flow requested by user › create sticker pack, scale, contour bleedless, and fulfill in printshop
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      22 |         page.on('pageerror', error => console.log('BROWSER ERROR:', error.message));
+      23 |
+    > 24 |         await page.goto('/');
+         |                    ^
+      25 |
+      26 |         // Wait for app initialization to complete before uploading
+      27 |         await page.waitForFunction(() => window.__appInitialized === true);
+        at /app/playwright_tests/qa_flow.spec.js:24:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/qa_flow-QA-Flow-requested--68f2f-ss-and-fulfill-in-printshop-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  15) [chromium] › playwright_tests/regression_cutline_slider.spec.js:7:1 › Cutline Slider features - Magic Edge / Offset / Lazy Lasso
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+       6 |
+       7 | test('Cutline Slider features - Magic Edge / Offset / Lazy Lasso', async ({ page }) => {
+    >  8 |     await page.goto('/');
+         |                ^
+       9 |
+      10 |     const fileInput = page.locator('#file');
+      11 |     await page.waitForTimeout(1000);
+        at /app/playwright_tests/regression_cutline_slider.spec.js:8:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/regression_cutline_slider--7106b-agic-Edge-Offset-Lazy-Lasso-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/regression_cutline_slider--7106b-agic-Edge-Offset-Lazy-Lasso-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  16) [chromium] › playwright_tests/regression_negative_cutline_miter.spec.js:3:1 › Negative cutline offset should generate sharp edges (miter)
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      2 |
+      3 | test('Negative cutline offset should generate sharp edges (miter)', async ({ page }) => {
+    > 4 |     await page.goto('/');
+        |                ^
+      5 |
+      6 |     await page.evaluate("document.dispatchEvent(new CustomEvent('easterEggUnlocked'))");
+      7 |     await page.waitForSelector('body', { state: 'visible' });
+        at /app/playwright_tests/regression_negative_cutline_miter.spec.js:4:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/regression_negative_cutlin-bcd8e-generate-sharp-edges-miter--chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/regression_negative_cutlin-bcd8e-generate-sharp-edges-miter--chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  17) [chromium] › playwright_tests/regression_rotation_dpr.spec.js:5:1 › verify rotation behavior with DPR=2
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      4 |
+      5 | test('verify rotation behavior with DPR=2', async ({ page }) => {
+    > 6 |   await page.goto('/');
+        |              ^
+      7 |
+      8 |   // Generate a non-square image 300x200
+      9 |   const nonSquareImage = await page.evaluate(() => {
+        at /app/playwright_tests/regression_rotation_dpr.spec.js:6:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/regression_rotation_dpr-verify-rotation-behavior-with-DPR-2-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/regression_rotation_dpr-verify-rotation-behavior-with-DPR-2-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  18) [chromium] › playwright_tests/regression_smart_cutline.spec.js:8:1 › Generate Smart Cutline should preserve the original image
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+       7 |
+       8 | test('Generate Smart Cutline should preserve the original image', async ({ page }) => {
+    >  9 |     await page.goto('/');
+         |                ^
+      10 |     await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+      11 |
+      12 |     const fileInput = page.locator('#file');
+        at /app/playwright_tests/regression_smart_cutline.spec.js:9:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/regression_smart_cutline-G-498f9-preserve-the-original-image-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/regression_smart_cutline-G-498f9-preserve-the-original-image-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  19) [chromium] › playwright_tests/ux_clear_button.spec.js:3:1 › allows a user to clear the uploaded image
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      2 |
+      3 | test('allows a user to clear the uploaded image', async ({ page }) => {
+    > 4 |   await page.goto('/');
+        |              ^
+      5 |     await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+      6 |
+      7 |   // Verify Clear button is hidden initially
+        at /app/playwright_tests/ux_clear_button.spec.js:4:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/ux_clear_button-allows-a-user-to-clear-the-uploaded-image-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/ux_clear_button-allows-a-user-to-clear-the-uploaded-image-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  20) [chromium] › playwright_tests/verify_css.spec.js:4:1 › Verify Splotch Theme and Tailwind CSS are applied
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      3 |
+      4 | test('Verify Splotch Theme and Tailwind CSS are applied', async ({ page }) => {
+    > 5 |   await page.goto('/');
+        |              ^
+      6 |
+      7 |   // 1. Verify Splotch Theme is loading (this seemed to work before)
+      8 |   const body = page.locator('body');
+        at /app/playwright_tests/verify_css.spec.js:5:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/verify_css-Verify-Splotch-Theme-and-Tailwind-CSS-are-applied-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/verify_css-Verify-Splotch-Theme-and-Tailwind-CSS-are-applied-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  21) [chromium] › playwright_tests/verify_features.spec.js:27:5 › Standard Size Buttons and Unit Selection › Standard Size Buttons update resize slider
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      26 | test.describe('Standard Size Buttons and Unit Selection', () => {
+      27 |     test('Standard Size Buttons update resize slider', async ({ page }) => {
+    > 28 |         await page.goto('/');
+         |                    ^
+      29 |
+      30 |         // Upload an image to enable controls
+      31 |         // Use the ID selector to be specific, as there are multiple file inputs
+        at /app/playwright_tests/verify_features.spec.js:28:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/verify_features-Standard-S-3defb-uttons-update-resize-slider-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/verify_features-Standard-S-3defb-uttons-update-resize-slider-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  22) [chromium] › playwright_tests/verify_features.spec.js:77:5 › Standard Size Buttons and Unit Selection › Unit Selection toggle updates display
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      76 |
+      77 |     test('Unit Selection toggle updates display', async ({ page }) => {
+    > 78 |         await page.goto('/');
+         |                    ^
+      79 |
+      80 |         // Upload an image to enable controls
+      81 |         // Use the ID selector to be specific
+        at /app/playwright_tests/verify_features.spec.js:78:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/verify_features-Standard-S-8f412-tion-toggle-updates-display-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/verify_features-Standard-S-8f412-tion-toggle-updates-display-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  23) [chromium] › playwright_tests/verify_optimization.spec.cjs:53:5 › Bolt Optimization Verification › should display orders correctly with DocumentFragment optimization
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/printshop.html
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/printshop.html", waiting until "load"[22m
+
+
+      57 |         });
+      58 |
+    > 59 |         await page.goto('/printshop.html');
+         |                    ^
+      60 |
+      61 |         // Wait for orders to load
+      62 |         await expect(page.locator('.order-card')).toHaveCount(2);
+        at /app/playwright_tests/verify_optimization.spec.cjs:59:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/verify_optimization-Bolt-O-727c2-cumentFragment-optimization-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/verify_optimization-Bolt-O-727c2-cumentFragment-optimization-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  24) [chromium] › playwright_tests/verify_ux_icons.spec.js:3:1 › Verify UX icons and required attribute in orders.html
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/orders.html
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/orders.html", waiting until "load"[22m
+
+
+      3 | test('Verify UX icons and required attribute in orders.html', async ({ page }) => {
+      4 |   // Navigate to the orders page
+    > 5 |   await page.goto('/orders.html');
+        |              ^
+      6 |
+      7 |   // Verify email input has the required attribute
+      8 |   const emailInput = page.locator('#emailInput');
+        at /app/playwright_tests/verify_ux_icons.spec.js:5:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/verify_ux_icons-Verify-UX--3ef56-ed-attribute-in-orders-html-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/verify_ux_icons-Verify-UX--3ef56-ed-attribute-in-orders-html-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  25) [chromium] › playwright_tests/visual_bugs.spec.js:4:3 › Visual Bug Reproduction › Top menu bar should not overlap with main title
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+       5 |     // Set mobile viewport (iPhone SE 1st gen width)
+       6 |     await page.setViewportSize({ width: 320, height: 568 });
+    >  7 |     await page.goto('/');
+         |                ^
+       8 |
+       9 |     // Wait for elements
+      10 |     const menuBar = page.locator('.top-menu-bar');
+        at /app/playwright_tests/visual_bugs.spec.js:7:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/visual_bugs-Visual-Bug-Rep-da859-not-overlap-with-main-title-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/visual_bugs-Visual-Bug-Rep-da859-not-overlap-with-main-title-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  26) [chromium] › playwright_tests/visual_bugs.spec.js:30:3 › Visual Bug Reproduction › Set max dimension label should not be squashed
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      31 |     // Set mobile viewport (iPhone SE 1st gen width)
+      32 |     await page.setViewportSize({ width: 320, height: 568 });
+    > 33 |     await page.goto('/');
+         |                ^
+      34 |
+      35 |     const label = page.locator('#standard-sizes-controls span').filter({ hasText: 'Set max dimension to:' });
+      36 |     await expect(label).toBeVisible();
+        at /app/playwright_tests/visual_bugs.spec.js:33:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/visual_bugs-Visual-Bug-Rep-3cd4f-abel-should-not-be-squashed-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/visual_bugs-Visual-Bug-Rep-3cd4f-abel-should-not-be-squashed-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  27) [Mobile Chrome] › playwright_tests/add-text.spec.js:3:1 › allows a user to add text to an image
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      2 |
+      3 | test('allows a user to add text to an image', async ({ page }) => {
+    > 4 |   await page.goto('/');
+        |              ^
+      5 |   await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+      6 |
+      7 |   // Wait for the app to initialize (BootStrap runs and disables/hides controls)
+        at /app/playwright_tests/add-text.spec.js:4:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/add-text-allows-a-user-to-add-text-to-an-image-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/add-text-allows-a-user-to-add-text-to-an-image-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  28) [Mobile Chrome] › playwright_tests/bounding-box.spec.js:9:1 › bounding box is visible when scaling image
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+       9 | test('bounding box is visible when scaling image', async ({ page }) => {
+      10 |   test.setTimeout(60000);
+    > 11 |   await page.goto('/');
+         |              ^
+      12 |   await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+      13 |   // --- ROBUST LOGGING SETUP ---
+      14 |   page.on('console', msg => {
+        at /app/playwright_tests/bounding-box.spec.js:11:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/bounding-box-bounding-box-is-visible-when-scaling-image-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/bounding-box-bounding-box-is-visible-when-scaling-image-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  29) [Mobile Chrome] › playwright_tests/canvas-ruler.spec.js:16:5 › Canvas Ruler › should display ruler after loading an image
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      11 |
+      12 |     test.beforeEach(async ({ page }) => {
+    > 13 |         await page.goto('/');
+         |                    ^
+      14 |     });
+      15 |
+      16 |     test('should display ruler after loading an image', async ({ page }) => {
+        at /app/playwright_tests/canvas-ruler.spec.js:13:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/canvas-ruler-Canvas-Ruler--b5e13-uler-after-loading-an-image-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/canvas-ruler-Canvas-Ruler--b5e13-uler-after-loading-an-image-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  30) [Mobile Chrome] › playwright_tests/contour_edge.spec.js:34:3 › Contour Edge Toggle and Offset Logic › Toggle state reflects correctly and positive offset produces a single contour
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      28 |     }));
+      29 |
+    > 30 |     await page.goto('/');
+         |                ^
+      31 |     await page.evaluate("document.dispatchEvent(new CustomEvent('easterEggUnlocked'))");
+      32 |   });
+      33 |
+        at /app/playwright_tests/contour_edge.spec.js:30:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/contour_edge-Contour-Edge--f027a-t-produces-a-single-contour-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/contour_edge-Contour-Edge--f027a-t-produces-a-single-contour-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  31) [Mobile Chrome] › playwright_tests/cutline_offset.spec.js:34:3 › Cutline Offset Slider Interaction › generates smart edge cuts when slider moves negative into sticker
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      29 |
+      30 |     // Load the page
+    > 31 |     await page.goto('/');
+         |                ^
+      32 |   });
+      33 |
+      34 |   test('generates smart edge cuts when slider moves negative into sticker', async ({ page }) => {
+        at /app/playwright_tests/cutline_offset.spec.js:31:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/cutline_offset-Cutline-Off-e6e88-moves-negative-into-sticker-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/cutline_offset-Cutline-Off-e6e88-moves-negative-into-sticker-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  32) [Mobile Chrome] › playwright_tests/e2e.spec.js:3:1 › has title ───────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      2 |
+      3 | test('has title', async ({ page }) => {
+    > 4 |   await page.goto('/');
+        |              ^
+      5 |
+      6 |   // Expect a title "to contain" a substring.
+      7 |   await expect(page).toHaveTitle(/Image Editor & Secure Pay - Custom Stickers/);
+        at /app/playwright_tests/e2e.spec.js:4:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/e2e-has-title-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  33) [Mobile Chrome] › playwright_tests/image-manipulation.spec.js:48:5 › Frontend Image Manipulation › should add text to the canvas
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at https://127.0.0.1:5173/
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      14 |         page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+      15 |         page.on('pageerror', err => console.log('PAGE ERROR:', err));
+    > 16 |         await page.goto('/');
+         |                    ^
+      17 |         await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+      18 |     });
+      19 |
+        at /app/playwright_tests/image-manipulation.spec.js:16:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/image-manipulation-Fronten-04d3b-ould-add-text-to-the-canvas-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/image-manipulation-Fronten-04d3b-ould-add-text-to-the-canvas-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  34) [Mobile Chrome] › playwright_tests/image-manipulation.spec.js:64:5 › Frontend Image Manipulation › should rotate the image
+
+    [31mTest timeout of 30000ms exceeded while running "beforeEach" hook.[39m
+
+      10 | test.describe('Frontend Image Manipulation', () => {
+      11 |
+    > 12 |     test.beforeEach(async ({ page }) => {
+         |          ^
+      13 |         // The autoMock fixture handles mocks
+      14 |         page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+      15 |         page.on('pageerror', err => console.log('PAGE ERROR:', err));
+        at /app/playwright_tests/image-manipulation.spec.js:12:10
+
+    Error: page.goto: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      14 |         page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+      15 |         page.on('pageerror', err => console.log('PAGE ERROR:', err));
+    > 16 |         await page.goto('/');
+         |                    ^
+      17 |         await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+      18 |     });
+      19 |
+        at /app/playwright_tests/image-manipulation.spec.js:16:20
+
+    attachment #1: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/image-manipulation-Fronten-7bf8c-ion-should-rotate-the-image-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/image-manipulation-Fronten-7bf8c-ion-should-rotate-the-image-Mobile-Chrome/error-context.md
+
+  35) [Mobile Chrome] › playwright_tests/nesting.spec.cjs:44:5 › Nesting Functionality › should generate nested layout when "Nest Stickers" is clicked
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#nested-svg-container svg')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for locator('#nested-svg-container svg')[22m
+
+
+      61 |         // The implementation updates innerHTML of #nested-svg-container
+      62 |         // We expect an <svg> element inside it.
+    > 63 |         await expect(page.locator('#nested-svg-container svg')).toBeVisible({ timeout: 10000 });
+         |                                                                 ^
+      64 |
+      65 |         // Verify the SVG has valid dimensions (basic sanity check)
+      66 |         const svg = page.locator('#nested-svg-container svg');
+        at /app/playwright_tests/nesting.spec.cjs:63:65
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/nesting-Nesting-Functional-3551f-en-Nest-Stickers-is-clicked-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/nesting-Nesting-Functional-3551f-en-Nest-Stickers-is-clicked-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/nesting-Nesting-Functional-3551f-en-Nest-Stickers-is-clicked-Mobile-Chrome/error-context.md
+
+  36) [Mobile Chrome] › playwright_tests/printshop_cache.spec.js:3:1 › printshop caches SVG fetches during nesting
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#success-toast')
+    Timeout: 5000ms
+    [32m- Expected substring  - 1[39m
+    [31m+ Received string     + 6[39m
+
+    [32m- Nesting complete.[39m
+    [31m+[39m
+    [31m+ [43m      [49m[39m
+    [31m+ [43m      [49m[39m
+    [31m+         ×[39m
+    [31m+ [43m      [49m[39m
+    [31m+ [43m    [49m[39m
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('#success-toast')[22m
+    [2m    8 × locator resolved to <div role="status" id="success-toast" aria-live="polite" class="fixed bottom-0 right-0 mb-4 mr-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-md z-[100] transition-all duration-300 ease-in-out transform translate-y-full opacity-0 pointer-events-none">…</div>[22m
+    [2m      - unexpected value "[22m
+    [2m      [22m
+    [2m      [22m
+    [2m        ×[22m
+    [2m      [22m
+    [2m    "[22m
+
+
+      47 |
+      48 |     // Wait for success toast
+    > 49 |     await expect(page.locator('#success-toast')).toContainText('Nesting complete.');
+         |                                                  ^
+      50 |
+      51 |     // 7. Click Nest Stickers again
+      52 |     // Manually hide the toast to ensure it doesn't block clicks and we don't wait for animation
+        at /app/playwright_tests/printshop_cache.spec.js:49:50
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/printshop_cache-printshop-caches-SVG-fetches-during-nesting-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/printshop_cache-printshop-caches-SVG-fetches-during-nesting-Mobile-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/printshop_cache-printshop-caches-SVG-fetches-during-nesting-Mobile-Chrome/error-context.md
+
+  37) [Mobile Chrome] › playwright_tests/qa_flow.spec.js:10:5 › QA Flow requested by user › create sticker pack, scale, contour bleedless, and fulfill in printshop
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "**/orders.html**" until "load"
+    ============================================================
+
+      93 |         });
+      94 |         // Expect redirect to order tracking page
+    > 95 |         await page.waitForURL('**/orders.html**', { timeout: 15000 });
+         |                    ^
+      96 |         // Grab the order ID if possible, though we can just fulfill the latest
+      97 |
+      98 |         // 6. Go to printshop dashboard
+        at /app/playwright_tests/qa_flow.spec.js:95:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/qa_flow-QA-Flow-requested--68f2f-ss-and-fulfill-in-printshop-Mobile-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/qa_flow-QA-Flow-requested--68f2f-ss-and-fulfill-in-printshop-Mobile-Chrome/error-context.md
+
+  38) [Mobile Safari] › playwright_tests/add-text.spec.js:3:1 › allows a user to add text to an image
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    attachment #1: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/add-text-allows-a-user-to-add-text-to-an-image-Mobile-Safari/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/add-text-allows-a-user-to-add-text-to-an-image-Mobile-Safari/error-context.md
+
+  39) [Mobile Safari] › playwright_tests/image-upload.spec.js:3:1 › allows a user to upload an image
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('label[for="file"]')[22m
+    [2m    - locator resolved to <label for="file" class="label text-sm font-medium text-gray-700">Upload Sticker Design Image:</label>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <p>We use cookies to improve your experience and pro…</p> from <div id="cookie-consent-banner">…</div> subtree intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    - waiting for element to be visible, enabled and stable[22m
+    [2m    - element is visible, enabled and stable[22m
+    [2m    - scrolling into view if needed[22m
+    [2m    - done scrolling[22m
+
+
+       6 |   // Use the file chooser to upload the test image.
+       7 |   const fileChooserPromise = page.waitForEvent('filechooser');
+    >  8 |   await page.locator('label[for="file"]').click();
+         |                                           ^
+       9 |   const fileChooser = await fileChooserPromise;
+      10 |   await fileChooser.setFiles('public/mascot.png');
+      11 |
+        at /app/playwright_tests/image-upload.spec.js:8:43
+
+    Error: page.waitForEvent: Test timeout of 30000ms exceeded.
+    =========================== logs ===========================
+    waiting for event "filechooser"
+    ============================================================
+
+       5 |
+       6 |   // Use the file chooser to upload the test image.
+    >  7 |   const fileChooserPromise = page.waitForEvent('filechooser');
+         |                                   ^
+       8 |   await page.locator('label[for="file"]').click();
+       9 |   const fileChooser = await fileChooserPromise;
+      10 |   await fileChooser.setFiles('public/mascot.png');
+        at /app/playwright_tests/image-upload.spec.js:7:35
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/image-upload-allows-a-user-to-upload-an-image-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/image-upload-allows-a-user-to-upload-an-image-Mobile-Safari/error-context.md
+
+    attachment #3: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/image-upload-allows-a-user-to-upload-an-image-Mobile-Safari/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  40) [Mobile Safari] › playwright_tests/nesting.spec.cjs:44:5 › Nesting Functionality › should generate nested layout when "Nest Stickers" is clicked
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#nested-svg-container svg')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for locator('#nested-svg-container svg')[22m
+
+
+      61 |         // The implementation updates innerHTML of #nested-svg-container
+      62 |         // We expect an <svg> element inside it.
+    > 63 |         await expect(page.locator('#nested-svg-container svg')).toBeVisible({ timeout: 10000 });
+         |                                                                 ^
+      64 |
+      65 |         // Verify the SVG has valid dimensions (basic sanity check)
+      66 |         const svg = page.locator('#nested-svg-container svg');
+        at /app/playwright_tests/nesting.spec.cjs:63:65
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/nesting-Nesting-Functional-3551f-en-Nest-Stickers-is-clicked-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/nesting-Nesting-Functional-3551f-en-Nest-Stickers-is-clicked-Mobile-Safari/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/nesting-Nesting-Functional-3551f-en-Nest-Stickers-is-clicked-Mobile-Safari/error-context.md
+
+  41) [Mobile Safari] › playwright_tests/orders_optimization.spec.js:3:1 › orders list renders correctly and reorder button works
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.waitForURL: Test timeout of 30000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "**/?design=%2Fuploads%2Ftest-design.png" until "load"
+      navigated to "https://127.0.0.1:5173/orders.html"
+    ============================================================
+
+      45 |
+      46 |   // Wait for URL to contain the design parameter
+    > 47 |   await page.waitForURL('**/?design=%2Fuploads%2Ftest-design.png');
+         |              ^
+      48 | });
+      49 |
+        at /app/playwright_tests/orders_optimization.spec.js:47:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/orders_optimization-orders-68b64-ly-and-reorder-button-works-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/orders_optimization-orders-68b64-ly-and-reorder-button-works-Mobile-Safari/error-context.md
+
+  42) [Mobile Safari] › playwright_tests/payment-form.spec.js:29:3 › Payment Form Flow › allows a user to submit the payment form
+
+    Error: page.waitForURL: Could not connect to 127.0.0.1: Connection refused
+    =========================== logs ===========================
+    waiting for navigation to "**/orders.html?requires_login=true" until "load"
+    ============================================================
+
+      63 |
+      64 |     // 7. Verify redirection to orders page
+    > 65 |     await page.waitForURL('**/orders.html?requires_login=true', { timeout: 10000 });
+         |                ^
+      66 |   });
+      67 | });
+      68 |
+        at /app/playwright_tests/payment-form.spec.js:65:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/payment-form-Payment-Form--f71fd--to-submit-the-payment-form-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/payment-form-Payment-Form--f71fd--to-submit-the-payment-form-Mobile-Safari/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/payment-form-Payment-Form--f71fd--to-submit-the-payment-form-Mobile-Safari/error-context.md
+
+  43) [Mobile Safari] › playwright_tests/printshop_cache.spec.js:3:1 › printshop caches SVG fetches during nesting
+
+    Error: page.goto: Could not connect to 127.0.0.1: Connection refused
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/printshop.html", waiting until "load"[22m
+
+
+      35 |
+      36 |     // 4. Go to Printshop
+    > 37 |     await page.goto('/printshop.html');
+         |                ^
+      38 |
+      39 |     // 5. Wait for orders to load
+      40 |     await expect(page.locator('#order-card-12345678')).toBeVisible();
+        at /app/playwright_tests/printshop_cache.spec.js:37:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/printshop_cache-printshop-caches-SVG-fetches-during-nesting-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  44) [Mobile Safari] › playwright_tests/printshop_dashboard.spec.js:90:3 › Printshop Dashboard E2E › should load printshop, display orders, and fulfill order
+
+    Error: page.goto: Could not connect to 127.0.0.1: Connection refused
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/printshop.html", waiting until "load"[22m
+
+
+      85 |
+      86 |
+    > 87 |       await page.goto('/printshop.html');
+         |                  ^
+      88 |   });
+      89 |
+      90 |   test('should load printshop, display orders, and fulfill order', async ({ page }) => {
+        at /app/playwright_tests/printshop_dashboard.spec.js:87:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/printshop_dashboard-Prints-7c616-ay-orders-and-fulfill-order-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/printshop_dashboard-Prints-7c616-ay-orders-and-fulfill-order-Mobile-Safari/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  45) [Mobile Safari] › playwright_tests/qa_flow.spec.js:10:5 › QA Flow requested by user › create sticker pack, scale, contour bleedless, and fulfill in printshop
+
+    Error: page.goto: Could not connect to 127.0.0.1: Connection refused
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      22 |         page.on('pageerror', error => console.log('BROWSER ERROR:', error.message));
+      23 |
+    > 24 |         await page.goto('/');
+         |                    ^
+      25 |
+      26 |         // Wait for app initialization to complete before uploading
+      27 |         await page.waitForFunction(() => window.__appInitialized === true);
+        at /app/playwright_tests/qa_flow.spec.js:24:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/qa_flow-QA-Flow-requested--68f2f-ss-and-fulfill-in-printshop-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  46) [Mobile Safari] › playwright_tests/regression_negative_cutline_miter.spec.js:3:1 › Negative cutline offset should generate sharp edges (miter)
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    attachment #1: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/regression_negative_cutlin-bcd8e-generate-sharp-edges-miter--Mobile-Safari/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/regression_negative_cutlin-bcd8e-generate-sharp-edges-miter--Mobile-Safari/error-context.md
+
+  47) [Mobile Safari] › playwright_tests/ux_clear_button.spec.js:3:1 › allows a user to clear the uploaded image
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.goto: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - navigating to "https://127.0.0.1:5173/", waiting until "load"[22m
+
+
+      2 |
+      3 | test('allows a user to clear the uploaded image', async ({ page }) => {
+    > 4 |   await page.goto('/');
+        |              ^
+      5 |     await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+      6 |
+      7 |   // Verify Clear button is hidden initially
+        at /app/playwright_tests/ux_clear_button.spec.js:4:14
+
+    Error Context: test-results/ux_clear_button-allows-a-user-to-clear-the-uploaded-image-Mobile-Safari/error-context.md
+
+  48) [Mobile Safari] › playwright_tests/verify_features.spec.js:27:5 › Standard Size Buttons and Unit Selection › Standard Size Buttons update resize slider
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('button.size-btn[data-size="1"]')[22m
+    [2m    - locator resolved to <button type="button" data-size="1" class="size-btn" aria-pressed="false" aria-label="Set max dimension to 1 inch" data-tooltip="Set max dimension to 1 inch">↵              1"↵            </button>[22m
+    [2m  - attempting click action[22m
+    [2m    - waiting for element to be visible, enabled and stable[22m
+
+
+      63 |
+      64 |         // Click 1" button
+    > 65 |         await btn1.click();
+         |                    ^
+      66 |         await expect(page.locator('#resizeSlider')).toHaveValue('1');
+      67 |         await expect(page.locator('#resizeInput')).toHaveValue('1.0');
+      68 |         await expect(page.locator('#resizeUnitLabel')).toHaveText('in');
+        at /app/playwright_tests/verify_features.spec.js:65:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/verify_features-Standard-S-3defb-uttons-update-resize-slider-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/verify_features-Standard-S-3defb-uttons-update-resize-slider-Mobile-Safari/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/verify_features-Standard-S-3defb-uttons-update-resize-slider-Mobile-Safari/error-context.md
+
+  48 failed
+    [chromium] › playwright_tests/add-text.spec.js:3:1 › allows a user to add text to an image ─────
+    [chromium] › playwright_tests/mascot_drag.spec.js:4:3 › Mascot Drag and Drop › drag mascot test
+    [chromium] › playwright_tests/mascot.spec.js:4:3 › Mascot Integration › should load a random mascot image
+    [chromium] › playwright_tests/mascot.spec.js:27:3 › Mascot Integration › should wiggle when mouse is near
+    [chromium] › playwright_tests/mobile-responsiveness.spec.js:5:3 › Mobile Responsiveness › Critical elements should be visible on mobile
+    [chromium] › playwright_tests/mobile-responsiveness.spec.js:75:3 › Mobile Responsiveness › Small mobile viewport (320px) overlap check
+    [chromium] › playwright_tests/nesting.spec.cjs:44:5 › Nesting Functionality › should generate nested layout when "Nest Stickers" is clicked
+    [chromium] › playwright_tests/order-status.spec.js:3:1 › has title ─────────────────────────────
+    [chromium] › playwright_tests/orders_optimization.spec.js:3:1 › orders list renders correctly and reorder button works
+    [chromium] › playwright_tests/paste-context-menu.spec.js:3:1 › placeholder should be contenteditable to allow context menu paste
+    [chromium] › playwright_tests/payment-form.spec.js:29:3 › Payment Form Flow › allows a user to submit the payment form
+    [chromium] › playwright_tests/printshop_cache.spec.js:3:1 › printshop caches SVG fetches during nesting
+    [chromium] › playwright_tests/printshop_dashboard.spec.js:90:3 › Printshop Dashboard E2E › should load printshop, display orders, and fulfill order
+    [chromium] › playwright_tests/qa_flow.spec.js:10:5 › QA Flow requested by user › create sticker pack, scale, contour bleedless, and fulfill in printshop
+    [chromium] › playwright_tests/regression_cutline_slider.spec.js:7:1 › Cutline Slider features - Magic Edge / Offset / Lazy Lasso
+    [chromium] › playwright_tests/regression_negative_cutline_miter.spec.js:3:1 › Negative cutline offset should generate sharp edges (miter)
+    [chromium] › playwright_tests/regression_rotation_dpr.spec.js:5:1 › verify rotation behavior with DPR=2
+    [chromium] › playwright_tests/regression_smart_cutline.spec.js:8:1 › Generate Smart Cutline should preserve the original image
+    [chromium] › playwright_tests/ux_clear_button.spec.js:3:1 › allows a user to clear the uploaded image
+    [chromium] › playwright_tests/verify_css.spec.js:4:1 › Verify Splotch Theme and Tailwind CSS are applied
+    [chromium] › playwright_tests/verify_features.spec.js:27:5 › Standard Size Buttons and Unit Selection › Standard Size Buttons update resize slider
+    [chromium] › playwright_tests/verify_features.spec.js:77:5 › Standard Size Buttons and Unit Selection › Unit Selection toggle updates display
+    [chromium] › playwright_tests/verify_optimization.spec.cjs:53:5 › Bolt Optimization Verification › should display orders correctly with DocumentFragment optimization
+    [chromium] › playwright_tests/verify_ux_icons.spec.js:3:1 › Verify UX icons and required attribute in orders.html
+    [chromium] › playwright_tests/visual_bugs.spec.js:4:3 › Visual Bug Reproduction › Top menu bar should not overlap with main title
+    [chromium] › playwright_tests/visual_bugs.spec.js:30:3 › Visual Bug Reproduction › Set max dimension label should not be squashed
+    [Mobile Chrome] › playwright_tests/add-text.spec.js:3:1 › allows a user to add text to an image
+    [Mobile Chrome] › playwright_tests/bounding-box.spec.js:9:1 › bounding box is visible when scaling image
+    [Mobile Chrome] › playwright_tests/canvas-ruler.spec.js:16:5 › Canvas Ruler › should display ruler after loading an image
+    [Mobile Chrome] › playwright_tests/contour_edge.spec.js:34:3 › Contour Edge Toggle and Offset Logic › Toggle state reflects correctly and positive offset produces a single contour
+    [Mobile Chrome] › playwright_tests/cutline_offset.spec.js:34:3 › Cutline Offset Slider Interaction › generates smart edge cuts when slider moves negative into sticker
+    [Mobile Chrome] › playwright_tests/e2e.spec.js:3:1 › has title ─────────────────────────────────
+    [Mobile Chrome] › playwright_tests/image-manipulation.spec.js:48:5 › Frontend Image Manipulation › should add text to the canvas
+    [Mobile Chrome] › playwright_tests/image-manipulation.spec.js:64:5 › Frontend Image Manipulation › should rotate the image
+    [Mobile Chrome] › playwright_tests/nesting.spec.cjs:44:5 › Nesting Functionality › should generate nested layout when "Nest Stickers" is clicked
+    [Mobile Chrome] › playwright_tests/printshop_cache.spec.js:3:1 › printshop caches SVG fetches during nesting
+    [Mobile Chrome] › playwright_tests/qa_flow.spec.js:10:5 › QA Flow requested by user › create sticker pack, scale, contour bleedless, and fulfill in printshop
+    [Mobile Safari] › playwright_tests/add-text.spec.js:3:1 › allows a user to add text to an image
+    [Mobile Safari] › playwright_tests/image-upload.spec.js:3:1 › allows a user to upload an image ─
+    [Mobile Safari] › playwright_tests/nesting.spec.cjs:44:5 › Nesting Functionality › should generate nested layout when "Nest Stickers" is clicked
+    [Mobile Safari] › playwright_tests/orders_optimization.spec.js:3:1 › orders list renders correctly and reorder button works
+    [Mobile Safari] › playwright_tests/payment-form.spec.js:29:3 › Payment Form Flow › allows a user to submit the payment form
+    [Mobile Safari] › playwright_tests/printshop_cache.spec.js:3:1 › printshop caches SVG fetches during nesting
+    [Mobile Safari] › playwright_tests/printshop_dashboard.spec.js:90:3 › Printshop Dashboard E2E › should load printshop, display orders, and fulfill order
+    [Mobile Safari] › playwright_tests/qa_flow.spec.js:10:5 › QA Flow requested by user › create sticker pack, scale, contour bleedless, and fulfill in printshop
+    [Mobile Safari] › playwright_tests/regression_negative_cutline_miter.spec.js:3:1 › Negative cutline offset should generate sharp edges (miter)
+    [Mobile Safari] › playwright_tests/ux_clear_button.spec.js:3:1 › allows a user to clear the uploaded image
+    [Mobile Safari] › playwright_tests/verify_features.spec.js:27:5 › Standard Size Buttons and Unit Selection › Standard Size Buttons update resize slider
+  2 skipped
+  73 passed (10.4m)
+ ELIFECYCLE  Command failed with exit code 1.
