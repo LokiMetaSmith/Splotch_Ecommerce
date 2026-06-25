@@ -537,6 +537,7 @@ async function fetchAndDisplayOrders(query = '') {
     try {
         const endpoint = query ? `${serverUrl}/api/orders/search?q=${encodeURIComponent(query)}` : `${serverUrl}/api/orders`;
         allOrders = await fetchWithAuth(endpoint);
+        if (!Array.isArray(allOrders)) allOrders = [];
         // After fetching, display with the current filter (defaults to ALL)
         const activeFilter = document.querySelector('#filter-container .filter-btn.active')?.dataset.status || 'ALL';
         filterAndDisplayOrders(activeFilter);

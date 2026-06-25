@@ -52,6 +52,7 @@ test.describe('Nesting Functionality', () => {
         await expect(page.locator('#order-card-order-nest-1')).toBeVisible();
 
         // Click Nest Stickers button
+        await page.locator('#order-card-order-nest-1 input[type="checkbox"]').check();
         await page.click('#nestStickersBtn');
 
         // Check for loading state (optional, might happen too fast)
