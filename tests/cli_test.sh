@@ -7,9 +7,9 @@ set -e
 
 # --- Test Setup ---
 CLI_PATH="server/cli.js"
-export DB_PATH="server/test-db.json"
+DB_PATH="server/test-db.json"
 TEST_USER="clitestuser"
-TEST_PASS="${TEST_PASSWORD:-password123}"
+TEST_PASS="password123"
 
 # Ensure we are in the project root
 if [ ! -f "$CLI_PATH" ]; then
@@ -17,11 +17,18 @@ if [ ! -f "$CLI_PATH" ]; then
     exit 1
 fi
 
+# Point the CLI to our test database by temporarily renaming it.
+# This is a simple way to isolate the test environment.
+mv server/db.json "$DB_PATH" 2>/dev/null || true # Ignore error if it doesn't exist
+
+echo "--- Running CLI Tests ---"
+
 # --- Helper Functions ---
 cleanup() {
     echo "--- Cleaning up ---"
-    # Remove the test database, leaving the production db untouched.
-    rm -f "$DB_PATH"
+    # Restore the original database and remove the test one.
+    rm "$DB_PATH"
+    mv "$DB_PATH" server/db.json 2>/dev/null || true
 }
 
 # Register the cleanup function to be called on script exit.
@@ -53,22 +60,8 @@ const fakeCredential = {
     credentialPublicKey: 'some-public-key',
     counter: 0
 };
-
-let user = db.users['$TEST_USER'];
-if (!user) {
-    user = Object.values(db.users).find(u => u.username === '$TEST_USER');
-}
-if (!user) {
-    console.error('User $TEST_USER not found');
-    process.exit(1);
-}
-
-if (!user.credentials) user.credentials = [];
-user.credentials.push(fakeCredential);
-
-if (!db.credentials) db.credentials = {};
+db.users['$TEST_USER'].credentials.push(fakeCredential);
 db.credentials[fakeCredential.credentialID] = fakeCredential;
-
 fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
 console.log('Fake credential added.');
 "

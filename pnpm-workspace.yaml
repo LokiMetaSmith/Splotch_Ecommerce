@@ -1,9 +1,0 @@
-allowBuilds:
-  - "@parcel/watcher"
-  - "bcrypt"
-  - "core-js"
-  - "esbuild"
-  - "nodent-runtime"
-  - "unrs-resolver"
-  - "@sentry-internal/node-cpu-profiler"
-  - "msgpackr-extract"

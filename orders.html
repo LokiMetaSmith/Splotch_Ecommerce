@@ -1,205 +1,42 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Orders - Splotch</title>
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" href="/favicon.png" type="image/png" />
-    <link rel="apple-touch-icon" href="/favicon192.png" />
-    <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./splotch-theme.css" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/favicon192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap" rel="stylesheet">
     <script type="module" src="./src/orders.js" defer></script>
-    <script type="module" src="./src/a11y-improvements.js" defer></script>
-    <script src="/cookie-consent.js" defer></script>
-  </head>
-  <body class="bg-gray-100">
-    <a href="#main-content" class="skip-link">Skip to main content</a>
-    <main
-      id="main-content"
-      class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8"
-    >
-      <div class="flex justify-between items-center mb-8">
-        <h1 class="text-3xl font-bold text-center text-gray-700">
-          Your Order History
-        </h1>
-        <a href="/" class="text-splotch-red hover:underline"
-          >← Back to Editor</a
-        >
-      </div>
+</head>
+<body class="bg-gray-100">
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-xl rounded-lg my-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-center text-gray-700">Your Order History</h1>
+            <a href="/" class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full">← Back to Editor</a>
+        </div>
 
-      <!-- Login Section -->
-      <div id="login-section" class="mb-8 p-6 bg-gray-50 rounded-lg shadow-md">
-        <h2 class="text-xl font-semibold text-splotch-navy mb-4">
-          Access Your Orders
-        </h2>
-        <p class="text-gray-600 mb-4">
-          Enter your email below to receive a magic link to view your past
-          orders.
-        </p>
-        <form id="magic-link-form" class="flex flex-col sm:flex-row gap-4">
-          <label
-            for="emailInput"
-            class="text-sm font-medium text-gray-700 self-center"
-            >Email</label
-          >
-          <input
-            type="email"
-            id="emailInput"
-            placeholder="you@example.com"
-            class="input flex-grow"
-            aria-label="Email address for login"
-            required
-          />
-          <button
-            type="submit"
-            id="loginBtn"
-            class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full flex justify-center items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-              class="w-5 h-5"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
-              />
-            </svg>
-            Send Magic Link
-          </button>
-        </form>
-        <p
-          id="login-status"
-          class="text-sm mt-4"
-          role="status"
-          aria-live="polite"
-        ></p>
-      </div>
-
-      <!-- Order History Section -->
-      <div id="order-history-section" class="hidden">
-        <h2 class="text-2xl font-semibold text-splotch-navy mb-4">
-          Your Past Orders
-        </h2>
-        <div id="orders-list" class="space-y-6">
-          <!-- Orders will be dynamically inserted here -->
-          <div
-            id="no-orders-message"
-            class="text-center py-12 px-4 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50"
-          >
-            <div
-              class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4 text-blue-600"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-8 w-8"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                />
-              </svg>
+        <!-- Login Section -->
+        <div id="login-section" class="mb-8 p-6 bg-gray-50 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold text-splotch-navy mb-4">Access Your Orders</h2>
+            <p class="text-gray-600 mb-4">Enter your email below to receive a magic link to view your past orders.</p>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="email" id="emailInput" placeholder="you@example.com" class="input flex-grow">
+                <button id="loginBtn" class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2 px-4 rounded-full">Send Magic Link</button>
             </div>
-            <h3
-              class="text-lg font-medium text-gray-900 mb-1"
-              style="font-family: var(--font-modak); letter-spacing: 0.05em"
-            >
-              No orders yet
-            </h3>
-            <p class="text-gray-500 mb-6 max-w-sm mx-auto">
-              Looks like you haven't placed any orders yet. Unleash your
-              creativity and design your first custom sticker!
-            </p>
-            <a
-              href="/"
-              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-splotch-red hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red transition-all"
-            >
-              Start Creating
-            </a>
-          </div>
+            <p id="login-status" class="text-sm mt-4"></p>
         </div>
-      </div>
 
-      <!-- Privacy Section -->
-      <div
-        id="data-privacy-section"
-        class="hidden mt-8 p-6 bg-gray-50 rounded-lg shadow-md border-t-4 border-splotch-navy"
-      >
-        <h2 class="text-xl font-semibold text-splotch-navy mb-4">
-          Privacy & Data
-        </h2>
-        <p class="text-gray-600 mb-4">Manage your personal data.</p>
-        <div class="flex flex-wrap gap-4">
-          <button
-            id="exportDataBtn"
-            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md flex items-center gap-2"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-              class="w-5 h-5"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-              />
-            </svg>
-            Export My Data
-          </button>
-          <button
-            id="deleteAccountBtn"
-            class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md flex items-center gap-2"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-              class="w-5 h-5"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-              />
-            </svg>
-            Delete Account
-          </button>
+        <!-- Order History Section -->
+        <div id="order-history-section" class="hidden">
+            <h2 class="text-2xl font-semibold text-splotch-navy mb-4">Your Past Orders</h2>
+            <div id="orders-list" class="space-y-6">
+                <!-- Orders will be dynamically inserted here -->
+                <p id="no-orders-message" class="text-gray-500 italic">You have no past orders.</p>
+            </div>
         </div>
-        <p id="privacy-status" class="text-sm mt-4" aria-live="polite"></p>
-      </div>
+
     </main>
-    <footer class="bg-white shadow-md mt-8">
-      <div class="container mx-auto px-6 py-3 text-center text-gray-500">
-        &copy; 2025 Splotch |
-        <a href="/terms.html" class="text-splotch-red hover:underline"
-          >Terms & FAQ</a
-        >
-       | <span class="text-xs text-gray-400 ml-2">v<span class="app-version-display"></span></span></div>
-    </footer>
-    <script type="module" src="./src/version.js"></script>
 </body>
 </html>

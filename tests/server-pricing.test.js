@@ -1,69 +1,114 @@
+import { describe, it, expect } from '@jest/globals';
+import { calculateStickerPrice } from '../server/pricing.js';
 
-import fs from 'fs';
-import path from 'path';
-import { jest } from '@jest/globals';
-import { getDesignDimensions, calculatePerimeter } from '../server/pricing.js';
+// Mock pricing configuration for consistent testing
+const mockPricingConfig = {
+  pricePerSquareInchCents: 10, // 10 cents per sq inch
+  materials: [
+    { id: 'standard', costMultiplier: 1.0 },
+    { id: 'premium', costMultiplier: 1.5 },
+  ],
+  complexity: {
+    tiers: [
+      { thresholdInches: 10, multiplier: 1.0 },
+      { thresholdInches: 20, multiplier: 1.2 },
+      { thresholdInches: 'Infinity', multiplier: 1.5 },
+    ],
+  },
+  quantityDiscounts: [
+    { quantity: 50, discount: 0.05 }, // 5% off for 50+
+    { quantity: 100, discount: 0.1 }, // 10% off for 100+
+  ],
+  resolutions: [
+    { id: 'dpi_150', ppi: 150, costMultiplier: 1.0 },
+    { id: 'dpi_300', ppi: 300, costMultiplier: 1.2 },
+  ],
+};
 
-const tempSvgPath = path.join(process.cwd(), 'tests', 'temp_test.svg');
-const complexSvgPath = path.join(process.cwd(), 'tests', 'complex_test.svg');
+describe('calculateStickerPrice', () => {
+  const resolution = mockPricingConfig.resolutions[0]; // 150 PPI
 
-describe('getDesignDimensions', () => {
-    beforeAll(() => {
-        // Create a simple SVG file
-        const svgContent = `
-<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-    <path d="M 10 10 L 90 10 L 90 90 L 10 90 Z" />
-</svg>`;
-        fs.writeFileSync(tempSvgPath, svgContent);
+  it('should calculate a basic price correctly', () => {
+    const quantity = 10;
+    const material = 'standard';
+    // 300x300 pixels at 150 PPI = 2x2 inches = 4 sq inches
+    const bounds = { width: 300, height: 300 };
+    // Simple rectangle perimeter = (2+2)*2 = 8 inches. Below complexity threshold.
+    const cutline = [[{x: 0, y: 0}, {x: 300, y: 0}, {x: 300, y: 300}, {x: 0, y: 300}]];
 
-        // Create a complex SVG file with curves
-        const complexSvgContent = `
-<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-  <path d="M 10 90 C 30 90, 30 10, 50 10 S 70 90, 90 90" />
-  <path d="M 110 90 Q 130 10, 150 90 T 190 90" />
-</svg>`;
-        fs.writeFileSync(complexSvgPath, complexSvgContent);
-    });
+    // Calculation:
+    // Base price = 4 sq in * 10 cents/sqin = 40 cents
+    // Total for quantity = 40 * 10 = 400 cents
+    // Multipliers (material, complexity, resolution) = 1.0
+    // Discount = 0%
+    // Final = 400 cents
+    const { total } = calculateStickerPrice(quantity, material, bounds, cutline, resolution, mockPricingConfig);
+    expect(total).toBe(400);
+  });
 
-    afterAll(() => {
-        if (fs.existsSync(tempSvgPath)) {
-            fs.unlinkSync(tempSvgPath);
-        }
-        if (fs.existsSync(complexSvgPath)) {
-            fs.unlinkSync(complexSvgPath);
-        }
-    });
+  it('should apply material cost multiplier', () => {
+    const quantity = 10;
+    const material = 'premium'; // 1.5x multiplier
+    const bounds = { width: 300, height: 300 }; // 4 sq in
+    const cutline = [[{x: 0, y: 0}, {x: 300, y: 0}, {x: 300, y: 300}, {x: 0, y: 300}]];
 
-    it('should correctly calculate dimensions and cutline for simple SVG', async () => {
-        const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
-        const readFileAsyncSpy = jest.spyOn(fs.promises, 'readFile');
+    // Calculation: 400 cents * 1.5 (material) = 600 cents
+    const { total } = calculateStickerPrice(quantity, material, bounds, cutline, resolution, mockPricingConfig);
+    expect(total).toBe(600);
+  });
 
-        try {
-            const result = await getDesignDimensions(tempSvgPath);
+  it('should apply complexity multiplier for long perimeters', () => {
+    const quantity = 10;
+    const material = 'standard';
+    const bounds = { width: 300, height: 300 }; // 4 sq in
+    // A 562x562 pixel rectangle at 150 PPI has a perimeter of ~15 inches.
+    // (562*4) / 150 = 14.98 inches. This should fall into the 1.2x multiplier tier.
+    const cutline = [[{x: 0, y: 0}, {x: 562, y: 0}, {x: 562, y: 562}, {x: 0, y: 562}]];
 
-            expect(result.bounds).toEqual({ width: 100, height: 100 });
-            expect(result.cutline).toBeDefined();
-            // Perimeter of 80x80 square = 320
-            // The path is M 10 10 L 90 10 L 90 90 L 10 90 Z
-            // 80 + 80 + 80 + 80 = 320
-            const perimeter = calculatePerimeter(result.cutline);
-            expect(perimeter).toBeCloseTo(320, 1);
+    // Calculation: 400 cents * 1.2 (complexity) = 480 cents
+    const { total } = calculateStickerPrice(quantity, material, bounds, cutline, resolution, mockPricingConfig);
+    expect(total).toBe(480);
+  });
 
-            expect(readFileSyncSpy).not.toHaveBeenCalled();
-            expect(readFileAsyncSpy).toHaveBeenCalledWith(tempSvgPath, 'utf8');
+  it('should apply quantity discounts', () => {
+    const quantity = 50; // 5% discount
+    const material = 'standard';
+    const bounds = { width: 300, height: 300 }; // 4 sq in
+    const cutline = [[{x: 0, y: 0}, {x: 300, y: 0}, {x: 300, y: 300}, {x: 0, y: 300}]];
 
-        } finally {
-            readFileSyncSpy.mockRestore();
-            readFileAsyncSpy.mockRestore();
-        }
-    });
+    // Calculation:
+    // Base price = 4 sq in * 10 cents/sqin = 40 cents
+    // Total for quantity = 40 * 50 = 2000 cents
+    // Discount = 2000 * 0.05 = 100 cents
+    // Final = 2000 - 100 = 1900 cents
+    const { total } = calculateStickerPrice(quantity, material, bounds, cutline, resolution, mockPricingConfig);
+    expect(total).toBe(1900);
+  });
 
-    it('should correctly calculate perimeter for complex path commands (C, S, Q, T)', async () => {
-        const result = await getDesignDimensions(complexSvgPath);
-        // We expect a valid calculation, not 0 and not linear approximation
-        const perimeter = calculatePerimeter(result.cutline);
-        expect(perimeter).toBeGreaterThan(100);
-        // Value from previous test run was ~373.58
-        expect(perimeter).toBeCloseTo(373.58, 1);
-    });
+  it('should apply resolution multiplier', () => {
+    const quantity = 10;
+    const material = 'standard';
+    const bounds = { width: 300, height: 300 }; // 4 sq in
+    const cutline = [[{x: 0, y: 0}, {x: 300, y: 0}, {x: 300, y: 300}, {x: 0, y: 300}]];
+    const highRes = mockPricingConfig.resolutions[1]; // 300 PPI, 1.2x multiplier
+
+    // Calculation at 300 PPI:
+    // Bounds are now 1x1 inches = 1 sq in
+    // Base price = 1 * 10 = 10 cents
+    // Total for quantity = 10 * 10 = 100 cents
+    // Resolution multiplier = 1.2
+    // Final = 100 * 1.2 = 120 cents
+    const { total } = calculateStickerPrice(quantity, material, bounds, cutline, highRes, mockPricingConfig);
+    expect(total).toBe(120);
+  });
+
+  it('should return 0 for invalid inputs', () => {
+    const bounds = { width: 300, height: 300 };
+    const cutline = [[{x: 0, y: 0}]];
+
+    expect(calculateStickerPrice(0, 'standard', bounds, cutline, resolution, mockPricingConfig).total).toBe(0);
+    expect(calculateStickerPrice(10, 'standard', {width: 0, height: 0}, cutline, resolution, mockPricingConfig).total).toBe(0);
+    expect(calculateStickerPrice(10, 'standard', bounds, cutline, null, mockPricingConfig).total).toBe(0);
+    expect(calculateStickerPrice(10, 'standard', bounds, cutline, resolution, null).total).toBe(0);
+  });
 });

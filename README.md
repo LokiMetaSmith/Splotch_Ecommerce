@@ -1,15 +1,4 @@
-# Print Shop Application
-
-Welcome to the Print Shop application. This repository contains the source code for the frontend and backend of the print shop order management system.
-
-## Documentation
-
-*   **[Deployment Guide](docs/deployment/README.md)**: Instructions for deploying to Cloud VPS, Proxmox, or Local Docker.
-*   **[Security](docs/security.md)**: Security best practices and guidelines.
-*   **[Backups](docs/backups.md)**: Backup and restore procedures.
-*   **[Full Documentation Index](docs/README.md)**: Complete list of all documentation.
-
-## Getting Started
+# Print Shop Application - Getting Started
 
 This guide provides instructions for setting up and running the Print Shop application locally for development.
 
@@ -32,24 +21,25 @@ cd <your-project-folder>
 Install the necessary Node.js packages for both the server and the client.
 ```bash
 # From the root directory
-pnpm install
+npm install
 
 # For the server
 cd server
-pnpm install
+npm install
 cd ..
 ```
 
 #### 3. Set Up Third-Party Services
-You will need to API keys and credentials from three services:
+You will need API keys and credentials from three services:
 
 * **Square**: Go to the [Square Developer Dashboard](https://developer.squareup.com/apps). Get your **Sandbox Access Token** and **Sandbox Location ID**.
 * **Google Cloud**: Go to the [Google Cloud Console](https://console.cloud.google.com/).
     * Create a new project.
     * Enable the **Gmail API**.
     * Create **OAuth 2.0 Credentials** for a "Web application".
-    * Under **Authorized redirect URIs**, add the public URI for your server's callback endpoint. This URI should be your `BASE_URL` followed by `/oauth2callback`. For example: `https://your-print-shop.com/oauth2callback`. For local development, use `http://localhost:3000/oauth2callback`.
+    * Add `http://localhost:3000/oauth2callback` as an **Authorized redirect URI**.
     * Copy your **Client ID** and **Client Secret**.
+* **SendGrid**: Create an account at [SendGrid](https://sendgrid.com) and generate an **API Key** for sending emails.
 
 #### 4. Generate Security Keys
 This application uses an RS256 key pair to sign server session tokens. Generate these keys in your terminal:
@@ -63,44 +53,60 @@ openssl rsa -in private.pem -pubout -out public.pem
 ```
 
 #### 5. Create Your Environment File
-Create a file named `.env` in the `server/` directory. You can use `server/env.example` as a template. For a detailed explanation of each environment variable, please see the [Environment Variable Documentation](server/ENV_DOCUMENTATION.md).
+Create a file named `.env` in the `server/` directory and add the following variables.
+
+```env
+# server/.env
+
+# --- Server Configuration ---
+# The port the backend server will run on.
+PORT=3000
+# The base URL of the frontend application, used for creating links in emails.
+BASE_URL="http://localhost:5173"
+
+
+# --- Square Credentials ---
+# Your Square Sandbox Access Token for processing payments.
+SQUARE_ACCESS_TOKEN="YOUR_SANDBOX_ACCESS_TOKEN"
+# Your Square Sandbox Location ID.
+SQUARE_LOCATION_ID="YOUR_SANDBOX_LOCATION_ID"
+
+
+# --- Google OAuth Credentials ---
+# The Client ID for your Google Cloud OAuth 2.0 application.
+GOOGLE_CLIENT_ID="YOUR_GOOGLE_CLIENT_ID"
+# The Client Secret for your Google Cloud OAuth 2.0 application.
+GOOGLE_CLIENT_SECRET="YOUR_GOOGLE_CLIENT_SECRET"
+
+
+# --- SendGrid API Key ---
+# API key for sending emails via SendGrid (if used as an alternative to Gmail).
+SENDGRID_API_KEY="YOUR_SENDGRID_API_KEY"
+
+
+# --- Admin Configuration ---
+# The email address where error logs and notifications will be sent.
+ADMIN_EMAIL="your-admin-email@example.com"
+
+
+# --- WebAuthn (Security Key) Configuration ---
+# The "Relying Party ID". For local development, this should be "localhost".
+# For production, it must be the domain where the application is hosted.
+RP_ID="localhost"
+# The full origin URL of the frontend application.
+EXPECTED_ORIGIN="http://localhost:5173"
+
+
+# --- JWT Asymmetric Keys ---
+# Copy the entire file content of your `private.pem`, including the header and footer,
+# and format it as a single line with `\n` for newlines.
+JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+# Copy the entire file content of your `public.pem`.
+JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+```
 
 #### 6. Place Legacy Scripts
 The nesting feature relies on two older libraries. Place `clipper.js` and `parallel.js` inside the `public/lib/` directory at the root of your project.
-
-## Configuring Gmail API Access
-
-The server is already equipped to handle the Google OAuth2 authentication process for sending emails. The following steps will guide you through using the built-in endpoints to authorize your application and automatically store the necessary refresh token.
-
-### Step 1: Configure Your Environment Variables
-Make sure your `server/.env` file is correctly configured with your Google API credentials:
-
--   `GOOGLE_CLIENT_ID`: Your Google API client ID.
--   `GOOGLE_CLIENT_SECRET`: Your Google API client secret.
--   `BASE_URL`: The public-facing URL of your server (e.g., `https://your-print-shop.com`). For local development, this should be `http://localhost:3000`.
-
-### Step 2: Start Your Server
-Run your print shop server as you normally would:
-```bash
-# In a terminal, from the project root
-pnpm run start --prefix server
-```
-
-### Step 3: Authorize the Application
-Once your server is running, open your web browser and navigate to the following URL:
-
-[http://localhost:3000/auth/google](http://localhost:3000/auth/google)
-
-This will redirect you to the Google consent screen. You will be asked to log in to your Google account and grant the application permission to send emails on your behalf.
-
-### Step 4: Automatic Token Retrieval
-After you grant permission, Google will redirect you back to your server's `/oauth2callback` endpoint. The server will automatically:
-
-1.  Capture the authorization code from the URL.
-2.  Exchange the code for an access token and a **refresh token**.
-3.  Securely store the refresh token in your `server/db.json` file under `config.google_refresh_token`.
-
-Your application is now fully configured to send emails. The server will use the stored refresh token to get new access tokens whenever it needs to send an email.
 
 ## Running the Application
 
@@ -112,7 +118,7 @@ You will need to run the backend server and the frontend development server in t
 cd server
 
 # Start the server using the npm script
-pnpm start
+npm start
 ```
 The backend server will be running at `http://localhost:3000`.
 
@@ -121,23 +127,9 @@ The backend server will be running at `http://localhost:3000`.
 #### 2. Start the Frontend Dev Server
 ```bash
 # In a second terminal, from the root directory
-pnpm run dev
+npm run dev
 ```
 The frontend application will be available at `http://localhost:5173`.
-
-### Lite Mode / Local Development
-
-For local development or single-instance "Lite" deployments where Redis is not available or not desired, the server automatically detects the unavailability of Redis and falls back to in-memory queues and session storage.
-
-You can also explicitly force this mode by setting the environment variable:
-```bash
-NO_REDIS=true
-```
-
-In this mode:
--   Job queues (Email, Telegram, Odoo) run in-memory within the server process.
--   Sessions are stored in memory (Note: restarts will clear sessions).
--   Rate limiting uses in-memory storage.
 
 ## Production Build
 
@@ -146,13 +138,13 @@ To create a production-ready build of the application, follow these steps:
 1.  **Build the Application:**
     This command will bundle the application and output the static files to the `dist` directory.
     ```bash
-    pnpm run build
+    npm run build
     ```
 
 2.  **Serve the Production Build:**
     This command will serve the contents of the `dist` directory. This is a simple way to preview the production build locally.
     ```bash
-    pnpm run start
+    npm run start
     ```
     The production build will be available at `http://localhost:3000` by default.
 
@@ -165,7 +157,7 @@ This project includes both unit tests (using Jest) and end-to-end tests (using P
 To run all tests, use the following command:
 
 ```bash
-pnpm test
+npm test
 ```
 
 This will first run the unit tests, and then the end-to-end tests.
@@ -175,7 +167,7 @@ This will first run the unit tests, and then the end-to-end tests.
 To run only the unit tests, use the following command:
 
 ```bash
-pnpm run test:unit
+npm run test:unit
 ```
 
 ### Running End-to-End Tests
@@ -183,11 +175,11 @@ pnpm run test:unit
 To run only the end-to-end tests, use the following command:
 
 ```bash
-pnpm run test:e2e
+npm run test:e2e
 ```
 
-**Note:** The end-to-end tests require the development server to be running. Make sure you have the dev server running in a separate terminal with `pnpm run dev` before running the e2e tests.
+**Note:** The end-to-end tests require the development server to be running. Make sure you have the dev server running in a separate terminal with `npm run dev` before running the e2e tests.
 
 ## Deployment
 
-For detailed deployment instructions, please see the [Deployment Guide](docs/deployment/README.md).
+For detailed deployment instructions, please see the [Deployment Guide](DEPLOY.md).

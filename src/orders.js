@@ -1,398 +1,151 @@
+import '/styles.css';
+
+const serverUrl = process.env.NODE_ENV === 'test' ? 'http://localhost:3001' : 'http://localhost:3000';
 let csrfToken;
-let authToken = null;
 
-export function escapeHtml(unsafe) {
-  if (unsafe == null) return "";
-  return String(unsafe)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+async function fetchCsrfToken() {
+    try {
+        const response = await fetch(`${serverUrl}/api/csrf-token`, { credentials: 'include' });
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.csrfToken) {
+            throw new Error("CSRF token not found in server response");
+        }
+        csrfToken = data.csrfToken;
+    } catch (error) {
+        console.error('Error fetching CSRF token:', error);
+        const loginStatus = document.getElementById('login-status');
+        if (loginStatus) {
+            loginStatus.textContent = 'A security token could not be loaded. Please refresh the page.';
+            loginStatus.style.color = 'red';
+        }
+    }
 }
 
-export async function fetchCsrfToken() {
-  try {
-    const response = await fetch("/api/csrf-token", { credentials: "include" });
-    if (!response.ok) {
-      throw new Error(`Server responded with ${response.status}`);
+document.addEventListener('DOMContentLoaded', async () => {
+    await fetchCsrfToken();
+
+    const loginSection = document.getElementById('login-section');
+    const orderHistorySection = document.getElementById('order-history-section');
+    const loginBtn = document.getElementById('loginBtn');
+    const emailInput = document.getElementById('emailInput');
+    const loginStatus = document.getElementById('login-status');
+    const ordersList = document.getElementById('orders-list');
+    const noOrdersMessage = document.getElementById('no-orders-message');
+
+    // Check for magic link token in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (token) {
+        verifyTokenAndFetchOrders(token);
     }
-    const data = await response.json();
-    if (!data.csrfToken) {
-      throw new Error("CSRF token not found in server response");
+
+    loginBtn.addEventListener('click', async () => {
+        const email = emailInput.value;
+        if (!email) {
+            loginStatus.textContent = 'Please enter a valid email address.';
+            loginStatus.style.color = 'red';
+            return;
+        }
+
+        try {
+            if (!csrfToken) {
+                throw new Error('CSRF token is not available. Please refresh the page.');
+            }
+            const response = await fetch(`${serverUrl}/api/auth/magic-login`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ email, redirectPath: '/orders.html' }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                loginStatus.textContent = 'Magic link sent! Please check your email.';
+                loginStatus.style.color = 'green';
+            } else {
+                throw new Error(data.error || 'Failed to send magic link.');
+            }
+        } catch (error) {
+            loginStatus.textContent = `Error: ${error.message}`;
+            loginStatus.style.color = 'red';
+        }
+    });
+
+    async function verifyTokenAndFetchOrders(authToken) {
+        loginSection.classList.add('hidden');
+        orderHistorySection.classList.remove('hidden');
+
+        try {
+            const response = await fetch(`${serverUrl}/api/orders/my-orders`, {
+                credentials: 'include',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Could not fetch your orders.');
+            }
+
+            const orders = await response.json();
+            displayOrders(orders, authToken);
+
+        } catch (error) {
+            noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
+            noOrdersMessage.style.color = 'red';
+        }
     }
-    csrfToken = data.csrfToken;
-  } catch (error) {
-    console.error("Error fetching CSRF token:", error);
-    const loginStatus = document.getElementById("login-status");
-    if (loginStatus) {
-      loginStatus.textContent =
-        "A security token could not be loaded. Please refresh the page.";
-      loginStatus.style.color = "red";
-    }
-  }
-}
 
-/**
- * Renders the list of orders into the container.
- * @param {Array} orders - List of order objects.
- * @param {HTMLElement} container - The container element to render into.
- * @param {HTMLElement} noOrdersMessage - The element to show if there are no orders.
- */
-export function displayOrders(orders, container, noOrdersMessage) {
-  if (!container) return;
+    function displayOrders(orders, authToken) {
+        ordersList.innerHTML = ''; // Clear loading/error message
+        if (orders.length === 0) {
+            ordersList.appendChild(noOrdersMessage); // Show the "no orders" message
+            return;
+        }
 
-  if (orders.length === 0) {
-    container.innerHTML = ""; // Clear content
-    if (noOrdersMessage) {
-      container.appendChild(noOrdersMessage); // Show the "no orders" message
-      noOrdersMessage.style.display = "block"; // Ensure visibility
-    }
-    return;
-  }
+        orders.forEach(order => {
+            const orderCard = document.createElement('div');
+            orderCard.className = 'p-4 border rounded-lg shadow-sm bg-gray-50';
 
-  // Bolt Optimization: Batch DOM updates using innerHTML
-  const html = orders
-    .map((order) => {
-      const receivedDate = new Date(order.receivedAt).toLocaleDateString();
-      const formattedAmount = order.amount
-        ? `$${(order.amount / 100).toFixed(2)}`
-        : "N/A";
+            const receivedDate = new Date(order.receivedAt).toLocaleDateString();
+            const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
 
-      const safeOrderId = escapeHtml(order.orderId);
-      const safeOrderIdShort = escapeHtml(order.orderId.substring(0, 8));
-      const safeStatus = escapeHtml(order.status);
-      const safeDesignImagePath = escapeHtml(order.designImagePath);
-
-      return `
-            <div class="order-card p-4 border rounded-lg shadow-sm bg-gray-50">
+            orderCard.innerHTML = `
                 <div class="flex flex-col sm:flex-row justify-between items-start">
                     <div>
-                        <h3 class="text-lg font-semibold text-splotch-red flex items-center gap-2">
-                            Order ID: <span class="font-mono text-sm" title="${safeOrderId}">${safeOrderIdShort}...</span>
-                            <button class="copy-order-id-btn text-gray-500 hover:text-splotch-teal focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-teal transition-colors p-1 rounded-full hover:bg-gray-200" data-order-id="${safeOrderId}" aria-label="Copy full Order ID" title="Copy full Order ID">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                                </svg>
-                            </button>
-                        </h3>
+                        <h3 class="text-lg font-semibold text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
                         <p class="text-sm text-gray-600">Ordered on: ${receivedDate}</p>
                         <p class="text-sm text-gray-600">Amount: ${formattedAmount}</p>
-                        <p class="text-sm text-gray-600 flex items-center gap-2">
-                            Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${safeStatus.toLowerCase()}">${safeStatus}</span>
-                        </p>
+                        <p class="text-sm text-gray-600">Status: <span class="font-semibold">${order.status}</span></p>
                     </div>
                     <div class="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">
-                        <img src="${safeDesignImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
+                        <img src="${serverUrl}${order.designImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
                     </div>
                 </div>
                 <div class="mt-4">
-                    <button class="reorder-btn button is-primary text-sm" data-design-image="${safeDesignImagePath}">Reorder This Sticker</button>
+                    <button class="reorder-btn button is-primary text-sm" data-design-image="${order.designImagePath}">Reorder This Sticker</button>
                 </div>
-            </div>`;
-    })
-    .join("");
-
-  container.innerHTML = html;
-}
-
-/**
- * Sets up event handlers for the orders list (delegation).
- * @param {HTMLElement} container - The container element (e.g., #orders-list).
- */
-export function setupOrderListHandlers(container) {
-  if (!container) return;
-
-  container.addEventListener("click", (e) => {
-    // Reorder Handler
-    const reorderBtn = e.target.closest(".reorder-btn");
-    if (reorderBtn) {
-      const designImage = reorderBtn.dataset.designImage;
-      window.location.href = `/?design=${encodeURIComponent(designImage)}`;
-      return;
-    }
-
-    // Copy Order ID Handler
-    const copyBtn = e.target.closest(".copy-order-id-btn");
-    if (copyBtn) {
-      const orderId = copyBtn.dataset.orderId;
-      if (orderId && navigator.clipboard) {
-        navigator.clipboard
-          .writeText(orderId)
-          .then(() => {
-            const originalHTML = copyBtn.innerHTML;
-            // Change to checkmark
-            copyBtn.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-green-600">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
             `;
-            // Optional: tooltip feedback
-            const originalLabel = copyBtn.getAttribute("aria-label");
-            copyBtn.setAttribute("aria-label", "Copied!");
+            ordersList.appendChild(orderCard);
+        });
 
-            setTimeout(() => {
-              copyBtn.innerHTML = originalHTML;
-              copyBtn.setAttribute("aria-label", originalLabel);
-            }, 2000);
-          })
-          .catch((err) => {
-            console.error("Failed to copy text: ", err);
-          });
-      }
+        // Add event listeners to reorder buttons
+        document.querySelectorAll('.reorder-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const designImage = e.target.dataset.designImage;
+                // For now, redirect to the main page with the image URL as a query param
+                // A more robust solution would pre-fill all options
+                window.location.href = `/?design=${encodeURIComponent(designImage)}`;
+            });
+        });
     }
-  });
-}
-
-export function setButtonLoading(
-  button,
-  isLoading,
-  originalContent,
-  loadingText = "Loading...",
-) {
-  if (isLoading) {
-    button.disabled = true;
-    button.innerHTML = `
-            <svg class="animate-spin h-5 w-5 text-white inline-block mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>${loadingText}</span>
-        `;
-    button.classList.add("opacity-75", "cursor-not-allowed");
-  } else {
-    button.disabled = false;
-    button.innerHTML = originalContent;
-    button.classList.remove("opacity-75", "cursor-not-allowed");
-  }
-}
-
-document.addEventListener("DOMContentLoaded", async () => {
-  await fetchCsrfToken();
-
-  const loginSection = document.getElementById("login-section");
-  const orderHistorySection = document.getElementById("order-history-section");
-  const loginBtn = document.getElementById("loginBtn");
-  const emailInput = document.getElementById("emailInput");
-  const loginStatus = document.getElementById("login-status");
-  const ordersList = document.getElementById("orders-list");
-  const noOrdersMessage = document.getElementById("no-orders-message");
-  const dataPrivacySection = document.getElementById("data-privacy-section");
-
-  // Bolt Optimization: Event Delegation for reorder buttons AND Copy buttons
-  setupOrderListHandlers(ordersList);
-
-  const exportDataBtn = document.getElementById("exportDataBtn");
-  const deleteAccountBtn = document.getElementById("deleteAccountBtn");
-  const privacyStatus = document.getElementById("privacy-status");
-
-  // Check for magic link token in URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get("token");
-  const requiresLogin = urlParams.get("requires_login");
-
-  if (token) {
-    authToken = token;
-    verifyTokenAndFetchOrders(authToken);
-    // Remove token from URL to prevent accidental sharing
-    window.history.replaceState({}, document.title, window.location.pathname);
-  } else if (requiresLogin === "true") {
-    loginStatus.textContent =
-      "Please verify your email via the magic link below to view your order history.";
-    loginStatus.style.color = "blue";
-  }
-
-  // Privacy Event Listeners
-  if (exportDataBtn) {
-    exportDataBtn.addEventListener("click", async () => {
-      if (!csrfToken) return;
-      const originalText = exportDataBtn.innerHTML;
-      setButtonLoading(exportDataBtn, true, originalText, "Exporting...");
-      privacyStatus.textContent = "Exporting data...";
-      privacyStatus.style.color = "blue";
-      try {
-        const response = await fetch("/api/auth/user/data", {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        });
-        if (!response.ok) throw new Error("Failed to fetch data");
-        const data = await response.json();
-        const blob = new Blob([JSON.stringify(data, null, 2)], {
-          type: "application/json",
-        });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "splotch-user-data.json";
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        privacyStatus.textContent = "Data exported successfully.";
-        privacyStatus.style.color = "green";
-      } catch (e) {
-        privacyStatus.textContent = "Error exporting data: " + e.message;
-        privacyStatus.style.color = "red";
-      } finally {
-        setButtonLoading(exportDataBtn, false, originalText);
-      }
-    });
-  }
-
-  if (deleteAccountBtn) {
-    deleteAccountBtn.addEventListener("click", async () => {
-      if (
-        !window.confirm(
-          "Are you sure you want to delete your account? This action cannot be undone and will anonymize your order history.",
-        )
-      ) {
-        return;
-      }
-
-      const originalText = deleteAccountBtn.innerHTML;
-      setButtonLoading(deleteAccountBtn, true, originalText, "Deleting...");
-      privacyStatus.textContent = "Deleting account...";
-      privacyStatus.style.color = "red";
-      try {
-        const response = await fetch("/api/auth/user", {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            "X-CSRF-Token": csrfToken,
-          },
-        });
-        if (!response.ok) throw new Error("Failed to delete account");
-        alert("Your account has been deleted.");
-        window.location.href = "/";
-      } catch (e) {
-        privacyStatus.textContent = "Error deleting account: " + e.message;
-        privacyStatus.style.color = "red";
-        setButtonLoading(deleteAccountBtn, false, originalText);
-      }
-    });
-  }
-
-  const magicLinkForm = document.getElementById("magic-link-form");
-  if (magicLinkForm) {
-    magicLinkForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = emailInput.value;
-      if (!email) {
-        loginStatus.textContent = "Please enter a valid email address.";
-        loginStatus.style.color = "red";
-        return;
-      }
-
-      const originalText = loginBtn.innerHTML;
-      const originalClassName = loginBtn.className;
-      loginBtn.disabled = true;
-      loginBtn.innerHTML = `
-            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>Sending...</span>
-        `;
-      // Ensure disabled style is applied visually if not handled by CSS
-      loginBtn.classList.add("opacity-75", "cursor-not-allowed");
-
-      let success = false;
-
-      try {
-        if (!csrfToken) {
-          throw new Error(
-            "CSRF token is not available. Please refresh the page.",
-          );
-        }
-        const response = await fetch("/api/auth/magic-login", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": csrfToken,
-          },
-          body: JSON.stringify({ email, redirectPath: "/orders.html" }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          success = true;
-          loginStatus.textContent = "Magic link sent! Please check your email.";
-          loginStatus.style.color = "green";
-        } else {
-          throw new Error(data.error || "Failed to send magic link.");
-        }
-      } catch (error) {
-        loginStatus.textContent = `Error: ${error.message}`;
-        loginStatus.style.color = "red";
-      } finally {
-        if (!success) {
-          loginBtn.disabled = false;
-          loginBtn.innerHTML = originalText;
-          loginBtn.className = originalClassName;
-        } else {
-          // Success: Show Cooldown
-          let cooldown = 30;
-          loginBtn.disabled = true;
-          loginBtn.classList.add("cursor-not-allowed");
-          loginBtn.classList.remove("bg-splotch-red");
-          loginBtn.classList.add("bg-green-600"); // Success color
-
-          const updateButtonText = () => {
-            loginBtn.innerHTML = `
-                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                <span>Sent! Retry in ${cooldown}s</span>
-            `;
-          };
-
-          updateButtonText();
-
-          const timer = setInterval(() => {
-            cooldown--;
-            if (cooldown <= 0) {
-              clearInterval(timer);
-              loginBtn.disabled = false;
-              loginBtn.innerHTML = originalText;
-              loginBtn.className = originalClassName;
-            } else {
-              updateButtonText();
-            }
-          }, 1000);
-        }
-      }
-    });
-  }
-
-  async function verifyTokenAndFetchOrders(authToken) {
-    loginSection.classList.add("hidden");
-    orderHistorySection.classList.remove("hidden");
-    if (dataPrivacySection) dataPrivacySection.classList.remove("hidden");
-
-    try {
-      const response = await fetch("/api/orders/my-orders", {
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Could not fetch your orders.");
-      }
-
-      const orders = await response.json();
-      displayOrders(orders, ordersList, noOrdersMessage);
-    } catch (error) {
-      if (noOrdersMessage) {
-        noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
-        noOrdersMessage.style.color = "red";
-        ordersList.appendChild(noOrdersMessage);
-      }
-    }
-  }
 });

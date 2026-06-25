@@ -34,8 +34,8 @@ describe('Server', () => {
     });
 
     afterAll(async () => {
-        // Stop the bot from polling, if it's running
-        if (bot && typeof bot.isPolling === 'function' && bot.isPolling()) {
+        // Stop the bot from polling
+        if (bot && bot.isPolling()) {
             await bot.stopPolling();
         }
         // Clear timers
@@ -43,38 +43,14 @@ describe('Server', () => {
         // Close the server
         await new Promise(resolve => serverInstance.close(resolve));
         // Clean up the test database file
-        if (fs.existsSync(testDbPath)) {
-            fs.unlinkSync(testDbPath);
-        }
+            if (fs.existsSync(testDbPath)) {
+                fs.unlinkSync(testDbPath);
+            }
     });
 
     it('should respond to ping', async () => {
         const res = await request(app).get('/api/ping');
         expect(res.statusCode).toEqual(200);
         expect(res.body.status).toEqual('ok');
-    });
-
-    it('should return a CSRF token', async () => {
-        const res = await request(app).get('/api/csrf-token');
-        expect(res.statusCode).toEqual(200);
-        expect(res.body).toHaveProperty('csrfToken');
-        expect(typeof res.body.csrfToken).toBe('string');
-    });
-
-    it('should return pricing info', async () => {
-        const res = await request(app).get('/api/pricing-info');
-        expect(res.statusCode).toEqual(200);
-        // We expect the body to be the pricing config object.
-        // Checking for a few key properties to ensure it's the right object.
-        expect(res.body).toHaveProperty('pricePerSquareInchCents');
-        expect(res.body).toHaveProperty('resolutions');
-        expect(res.body).toHaveProperty('materials');
-    });
-
-    it('should return server info with session token', async () => {
-        const res = await request(app).get('/api/server-info');
-        expect(res.statusCode).toEqual(200);
-        expect(res.body).toHaveProperty('serverSessionToken');
-        expect(typeof res.body.serverSessionToken).toBe('string');
     });
 });

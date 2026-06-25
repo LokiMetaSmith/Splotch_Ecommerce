@@ -106,11 +106,10 @@ export class SVGParser {
             }
         } else if (!currentMatrix.isIdentity() && this.allowedElements.includes(element.tagName) && element.tagName !== 'svg') {
             const poly = this.polygonify(element);
-            // Bolt Optimization: Transform points in-place to avoid object allocation
-            const transformedPoly = poly;
-            for (let i = 0; i < poly.length; i++) {
-                currentMatrix.calc(poly[i].x, poly[i].y, false, poly[i]);
-            }
+            const transformedPoly = poly.map(p => {
+                const [x, y] = currentMatrix.calc(p.x, p.y);
+                return { x, y };
+            });
 
             if (transformedPoly.length > 0) {
                 let d = transformedPoly.map((p, i) => (i === 0 ? 'M ' : 'L ') + p.x + ' ' + p.y).join(' ');
@@ -166,10 +165,9 @@ export class SVGParser {
     }
 
     parsePath(d) {
-        // More robust splitting to handle commands without spaces (e.g., "M0 0H100")
-        // Fix: Use regex that excludes 'e' (scientific notation) from commands
-        const tokens = d.replace(/([MmLlHhVvCcSsQqTtAaZz])/g, ' $1 ').trim().split(/[\s,]+/).filter(t => t.length > 0);
-        const COMMAND = /([MmLlHhVvCcSsQqTtAaZz])/;
+        const COMMAND = /([a-zA-Z])/;
+        const WSP = /[\s,]+/;
+        const tokens = d.split(WSP).filter(t => t.length > 0);
 
         const polygons = [];
         let currentPolygon = [];
@@ -177,25 +175,17 @@ export class SVGParser {
         let startX = 0, startY = 0; // start of current subpath
 
         let command = '';
-        let i = 0;
-
-        while(i < tokens.length) {
-            let token = tokens[i++];
+        while(tokens.length > 0) {
+            let token = tokens.shift();
             const isCommand = token.match(COMMAND);
             if (isCommand) {
                 command = token;
             } else {
-                i--; // put it back
+                tokens.unshift(token); // put it back
             }
 
             // Helper to get the next number from tokens
-            const next = () => parseFloat(tokens[i++]);
-
-            // Handle parsing errors or missing tokens
-            const safeNext = () => {
-                const val = next();
-                return isNaN(val) ? 0 : val;
-            };
+            const next = () => parseFloat(tokens.shift());
 
             switch(command) {
                 case 'M':

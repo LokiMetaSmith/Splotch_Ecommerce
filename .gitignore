@@ -1,23 +1,15 @@
 .DS_Store
 node_modules
-dist/
 .env
 db.json
 *.pem
 /server/uploads/designImage-*
 /server/uploads/cutLineFile-*
 *.bak
-dist/
 server/error.log
-.deepsec/
 
 # Playwright
 test-results/
 playwright-report/
 verification/
 **/*-snapshots/
-server/logs/
-
-# Logs
-*.log
-server/db.test.json

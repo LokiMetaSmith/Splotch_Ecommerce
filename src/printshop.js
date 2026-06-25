@@ -1,83 +1,23 @@
 // printshop.js
-import '/src/styles.css'; // Or your main CSS file
+import '/styles.css'; // Or your main CSS file
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import DOMPurify from 'dompurify';
 import { SvgNest } from './lib/svgnest.js';
 import { SVGParser } from './lib/svgparser.js';
-import { generateCutFile } from './lib/cut_file_generator.js';
 import * as jose from 'jose';
 import { jsPDF } from "jspdf";
-import "svg2pdf.js";
+import SVGtoPDF from 'svg-to-pdfkit';
 
 // --- Global Variables ---
-const serverUrl = ''; // Use relative paths for API calls
-let authToken;
+const serverUrl = 'http://localhost:3000';
+let authToken = localStorage.getItem('authToken');
 let csrfToken;
 let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
-const svgCache = new Map(); // Cache for SVG strings to avoid redundant fetches
 
 // --- DOM Elements ---
 // A single object to hold all DOM elements for cleaner management
-export const ui = {};
-
-class ToastManager {
-    constructor(element, messageElement, duration = 3000) {
-        this.element = element;
-        this.messageElement = messageElement;
-        this.duration = duration;
-        this.timeoutId = null;
-        this.isHidden = true;
-
-        if (this.element) {
-            // Bind events for pause on hover/focus
-            this.element.addEventListener('mouseenter', () => this.pause());
-            this.element.addEventListener('mouseleave', () => this.resume());
-            this.element.addEventListener('focusin', () => this.pause());
-            this.element.addEventListener('focusout', () => this.resume());
-        }
-    }
-
-    show(message) {
-        if (!this.element) return;
-        this.messageElement.textContent = message;
-        this.element.classList.remove('opacity-0', 'translate-y-full', 'pointer-events-none');
-        this.isHidden = false;
-        this.startTimer();
-    }
-
-    hide() {
-        if (!this.element) return;
-        this.element.classList.add('opacity-0', 'translate-y-full', 'pointer-events-none');
-        this.isHidden = true;
-        this.clearTimer();
-    }
-
-    startTimer() {
-        this.clearTimer();
-        this.timeoutId = setTimeout(() => this.hide(), this.duration);
-    }
-
-    clearTimer() {
-        if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-            this.timeoutId = null;
-        }
-    }
-
-    pause() {
-        this.clearTimer();
-    }
-
-    resume() {
-        if (!this.isHidden) {
-            this.startTimer();
-        }
-    }
-}
-
-let errorToastManager;
-let successToastManager;
+const ui = {};
 
 // --- Helper Functions ---
 
@@ -98,22 +38,18 @@ function updateConnectionStatus(status) {
         case 'connected':
             dot.classList.add('bg-green-500');
             text.textContent = 'Connected';
-            dot.setAttribute('aria-label', 'Connection Status: Connected');
             break;
         case 'error':
             dot.classList.add('bg-red-500');
             text.textContent = 'Error';
-            dot.setAttribute('aria-label', 'Connection Status: Error');
             break;
         case 'connecting':
             dot.classList.add('bg-yellow-500');
             text.textContent = 'Connecting...';
-            dot.setAttribute('aria-label', 'Connection Status: Connecting...');
             break;
         default: // idle
             dot.classList.add('bg-yellow-500');
             text.textContent = 'Status';
-            dot.setAttribute('aria-label', 'Connection Status: Idle');
             break;
     }
 }
@@ -124,82 +60,11 @@ function updateConnectionStatus(status) {
  * @param {ArrayBuffer} value The buffer to encode.
  * @returns {string} The encoded string.
  */
-
-/**
- * Sets a button to a loading state with an inline spinner.
- * @param {HTMLElement} btn - The button element.
- * @param {boolean} isLoading - Whether the button is loading.
- * @param {string} loadingText - Text to display while loading.
- */
-function setButtonLoading(btn, isLoading, loadingText = 'Processing...') {
-    if (!btn) return;
-    if (isLoading) {
-        if (!btn.dataset.originalContent) {
-            btn.dataset.originalContent = btn.innerHTML;
-        }
-        btn.disabled = true;
-
-        // Save current width to prevent button from resizing when content changes
-        btn.style.width = `${btn.offsetWidth}px`;
-
-        // Add minimal classes just for the loading state, save old classes if needed
-        btn.dataset.originalClasses = btn.className;
-
-        // We add some classes for flex layout of the spinner, but we keep existing classes
-        // Note: Tailwind classes won't conflict if they aren't the same type, but to be safe,
-        // we just add inline-flex items-center justify-center if they aren't there.
-        const classesToAdd = ['opacity-75', 'cursor-not-allowed'];
-        if (!btn.classList.contains('flex') && !btn.classList.contains('inline-flex')) {
-            classesToAdd.push('inline-flex', 'items-center', 'justify-center');
-        }
-
-        btn.classList.add(...classesToAdd);
-        btn.dataset.addedClasses = JSON.stringify(classesToAdd);
-
-        btn.innerHTML = `
-            <svg class="animate-spin h-4 w-4 mr-2 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>${loadingText}</span>
-        `;
-    } else {
-        if (btn.dataset.originalContent) {
-            btn.innerHTML = btn.dataset.originalContent;
-            delete btn.dataset.originalContent;
-        }
-        btn.disabled = false;
-        btn.style.width = ''; // remove fixed width
-
-        if (btn.dataset.addedClasses) {
-            const addedClasses = JSON.parse(btn.dataset.addedClasses);
-            btn.classList.remove(...addedClasses);
-            delete btn.dataset.addedClasses;
-        }
-    }
-}
-
 function bufferEncode(value) {
-    if (typeof value === 'string') return value;
     return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=/g, '');
-}
-
-/**
- * Safely escapes HTML characters to prevent XSS.
- * @param {string} unsafe - The unsafe string.
- * @returns {string} The escaped string.
- */
-function escapeHtml(unsafe) {
-    if (unsafe == null) return '';
-    return String(unsafe)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
 }
 
 // The final fetchWithAuth function with robust verification
@@ -254,11 +119,7 @@ async function fetchWithAuth(url, options = {}) {
     }
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => {
-            // Provide a more descriptive error if we can't parse JSON (e.g. proxy returned 500 without a body)
-            console.error(`[fetchWithAuth] Received non-JSON error response. HTTP Status: ${response.status}`);
-            return { error: `Server error: Could not process response (Status ${response.status})` };
-        });
+        const errorData = await response.json().catch(() => ({ error: 'An unknown server error occurred.' }));
         throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
     }
 
@@ -309,27 +170,22 @@ function logout() {
     ui.loginBtn.removeEventListener('click', logout);
     ui.loginBtn.addEventListener('click', showLoginModal);
 
-    // Clear existing order cards without destroying the message element
-    const orderCards = ui.ordersList.querySelectorAll('.order-card');
-    orderCards.forEach(card => card.remove());
-
-    const noOrdersText = document.getElementById('no-orders-text');
-    if (noOrdersText) noOrdersText.textContent = 'Please log in to view orders.';
+    ui.ordersList.innerHTML = '';
+    ui.noOrdersMessage.textContent = 'Please log in to view orders.';
     ui.noOrdersMessage.style.display = 'block';
 }
 
 /**
  * Handles the WebAuthn (YubiKey) login flow.
  */
-async function handleWebAuthnLogin(e) {
-    const btn = e ? (e.submitter || e.currentTarget || e.target.closest('button')) : ui.webauthnLoginBtn;
+async function handleWebAuthnLogin() {
     const username = ui.usernameInput.value;
     if (!username) {
         showErrorToast('Please enter your username.');
         return;
     }
 
-    setButtonLoading(btn, true, 'Authenticating...');
+    showLoadingIndicator();
     try {
         const opts = await fetchWithAuth(`${serverUrl}/api/auth/login-options?username=${encodeURIComponent(username)}`);
 
@@ -339,19 +195,19 @@ async function handleWebAuthnLogin(e) {
             return;
         }
 
-        const authResp = await startAuthentication({ optionsJSON: opts });
+        const authResp = await startAuthentication(opts);
         
         // Encode binary data to Base64URL before sending to server
         const verificationPayload = {
             username,
             id: authResp.id,
-            rawId: authResp.rawId,
+            rawId: bufferEncode(authResp.rawId),
             type: authResp.type,
             response: {
-                clientDataJSON: authResp.response.clientDataJSON,
-                authenticatorData: authResp.response.authenticatorData,
-                signature: authResp.response.signature,
-                userHandle: authResp.response.userHandle,
+                clientDataJSON: bufferEncode(authResp.response.clientDataJSON),
+                authenticatorData: bufferEncode(authResp.response.authenticatorData),
+                signature: bufferEncode(authResp.response.signature),
+                userHandle: authResp.response.userHandle ? bufferEncode(authResp.response.userHandle) : null,
             },
         };
 
@@ -370,39 +226,14 @@ async function handleWebAuthnLogin(e) {
         showErrorToast(`WebAuthn Login Failed: ${error.message}`);
         console.error(error);
     } finally {
-        setButtonLoading(btn, false);
-    }
-}
-
-async function handleAddTracking(orderId, btn) {
-    const trackingNumber = document.getElementById(`tracking-number-${orderId}`).value;
-    const courier = document.getElementById(`courier-${orderId}`).value;
-
-    if (!trackingNumber) {
-        showErrorToast('Please enter a tracking number.');
-        return;
-    }
-
-    setButtonLoading(btn, true, 'Saving...');
-    try {
-        await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/tracking`, {
-            method: 'POST',
-            body: JSON.stringify({ trackingNumber, courier }),
-        });
-        showSuccessToast('Tracking information added successfully.');
-    } catch (error) {
-        showErrorToast(`Failed to add tracking info: ${error.message}`);
-        console.error(error);
-    } finally {
-        setButtonLoading(btn, false);
+        hideLoadingIndicator();
     }
 }
 
 /**
  * Handles the password login flow.
  */
-async function handlePasswordLogin(e) {
-    const btn = e ? (e.submitter || e.currentTarget || e.target.closest('button')) : ui.passwordLoginBtn;
+async function handlePasswordLogin() {
     const username = ui.usernameInput.value;
     const password = ui.passwordInput.value;
 
@@ -411,7 +242,7 @@ async function handlePasswordLogin(e) {
         return;
     }
 
-    setButtonLoading(btn, true, 'Logging in...');
+    showLoadingIndicator();
     try {
         const data = await fetchWithAuth(`${serverUrl}/api/auth/login`, {
             method: 'POST',
@@ -428,38 +259,37 @@ async function handlePasswordLogin(e) {
         showErrorToast(`Password Login Failed: ${error.message}`);
         console.error(error);
     } finally {
-        setButtonLoading(btn, false);
+        hideLoadingIndicator();
     }
 }
 
 /**
  * Handles the registration of a new WebAuthn credential.
  */
-async function handleRegistration(e) {
-    const btn = e ? (e.submitter || e.currentTarget || e.target.closest('button')) : ui.webauthnRegisterBtn;
+async function handleRegistration() {
     const username = ui.usernameInput.value;
     if (!username) {
         showErrorToast('Please enter a username to register a key.');
         return;
     }
 
-    setButtonLoading(btn, true, 'Registering...');
+    showLoadingIndicator();
     try {
         const opts = await fetchWithAuth(`${serverUrl}/api/auth/pre-register`, {
             method: 'POST',
             body: JSON.stringify({ username }),
         });
-        const regResp = await startRegistration({ optionsJSON: opts });
+        const regResp = await startRegistration(opts);
         
         // Encode binary data before sending for verification
         const verificationPayload = {
             username,
             id: regResp.id,
-            rawId: regResp.rawId,
+            rawId: bufferEncode(regResp.rawId),
             type: regResp.type,
             response: {
-                clientDataJSON: regResp.response.clientDataJSON,
-                attestationObject: regResp.response.attestationObject,
+                clientDataJSON: bufferEncode(regResp.response.clientDataJSON),
+                attestationObject: bufferEncode(regResp.response.attestationObject),
             },
         };
         
@@ -477,7 +307,7 @@ async function handleRegistration(e) {
         showErrorToast(`Registration Failed: ${error.message}`);
         console.error(error);
     } finally {
-        setButtonLoading(btn, false);
+        hideLoadingIndicator();
     }
 }
 
@@ -488,50 +318,30 @@ function hideLoginModal() { ui.loginModal?.classList.add('hidden'); }
 function showLoadingIndicator() { ui.loadingIndicator?.classList.remove('hidden'); }
 function hideLoadingIndicator() { ui.loadingIndicator?.classList.add('hidden'); }
 function showErrorToast(message) {
-    if (errorToastManager) {
-        errorToastManager.show(message);
-    } else {
-        // Fallback if not initialized
-        ui.errorMessage.textContent = message;
-        ui.errorToast.classList.remove('hidden');
-    }
+    ui.errorMessage.textContent = message;
+    ui.errorToast.classList.remove('hidden');
+    setTimeout(hideErrorToast, 5000);
 }
-function hideErrorToast() {
-    if (errorToastManager) {
-        errorToastManager.hide();
-    } else {
-        ui.errorToast?.classList.add('hidden');
-    }
-}
+function hideErrorToast() { ui.errorToast?.classList.add('hidden'); }
 function showSuccessToast(message) {
-    if (successToastManager) {
-        successToastManager.show(message);
-    } else {
-        ui.successMessage.textContent = message;
-        ui.successToast.classList.remove('hidden');
-    }
+    ui.successMessage.textContent = message;
+    ui.successToast.classList.remove('hidden');
+    setTimeout(hideSuccessToast, 3000);
 }
-function hideSuccessToast() {
-    if (successToastManager) {
-        successToastManager.hide();
-    } else {
-        ui.successToast?.classList.add('hidden');
-    }
-}
+function hideSuccessToast() { ui.successToast?.classList.add('hidden'); }
 
 
 // --- Application Logic ---
 
 async function fetchAndDisplayOrders(query = '') {
-    const noOrdersText = document.getElementById('no-orders-text');
     if (!authToken) {
-        if (noOrdersText) noOrdersText.textContent = 'Please log in to view orders.';
+        ui.noOrdersMessage.textContent = 'Please log in to view orders.';
         updateConnectionStatus('idle');
         return;
     }
     showLoadingIndicator();
     updateConnectionStatus('connecting');
-    if (noOrdersText) noOrdersText.textContent = 'Loading orders...';
+    ui.noOrdersMessage.textContent = 'Loading orders...';
     ui.noOrdersMessage.style.display = 'block';
 
     try {
@@ -542,68 +352,15 @@ async function fetchAndDisplayOrders(query = '') {
         filterAndDisplayOrders(activeFilter);
 
         updateConnectionStatus('connected');
-
-        await fetchAndDisplayMetrics();
     } catch (error) {
         console.error('[SHOP] Error fetching orders:', error);
         updateConnectionStatus('error');
-        // Clear orders but keep message on error
-        ui.ordersList.innerHTML = '';
-        ui.ordersList.appendChild(ui.noOrdersMessage);
-
-        const noOrdersTextErr = document.getElementById('no-orders-text');
-
-        if (error.message.includes('Forbidden') || error.message.includes('permission')) {
-            if (noOrdersTextErr) noOrdersTextErr.textContent = 'Access Denied: You must be an administrator to view orders.';
-        } else if (error.message !== 'Authentication failed') {
-            if (noOrdersTextErr) noOrdersTextErr.textContent = `Error: Could not load orders (${error.message})`;
-            showErrorToast(`Could not fetch orders: ${error.message}`);
+        // Error is already shown by fetchWithAuth on 401, this handles other network errors
+        if (error.message !== 'Authentication failed') {
+           showErrorToast(`Could not fetch orders: ${error.message}`);
         }
     } finally {
         hideLoadingIndicator();
-    }
-}
-
-async function fetchAndDisplayMetrics() {
-    try {
-        const metrics = await fetchWithAuth(`${serverUrl}/api/admin/sales-metrics`);
-        const elTotalOrders = document.getElementById('metric-total-orders');
-        if (elTotalOrders) elTotalOrders.textContent = metrics.totalOrders;
-
-        const elTotalRevenue = document.getElementById('metric-total-revenue');
-        if (elTotalRevenue) elTotalRevenue.textContent = `$${metrics.totalRevenue.toFixed(2)}`;
-
-        const elRecentOrders = document.getElementById('metric-recent-orders');
-        if (elRecentOrders) elRecentOrders.textContent = metrics.recentOrders;
-
-        // Also fetch uptime
-        const uptimeRes = await fetch(`${serverUrl}/api/ping`);
-        if (uptimeRes.ok) {
-            const elServerStatus = document.getElementById('metric-server-status');
-            if (elServerStatus) {
-                elServerStatus.textContent = 'Online / Up';
-                elServerStatus.classList.remove('text-red-500');
-                elServerStatus.classList.add('text-green-500');
-            }
-        } else {
-            throw new Error('Ping failed');
-        }
-    } catch (e) {
-        console.error('Error fetching metrics', e);
-        if (e.message.includes('Forbidden') || e.message.includes('permission')) {
-            const elTotalOrders = document.getElementById('metric-total-orders');
-            if (elTotalOrders) elTotalOrders.textContent = 'N/A';
-            const elTotalRevenue = document.getElementById('metric-total-revenue');
-            if (elTotalRevenue) elTotalRevenue.textContent = 'N/A';
-            const elRecentOrders = document.getElementById('metric-recent-orders');
-            if (elRecentOrders) elRecentOrders.textContent = 'N/A';
-        }
-        const elServerStatus = document.getElementById('metric-server-status');
-        if (elServerStatus) {
-            elServerStatus.textContent = 'Offline';
-            elServerStatus.classList.add('text-red-500');
-            elServerStatus.classList.remove('text-green-500');
-        }
     }
 }
 
@@ -612,258 +369,79 @@ async function fetchAndDisplayMetrics() {
  * @param {string} status - The status to filter by (e.g., 'NEW', 'ALL').
  */
 function filterAndDisplayOrders(status) {
-    // ui.ordersList.innerHTML = ''; // Do NOT clear here, as it removes the message element
+    ui.ordersList.innerHTML = ''; // Clear the current list
 
     const ordersToDisplay = (status === 'ALL')
         ? allOrders
         : allOrders.filter(order => order.status === status);
 
-    const noOrdersText = document.getElementById('no-orders-text');
-
     if (ordersToDisplay.length === 0) {
-        // Clear orders but keep message
-        ui.ordersList.innerHTML = '';
-        ui.ordersList.appendChild(ui.noOrdersMessage);
-
-        if (noOrdersText) noOrdersText.textContent = `No orders found with status: ${status}.`;
+        ui.noOrdersMessage.textContent = `No orders found with status: ${status}.`;
         ui.noOrdersMessage.style.display = 'block';
     } else {
         ui.noOrdersMessage.style.display = 'none';
-
-        // Bolt Optimization: Use map + join + innerHTML for batch DOM update
-        // Note: original code used fragment.prepend(), effectively reversing the list.
-        // We replicate this by reversing the array before mapping.
-        const html = ordersToDisplay.slice().reverse().map(order => displayOrder(order)).join('');
-
-        // Update innerHTML and restore the message element (hidden)
-        ui.ordersList.innerHTML = html;
-        ui.ordersList.appendChild(ui.noOrdersMessage);
-
-        // Render QR codes for all displayed orders
-        if (window.QRCode) {
-            ordersToDisplay.forEach(order => {
-                const canvas = document.getElementById(`qr-${order.orderId}`);
-                if (canvas) {
-                    QRCode.toCanvas(canvas, order.orderId, { width: 100, margin: 1 }, function (error) {
-                        if (error) console.error('Error rendering QR Code:', error);
-                    });
-                }
-            });
-        }
+        ordersToDisplay.forEach(displayOrder);
     }
 }
 
 /**
- * Renders a single order card into an HTML string.
- * Bolt Optimization: Returns string instead of DOM element for performance.
+ * Renders a single order card into the DOM.
  * @param {object} order - The order object from the server.
- * @returns {string} The created order card HTML string.
  */
-export function displayOrder(order) {
-    // Bolt Optimization: Return cached HTML if available and status hasn't changed
-    if (order._cachedHtml && order._cachedStatus === order.status) {
-        return order._cachedHtml;
-    }
+function displayOrder(order) {
+    const card = document.createElement('div');
+    card.className = 'order-card';
+    card.id = `order-card-${order.orderId}`;
 
     const formattedAmount = order.amount ? `$${(order.amount / 100).toFixed(2)}` : 'N/A';
     const receivedDate = new Date(order.receivedAt).toLocaleString();
 
-    const billingName = `${escapeHtml(order.billingContact?.givenName || '')} ${escapeHtml(order.billingContact?.familyName || '')}`;
-    const billingEmail = escapeHtml(order.billingContact?.email || 'N/A');
-
-    const shippingName = `${escapeHtml(order.shippingContact?.givenName || '')} ${escapeHtml(order.shippingContact?.familyName || '')}`;
-    const shippingEmail = escapeHtml(order.shippingContact?.email || 'N/A');
-
-    const quantity = escapeHtml(order.orderDetails?.quantity || 'N/A');
-    const status = escapeHtml(order.status);
-    const orderId = escapeHtml(order.orderId);
-    // Truncate BEFORE escaping would be safer for logic, but since orderId is UUID (safe chars),
-    // and escapeHtml changes '&' to '&amp;', we should truncate the raw ID if we want exactly 8 chars.
-    const orderIdShort = escapeHtml(order.orderId.substring(0, 8));
-
-    // Status badges styling class
-    const statusColors = {
-        'NEW': 'bg-blue-600 text-white',
-        'ACCEPTED': 'bg-amber-700 text-white',
-        'PRINTING': 'bg-violet-600 text-white',
-        'SHIPPED': 'bg-emerald-700 text-white',
-        'DELIVERED': 'bg-indigo-600 text-white',
-        'COMPLETED': 'bg-green-700 text-white',
-        'CANCELED': 'bg-red-600 text-white'
-    };
-    const statusClass = statusColors[status.toUpperCase()] || 'bg-gray-500 text-white';
-
-    const designImagePath = `${serverUrl}${escapeHtml(order.designImagePath)}`;
-    const cutFilePath = escapeHtml(order.orderDetails?.cutLinePath || order.cutLinePath || '');
-
-    const stickerName = escapeHtml(order.orderDetails?.stickerName || 'Custom Sticker');
-    const material = escapeHtml(order.orderDetails?.material || 'unknown');
-
-    // Action Dropdown
-    const statuses = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELED'];
-    const dropdownHtml = `
-        <select class="action-dropdown border rounded p-1 text-sm font-bold ${statusClass} mt-4" data-order-id="${orderId}">
-            ${statuses.map(s => `<option value="${s}" ${status === s ? 'selected' : ''}>${s.charAt(0) + s.slice(1).toLowerCase()}</option>`).join('')}
-        </select>
-    `;
-
-    // Tracking section
-    const trackingDisplay = order.status === 'SHIPPED' ? 'block' : 'none';
-    const courierOptions = ['usps', 'ups', 'fedex'].map(c =>
-        `<option value="${c}">${c.toUpperCase()}</option>`
-    ).join('');
-
-    const html = `
-    <div class="order-card border-l-4 ${statusClass.split(' ')[0].replace('bg-', 'border-')}" id="order-card-${orderId}">
+    card.innerHTML = DOMPurify.sanitize(`
         <div class="flex justify-between items-start">
-            <div class="flex items-start">
-                <input type="checkbox" class="order-select-checkbox mt-1 mr-3 w-5 h-5 cursor-pointer rounded text-blue-600 focus:ring-blue-500 shadow-sm" data-order-id="${orderId}">
-                <div>
-                    <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${orderIdShort}...</span></h3>
-                    <p class="text-sm text-gray-600">Received: ${escapeHtml(receivedDate)}</p>
-                </div>
+            <div>
+                <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${order.orderId.substring(0, 8)}...</span></h3>
+                <p class="text-sm text-gray-600">Received: ${receivedDate}</p>
             </div>
-            <div class="${statusClass} font-bold py-1 px-3 rounded-full text-sm" id="status-badge-${orderId}">${status}</div>
+            <div id="status-badge-${order.orderId}" class="status-${order.status.toLowerCase()} font-bold py-1 px-3 rounded-full text-sm">${order.status}</div>
         </div>
-
         <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
             <div>
-                <dt>Billing Name:</dt><dd>${billingName}</dd>
-                <dt>Billing Email:</dt><dd>${billingEmail}</dd>
+                <dt>Billing Name:</dt> <dd>${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}</dd>
+                <dt>Billing Email:</dt> <dd>${order.billingContact?.email || 'N/A'}</dd>
             </div>
             <div>
-                <dt>Shipping Name:</dt><dd>${shippingName}</dd>
-                <dt>Shipping Email:</dt><dd>${shippingEmail}</dd>
+                <dt>Shipping Name:</dt> <dd>${order.shippingContact?.givenName || ''} ${order.shippingContact?.familyName || ''}</dd>
+                <dt>Shipping Email:</dt> <dd>${order.shippingContact?.email || 'N/A'}</dd>
             </div>
             <div>
-                <dt>Sticker Name:</dt><dd>${stickerName}</dd>
-                <dt>Material:</dt><dd>${material}</dd>
-            </div>
-            <div>
-                <dt>Quantity:</dt><dd>${quantity}</dd>
-                <dt>Amount:</dt><dd>${escapeHtml(formattedAmount)}</dd>
+                <dt>Quantity:</dt> <dd>${order.orderDetails?.quantity || 'N/A'}</dd>
+                <dt>Amount:</dt> <dd>${formattedAmount}</dd>
             </div>
         </div>
-
         <div class="mt-4">
             <dt>Sticker Design:</dt>
-            <a class="sticker-peel-container" href="${designImagePath}" target="_blank">
-                <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" loading="lazy" decoding="async">
-            </a>
-            ${cutFilePath ? `<div class="mt-2"><dt>Cut File:</dt><dd><a href="${serverUrl}${cutFilePath}" class="text-blue-500 underline text-sm" target="_blank" download>Download SVG / XML</a></dd></div>` : ''}
+            <a href="${serverUrl}${order.designImagePath}" target="_blank"><img src="${serverUrl}${order.designImagePath}" alt="Sticker Design" class="sticker-design" data-cut-file-path="${order.cutLinePath || ''}"></a>
         </div>
+        <div class="mt-4 flex flex-wrap gap-2">
+            <button class="action-btn" data-order-id="${order.orderId}" data-status="ACCEPTED">Accept</button>
+            <button class="action-btn" data-order-id="${order.orderId}" data-status="PRINTING">Print</button>
+            <button class="action-btn" data-order-id="${order.orderId}" data-status="SHIPPED">Ship</button>
+            <button class="action-btn" data-order-id="${order.orderId}" data-status="DELIVERED">Deliver</button>
+            <button class="action-btn" data-order-id="${order.orderId}" data-status="COMPLETED">Complete</button>
+            <button class="action-btn" data-order-id="${order.orderId}" data-status="CANCELED">Cancel</button>
+        </div>`);
 
-        <div class="mt-2 flex flex-wrap gap-2">
-            ${dropdownHtml}
-        </div>
+    ui.ordersList.prepend(card);
 
-        <div class="mt-4" id="tracking-info-${orderId}" style="display: ${trackingDisplay};">
-            <input class="border rounded-md p-2" type="text" id="tracking-number-${orderId}" placeholder="Enter Tracking Number">
-            <select class="border rounded-md p-2" id="courier-${orderId}">
-                ${courierOptions}
-            </select>
-            <button class="add-tracking-btn" data-order-id="${orderId}">Add Tracking</button>
-        </div>
-
-        <div class="mt-4 border-t pt-2">
-            <h4 class="font-bold text-sm mb-1 text-gray-600">Log Time (Odoo)</h4>
-            <div class="flex items-center gap-2">
-                <input type="text" class="border rounded p-1 text-sm flex-grow time-log-desc" data-order-id="${orderId}" placeholder="Task Description">
-                <input type="number" class="border rounded p-1 text-sm w-20 time-log-duration" data-order-id="${orderId}" placeholder="Mins">
-                <button class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm log-time-btn" data-order-id="${orderId}">Log</button>
-            </div>
-        </div>
-
-        <div class="mt-4 border-t pt-2 flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-                <strong>QR Tracking Code</strong>
-            </div>
-            <div class="qr-code-container bg-white p-1 rounded border shadow-sm" data-order-id="${orderId}">
-                <!-- QR Code will be injected here after render -->
-                <canvas id="qr-${orderId}" width="100" height="100"></canvas>
-            </div>
-        </div>
-    </div>
-    `;
-
-    // Cache the result
-    order._cachedHtml = html;
-    order._cachedStatus = order.status;
-
-    return html;
-}
-
-/**
- * Handles clicks on the orders list for event delegation.
- * @param {Event} e - The click event.
- */
-function handleOrderListClick(e) {
-    const trackingBtn = e.target.closest('.add-tracking-btn');
-    if (trackingBtn) {
-        const orderId = trackingBtn.dataset.orderId;
-        handleAddTracking(orderId, trackingBtn);
-        return;
-    }
-
-    const timeLogBtn = e.target.closest('.log-time-btn');
-    if (timeLogBtn) {
-        const orderId = timeLogBtn.dataset.orderId;
-        handleTimeLog(orderId, timeLogBtn);
-        return;
-    }
-}
-
-function handleOrderListChange(e) {
-    const actionDropdown = e.target.closest('.action-dropdown');
-    if (actionDropdown) {
-        const orderId = actionDropdown.dataset.orderId;
-        const status = actionDropdown.value;
-
-        if (status === 'CANCELED') {
-            const confirmed = window.confirm('Are you sure you want to cancel this order? This action cannot be undone.');
-            if (!confirmed) {
-                // Revert selection visually by re-rendering
-                filterAndDisplayOrders(document.querySelector('#filter-container .filter-btn.active')?.dataset.status || 'ALL');
-                return;
-            }
-        }
-
-        updateOrderStatus(orderId, status, actionDropdown);
-    }
-}
-
-async function handleTimeLog(orderId, btn) {
-    const descInput = document.querySelector(`.time-log-desc[data-order-id="${orderId}"]`);
-    const durInput = document.querySelector(`.time-log-duration[data-order-id="${orderId}"]`);
-
-    if (!descInput || !durInput) return;
-
-    const description = descInput.value.trim();
-    const duration = parseInt(durInput.value, 10);
-
-    if (!description) {
-        showErrorToast('Description required.');
-        return;
-    }
-    if (!duration || duration <= 0) {
-        showErrorToast('Valid duration (minutes) required.');
-        return;
-    }
-
-    setButtonLoading(btn, true, 'Logging...');
-    try {
-        await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/time-log`, {
-            method: 'POST',
-            body: JSON.stringify({ description, duration })
+    card.querySelectorAll('.action-btn').forEach(btn => {
+      //  btn.addEventListener('click', (e) => updateOrderStatus(e.target.dataset.orderId, e.target.dataset.status));
+		btn.addEventListener('click', (e) => {
+            const orderId = e.target.dataset.orderId;
+            const status = e.target.dataset.status;
+            // This function calls your server to update the status
+            updateOrderStatus(orderId, status);
         });
-        showSuccessToast('Time logged successfully to Odoo.');
-        descInput.value = '';
-        durInput.value = '';
-    } catch (err) {
-        showErrorToast(`Failed to log time: ${err.message}`);
-    } finally {
-        setButtonLoading(btn, false);
-    }
+    });
 }
 
 /**
@@ -871,10 +449,10 @@ async function handleTimeLog(orderId, btn) {
  * @param {string} orderId The ID of the order to update.
  * @param {string} newStatus The new status for the order.
  */
-async function updateOrderStatus(orderId, newStatus, btn) {
-    setButtonLoading(btn, true, 'Updating...');
+async function updateOrderStatus(orderId, newStatus) {
+    showLoadingIndicator();
     try {
-        await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
+        const updatedOrder = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
             method: 'POST',
             body: JSON.stringify({ status: newStatus }),
         });
@@ -895,7 +473,7 @@ async function updateOrderStatus(orderId, newStatus, btn) {
         showErrorToast(`Update Failed: ${error.message}`);
         console.error(error);
     } finally {
-        setButtonLoading(btn, false);
+        hideLoadingIndicator();
     }
 }
 
@@ -907,82 +485,16 @@ async function handleSearch() {
         fetchAndDisplayOrders(); // Fetch all orders if search is cleared
         return;
     }
-    await fetchAndDisplayOrders(query);
-
-    // If Scan Mode is active and we found an order, automatically update it
-    if (document.getElementById('scan-mode-banner') && !document.getElementById('scan-mode-banner').classList.contains('hidden')) {
-        const matchingOrders = allOrders.filter(o => o.orderId.includes(query) || o.orderId === query);
-        if (matchingOrders.length === 1) {
-            const targetStatus = document.getElementById('scanTargetStatus').value;
-            const orderId = matchingOrders[0].orderId;
-            try {
-                const response = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
-                    method: 'POST',
-                    body: JSON.stringify({ status: targetStatus }),
-                });
-
-                const orderIndex = allOrders.findIndex(o => o.orderId === orderId);
-                if (orderIndex !== -1) {
-                    allOrders[orderIndex].status = targetStatus;
-                }
-                showSuccessToast(`Scan Mode: Updated ${orderId.substring(0, 8)} to ${targetStatus}`);
-
-                // Refresh display
-                const activeFilter = document.querySelector('#filter-container .filter-btn.active')?.dataset.status || 'ALL';
-                filterAndDisplayOrders(activeFilter);
-
-                // Clear input for next scan
-                ui.searchInput.value = '';
-                ui.searchInput.focus();
-
-            } catch (error) {
-                showErrorToast(`Scan Mode Update Failed: ${error.message}`);
-            }
-        } else if (matchingOrders.length > 1) {
-            showErrorToast('Scan Mode: Multiple orders match. Please refine search.');
-        } else {
-             showErrorToast('Scan Mode: No order found.');
-        }
-    }
+    fetchAndDisplayOrders(query);
 }
 
-let scanBuffer = '';
-let scanTimeout;
-
-function handleBarcodeScan(e) {
-    if (document.getElementById('scan-mode-banner') && !document.getElementById('scan-mode-banner').classList.contains('hidden')) {
-        // Only intercept if we are NOT already typing in an input box
-        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-            if (e.key === 'Enter') {
-                if (scanBuffer.length > 0) {
-                    ui.searchInput.value = scanBuffer;
-                    handleSearch();
-                    scanBuffer = '';
-                }
-            } else if (e.key.length === 1) { // Normal character
-                scanBuffer += e.key;
-                clearTimeout(scanTimeout);
-                // Clear buffer if pause is more than 500ms (not a scanner)
-                scanTimeout = setTimeout(() => { scanBuffer = ''; }, 500);
-            }
-        }
-    }
-}
-
-async function handleNesting(e) {
-    const btn = e ? (e.currentTarget || e.target.closest('button')) : ui.nestStickersBtn;
-    setButtonLoading(btn, true, 'Nesting...');
+async function handleNesting() {
+    showLoadingIndicator();
     ui.nestedSvgContainer.innerHTML = '<p>Nesting in progress...</p>';
 
-    // Grab all checked order cards and then find their sticker-design elements
-    const checkedCheckboxes = Array.from(ui.ordersList.querySelectorAll('.order-select-checkbox:checked'));
-    const svgElements = checkedCheckboxes.map(cb => {
-        const orderCard = cb.closest('.order-card');
-        return orderCard.querySelector('.sticker-design');
-    }).filter(img => img !== null);
-
+    const svgElements = Array.from(ui.ordersList.querySelectorAll('.sticker-design'));
     if (svgElements.length === 0) {
-        ui.nestedSvgContainer.innerHTML = '<p class="text-red-500 font-bold">Please select at least one order to nest.</p>';
+        ui.nestedSvgContainer.innerHTML = '<p>No designs to nest.</p>';
         hideLoadingIndicator();
         return;
     }
@@ -1035,27 +547,12 @@ async function handleNesting(e) {
         // 2. Fetch and prepare the sticker SVGs
         const svgPromises = svgElements.map(async (img) => {
             const cutFilePath = img.dataset.cutFilePath;
-            console.log("BROWSER LOG: Processing img.src=", img.src, "cutFilePath=", cutFilePath);
-            const cacheKey = cutFilePath || img.src;
-
-            if (svgCache.has(cacheKey)) {
-                return svgCache.get(cacheKey);
+            if (cutFilePath) {
+                return (await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' })).text();
+            } else {
+                const svgString = await (await fetch(img.src, { credentials: 'include' })).text();
+                return generateCutFile(svgString);
             }
-
-            const promise = (async () => {
-                if (cutFilePath) {
-                    return (await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' })).text();
-                } else {
-                    const svgString = await (await fetch(img.src, { credentials: 'include' })).text();
-                    return generateCutFile(svgString);
-                }
-            })();
-
-            svgCache.set(cacheKey, promise);
-            // Handle error by removing from cache so next try can succeed
-            promise.catch(() => svgCache.delete(cacheKey));
-
-            return promise;
         });
         const svgStrings = await Promise.all(svgPromises);
 
@@ -1064,72 +561,43 @@ async function handleNesting(e) {
         const svgs = svgStrings.map(s => parser.load(s));
 
         const spacing = parseInt(ui.spacingInput.value, 10) || 0;
-        const addPrintingMarks = ui.addPrintingMarks.checked;
-        const options = { spacing, rotations: 4, addPrintingMarks };
+        const options = { spacing, rotations: 4 };
 
         const nest = new SvgNest(null, svgs, options); // Pass null for binElement
         nest.setBinPolygon(complexBinPolygon); // Use the new method
 
         const resultSvg = nest.start();
 
-        // Generate a combined Tracking Batch ID
-        const batchIds = checkedCheckboxes.map(cb => cb.dataset.orderId.substring(0, 8)).join('-');
-        const trackingCode = `BATCH-${batchIds.substring(0, 30)}`; // limit length
-
-        // 4. Inject QR Code into SVG
-        let finalSvg = resultSvg;
-        if (window.QRCode) {
-            try {
-                // Generate QR as data URI
-                const qrCanvas = document.createElement('canvas');
-                await QRCode.toCanvas(qrCanvas, trackingCode, { width: 100, margin: 1 });
-                const qrDataUri = qrCanvas.toDataURL('image/png');
-
-                // Parse the nested SVG string back to DOM to inject the QR
-                const parser = new DOMParser();
-                const svgDoc = parser.parseFromString(finalSvg, 'image/svg+xml');
-                const rootSvg = svgDoc.documentElement;
-
-                // Create an image element for the QR code
-                const qrImg = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'image');
-                qrImg.setAttribute('href', qrDataUri);
-                // Place it in the bottom left corner (assuming binWidth/Height are logical dimensions)
-                qrImg.setAttribute('x', '10');
-                qrImg.setAttribute('y', String((binHeight) - 110)); // 110px from bottom
-                qrImg.setAttribute('width', '100');
-                qrImg.setAttribute('height', '100');
-
-                // Add text label
-                const textNode = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'text');
-                textNode.setAttribute('x', '10');
-                textNode.setAttribute('y', String((binHeight) - 115));
-                textNode.setAttribute('font-family', 'sans-serif');
-                textNode.setAttribute('font-size', '12');
-                textNode.setAttribute('fill', 'black');
-                textNode.textContent = trackingCode;
-
-                rootSvg.appendChild(qrImg);
-                rootSvg.appendChild(textNode);
-
-                // Serialize back to string
-                finalSvg = new XMLSerializer().serializeToString(svgDoc);
-            } catch (qrErr) {
-                console.error("Failed to inject QR code into SVG", qrErr);
-            }
-        }
-
-        // 5. Display result
-        const sanitizedSvg = DOMPurify.sanitize(finalSvg, { USE_PROFILES: { svg: true } });
-        ui.nestedSvgContainer.innerHTML = sanitizedSvg;
-        window.nestedSvg = sanitizedSvg;
+        // 4. Display result
+        ui.nestedSvgContainer.innerHTML = resultSvg;
+        window.nestedSvg = resultSvg;
         showSuccessToast('Nesting complete.');
 
     } catch (error) {
         showErrorToast(`Nesting failed: ${error.message}`);
         console.error(error);
     } finally {
-        setButtonLoading(btn, false);
+        hideLoadingIndicator();
     }
+}
+
+function generateCutFile(svgString) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const svgElement = doc.documentElement;
+    const cutFileSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    cutFileSvg.setAttribute('width', svgElement.getAttribute('width'));
+    cutFileSvg.setAttribute('height', svgElement.getAttribute('height'));
+    cutFileSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox'));
+
+    svgElement.querySelectorAll('path').forEach(path => {
+        const newPath = path.cloneNode();
+        newPath.setAttribute('stroke', 'red');
+        newPath.setAttribute('fill', 'none');
+        cutFileSvg.appendChild(newPath);
+    });
+
+    return new XMLSerializer().serializeToString(cutFileSvg);
 }
 
 function handleDownloadCutFile() {
@@ -1150,45 +618,27 @@ function handleDownloadCutFile() {
     URL.revokeObjectURL(url);
 }
 
-async function handleExportPdf() {
+function handleExportPdf() {
     if (!window.nestedSvg) {
         showErrorToast('No nested SVG to export.');
         return;
     }
 
     try {
-        const svgElement = new DOMParser().parseFromString(window.nestedSvg, "image/svg+xml").documentElement;
-        let width = parseFloat(svgElement.getAttribute('width'));
-        let height = parseFloat(svgElement.getAttribute('height'));
-
-        if (isNaN(width) || isNaN(height)) {
-            const viewBox = svgElement.getAttribute('viewBox');
-            if (viewBox) {
-                const parts = viewBox.split(/[\s,]+/);
-                if (parts.length === 4) {
-                    width = parseFloat(parts[2]);
-                    height = parseFloat(parts[3]);
-                }
-            }
-        }
-
-        if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
-            showErrorToast('Invalid SVG dimensions for PDF export.');
-            return;
-        }
-
-        // Create the PDF with the correct dimensions from the start.
         const doc = new jsPDF({
             unit: 'px',
-            format: [width, height]
+            format: 'a4'
         });
 
-        await doc.svg(svgElement, {
-            x: 0,
-            y: 0,
-            width: width,
-            height: height
-        });
+        const svgElement = new DOMParser().parseFromString(window.nestedSvg, "image/svg+xml").documentElement;
+
+        const width = parseFloat(svgElement.getAttribute('width'));
+        const height = parseFloat(svgElement.getAttribute('height'));
+
+        doc.deletePage(1);
+        doc.addPage([width, height]);
+
+        SVGtoPDF(doc, svgElement, 0, 0);
 
         doc.save('nested-stickers.pdf');
         showSuccessToast('PDF exported successfully.');
@@ -1198,125 +648,11 @@ async function handleExportPdf() {
     }
 }
 
-// --- Odoo Configuration Logic ---
-async function loadOdooConfig() {
-    showLoadingIndicator();
-    try {
-        const config = await fetchWithAuth(`${serverUrl}/api/admin/odoo/config`);
-
-        document.getElementById('odoo-url').value = config.url || '';
-        document.getElementById('odoo-db').value = config.db || '';
-        document.getElementById('odoo-username').value = config.username || '';
-        document.getElementById('odoo-password').value = config.password || '';
-        document.getElementById('odoo-default-task').value = config.defaults?.project_task_id || '';
-        document.getElementById('odoo-picking-type').value = config.defaults?.picking_type_id || '';
-
-        await renderMaterialMapping(config.mappings || {});
-    } catch (error) {
-        showErrorToast(`Failed to load Odoo config: ${error.message}`);
-    } finally {
-        hideLoadingIndicator();
-    }
-}
-
-async function renderMaterialMapping(currentMappings) {
-    try {
-        const pricing = await fetch(`${serverUrl}/api/pricing-info`).then(res => res.json());
-        const tbody = document.getElementById('material-mapping-tbody');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-
-        const materials = pricing.materials ? [...pricing.materials] : [];
-        materials.push({ id: 'ink', name: 'Ink Usage (Sq In)' });
-
-        materials.forEach(mat => {
-            const tr = document.createElement('tr');
-            const odooId = currentMappings[mat.id] || '';
-
-            tr.innerHTML = `
-                <td class="py-2 px-4 border">${escapeHtml(mat.name)} (${escapeHtml(mat.id)})</td>
-                <td class="py-2 px-4 border">
-                    <input type="number" class="w-full p-1 border rounded mapping-input" data-key="${mat.id}" value="${escapeHtml(odooId)}">
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (error) {
-        console.error('Failed to load pricing info for mapping:', error);
-    }
-}
-
-async function saveOdooConfig(e) {
-    e.preventDefault();
-    const btn = e.submitter || document.getElementById('save-odoo-config-btn');
-    setButtonLoading(btn, true, 'Saving...');
-
-    const url = document.getElementById('odoo-url').value;
-    const db = document.getElementById('odoo-db').value;
-    const username = document.getElementById('odoo-username').value;
-    const password = document.getElementById('odoo-password').value;
-    const defaultTask = document.getElementById('odoo-default-task').value;
-    const pickingType = document.getElementById('odoo-picking-type').value;
-
-    const mappings = {};
-    document.querySelectorAll('.mapping-input').forEach(input => {
-        const key = input.dataset.key;
-        const val = input.value;
-        if (val) mappings[key] = val;
-    });
-
-    const defaults = {
-        project_task_id: defaultTask ? Number(defaultTask) : null,
-        picking_type_id: pickingType ? Number(pickingType) : null
-    };
-
-    try {
-        await fetchWithAuth(`${serverUrl}/api/admin/odoo/config`, {
-            method: 'POST',
-            body: JSON.stringify({
-                url, db, username, password, mappings, defaults
-            })
-        });
-        showSuccessToast('Odoo configuration saved.');
-    } catch (error) {
-        showErrorToast(`Failed to save config: ${error.message}`);
-    } finally {
-        setButtonLoading(btn, false);
-    }
-}
-
-async function testOdooConnection(e) {
-    const btn = e ? (e.currentTarget || e.target.closest('button')) : document.getElementById('test-odoo-btn');
-    setButtonLoading(btn, true, 'Testing...');
-    const resultSpan = document.getElementById('test-connection-result');
-    resultSpan.textContent = '';
-    resultSpan.className = 'text-sm font-bold text-gray-500';
-
-    try {
-        const result = await fetchWithAuth(`${serverUrl}/api/admin/odoo/test`, { method: 'POST' });
-        if (result.success) {
-            resultSpan.textContent = `Success! Version: ${JSON.stringify(result.version)}`;
-            resultSpan.className = 'text-sm font-bold text-green-600';
-        } else {
-            resultSpan.textContent = `Failed: ${result.error}`;
-            resultSpan.className = 'text-sm font-bold text-red-600';
-        }
-    } catch (error) {
-        resultSpan.textContent = `Error: ${error.message}`;
-        resultSpan.className = 'text-sm font-bold text-red-600';
-    } finally {
-        setButtonLoading(btn, false);
-    }
-}
-
 
 // --- Initialization ---
 async function getServerSessionToken() {
     try {
         const response = await fetch(`${serverUrl}/api/server-info`, { credentials: 'include' });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
         const { serverSessionToken } = await response.json();
         localStorage.setItem('serverSessionToken', serverSessionToken);
         console.log('[CLIENT] Initial server session token acquired.');
@@ -1360,9 +696,6 @@ async function verifyInitialToken() {
 async function getCsrfToken() {
     try {
         const response = await fetch(`${serverUrl}/api/csrf-token`, { credentials: 'include' });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
         const data = await response.json();
         csrfToken = data.csrfToken;
     } catch (error) {
@@ -1374,34 +707,24 @@ async function getCsrfToken() {
 /**
  * Main application entry point.
  */
-export async function init() {
-    authToken = localStorage.getItem('authToken');
-
+async function init() {
     // This creates a verifier that automatically fetches and caches keys from your JWKS endpoint
-    JWKS = jose.createRemoteJWKSet(new URL(`${serverUrl}/.well-known/jwks.json`, window.location.origin));
+    JWKS = jose.createRemoteJWKSet(new URL(`${serverUrl}/.well-known/jwks.json`));
     console.log('[CLIENT] Remote JWKS verifier created.');
 
     await getServerSessionToken();
 
     // Assign all DOM elements to the ui object
-    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'addPrintingMarks', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text', 'login-form'];
+    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text'];
     ids.forEach(id => {
         // Convert kebab-case to camelCase for keys
         const key = id.replace(/-(\w)/g, (match, letter) => letter.toUpperCase());
         ui[key] = document.getElementById(id);
     });
 
-    // Initialize Toast Managers
-    if (ui.errorToast && ui.errorMessage) {
-        errorToastManager = new ToastManager(ui.errorToast, ui.errorMessage, 5000);
-    }
-    if (ui.successToast && ui.successMessage) {
-        successToastManager = new ToastManager(ui.successToast, ui.successMessage, 3000);
-    }
+    await getCsrfToken();
 
-    // Attach event listeners immediately so UI is responsive
-    ui.ordersList?.addEventListener('click', handleOrderListClick);
-    ui.ordersList?.addEventListener('change', handleOrderListChange);
+    // Attach event listeners
     ui.refreshOrdersBtn?.addEventListener('click', () => fetchAndDisplayOrders());
     ui.registerBtn?.addEventListener('click', handleRegistration);
     ui.closeErrorToast?.addEventListener('click', hideErrorToast);
@@ -1414,46 +737,9 @@ export async function init() {
         if (e.key === 'Enter') handleSearch();
     });
 
-    const scanModeBtn = document.getElementById('scanModeBtn');
-    const scanModeBanner = document.getElementById('scan-mode-banner');
-    const closeScanModeBtn = document.getElementById('closeScanModeBtn');
-
-    if (scanModeBtn) {
-        scanModeBtn.addEventListener('click', () => {
-            scanModeBanner.classList.remove('hidden');
-            ui.searchInput.focus();
-        });
-    }
-
-    if (closeScanModeBtn) {
-        closeScanModeBtn.addEventListener('click', () => {
-            scanModeBanner.classList.add('hidden');
-        });
-    }
-
-    // Global listener for barcode scanner
-    document.addEventListener('keydown', handleBarcodeScan);
-
-    // Select/Deselect All buttons
-    const selectAllBtn = document.getElementById('selectAllOrdersBtn');
-    const deselectAllBtn = document.getElementById('deselectAllOrdersBtn');
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', () => {
-            document.querySelectorAll('.order-select-checkbox').forEach(cb => cb.checked = true);
-        });
-    }
-    if (deselectAllBtn) {
-        deselectAllBtn.addEventListener('click', () => {
-            document.querySelectorAll('.order-select-checkbox').forEach(cb => cb.checked = false);
-        });
-    }
-
     // Login Modal Listeners
     ui.closeModalBtn?.addEventListener('click', hideLoginModal);
-    ui.loginForm?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        handlePasswordLogin(e);
-    });
+    ui.passwordLoginBtn?.addEventListener('click', handlePasswordLogin);
     ui.webauthnLoginBtn?.addEventListener('click', handleWebAuthnLogin);
     ui.webauthnRegisterBtn?.addEventListener('click', handleRegistration);
 
@@ -1461,61 +747,19 @@ export async function init() {
     // The main login button opens the modal
     ui.loginBtn?.addEventListener('click', showLoginModal);
 
-    // Fetch CSRF token in background or await if strictly needed for initial load,
-    // but we shouldn't block UI interactions that don't need it yet.
-    // However, login NEEDS it. But opening the modal doesn't.
-    // Let's await it but handle the case where it fails gracefully (it already catches error).
-    await getCsrfToken();
-
     // Filter button logic
     const filterContainer = document.getElementById('filter-container');
     filterContainer?.addEventListener('click', (e) => {
         if (e.target.classList.contains('filter-btn')) {
             // Remove active class from all buttons
-            filterContainer.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-                btn.setAttribute('aria-pressed', 'false');
-            });
+            filterContainer.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             // Add active class to the clicked button
             e.target.classList.add('active');
-            e.target.setAttribute('aria-pressed', 'true');
             // Actually filter the orders
             const status = e.target.dataset.status;
             filterAndDisplayOrders(status);
         }
     });
-
-    // --- View Switching ---
-    const viewDashboardBtn = document.getElementById('view-dashboard-btn');
-    const viewSettingsBtn = document.getElementById('view-settings-btn');
-    const dashboardView = document.getElementById('dashboard-view');
-    const settingsView = document.getElementById('settings-view');
-
-    if (viewDashboardBtn && viewSettingsBtn) {
-        viewDashboardBtn.addEventListener('click', () => {
-            dashboardView.classList.remove('hidden');
-            settingsView.classList.add('hidden');
-            viewDashboardBtn.classList.add('border-b-2', 'border-blue-500', 'font-bold', 'text-blue-600');
-            viewDashboardBtn.classList.remove('text-gray-500');
-            viewSettingsBtn.classList.remove('border-b-2', 'border-blue-500', 'font-bold', 'text-blue-600');
-            viewSettingsBtn.classList.add('text-gray-500');
-        });
-
-        viewSettingsBtn.addEventListener('click', () => {
-            dashboardView.classList.add('hidden');
-            settingsView.classList.remove('hidden');
-            viewSettingsBtn.classList.add('border-b-2', 'border-blue-500', 'font-bold', 'text-blue-600');
-            viewSettingsBtn.classList.remove('text-gray-500');
-            viewDashboardBtn.classList.remove('border-b-2', 'border-blue-500', 'font-bold', 'text-blue-600');
-            viewDashboardBtn.classList.add('text-gray-500');
-
-            loadOdooConfig();
-        });
-    }
-
-    // Odoo listeners
-    document.getElementById('odoo-config-form')?.addEventListener('submit', saveOdooConfig);
-    document.getElementById('test-odoo-btn')?.addEventListener('click', testOdooConnection);
 
     // Check for a token in the URL from OAuth redirect
     const urlParams = new URLSearchParams(window.location.search);
@@ -1534,15 +778,6 @@ export async function init() {
             logout();
         }
     }
-
-    // Start interval to poll metrics and uptime every 15 seconds
-    setInterval(() => {
-        if (authToken) {
-            fetchAndDisplayMetrics();
-        }
-    }, 15000);
-
-    window.__printshopInitialized = true;
 }
 
 document.addEventListener('DOMContentLoaded', init);

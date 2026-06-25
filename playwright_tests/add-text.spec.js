@@ -1,33 +1,42 @@
-import { test, expect } from './test-setup.js';
+import { test, expect } from '@playwright/test';
 
-test('allows a user to add text to an image', async ({ page }) => {
-  await page.goto('/');
-  await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
+test.describe('Add Text to Image', () => {
 
-  // Wait for the app to initialize (BootStrap runs and disables/hides controls)
-  // This prevents the race condition where we try to upload before listeners are attached.
-  // Using toBeDisabled() on the text input is a good proxy for "BootStrap finished".
-  await expect(page.locator('#textInput')).toBeDisabled();
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
 
-  // --- Step 1: Upload an image ---
-  // Use setInputFiles for a more direct and reliable file upload simulation.
-  // We use a file that is guaranteed to exist in the repository.
-  await page.locator('input#file').setInputFiles('favicon.png');
+  test('should add text to an image on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.waitForLoadState('networkidle');
 
-  // --- Step 2: Verify the image loaded successfully ---
-  // Wait for the text input to be enabled as a sign that processing is done.
-  await expect(page.locator('#textInput')).toBeEnabled({ timeout: 20000 });
+    // Upload an image
+    await page.locator('input[type="file"]').first().setInputFiles('verification/test.png');
 
-  // --- Step 3: Add text ---
-  await page.locator('#textInput').fill('Hello, World!');
-  await page.locator('#addTextBtn').click();
+    // Add text
+    await page.locator('#textInput').fill('Hello, Splotch!');
+    await page.locator('#addTextBtn').click();
 
-  // --- Step 4: Verify the text was added ---
-  // Verify the success message appears in the payment status container.
-  const statusContainer = page.locator('.message-content').last();
-  await expect(statusContainer).toBeVisible({ timeout: 10000 });
-  await expect(statusContainer).toContainText('Text "Hello, World!" added.', { timeout: 10000 });
+    // Verify by taking a screenshot
+    await expect(page.locator('#imageCanvas')).toHaveScreenshot('add-text-canvas-desktop.png');
+  });
 
-  // Take a screenshot of the canvas to verify the text is displayed.
-  await page.locator('#imageCanvas').screenshot({ path: 'test-results/add-text-canvas.png' });
+  test('should add text to an image on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.waitForLoadState('networkidle');
+
+    // In mobile, file input is on the first rolodex card.
+    await page.locator('#mobile-file').setInputFiles('verification/test.png');
+
+    // Navigate to the customize card
+    await page.locator('#rolodex-next').click();
+    await expect(page.locator('.rolodex-card[data-index="1"]')).toHaveClass(/active/);
+
+    // Add text
+    await page.locator('#mobile-textInput').fill('Hello Mobile');
+    await page.locator('#mobile-addTextBtn').click();
+
+    // Verify by taking a screenshot of the thumbnail
+    await expect(page.locator('#thumbnail-canvas')).toHaveScreenshot('add-text-canvas-mobile.png');
+  });
 });

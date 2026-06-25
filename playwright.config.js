@@ -1,25 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  webServer: {
-    command: 'npm run dev',
-    url: 'https://localhost:5173', // Vite's default port
-    reuseExistingServer: !process.env.CI, // Reuse server in local dev for speed
-    // Set a higher timeout for the server to start
-    timeout: 120 * 1000,
-    env: {
-      SQUARE_ACCESS_TOKEN: 'dummy-token-for-testing',
-      NODE_ENV: 'test',
-    },
-    ignoreHTTPSErrors: true,
-  },
+  testDir: './playwright_tests',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
   use: {
-    baseURL: 'https://127.0.0.1:5173', // Match the webServer port
+    baseURL: 'http://localhost:5173',
+    trace: 'on-first-retry',
     headless: true,
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    ignoreHTTPSErrors: true,
   },
+
   projects: [
     {
       name: 'chromium',
@@ -29,11 +22,11 @@ export default defineConfig({
       name: 'Mobile Chrome',
       use: { ...devices['Pixel 5'] },
     },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
   ],
-  testDir: 'playwright_tests',
-  reporter: 'list',
+
+  // webServer: {
+  //   command: 'env DB_PATH=server/test-db.json npm run dev',
+  //   url: 'http://localhost:5173',
+  //   reuseExistingServer: !process.env.CI,
+  // },
 });

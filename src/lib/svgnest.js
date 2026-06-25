@@ -11,36 +11,15 @@ import { SVGParser } from './svgparser.js';
 import { GeometryUtil } from './geometryutil.js';
 import { PlacementWorker } from './placementworker.js';
 
-export class GeneticAlgorithm {
+class GeneticAlgorithm {
     constructor(adam, bin, config) {
         this.config = config || { populationSize: 10, mutationRate: 10, rotations: 4 };
         this.binBounds = GeometryUtil.getPolygonBounds(bin);
 
-        // Bolt Optimization: Precompute valid rotations to avoid repeated geometry calculations in the hot loop.
-        // This makes randomAngle O(1) instead of O(Rotations * Points).
-        this.validRotations = {};
-        const allAngles = [];
-        for (let i = 0; i < Math.max(this.config.rotations, 1); i++) {
-            allAngles.push(i * (360 / this.config.rotations));
-        }
-
-        for (const part of adam) {
-            const valid = [];
-            for (const angle of allAngles) {
-                const rotatedBounds = GeometryUtil.getRotatedPolygonBounds(part, angle);
-                if (rotatedBounds.width < this.binBounds.width && rotatedBounds.height < this.binBounds.height) {
-                    valid.push(angle);
-                }
-            }
-            // If no rotation fits, fallback to 0 (though ideally we should handle this gracefully)
-            if (valid.length === 0) valid.push(0);
-            this.validRotations[part.id] = valid;
-        }
-
         const angles = [];
         for (let i = 0; i < adam.length; i++) {
             angles.push(this.randomAngle(adam[i]));
-        }
+}
 
         this.population = [{ placement: adam, rotation: angles }];
 
@@ -51,9 +30,24 @@ export class GeneticAlgorithm {
     }
 
     randomAngle(part) {
-        const valid = this.validRotations[part.id];
-        if (!valid || valid.length === 0) return 0;
-        return valid[Math.floor(Math.random() * valid.length)];
+        const angleList = [];
+        for (let i = 0; i < Math.max(this.config.rotations, 1); i++) {
+            angleList.push(i * (360 / this.config.rotations));
+        }
+
+        // Fisher-Yates shuffle
+        for (let i = angleList.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [angleList[i], angleList[j]] = [angleList[j], angleList[i]];
+        }
+
+        for (const angle of angleList) {
+            const rotatedPart = GeometryUtil.rotatePolygon(part, angle);
+            if (rotatedPart.width < this.binBounds.width && rotatedPart.height < this.binBounds.height) {
+                return angle;
+            }
+        }
+        return 0;
     }
 
     mutate(individual) {
@@ -139,7 +133,7 @@ export class GeneticAlgorithm {
 
 export class SvgNest {
     constructor(binElement, svgElements, options) {
-        this.svgParser = new SVGParser();
+        this.svgParser = new SvgParser();
         this.configure(options);
         
         if (binElement) {
@@ -204,20 +198,18 @@ export class SvgNest {
     }
 
     start() {
-        if (!this.binPolygon || !this.tree || this.tree.length === 0) {
-            console.error("Bin or parts not set or empty.");
-            return '';
+        if (!this.binPolygon || !this.tree) {
+            console.error("Bin or parts not set.");
+            return;
         }
 
         // The original logic uses web workers via Parallel.js
         // This is a simplified synchronous version for demonstration
+        console.log("Starting nesting process...");
         const adam = this.tree.slice(0);
         adam.sort((a, b) => Math.abs(GeometryUtil.polygonArea(b)) - Math.abs(GeometryUtil.polygonArea(a)));
 
-        // Bolt Optimization: Since we only use the first individual in this synchronous implementation,
-        // force populationSize to 1 to avoid generating unused mutants in the GA constructor.
-        const runConfig = { ...this.config, populationSize: 1 };
-        this.GA = new GeneticAlgorithm(adam, this.binPolygon, runConfig);
+        this.GA = new GeneticAlgorithm(adam, this.binPolygon, this.config);
         const individual = this.GA.population[0];
         
         const worker = new PlacementWorker(this.binPolygon, this.tree, individual.placement.map(p => p.id), individual.rotation, this.config, {});
@@ -246,63 +238,44 @@ export class SvgNest {
         });
         
         // --- Add Printing Marks ---
-        if (this.config.addPrintingMarks) {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        // First, enrich the placement data with width and height from the original tree
+        const enrichedPlacements = placedGroup.map(p => {
+            const originalPart = this.tree.find(part => part.id === p.id);
+            const partBounds = GeometryUtil.getPolygonBounds(originalPart);
+            return { ...p, width: partBounds.width, height: partBounds.height };
+        });
 
-            placedGroup.forEach(p => {
-                const originalPart = this.tree.find(part => part.id === p.id);
-                // We need to rotate the polygon to get accurate bounds
-                // Bolt Optimization: Use getRotatedPolygonBounds to avoid allocating new polygon points
-                const partBounds = GeometryUtil.getRotatedPolygonBounds(originalPart, p.rotation);
+        const bounds = {
+            left: Math.min(...enrichedPlacements.map(p => p.x)),
+            top: Math.min(...enrichedPlacements.map(p => p.y)),
+            right: Math.max(...enrichedPlacements.map(p => p.x + p.width)),
+            bottom: Math.max(...enrichedPlacements.map(p => p.y + p.height)),
+        };
 
-                // Placement x, y corresponds to the origin (0,0) of the part's coordinate system.
-                // We need to add the rotated part's bounds offset (which might be negative) to get the visual edges.
-                const absMinX = p.x + partBounds.x;
-                const absMinY = p.y + partBounds.y;
-                const absMaxX = p.x + partBounds.x + partBounds.width;
-                const absMaxY = p.y + partBounds.y + partBounds.height;
+        const markLength = 20; // Length of the crop mark lines
+        const markOffset = 10; // Distance from the bounding box
 
-                if (absMinX < minX) minX = absMinX;
-                if (absMinY < minY) minY = absMinY;
-                if (absMaxX > maxX) maxX = absMaxX;
-                if (absMaxY > maxY) maxY = absMaxY;
-            });
+        const createMark = (d) => {
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute('d', d);
+            path.setAttribute('stroke', 'black');
+            path.setAttribute('stroke-width', '1');
+            path.setAttribute('fill', 'none');
+            return path;
+        };
 
-            // If no parts placed, skip marks
-            if (minX !== Infinity) {
-                const bounds = {
-                    left: minX,
-                    top: minY,
-                    right: maxX,
-                    bottom: maxY,
-                };
-
-                const markLength = 20; // Length of the crop mark lines
-                const markOffset = 10; // Distance from the bounding box
-
-                const createMark = (d) => {
-                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    path.setAttribute('d', d);
-                    path.setAttribute('stroke', 'black');
-                    path.setAttribute('stroke-width', '1');
-                    path.setAttribute('fill', 'none');
-                    return path;
-                };
-
-                // Top-left
-                newSvg.appendChild(createMark(`M ${bounds.left - markOffset} ${bounds.top - markOffset - markLength} L ${bounds.left - markOffset} ${bounds.top - markOffset}`));
-                newSvg.appendChild(createMark(`M ${bounds.left - markOffset - markLength} ${bounds.top - markOffset} L ${bounds.left - markOffset} ${bounds.top - markOffset}`));
-                // Top-right
-                newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.top - markOffset - markLength} L ${bounds.right + markOffset} ${bounds.top - markOffset}`));
-                newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.top - markOffset} L ${bounds.right + markOffset} ${bounds.top - markOffset}`));
-                // Bottom-left
-                newSvg.appendChild(createMark(`M ${bounds.left - markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.left - markOffset} ${bounds.bottom + markOffset}`));
-                newSvg.appendChild(createMark(`M ${bounds.left - markOffset - markLength} ${bounds.bottom + markOffset} L ${bounds.left - markOffset} ${bounds.bottom + markOffset}`));
-                // Bottom-right
-                newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
-                newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.bottom + markOffset} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
-            }
-        }
+        // Top-left
+        newSvg.appendChild(createMark(`M ${bounds.left - markOffset} ${bounds.top - markOffset - markLength} L ${bounds.left - markOffset} ${bounds.top - markOffset}`));
+        newSvg.appendChild(createMark(`M ${bounds.left - markOffset - markLength} ${bounds.top - markOffset} L ${bounds.left - markOffset} ${bounds.top - markOffset}`));
+        // Top-right
+        newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.top - markOffset - markLength} L ${bounds.right + markOffset} ${bounds.top - markOffset}`));
+        newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.top - markOffset} L ${bounds.right + markOffset} ${bounds.top - markOffset}`));
+        // Bottom-left
+        newSvg.appendChild(createMark(`M ${bounds.left - markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.left - markOffset} ${bounds.bottom + markOffset}`));
+        newSvg.appendChild(createMark(`M ${bounds.left - markOffset - markLength} ${bounds.bottom + markOffset} L ${bounds.left - markOffset} ${bounds.bottom + markOffset}`));
+        // Bottom-right
+        newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
+        newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.bottom + markOffset} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
 
 
         const serializer = new XMLSerializer();
@@ -313,37 +286,16 @@ export class SvgNest {
         const polygons = [];
         let idCounter = 0;
         
-        const processElement = (el) => {
-            // Recurse into containers
-            if (['svg', 'g', 'defs', 'symbol'].includes(el.tagName)) {
-                Array.from(el.children).forEach(child => processElement(child));
-                return;
-            }
-
-            // Attempt to polygonify shape elements
-            const poly = this.svgParser.polygonify(el);
-
-            if (poly && poly.length > 0) {
-                const cleanedPoly = this._cleanPolygon(poly);
-
-                if (cleanedPoly && cleanedPoly.length > 2 && Math.abs(GeometryUtil.polygonArea(cleanedPoly)) > this.config.curveTolerance * this.config.curveTolerance) {
-                    cleanedPoly.id = idCounter++;
-                    cleanedPoly.element = el; // Keep reference to original DOM element
-                    polygons.push(cleanedPoly);
-                } else {
-                     console.warn(`Part skipped: Area too small or invalid.`);
-                }
-            }
-        };
-
         elements.forEach(element => {
-            processElement(element);
+            const poly = this.svgParser.polygonify(element);
+            const cleanedPoly = this._cleanPolygon(poly);
+            if (cleanedPoly && cleanedPoly.length > 2 && Math.abs(GeometryUtil.polygonArea(cleanedPoly)) > this.config.curveTolerance * this.config.curveTolerance) {
+                cleanedPoly.id = idCounter++;
+                cleanedPoly.element = element; // Keep reference to original DOM element
+                polygons.push(cleanedPoly);
+            }
         });
-
-        if (polygons.length === 0) {
-            console.warn("No valid parts found in provided elements.");
-        }
-
+        // Basic tree generation (without hole detection for simplicity)
         return polygons;
     }
 
@@ -356,28 +308,14 @@ export class SvgNest {
         
         const scale = this.config.clipperScale;
         const scaledPoly = polygon.map(p => ({ X: p.x * scale, Y: p.y * scale }));
-        const simple = window.ClipperLib.Clipper.SimplifyPolygon(scaledPoly, window.ClipperLib.PolyFillType.pftNonZero);
+        const simple = ClipperLib.Clipper.SimplifyPolygon(scaledPoly, ClipperLib.PolyFillType.pftNonZero);
 
-        if (!simple || simple.length === 0) {
-             return null;
-        }
+        if (!simple || simple.length === 0) return null;
         
-        let biggest = simple[0];
-        let maxArea = Math.abs(window.ClipperLib.Clipper.Area(biggest));
-
-        for (let i = 1; i < simple.length; i++) {
-            const area = Math.abs(window.ClipperLib.Clipper.Area(simple[i]));
-            if (area > maxArea) {
-                biggest = simple[i];
-                maxArea = area;
-            }
-        }
-
-        const clean = window.ClipperLib.Clipper.CleanPolygon(biggest, this.config.curveTolerance * scale);
+        const biggest = simple.reduce((a, b) => Math.abs(ClipperLib.Clipper.Area(a)) > Math.abs(ClipperLib.Clipper.Area(b)) ? a : b);
+        const clean = ClipperLib.Clipper.CleanPolygon(biggest, this.config.curveTolerance * scale);
         
-        if (!clean || clean.length === 0) {
-             return null;
-        }
+        if (!clean || clean.length === 0) return null;
         
         return clean.map(p => ({ x: p.X / scale, y: p.Y / scale }));
     }

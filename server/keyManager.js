@@ -1,15 +1,9 @@
 // keyManager.js
 import crypto from 'crypto';
 import { exportJWK } from 'jose';
-import { getSecret } from './secretManager.js';
-import logger from './logger.js';
 
 let activeKeys = [];
-// Retention period must exceed token lifetime (1h) + rotation buffer.
-// 2 hours provides ample overlap to ensure tokens are verifiable until they expire.
-const KEY_RETENTION_MS = 2 * 60 * 60 * 1000;
-
-export const KEY_ROTATION_MS = 60 * 60 * 1000; // Rotate keys every hour
+const KEY_LIFETIME_MS = 60 * 60 * 1000; // Rotate keys every hour
 
 // Generate a new RSA key pair
 const generateKeyPair = () => {
@@ -25,37 +19,29 @@ const generateKeyPair = () => {
 // Get the current key for signing (always the newest one)
 export const getCurrentSigningKey = () => {
     if (activeKeys.length === 0) {
-        const jwtPrivateKey = getSecret('JWT_PRIVATE_KEY');
-        const jwtPublicKey = getSecret('JWT_PUBLIC_KEY');
-
-        if (jwtPrivateKey && jwtPublicKey) {
-            logger.info('[KEY_MANAGER] Loading keys from environment variables.');
+        if (process.env.JWT_PRIVATE_KEY && process.env.JWT_PUBLIC_KEY) {
+            console.log('[KEY_MANAGER] Loading keys from environment variables.');
             const kid = 'env_key';
-            const privateKey = jwtPrivateKey.replace(/\\n/g, '\n');
-            const publicKey = jwtPublicKey.replace(/\\n/g, '\n');
+            const privateKey = process.env.JWT_PRIVATE_KEY.replace(/\\n/g, '\n');
+            const publicKey = process.env.JWT_PUBLIC_KEY.replace(/\\n/g, '\n');
             activeKeys.push({ kid, privateKey, publicKey, createdAt: Date.now() });
         } else {
-            logger.info('[KEY_MANAGER] No environment keys found, generating new key pair.');
+            console.log('[KEY_MANAGER] No environment keys found, generating new key pair.');
             activeKeys.push(generateKeyPair());
         }
     }
     return activeKeys[activeKeys.length - 1];
 };
 
-// Get a key by its ID
-export const getKey = (kid) => {
-    return activeKeys.find(key => key.kid === kid);
-};
-
 // Rotate keys: Add a new one and remove expired ones
 export const rotateKeys = () => {
-    logger.info('[KEY_MANAGER] Rotating keys...');
+    console.log('[KEY_MANAGER] Rotating keys...');
     const now = Date.now();
     // Add a new key
     activeKeys.push(generateKeyPair());
-    // Filter out old keys (older than retention period)
-    activeKeys = activeKeys.filter(key => now - key.createdAt < KEY_RETENTION_MS);
-    logger.info(`[KEY_MANAGER] Now managing ${activeKeys.length} active keys.`);
+    // Filter out old keys (older than 1 hour)
+    activeKeys = activeKeys.filter(key => now - key.createdAt < KEY_LIFETIME_MS);
+    console.log(`[KEY_MANAGER] Now managing ${activeKeys.length} active keys.`);
 };
 
 // Generate the public JWKS document
@@ -69,10 +55,13 @@ export const getJwks = async () => {
         );
         return { keys };
     } catch (error) {
-        logger.error('❌ [KEY_MANAGER] Error generating JWKS:', error);
+        console.error('❌ [KEY_MANAGER] Error generating JWKS:', error);
         // Return an empty JWKS document in case of an error
         return { keys: [] };
     }
 };
 
-// Note: Automatic rotation is handled by the main server entry point (server.js)
+// Initial key generation
+rotateKeys();
+// Set up automatic rotation - This will be handled by the main server entry point
+ setInterval(rotateKeys, KEY_LIFETIME_MS);

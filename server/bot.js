@@ -1,179 +1,132 @@
-import { Telegraf } from 'telegraf';
-import { message } from 'telegraf/filters';
-import { getSecret } from './secretManager.js';
-import { getOrderStatusKeyboard } from './telegramHelpers.js';
-import logger from './logger.js';
-import { escapeHtml } from './utils.js';
-import { LowDbAdapter } from './database/lowdb_adapter.js';
+import TelegramBot from 'node-telegram-bot-api';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+const token = process.env.TELEGRAM_BOT_TOKEN;
 
 let bot;
+let db;
 
-function initializeBot(db, { startPolling = true } = {}) {
-  if (db && !db.getOrder) {
-      db = new LowDbAdapter(db);
-  }
-
-  const token = getSecret('TELEGRAM_BOT_TOKEN');
-
+function initializeBot(database) {
+  db = database;
   if (token) {
     const isTestEnv = process.env.NODE_ENV === 'test';
-    bot = new Telegraf(token);
+    // Create a bot that uses 'polling' to fetch new updates, but disable it for tests.
+    bot = new TelegramBot(token, { polling: !isTestEnv });
 
-    // --- Authorization Middleware ---
-    bot.use(async (ctx, next) => {
-        // If in test env, we might want to bypass or mock this?
-        // But for security, we should test this logic too.
-        // In unit tests, we mock getChatMember.
+    if (!isTestEnv) {
+      console.log('Telegram bot is running...');
+    }
 
-        const channelId = getSecret('TELEGRAM_CHANNEL_ID');
-        if (!channelId) {
-             logger.warn('[TELEGRAM] TELEGRAM_CHANNEL_ID not set. Denying all access.');
-             // Fail secure: Do not process update.
-             return;
-        }
+    const commands = [
+      { command: 'jobs', description: 'Lists all active jobs' },
+      { command: 'new_orders', description: 'Lists all NEW orders' },
+      { command: 'in_process_orders', description: 'Lists all ACCEPTED or PRINTING orders' },
+      { command: 'shipped_orders', description: 'Lists all SHIPPED orders' },
+      { command: 'canceled_orders', description: 'Lists all CANCELED orders' },
+      { command: 'delivered_orders', description: 'Lists all DELIVERED orders' },
+    ];
+    bot.setMyCommands(commands);
 
-        let userId;
-        if (ctx.from) {
-            userId = ctx.from.id;
-        } else {
-            // Update without user (e.g. my_chat_member)? Allow to proceed or drop?
-            // Usually we only care about messages/callbacks from users.
-            return next();
-        }
-
+    const listOrdersByStatus = (chatId, statuses, title) => {
         try {
-            const member = await ctx.telegram.getChatMember(channelId, userId);
-            if (['creator', 'administrator', 'member'].includes(member.status)) {
-                return next();
+            const orders = db.data.orders.filter(o => statuses.includes(o.status));
+
+            if (orders.length === 0) {
+                bot.sendMessage(chatId, `No orders with status: ${statuses.join(', ')}`)
+                   .catch(err => console.error('[TELEGRAM] Error sending message:', err));
+                return;
             }
+
+            let list = `*${title}:*\n\n`;
+            orders.forEach(order => {
+                list += `• *Order ID:* ${order.orderId.substring(0, 8)}...\n`;
+                list += `  *Status:* ${order.status}\n`;
+                list += `  *Customer:* ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
+            });
+
+            bot.sendMessage(chatId, list, { parse_mode: 'Markdown' })
+               .catch(err => console.error('[TELEGRAM] Error sending message:', err));
         } catch (error) {
-            logger.error(`[TELEGRAM] Authorization check failed for user ${userId}:`, error);
-            // Fall through to unauthorized handling
+            console.error('[TELEGRAM] A critical error occurred in listOrdersByStatus:', error);
+            bot.sendMessage(chatId, 'Sorry, an internal error occurred while fetching the order list.')
+               .catch(err => console.error('[TELEGRAM] Error sending critical error message:', err));
         }
-
-        // Unauthorized handling
-        if (ctx.callbackQuery) {
-            await ctx.answerCbQuery('⛔️ Unauthorized', { show_alert: true })
-               .catch(err => logger.error('[TELEGRAM] Error sending unauthorized callback answer:', err));
-        } else if (ctx.message) {
-            // Only reply to direct messages or mentions to avoid spamming groups
-            if (ctx.chat.type === 'private' || (ctx.message.text && ctx.message.text.includes(`@${ctx.botInfo?.username}`))) {
-                 await ctx.reply('⛔️ Unauthorized. You must be a member of the alerts channel.')
-                    .catch(err => logger.error('[TELEGRAM] Error sending unauthorized message:', err));
-            }
-        }
-    });
-
-    const listOrdersByStatus = async (ctx, statuses, title) => {
-      try {
-        const orders = await db.getOrdersByStatus(statuses);
-
-        if (orders.length === 0) {
-          ctx.reply(`No orders with status: ${statuses.join(', ')}`)
-            .catch(err => logger.error('[TELEGRAM] Error sending message:', err));
-          return;
-        }
-
-        // SECURITY: Use HTML mode for safer rendering.
-        let list = `<b>${title}:</b>\n\n`;
-        orders.forEach(order => {
-          list += `• <b>Order ID:</b> <code>${order.orderId}</code>\n`;
-          list += `  <b>Status:</b> ${order.status}\n`;
-          list += `  <b>Customer:</b> ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
-        });
-
-        ctx.replyWithHTML(list)
-           .catch(err => logger.error('[TELEGRAM] Error sending message:', err));
-      } catch (error) {
-        logger.error('[TELEGRAM] A critical error occurred in listOrdersByStatus:', error);
-        ctx.reply('Sorry, an internal error occurred while fetching the order list.')
-           .catch(err => logger.error('[TELEGRAM] Error sending critical error message:', err));
-      }
     };
 
-    bot.command('jobs', (ctx) => listOrdersByStatus(ctx, ['NEW', 'ACCEPTED', 'PRINTING'], 'All Active Jobs'));
-    bot.command('new_orders', (ctx) => listOrdersByStatus(ctx, ['NEW'], 'New Orders'));
-    bot.command('in_process_orders', (ctx) => listOrdersByStatus(ctx, ['ACCEPTED', 'PRINTING'], 'In Process Orders'));
-    bot.command('shipped_orders', (ctx) => listOrdersByStatus(ctx, ['SHIPPED'], 'Shipped Orders'));
-    bot.command('canceled_orders', (ctx) => listOrdersByStatus(ctx, ['CANCELED'], 'Canceled Orders'));
-    bot.command('delivered_orders', (ctx) => listOrdersByStatus(ctx, ['DELIVERED'], 'Delivered Orders'));
-    bot.command('completed_orders', (ctx) => listOrdersByStatus(ctx, ['COMPLETED'], 'Completed Orders'));
-
-    // Listen for replies to add notes to orders
-    bot.on(message('text'), async (ctx) => {
-      if (ctx.message.reply_to_message) {
-        const originalMessageId = ctx.message.reply_to_message.message_id;
-        let order = await db.getOrderByTelegramMessageId(originalMessageId);
-        if (!order) {
-            order = await db.getOrderByTelegramPhotoMessageId(originalMessageId);
-        }
-
-        if (order) {
-          if (!order.notes) {
-            order.notes = [];
-          }
-          const note = {
-            text: escapeHtml(ctx.message.text),
-            from: escapeHtml(ctx.from.username || `${ctx.from.first_name} ${ctx.from.last_name || ''}`.trim()),
-            date: new Date(ctx.message.date * 1000).toISOString(),
-          };
-          order.notes.push(note);
-          await db.updateOrder(order);
-
-          ctx.reply("Note added successfully!", {
-            reply_to_message_id: ctx.message.message_id
-          }).catch(err => logger.error('[TELEGRAM] Error sending confirmation message:', err));
-        }
-      }
+    // Listen for the /jobs command
+    bot.onText(/\/jobs/, (msg) => {
+      listOrdersByStatus(msg.chat.id, ['NEW', 'ACCEPTED', 'PRINTING'], 'All Active Jobs');
     });
 
-    bot.on('callback_query', async (ctx) => {
-      const [action, orderId] = ctx.callbackQuery.data.split('_');
-      const order = await db.getOrder(orderId);
+    bot.onText(/\/new_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['NEW'], 'New Orders');
+    });
 
-      if (order) {
-        let newStatus;
-        switch (action) {
-          case 'accept':
-            newStatus = 'ACCEPTED';
-            break;
-          case 'print':
-            newStatus = 'PRINTING';
-            break;
-          case 'ship':
-            newStatus = 'SHIPPED';
-            break;
-          case 'deliver':
-            newStatus = 'DELIVERED';
-            break;
-          case 'complete':
-              newStatus = 'COMPLETED';
-              break;
-          case 'cancel':
-            newStatus = 'CANCELED';
-            break;
-        }
+    bot.onText(/\/in_process_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['ACCEPTED', 'PRINTING'], 'In Process Orders');
+    });
 
-        if (newStatus) {
-          order.status = newStatus;
-          await db.updateOrder(order);
+    bot.onText(/\/shipped_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['SHIPPED'], 'Shipped Orders');
+    });
 
-          const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-          const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-          const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
-          const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
-          const completedOrLater = ['COMPLETED'];
+    bot.onText(/\/canceled_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['CANCELED'], 'Canceled Orders');
+    });
 
-          const statusChecklist = `
+    bot.onText(/\/delivered_orders/, (msg) => {
+        listOrdersByStatus(msg.chat.id, ['DELIVERED'], 'Delivered Orders');
+    });
+
+  } else {
+    console.warn('[TELEGRAM] Bot token not found. Bot is disabled.');
+    // Create a mock bot to avoid errors when the token is not set
+    bot = {
+      sendMessage: () => Promise.resolve(),
+      sendPhoto: () => Promise.resolve(),
+      sendDocument: () => Promise.resolve(),
+      editMessageText: () => Promise.resolve(),
+      deleteMessage: () => Promise.resolve(),
+      onText: () => {},
+      setMyCommands: () => {},
+      isPolling: () => false,
+      stopPolling: () => {},
+    };
+  }
+  return bot;
+}
+
+async function handleOrderStatusUpdate(order, newStatus, db) {
+  // If the order was stalled, delete the 'stalled' message
+  if (order.stalledMessageId) {
+    try {
+      await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.stalledMessageId);
+      const orderInDb = db.data.orders.find(o => o.orderId === order.orderId);
+      if (orderInDb) {
+        orderInDb.stalledMessageId = null; // Clear the ID after deleting
+        await db.write();
+      }
+    } catch (error) {
+      if (error.response && error.response.body && error.response.body.description.includes('message to delete not found')) {
+        console.log(`[TELEGRAM] Stalled message for order ${order.orderId} was already deleted.`);
+      } else {
+        console.error('[TELEGRAM] Failed to delete stalled message:', error);
+      }
+    }
+  }
+
+  // Update Telegram message
+  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL_ID && order.telegramMessageId) {
+    const statusChecklist = `
 ✅ New
-${acceptedOrLater.includes(newStatus) ? '✅' : '⬜️'} Accepted
-${printingOrLater.includes(newStatus) ? '✅' : '⬜️'} Printing
-${shippedOrLater.includes(newStatus) ? '✅' : '⬜️'} Shipped
-${deliveredOrLater.includes(newStatus) ? '✅' : '⬜️'} Delivered
-${completedOrLater.includes(newStatus) ? '✅' : '⬜️'} Completed
-            `;
-
-          const message = `
+${newStatus === 'ACCEPTED' || newStatus === 'PRINTING' || newStatus === 'SHIPPED' ? '✅' : '⬜️'} Accepted
+${newStatus === 'PRINTING' || newStatus === 'SHIPPED' ? '✅' : '⬜️'} Printing
+${newStatus === 'SHIPPED' ? '✅' : '⬜️'} Shipped
+    `;
+    const message = `
 Order: ${order.orderId}
 Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
 Email: ${order.billingContact.email}
@@ -181,70 +134,25 @@ Quantity: ${order.orderDetails.quantity}
 Amount: $${(order.amount / 100).toFixed(2)}
 
 ${statusChecklist}
-            `;
-          const keyboard = getOrderStatusKeyboard(order);
-          ctx.editMessageText(message, { reply_markup: keyboard });
+    `;
+    try {
+      if (newStatus === 'SHIPPED' || newStatus === 'COMPLETED' || newStatus === 'CANCELED') {
+        if (order.telegramMessageId) {
+          await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramMessageId);
         }
-      }
-      ctx.answerCbQuery();
-    });
-
-    if (!isTestEnv) {
-      const commands = [
-        { command: 'jobs', description: 'Lists all active jobs' },
-        { command: 'new_orders', description: 'Lists all NEW orders' },
-        { command: 'in_process_orders', description: 'Lists all ACCEPTED or PRINTING orders' },
-        { command: 'shipped_orders', description: 'Lists all SHIPPED orders' },
-        { command: 'canceled_orders', description: 'Lists all CANCELED orders' },
-        { command: 'delivered_orders', description: 'Lists all DELIVERED orders' },
-        { command: 'completed_orders', description: 'Lists all COMPLETED orders' },
-      ];
-      bot.telegram.setMyCommands(commands);
-      if (startPolling) {
-          bot.launch();
-          logger.info('[BOT] Telegraf bot launched (Polling enabled).');
+        if (order.telegramImageMessageId) {
+          await bot.deleteMessage(process.env.TELEGRAM_CHANNEL_ID, order.telegramImageMessageId);
+        }
       } else {
-          logger.info('[BOT] Telegraf bot initialized (Polling disabled).');
+        await bot.editMessageText(message, {
+          chat_id: process.env.TELEGRAM_CHANNEL_ID,
+          message_id: order.telegramMessageId,
+        });
       }
-    } else {
-      // In a test environment, we don't launch the bot, but we need to mock the telegram object.
-      // Use no-op functions instead of assuming jest.fn() is available, since this code runs in the server process
-      // Create a new object to replace bot.telegram
-      bot.telegram = {
-        sendMessage: () => Promise.resolve(),
-        sendPhoto: () => Promise.resolve(),
-        sendDocument: () => Promise.resolve(),
-        editMessageText: () => Promise.resolve(),
-        deleteMessage: () => Promise.resolve(),
-        setMyCommands: () => Promise.resolve(),
-        getChatMember: () => Promise.resolve({ status: 'administrator' }),
-        getMe: () => Promise.resolve({ id: 123456, is_bot: true, first_name: 'TestBot', username: 'TestBot' }),
-      };
-      // Manually set botInfo in test environment to satisfy Context constructor requirements
-      bot.botInfo = { id: 123456, is_bot: true, first_name: 'TestBot', username: 'TestBot' };
+    } catch (error) {
+      console.error('[TELEGRAM] Failed to edit or delete message:', error);
     }
-
-  } else {
-    logger.warn('[TELEGRAM] Bot token not found. Bot is disabled.');
-    // Create a mock bot to avoid errors when the token is not set
-    bot = {
-      telegram: {
-        sendMessage: () => Promise.resolve(),
-        sendPhoto: () => Promise.resolve(),
-        sendDocument: () => Promise.resolve(),
-        editMessageText: () => Promise.resolve(),
-        deleteMessage: () => Promise.resolve(),
-        setMyCommands: () => Promise.resolve(),
-        getChatMember: () => Promise.resolve({ status: 'left' }),
-      },
-      command: () => {},
-      on: () => {},
-      use: () => {}, // Added use to mock
-      launch: () => {},
-      stop: () => {},
-    };
   }
-  return bot;
 }
 
-export { initializeBot };
+export { initializeBot, bot, handleOrderStatusUpdate };

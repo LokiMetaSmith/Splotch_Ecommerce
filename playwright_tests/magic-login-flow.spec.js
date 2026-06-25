@@ -2,7 +2,6 @@ import { test, expect } from './test-setup.js';
 
 test('magic link login form', async ({ page }) => {
   await page.goto('/orders.html');
-  await page.evaluate(() => document.dispatchEvent(new CustomEvent('easterEggUnlocked')));
 
   // Fill out the email and click the button.
   await page.locator('#emailInput').fill('test@example.com');

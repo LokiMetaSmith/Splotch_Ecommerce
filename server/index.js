@@ -1,98 +1,103 @@
-import logger from './logger.js';
-
 // --- Global Error Handlers ---
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('❌ [FATAL] Unhandled Rejection at:', { promise, reason });
+  console.error('❌ [FATAL] Unhandled Rejection at:', promise, 'reason:', reason);
   // Optional: exit process, but it's often better to log and monitor
   // process.exit(1);
 });
 
 process.on('uncaughtException', (error) => {
-  logger.error('❌ [FATAL] Uncaught Exception:', error);
+  console.error('❌ [FATAL] Uncaught Exception:', error);
   // It's generally recommended to exit after an uncaught exception
   process.exit(1);
 });
 // -----------------------------
 
-import { startServer, FINAL_STATUSES } from './server.js';
+import { startServer } from './server.js';
 import { initializeBot } from './bot.js';
 import { sendEmail } from './email.js';
-import { getSecret } from './secretManager.js';
 import { JSONFilePreset } from 'lowdb/node';
-import { Low } from 'lowdb';
-import { getDatabaseAdapter } from './database/index.js';
-import { EncryptedJSONFile } from './database/EncryptedJSONFile.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { encrypt, decrypt } from './encryption.js';
-
-// Re-export for backward compatibility with tests
-export { encrypt, decrypt };
+import crypto from 'crypto';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const ENCRYPTION_KEY = process.env.JWT_SECRET; // 32 bytes
+const IV_LENGTH = 16; // For AES, this is always 16
+
+function encrypt(text) {
+    let iv = crypto.randomBytes(IV_LENGTH);
+    let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+    let encrypted = cipher.update(text);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function decrypt(text) {
+    let textParts = text.split(':');
+    let iv = Buffer.from(textParts.shift(), 'hex');
+    let encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+}
+
 async function main() {
+    const dbPath = path.join(__dirname, 'db.json');
     let db;
 
-    if (getSecret('DB_PROVIDER') === 'mongo' || getSecret('MONGO_URL')) {
-        const mongoUrl = getSecret('MONGO_URL');
-        if (!mongoUrl) {
-             logger.error('MONGO_URL must be set when DB_PROVIDER is mongo.');
-             process.exit(1);
+    if (process.env.ENCRYPT_CLIENT_JSON === 'true') {
+        if (fs.existsSync(dbPath)) {
+            const encryptedData = fs.readFileSync(dbPath, 'utf8');
+            const decryptedData = decrypt(encryptedData);
+            fs.writeFileSync(dbPath, decryptedData);
         }
-        db = getDatabaseAdapter(mongoUrl);
-        await db.connect();
-        logger.info('[SERVER] Connected to MongoDB.');
-    } else {
-        const dbPath = path.join(__dirname, 'db.json');
-        const defaultData = { orders: {}, users: {}, credentials: {}, config: {} };
-        let lowDbInstance;
-
-        if (getSecret('ENCRYPT_CLIENT_JSON') === 'true') {
-            const adapter = new EncryptedJSONFile(dbPath);
-            lowDbInstance = new Low(adapter, defaultData);
-            await lowDbInstance.read();
-            logger.info('[SERVER] Using EncryptedJSONFile adapter for database.');
-        } else {
-            lowDbInstance = await JSONFilePreset(dbPath, defaultData);
-        }
-
-        db = getDatabaseAdapter(lowDbInstance);
     }
 
-    const bot = initializeBot(db, { startPolling: process.env.ENABLE_BOT_POLLING !== 'false' });
+    db = await JSONFilePreset(dbPath, { orders: [], users: {}, credentials: {}, config: {} });
+
+    if (process.env.ENCRYPT_CLIENT_JSON === 'true') {
+        const originalWrite = db.write;
+        db.write = async function() {
+            const data = JSON.stringify(this.data);
+            const encryptedData = encrypt(data);
+            fs.writeFileSync(dbPath, encryptedData);
+        }
+    }
+
+    const bot = initializeBot(db);
     // startServer now returns the app and timers
     const { app } = await startServer(db, bot, sendEmail);
 
-  if (process.env.ENABLE_WEB_SERVER !== 'false') {
-      const port = getSecret('PORT') || 3000;
+  const port = process.env.PORT || 3000;
 
-      const server = app.listen(port, () => {
-        logger.info(`[SERVER] Server listening at http://localhost:${port}`);
-      });
+  const server = app.listen(port, () => {
+    console.log(`[SERVER] Server listening at http://localhost:${port}`);
+  });
 
-      server.on('error', (error) => {
-        if (error.code === 'EADDRINUSE') {
-          logger.error(`❌ [FATAL] Port ${port} is already in use.`);
-          logger.error('Please close the other process or specify a different port in your .env file.');
-          process.exit(1);
-        } else {
-          logger.error(`❌ [FATAL] An unexpected error occurred:`, error);
-          process.exit(1);
-        }
-      });
-  } else {
-      logger.info('[SERVER] Web server disabled by ENABLE_WEB_SERVER environment variable. Running in background worker mode.');
-  }
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ [FATAL] Port ${port} is already in use.`);
+      console.error('Please close the other process or specify a different port in your .env file.');
+      process.exit(1);
+    } else {
+      console.error(`❌ [FATAL] An unexpected error occurred:`, error);
+      process.exit(1);
+    }
+  });
 
   // Check for stalled orders every hour
   setInterval(async () => {
-    const now = new Date();
-    const ordersToCheck = await db.getActiveOrders();
+    // Force a re-read from the db.json file to get the latest order statuses
+    await db.read();
 
-    const stalledOrders = ordersToCheck.filter(order => {
-      if (FINAL_STATUSES.includes(order.status)) {
+    const now = new Date();
+    const finalStatuses = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+    const stalledOrders = db.data.orders.filter(order => {
+      if (finalStatuses.includes(order.status)) {
         return false;
       }
       const lastUpdatedAt = new Date(order.lastUpdatedAt || order.receivedAt);
@@ -107,22 +112,20 @@ async function main() {
   Last Update: ${new Date(order.lastUpdatedAt || order.receivedAt).toLocaleString()}
       `;
       try {
-        const sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, {
+        const sentMessage = await bot.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message, {
           reply_to_message_id: order.telegramMessageId,
         });
         // Store the message ID so we can delete it later
-        const orderInDb = await db.getOrder(order.orderId);
+        const orderInDb = db.data.orders.find(o => o.orderId === order.orderId);
         if (orderInDb) {
             orderInDb.stalledMessageId = sentMessage.message_id;
-            await db.updateOrder(orderInDb);
+            await db.write();
         }
       } catch (error) {
-        logger.error('[TELEGRAM] Failed to send stalled order notification:', error);
+        console.error('[TELEGRAM] Failed to send stalled order notification:', error);
       }
     }
   }, 1000 * 60 * 60);
 }
 
-if (process.argv[1] === __filename) {
-    main();
-}
+main();

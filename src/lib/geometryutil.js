@@ -41,10 +41,10 @@ function _normalizeVector(v) {
     };
 }
 
-function _onSegment(Ax, Ay, Bx, By, px, py) {
+function _onSegment(A, B, p) {
     // vertical line
-    if (_almostEqual(Ax, Bx) && _almostEqual(px, Ax)) {
-        if (!_almostEqual(py, By) && !_almostEqual(py, Ay) && py < Math.max(By, Ay) && py > Math.min(By, Ay)) {
+    if (_almostEqual(A.x, B.x) && _almostEqual(p.x, A.x)) {
+        if (!_almostEqual(p.y, B.y) && !_almostEqual(p.y, A.y) && p.y < Math.max(B.y, A.y) && p.y > Math.min(B.y, A.y)) {
             return true;
         } else {
             return false;
@@ -52,8 +52,8 @@ function _onSegment(Ax, Ay, Bx, By, px, py) {
     }
 
     // horizontal line
-    if (_almostEqual(Ay, By) && _almostEqual(py, Ay)) {
-        if (!_almostEqual(px, Bx) && !_almostEqual(px, Ax) && px < Math.max(Bx, Ax) && px > Math.min(Bx, Ax)) {
+    if (_almostEqual(A.y, B.y) && _almostEqual(p.y, A.y)) {
+        if (!_almostEqual(p.x, B.x) && !_almostEqual(p.x, A.x) && p.x < Math.max(B.x, A.x) && p.x > Math.min(B.x, A.x)) {
             return true;
         } else {
             return false;
@@ -61,26 +61,26 @@ function _onSegment(Ax, Ay, Bx, By, px, py) {
     }
 
     // range check
-    if ((px < Ax && px < Bx) || (px > Ax && px > Bx) || (py < Ay && py < By) || (py > Ay && py > By)) {
+    if ((p.x < A.x && p.x < B.x) || (p.x > A.x && p.x > B.x) || (p.y < A.y && p.y < B.y) || (p.y > A.y && p.y > B.y)) {
         return false;
     }
 
     // exclude end points
-    if ((_almostEqual(px, Ax) && _almostEqual(py, Ay)) || (_almostEqual(px, Bx) && _almostEqual(py, By))) {
+    if ((_almostEqual(p.x, A.x) && _almostEqual(p.y, A.y)) || (_almostEqual(p.x, B.x) && _almostEqual(p.y, B.y))) {
         return false;
     }
 
-    const cross = (py - Ay) * (Bx - Ax) - (px - Ax) * (By - Ay);
+    const cross = (p.y - A.y) * (B.x - A.x) - (p.x - A.x) * (B.y - A.y);
     if (Math.abs(cross) > TOL) {
         return false;
     }
 
-    const dot = (px - Ax) * (Bx - Ax) + (py - Ay) * (By - Ay);
+    const dot = (p.x - A.x) * (B.x - A.x) + (p.y - A.y) * (B.y - A.y);
     if (dot < 0 || _almostEqual(dot, 0)) {
         return false;
     }
 
-    const len2 = (Bx - Ax) * (Bx - Ax) + (By - Ay) * (By - Ay);
+    const len2 = (B.x - A.x) * (B.x - A.x) + (B.y - A.y) * (B.y - A.y);
     if (dot > len2 || _almostEqual(dot, len2)) {
         return false;
     }
@@ -289,11 +289,6 @@ export const GeometryUtil = {
         }
     },
 
-    rectsIntersect: function(r1, r2) {
-        return (r1.x < r2.x + r2.width && r1.x + r1.width > r2.x &&
-                r1.y < r2.y + r2.height && r1.y + r1.height > r2.y);
-    },
-
     getPolygonBounds: function(polygon) {
         if (!polygon || polygon.length < 1) return null;
         let xmin = polygon[0].x, xmax = polygon[0].x;
@@ -309,53 +304,14 @@ export const GeometryUtil = {
 
     pointInPolygon: function(point, polygon) {
         if (!polygon || polygon.length < 3) return null;
-
-        // Optimization: Check bounding box first
-        // If polygon doesn't have cached bounds, calculate them once (this is O(N))
-        // but saves us from the O(N) ray casting if the point is clearly outside.
-        // We cache LOCAL bounds (ignoring offset) so they remain valid even if the polygon is moved.
-        if (!polygon._bounds) {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            for (let i = 0; i < polygon.length; i++) {
-                 const x = polygon[i].x;
-                 const y = polygon[i].y;
-                 if (x < minX) minX = x;
-                 if (x > maxX) maxX = x;
-                 if (y < minY) minY = y;
-                 if (y > maxY) maxY = y;
-            }
-            // Cache it (non-enumerable to avoid polluting JSON stringify if needed)
-            // Note: We use Object.defineProperty to ensure the property is not enumerable,
-            // preventing it from being serialized to JSON.
-            try {
-                Object.defineProperty(polygon, '_bounds', {
-                    value: { minX, minY, maxX, maxY },
-                    writable: true,
-                    configurable: true,
-                    enumerable: false
-                });
-            } catch (e) {
-                 // Fallback if object is frozen/sealed: just use a temporary variable (no caching benefit for this single call, but safe)
-                 polygon._bounds = { minX, minY, maxX, maxY };
-            }
-        }
-
-        const b = polygon._bounds;
+        let inside = false;
         const offsetx = polygon.offsetx || 0;
         const offsety = polygon.offsety || 0;
-
-        if (point.x < b.minX + offsetx || point.x > b.maxX + offsetx || point.y < b.minY + offsety || point.y > b.maxY + offsety) {
-            return false;
-        }
-
-        let inside = false;
-        // The variables offsetx and offsety are already declared above
         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
             const xi = polygon[i].x + offsetx, yi = polygon[i].y + offsety;
             const xj = polygon[j].x + offsetx, yj = polygon[j].y + offsety;
             if (_almostEqual(xi, point.x) && _almostEqual(yi, point.y)) return null;
-            // Bolt Optimization: Pass scalar coordinates to avoid creating {x,y} objects in this hot loop
-            if (_onSegment(xi, yi, xj, yj, point.x, point.y)) return null;
+            if (_onSegment({ x: xi, y: yi }, { x: xj, y: yj }, point)) return null;
             if (_almostEqual(xi, xj) && _almostEqual(yi, yj)) continue;
             const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
             if (intersect) inside = !inside;
@@ -369,47 +325,6 @@ export const GeometryUtil = {
             area += (polygon[j].x + polygon[i].x) * (polygon[j].y - polygon[i].y);
         }
         return 0.5 * area;
-    },
-
-    rotatePolygon: function(polygon, angle) {
-        if (!polygon || polygon.length === 0) return [];
-        const angleRad = _degreesToRadians(angle);
-        const cos = Math.cos(angleRad);
-        const sin = Math.sin(angleRad);
-        const rotated = [];
-        for (let i = 0; i < polygon.length; i++) {
-            rotated.push({
-                x: polygon[i].x * cos - polygon[i].y * sin,
-                y: polygon[i].x * sin + polygon[i].y * cos
-            });
-        }
-        if (polygon.id !== undefined) rotated.id = polygon.id;
-        if (polygon.source) rotated.source = polygon.source;
-        return rotated;
-    },
-
-    getRotatedPolygonBounds: function(polygon, angle) {
-        if (!polygon || polygon.length === 0) return null;
-        if (Math.abs(angle) < TOL) return this.getPolygonBounds(polygon);
-
-        const angleRad = _degreesToRadians(angle);
-        const cos = Math.cos(angleRad);
-        const sin = Math.sin(angleRad);
-
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-        for (let i = 0; i < polygon.length; i++) {
-            const p = polygon[i];
-            const rx = p.x * cos - p.y * sin;
-            const ry = p.x * sin + p.y * cos;
-
-            if (rx < minX) minX = rx;
-            if (rx > maxX) maxX = rx;
-            if (ry < minY) minY = ry;
-            if (ry > maxY) maxY = ry;
-        }
-
-        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     },
     
     // ... other methods from original file can be added here ...

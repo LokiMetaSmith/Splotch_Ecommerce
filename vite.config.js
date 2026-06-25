@@ -1,23 +1,9 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import tailwindcss from '@tailwindcss/postcss';
-import autoprefixer from 'autoprefixer';
-import basicSsl from '@vitejs/plugin-basic-ssl';
-import fs from 'fs';
-import dns from 'dns';
-
-dns.setDefaultResultOrder('ipv4first');
-
-const packageJson = JSON.parse(fs.readFileSync('./package.json'));
-process.env.VITE_APP_VERSION = packageJson.version;
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  define: {
-    __APP_VERSION__: JSON.stringify(packageJson.version)
-  },
-  plugins: [
-    basicSsl()
-  ],
+  plugins: [tailwindcss()],
   build: {
     rollupOptions: {
       input: {
@@ -29,27 +15,8 @@ export default defineConfig({
       },
     },
   },
-  css: {
-    postcss: {
-      plugins: [
-        tailwindcss,
-        autoprefixer,
-      ],
-    },
-  },
   server: {
-    host: '0.0.0.0',
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/uploads': {
-        target: 'http://127.0.0.1:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
-  },
+    // Expose the server to the network, which can be useful for testing on other devices.
+    host: '0.0.0.0'
+  }
 });
