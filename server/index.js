@@ -88,16 +88,15 @@ async function main() {
 
   // Check for stalled orders every hour
   setInterval(async () => {
-    const now = new Date();
+    const nowMs = Date.now();
+    const fourHoursMs = 4 * 60 * 60 * 1000;
     const ordersToCheck = await db.getActiveOrders();
 
     const stalledOrders = ordersToCheck.filter(order => {
-      if (FINAL_STATUSES.includes(order.status)) {
-        return false;
-      }
-      const lastUpdatedAt = new Date(order.lastUpdatedAt || order.receivedAt);
-      const hoursSinceUpdate = (now - lastUpdatedAt) / 1000 / 60 / 60;
-      return hoursSinceUpdate > 4;
+      // db.getActiveOrders() already filters out FINAL_STATUSES
+      const lastUpdateStr = order.lastUpdatedAt || order.receivedAt;
+      const lastUpdateMs = typeof lastUpdateStr === 'number' ? lastUpdateStr : Date.parse(lastUpdateStr);
+      return (nowMs - lastUpdateMs) > fourHoursMs;
     });
 
     for (const order of stalledOrders) {
