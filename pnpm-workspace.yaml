@@ -1,3 +1,7 @@
+packages:
+  - "."
+  - "server"
+
 allowBuilds:
   - "@parcel/watcher"
   - "bcrypt"
@@ -6,4 +10,5 @@ allowBuilds:
   - "nodent-runtime"
   - "unrs-resolver"
   - "@sentry-internal/node-cpu-profiler"
+  - "@sentry/node-cpu-profiler"
   - "msgpackr-extract"

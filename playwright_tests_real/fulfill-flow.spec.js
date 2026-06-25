@@ -119,19 +119,20 @@ test.describe('Order and Fulfillment Flow', () => {
         await expect(orderToFulfill).toBeVisible();
 
         // Mark as PRINTING
-        const printButton = orderToFulfill.locator('button.action-btn[data-status="PRINTING"]');
-        await printButton.click();
+        const actionDropdown = orderToFulfill.locator('select.action-dropdown');
+        await actionDropdown.selectOption('PRINTING');
         
         const successToast = page.locator('#success-toast');
         await expect(successToast).toBeVisible({ timeout: 10000 });
         await expect(page.locator('#success-message')).toContainText('Order status updated');
         
+        // Wait for the toast to go away or force close it to prevent blocking
+        await page.waitForTimeout(1000);
+
         // Mark as COMPLETED
-        const fulfillButton = orderToFulfill.locator('button.action-btn[data-status="COMPLETED"]');
-        await fulfillButton.click();
+        await actionDropdown.selectOption('COMPLETED');
         
-        // Depending on UI, the button might change, or the order drops off or just status updates.
-        // Since we clicked it, wait for toast
+        // Since we changed the select, wait for toast
         await expect(page.locator('#success-toast')).toBeVisible({ timeout: 10000 });
         await expect(orderToFulfill).toContainText('COMPLETED', { timeout: 10000 });
     });
