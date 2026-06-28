@@ -47,7 +47,7 @@ test('Generate Smart Cutline should preserve the original image', async ({ page 
     });
 
     // Wait for the button to reset state, indicating it has completed
-    await expect(generateBtn).not.toHaveClass(/opacity-50/, { timeout: 15000 });
+    const generateBtn = page.locator("#generateCutlineBtn"); await generateBtn.waitFor({ state: "attached" }); await expect(generateBtn).not.toHaveClass(/opacity-50/, { timeout: 15000 });
 
     // Check pixel again
     const isNotBlack = await page.evaluate(() => {
