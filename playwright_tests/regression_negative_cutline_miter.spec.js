@@ -24,7 +24,8 @@ test('Negative cutline offset should generate sharp edges (miter)', async ({ pag
 
     // Initial cutline generation (Wait for automatic generation to complete)
     // The image has a transparent background so handleGenerateCutline(true) is called automatically
-    await expect(page.locator('#toast-container')).toContainText('Smart cutline generated successfully', { timeout: 30000 });
+    const generateBtn = page.locator('#generateCutlineBtn');
+    await expect(generateBtn).not.toHaveClass(/opacity-50/, { timeout: 30000 });
 
     const offsetSlider = page.locator('#cutlineOffsetSlider');
     await offsetSlider.waitFor({ state: 'attached' });

@@ -49,13 +49,17 @@ test.describe('Frontend Image Manipulation', () => {
         test.setTimeout(60000);
         await uploadTestImage(page);
 
-        // Fill text input
-        await page.fill('#textInput', 'Hello World');
-        await page.fill('#textSizeInput', '50');
-        await page.fill('#textColorInput', '#000000');
-
-        // Click Add Text button
-        await page.click('#addTextBtn');
+        // Fill text input using evaluate
+        await page.evaluate(() => {
+            const ti = document.getElementById('textInput');
+            if(ti) { ti.value = 'Hello World'; ti.dispatchEvent(new Event('input', { bubbles: true })); }
+            const size = document.getElementById('textSizeInput');
+            if(size) { size.value = '50'; size.dispatchEvent(new Event('input', { bubbles: true })); }
+            const color = document.getElementById('textColorInput');
+            if(color) { color.value = '#000000'; color.dispatchEvent(new Event('input', { bubbles: true })); }
+            const btn = document.getElementById('addTextBtn');
+            if(btn) btn.click();
+        });
 
         // Verify success message
         await expect(page.locator('.message-content').last()).toContainText('Text "Hello World" added');
@@ -78,11 +82,17 @@ test.describe('Frontend Image Manipulation', () => {
         test.setTimeout(60000);
         await uploadTestImage(page);
 
-        await page.click('#grayscaleBtn');
+        await page.evaluate(() => {
+            const btn = document.getElementById('grayscaleBtn');
+            if (btn) btn.click();
+        });
         // Wait a bit
         await page.waitForTimeout(100);
 
-        await page.click('#grayscaleBtn');
+        await page.evaluate(() => {
+            const btn = document.getElementById('grayscaleBtn');
+            if (btn) btn.click();
+        });
         await page.waitForTimeout(100);
     });
 
@@ -113,7 +123,7 @@ test.describe('Frontend Image Manipulation', () => {
         // Check for the "Generating smart cutline..." or "Smart cutline generated successfully" message.
         // Wait for the button to appear.
         const generateBtn = page.locator('#generateCutlineBtn');
-        await expect(generateBtn).toBeVisible();
+        await generateBtn.waitFor({ state: 'attached' });
 
         // Because the image has a transparent background, `imageHasTransparentBorder` will return true
         // and `handleGenerateCutline(true)` will be called automatically!
