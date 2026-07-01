@@ -11,7 +11,7 @@ test.describe('Order and Fulfillment Flow', () => {
                         payments: () => ({
                             card: async () => ({
                                 attach: async () => { console.log('Mock Card Attached'); },
-                                tokenize: async () => ({ status: 'OK', token: 'mock-sq-token-client' }),
+                                tokenize: async () => ({ status: 'OK', token: 'cnon:card-nonce-ok' }),
                                 destroy: async () => {},
                             })
                         })

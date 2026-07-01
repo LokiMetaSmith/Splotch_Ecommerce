@@ -9,6 +9,7 @@ $mockServerJob = Start-Job {
 Write-Host "Starting Backend Server..."
 $backendServerJob = Start-Job {
     Set-Location -Path (Join-Path $using:PWD "server")
+    $env:NODE_ENV = "test"
     npm start
 }
 

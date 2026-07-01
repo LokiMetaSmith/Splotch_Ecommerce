@@ -1240,10 +1240,6 @@ async function startServer(
             amount: BigInt(amountCents),
             currency: currency || 'USD',
           },
-         appFeeMoney: {
-           amount: BigInt("10"),
-           currency: "USD"
-          },
           autocomplete: true,
           referenceId: randomUUID(),
           note: "STICKERS!!!",
