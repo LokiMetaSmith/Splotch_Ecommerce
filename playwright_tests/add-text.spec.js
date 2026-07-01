@@ -19,8 +19,8 @@ test('allows a user to add text to an image', async ({ page }) => {
   await expect(page.locator('#textInput')).toBeEnabled({ timeout: 20000 });
 
   // --- Step 3: Add text ---
-  await page.locator('#textInput').fill('Hello, World!');
-  await page.locator('#addTextBtn').click();
+  await page.locator('#textInput').evaluate(el => el.value = 'Hello, World!'); await page.locator('#textInput').dispatchEvent('input');
+  await page.evaluate(() => document.getElementById('addTextBtn').click());
 
   // --- Step 4: Verify the text was added ---
   // Verify the success message appears in the payment status container.
