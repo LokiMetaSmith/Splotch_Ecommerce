@@ -55,6 +55,7 @@
     "lusca": "^1.7.0",
     "multer": "^2.0.1",
     "nodemailer": "^7.0.5",
+    "pdf-poppler": "^0.2.3",
     "square": "^43.0.1",
     "svg-parser": "^2.0.4",
     "svg-path-properties": "^2.0.0",

@@ -51,11 +51,15 @@ import { emailQueue, telegramQueue, odooQueue, redisAvailable } from './queueMan
 import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
 import { wafMiddleware } from './waf.js';
 import OdooClient from './odoo.js';
+import { exec } from 'child_process';
+import util from 'util';
+
+const execPromise = util.promisify(exec);
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
 
-const allowedMimeTypes = ['image/svg+xml', 'application/xml', 'image/png', 'image/jpeg', 'image/webp'];
+const allowedMimeTypes = ['image/svg+xml', 'application/xml', 'image/png', 'image/jpeg', 'image/webp', 'image/tiff', 'application/pdf', 'application/postscript', 'application/illustrator'];
 // Pre-computed valid bcrypt hash for timing-safe comparison
 const DUMMY_HASH = '$2b$10$e8ypvsBL/MxhtxIydLPU2eoLd4IVyOy0MhGvCRL3DC/xUpoznhhHi';
 const __filename = fileURLToPath(import.meta.url);
@@ -830,6 +834,42 @@ async function startServer(
             return res.status(403).json({ error: 'Forbidden' });
         }
         res.json(Metrics.getMetrics());
+    });
+
+    app.post('/api/convert-image', upload.single('file'), async (req, res) => {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const inputFile = req.file.path;
+        const outputFile = `${inputFile}.png`;
+
+        try {
+            // Using [0] to extract the first layer/page of multi-page formats (PDF/TIFF/AI)
+            const command = `convert "${inputFile}[0]" "${outputFile}"`;
+            await execPromise(command);
+
+            res.sendFile(outputFile, async (err) => {
+                if (err) {
+                    logger.error("Error sending converted file:", err);
+                }
+                // Cleanup temp files
+                try {
+                    await fs.promises.unlink(inputFile);
+                    await fs.promises.unlink(outputFile);
+                } catch (cleanupErr) {
+                    logger.error("Error cleaning up conversion temp files:", cleanupErr);
+                }
+            });
+        } catch (error) {
+            logger.error("Error converting image:", error);
+            try {
+                await fs.promises.unlink(inputFile);
+            } catch (cleanupErr) {
+                // ignore
+            }
+            res.status(500).json({ error: 'Failed to convert file format.' });
+        }
     });
 
     app.post('/api/upload-design', authenticateToken, upload.fields([
