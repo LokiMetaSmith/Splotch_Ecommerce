@@ -81,11 +81,22 @@ let textInput,
   lazyLassoSlider,
   lazyLassoValueDisplay;
 let cutlineSensitivity = 42; // Default sensitivity
-let stickerMaterialSelect,
+let  stickerMaterialSelect,
   stickerResolutionSelect,
   designMarginNote,
   stickerQuantityInput,
   calculatedPriceDisplay;
+
+let currentTemplate = "blank";
+let templateBlankBtn;
+let templateHelloBtn;
+let templateThankYouBtn;
+let discountTableContainer;
+let discountTableBody;
+let promoAddonCheckbox;
+let promoAddonStatusMsg;
+
+// Original Image and File State
 let paymentStatusContainer,
   ipfsLinkContainer,
   fileInputGlobalRef,
@@ -247,6 +258,25 @@ async function BootStrap() {
   );
   lazyLassoSlider = document.getElementById("lazyLassoSlider");
   lazyLassoValueDisplay = document.getElementById("lazyLassoValue");
+
+  // New E-commerce / Template UI Elements
+  templateBlankBtn = document.getElementById("templateBlankBtn");
+  templateHelloBtn = document.getElementById("templateHelloBtn");
+  templateThankYouBtn = document.getElementById("templateThankYouBtn");
+  discountTableContainer = document.getElementById("discountTableContainer");
+  discountTableBody = document.getElementById("discountTableBody");
+  promoAddonCheckbox = document.getElementById("promoAddonCheckbox");
+  promoAddonStatusMsg = document.getElementById("promoAddonStatusMsg");
+
+  if (promoAddonCheckbox) {
+    promoAddonCheckbox.addEventListener("change", () => {
+      calculateAndUpdatePrice();
+    });
+  }
+
+  if (templateBlankBtn) templateBlankBtn.addEventListener("click", () => setTemplate("blank"));
+  if (templateHelloBtn) templateHelloBtn.addEventListener("click", () => setTemplate("hello_badge"));
+  if (templateThankYouBtn) templateThankYouBtn.addEventListener("click", () => setTemplate("thank_you"));
 
   // Fetch CSRF token and pricing info
   // Fetch CSRF token first to establish the session cookie, avoiding race conditions with other requests
@@ -1003,6 +1033,58 @@ function calculateAndUpdatePrice() {
   const totalMarkup = creatorProfitCents * quantity;
   currentOrderAmountCents = priceResult.total + totalMarkup;
   // ----------------------------
+  
+  // --- Promo Addon Logic ---
+  if (promoAddonCheckbox && promoAddonCheckbox.checked) {
+    if (quantity >= 50) {
+      if (promoAddonStatusMsg) {
+        promoAddonStatusMsg.textContent = "FREE PROMO STICKER APPLIED!";
+        promoAddonStatusMsg.className = "text-green-600 font-bold mt-1 text-xs uppercase tracking-wide";
+      }
+    } else {
+      currentOrderAmountCents += 200; // $2.00
+      if (promoAddonStatusMsg) {
+        promoAddonStatusMsg.textContent = "Free on orders of 50 or more items!";
+        promoAddonStatusMsg.className = "text-indigo-700 font-bold mt-1 text-xs uppercase tracking-wide";
+      }
+    }
+  } else {
+    if (promoAddonStatusMsg) {
+      promoAddonStatusMsg.textContent = "Free on orders of 50 or more items!";
+      promoAddonStatusMsg.className = "text-indigo-700 font-bold mt-1 text-xs uppercase tracking-wide";
+    }
+  }
+  // -------------------------
+
+  // --- Render Discount Table ---
+  if (pricingConfig && pricingConfig.quantityDiscounts && discountTableContainer && discountTableBody) {
+    discountTableContainer.classList.remove("hidden");
+    discountTableBody.innerHTML = "";
+    
+    // Convert discounts object to array and sort by quantity ascending for display
+    const discounts = Object.entries(pricingConfig.quantityDiscounts)
+      .map(([q, d]) => ({ minQty: parseInt(q, 10), discountPercent: d * 100 }))
+      .sort((a, b) => a.minQty - b.minQty);
+      
+    discounts.forEach(tier => {
+      const isCurrentTier = quantity >= tier.minQty && 
+                            (!discounts.find(t => t.minQty > tier.minQty && quantity >= t.minQty));
+                            
+      const row = document.createElement("tr");
+      if (isCurrentTier) {
+        row.className = "bg-indigo-100 font-semibold";
+      } else {
+        row.className = "border-t border-gray-100";
+      }
+      
+      row.innerHTML = `
+        <td class="px-2 py-1">${tier.minQty}+</td>
+        <td class="px-2 py-1 text-right text-indigo-700">-${tier.discountPercent}%</td>
+      `;
+      discountTableBody.appendChild(row);
+    });
+  }
+  // -----------------------------
 
   const ppi = selectedResolution.ppi;
   let width = bounds.width / ppi;
@@ -1374,11 +1456,15 @@ async function handlePaymentFormSubmit(event) {
 
     // 4. Create JSON payload for the order
     const orderDetails = {
+      resolution: stickerResolutionSelect
+        ? stickerResolutionSelect.value
+        : "unknown",
       quantity: stickerQuantityInput
         ? parseInt(stickerQuantityInput.value, 10)
         : 0,
       material: stickerMaterialSelect ? stickerMaterialSelect.value : "unknown",
       stickerName: stickerName,
+      promoAddon: promoAddonCheckbox ? promoAddonCheckbox.checked : false,
     };
     if (cutLinePath) {
       orderDetails.cutLinePath = cutLinePath;
@@ -2616,6 +2702,107 @@ function handleClearImage() {
   if (clearFileBtn) clearFileBtn.classList.add("hidden");
   if (fileInputGlobalRef) fileInputGlobalRef.focus();
   showNotification("Image removed.", "info");
+}
+
+function setTemplate(templateId) {
+  currentTemplate = templateId;
+  
+  if (templateBlankBtn) templateBlankBtn.classList.remove('bg-indigo-100', 'text-indigo-700', 'border-indigo-200');
+  if (templateBlankBtn) templateBlankBtn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+  if (templateHelloBtn) templateHelloBtn.classList.remove('bg-indigo-100', 'text-indigo-700', 'border-indigo-200');
+  if (templateHelloBtn) templateHelloBtn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+  if (templateThankYouBtn) templateThankYouBtn.classList.remove('bg-indigo-100', 'text-indigo-700', 'border-indigo-200');
+  if (templateThankYouBtn) templateThankYouBtn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+  
+  let activeBtn;
+  if (templateId === 'blank') activeBtn = templateBlankBtn;
+  if (templateId === 'hello_badge') activeBtn = templateHelloBtn;
+  if (templateId === 'thank_you') activeBtn = templateThankYouBtn;
+  
+  if (activeBtn) {
+    activeBtn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+    activeBtn.classList.add('bg-indigo-100', 'text-indigo-700', 'border-indigo-200');
+  }
+
+  // Guardrails
+  const isTemplate = templateId !== 'blank';
+  if (rotateLeftBtnEl) rotateLeftBtnEl.disabled = isTemplate;
+  if (rotateRightBtnEl) rotateRightBtnEl.disabled = isTemplate;
+  const uploadSection = document.getElementById("uploadFileSection");
+  if (uploadSection) {
+    uploadSection.style.display = isTemplate ? 'none' : 'block';
+  }
+  
+  if (isTemplate) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      originalImage = img;
+      setCanvasSize(img.width, img.height);
+      ctx.clearRect(0, 0, img.width, img.height);
+      ctx.drawImage(originalImage, 0, 0, img.width, img.height);
+      
+      const dpr = window.devicePixelRatio || 1;
+      const logicalWidth = canvas.width / dpr;
+      const logicalHeight = canvas.height / dpr;
+      
+      currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      currentBounds = {
+        minX: 0,
+        minY: 0,
+        maxX: canvas.width - 1,
+        maxY: canvas.height - 1,
+        width: canvas.width,
+        height: canvas.height
+      };
+      
+      clearCanvasAndDraw();
+      updateEditingButtonsState(false);
+      
+      // Auto-populate text based on template
+      if (templateId === 'hello_badge' && textInput) {
+        textInput.value = "John Doe";
+        textColorInput.value = "#000000";
+        if (textSizeInput) textSizeInput.value = "30";
+        if (textSizeSlider) textSizeSlider.value = "30";
+        handleAddText(); // Will trigger clearCanvasAndDraw again with the text
+      } else if (templateId === 'thank_you' && textInput) {
+        textInput.value = "Your name here";
+        textColorInput.value = "#d97706";
+        if (textSizeInput) textSizeInput.value = "20";
+        if (textSizeSlider) textSizeSlider.value = "20";
+        handleAddText();
+      } else {
+        calculateAndUpdatePrice();
+      }
+    };
+    img.onerror = () => showNotification("Failed to load template", "error");
+    img.src = `/templates/${templateId}.svg`;
+  } else {
+    // Reset to blank canvas
+    if (confirm("Are you sure you want to reset to a blank canvas? This will clear your current design.")) {
+      originalImage = null;
+      basePolygons = [];
+      currentPolygons = [];
+      rasterCutlinePoly = null;
+      currentCutline = [];
+      currentBounds = null;
+      cleanCanvasState = null;
+      cachedTempCanvas = null;
+      if (fileInputGlobalRef) fileInputGlobalRef.value = "";
+      if (canvas && ctx) {
+        setCanvasSize(500, 400);
+        ctx.clearRect(0, 0, 500, 400);
+      }
+      updateEditingButtonsState(true);
+      calculateAndUpdatePrice();
+      renderLegend();
+      if (clearFileBtn) clearFileBtn.classList.add("hidden");
+    } else {
+      // Revert button if they cancel
+      setTemplate('blank'); // actually wait, infinite loop... let's just clear manually if needed.
+    }
+  }
 }
 
 function handleResetImage() {

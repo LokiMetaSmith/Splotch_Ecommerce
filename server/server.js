@@ -1050,6 +1050,7 @@ async function startServer(
       // Security Fix: Validate orderDetails structure
       body('orderDetails').isObject().withMessage('orderDetails must be an object'),
       body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),
+      body('orderDetails.promoAddon').optional().isBoolean().withMessage('Promo Addon must be a boolean'),
       // Security: Validate material and resolution against allowed values to prevent injection
       body('orderDetails.material').optional().isString().withMessage('Material must be a string').custom(value => {
             const validMaterials = pricingConfig.materials.map(m => m.id);
@@ -1124,7 +1125,8 @@ async function startServer(
             quantity: orderDetails.quantity,
             material: orderDetails.material,
             resolution: orderDetails.resolution,
-            cutLinePath: orderDetails.cutLinePath
+            cutLinePath: orderDetails.cutLinePath,
+            promoAddon: orderDetails.promoAddon || false
         };
 
         // --- Product / Creator Payout Logic ---
@@ -1208,6 +1210,13 @@ async function startServer(
                 // Add Creator Profit if applicable
                 if (product) {
                     expectedTotal += (product.creatorProfitCents * quantity);
+                }
+                
+                // Promo Addon Logic
+                if (orderDetails.promoAddon) {
+                    if (quantity < 50) {
+                        expectedTotal += 200;
+                    }
                 }
 
                 const submittedTotal = Number(amountCents);

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <circle cx="150" cy="150" r="145" fill="#fef3c7" stroke="#f59e0b" stroke-width="10"/>
+  <text x="150" y="100" font-family="Georgia, serif" font-weight="bold" font-size="36" fill="#b45309" text-anchor="middle">Thank You!</text>
+  <text x="150" y="220" font-family="Arial, sans-serif" font-size="16" fill="#d97706" text-anchor="middle">Your support means</text>
+  <text x="150" y="240" font-family="Arial, sans-serif" font-size="16" fill="#d97706" text-anchor="middle">the world to us.</text>
+</svg>
