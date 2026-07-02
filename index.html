@@ -889,6 +889,32 @@
               </p>
             </div>
 
+            <div id="layer-controls-container" class="field mt-4 border border-gray-200 rounded-md p-4" style="display: none;">
+              <h4 class="text-md font-semibold text-gray-700 mb-2">Custom Printing Layers</h4>
+              <p class="text-xs text-gray-500 mb-4" style="font-family: var(--font-baumans)">
+                Specify custom layers from bottom to top (e.g., White Underbase, CMYK, Clear Coat). Drag to reorder.
+              </p>
+
+              <div class="flex flex-col md:flex-row gap-4">
+                <div class="w-full md:w-1/2">
+                  <img src="/layer-graphic.svg" alt="Layer Construction Graphic" class="w-full h-auto max-w-[200px] mx-auto border border-gray-200 rounded-md p-2 bg-white" />
+                </div>
+                <div class="w-full md:w-1/2 flex flex-col gap-2">
+                  <div class="flex gap-2">
+                    <select id="layerSelect" class="input flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                      <!-- Populated by JS -->
+                    </select>
+                    <button type="button" id="addLayerBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-3 rounded-md transition-colors">Add</button>
+                  </div>
+
+                  <ul id="layerList" class="mt-2 space-y-2 max-h-[150px] overflow-y-auto">
+                    <!-- Layer items go here -->
+                  </ul>
+                  <p class="text-xs text-gray-400 mt-1 italic">Top layer is at the bottom of the list</p>
+                </div>
+              </div>
+            </div>
+
             <div class="field bg-indigo-50 rounded-md border border-indigo-100 p-4 mt-4">
               <label class="flex items-start gap-3 cursor-pointer">
                 <div class="flex items-center h-5">
