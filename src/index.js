@@ -1832,8 +1832,40 @@ function loadFileAsImage(file, isMascot = false) {
 
   const reader = new FileReader();
 
+  // Hande API-based conversions for TIFF, PDF, and AI
+  if (
+    file.type === "image/tiff" ||
+    file.type === "application/pdf" ||
+    file.type === "application/postscript" ||
+    file.name.toLowerCase().endsWith(".ai") ||
+    file.name.toLowerCase().endsWith(".pdf") ||
+    file.name.toLowerCase().endsWith(".tiff")
+  ) {
+    showNotification("Converting file to preview format. This may take a moment...", "info");
+    const formData = new FormData();
+    formData.append("file", file);
+
+    fetch("/api/convert-image", {
+      method: "POST",
+      body: formData,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Conversion failed");
+        return res.blob();
+      })
+      .then((blob) => {
+        const convertedFile = new File([blob], file.name + ".png", { type: "image/png" });
+        loadFileAsImage(convertedFile, isMascot);
+      })
+      .catch((err) => {
+        console.error(err);
+        showNotification("Failed to convert file format.", "error");
+      });
+    return;
+  }
+
   // Handle SVGs differently from other images
-  if (file.type === "image/svg+xml") {
+  if (file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg")) {
     // Reset raster image state
     originalImage = null;
     reader.onload = (e) => {
@@ -1841,7 +1873,7 @@ function loadFileAsImage(file, isMascot = false) {
     };
     reader.onerror = () => showNotification("Error reading SVG file.", "error");
     reader.readAsText(file);
-  } else if (file.type.startsWith("image/")) {
+  } else if (file.type.startsWith("image/") || file.name.toLowerCase().endsWith(".png") || file.name.toLowerCase().endsWith(".jpg") || file.name.toLowerCase().endsWith(".jpeg")) {
     // Reset vector state
     currentPolygons = [];
     basePolygons = [];
