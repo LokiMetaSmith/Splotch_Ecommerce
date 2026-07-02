@@ -36,6 +36,21 @@
       "id": "pvc_laminated",
       "name": "Laminated PVC",
       "costMultiplier": 1.5
+    },
+    {
+      "id": "finish_holographic",
+      "name": "Holographic",
+      "costMultiplier": 2.0
+    },
+    {
+      "id": "finish_glitter",
+      "name": "Glitter",
+      "costMultiplier": 2.2
+    },
+    {
+      "id": "finish_matte",
+      "name": "Matte Soft-Touch",
+      "costMultiplier": 1.8
     }
   ],
   "complexity": {
