@@ -40,6 +40,23 @@
       "supportedLayers": ["white", "cmyk", "clear"]
     }
   ],
+  "layers": [
+    {
+      "id": "white",
+      "name": "White Underbase",
+      "costMultiplier": 1.1
+    },
+    {
+      "id": "cmyk",
+      "name": "CMYK Artwork",
+      "costMultiplier": 1.0
+    },
+    {
+      "id": "clear",
+      "name": "Clear Coat",
+      "costMultiplier": 1.2
+    }
+  ],
   "complexity": {
     "description": "Multiplier based on the perimeter of the cut path.",
     "tiers": [

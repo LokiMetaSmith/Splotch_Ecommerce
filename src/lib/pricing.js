@@ -43,6 +43,7 @@ export function calculateStickerPrice(
   cutline,
   resolution,
   existingPerimeterPixels,
+  customLayers = [],
 ) {
   if (!pricingConfig) {
     console.error("Pricing config not loaded.");
@@ -79,6 +80,17 @@ export function calculateStickerPrice(
     }
   }
 
+  // Get layer multiplier
+  let layerMultiplier = 1.0;
+  if (customLayers && customLayers.length > 0 && pricingConfig.layers) {
+    for (const layerId of customLayers) {
+      const layerConfig = pricingConfig.layers.find((l) => l.id === layerId);
+      if (layerConfig) {
+        layerMultiplier *= layerConfig.costMultiplier;
+      }
+    }
+  }
+
   // Get quantity discount
   let discount = 0;
   // Bolt Optimization: Discounts are pre-sorted on load. Iterating directly.
@@ -95,7 +107,8 @@ export function calculateStickerPrice(
     quantity *
     materialMultiplier *
     complexityMultiplier *
-    resolutionMultiplier;
+    resolutionMultiplier *
+    layerMultiplier;
   const discountedTotal = totalCents * (1 - discount);
 
   return {

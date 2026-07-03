@@ -1039,6 +1039,7 @@ function calculateAndUpdatePrice() {
     cutline,
     selectedResolution,
     lastCalculatedPerimeter,
+    customLayers
   );
 
   // --- Creator Markup Logic ---
