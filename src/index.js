@@ -3691,7 +3691,7 @@ function handleGenerateCutline(skipPrompt = false) {
           const scaledPoly = new Array(smoothedContour.length);
           for (let j = 0; j < smoothedContour.length; j++) {
             const p = smoothedContour[j];
-            scaledPoly[j] = { X: p.x * scale, Y: p.y * scale };
+            scaledPoly[j] = { X: Math.round(p.x * scale), Y: Math.round(p.y * scale) };
           }
           const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(
             scaledPoly,

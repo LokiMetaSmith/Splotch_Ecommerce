@@ -93,6 +93,8 @@ async function main() {
     const ordersToCheck = await db.getActiveOrders();
 
     const stalledOrders = ordersToCheck.filter(order => {
+      // Skip orders that have already had a stalled notification sent
+      if (order.stalledMessageId) return false;
       // db.getActiveOrders() already filters out FINAL_STATUSES
       const lastUpdateStr = order.lastUpdatedAt || order.receivedAt;
       const lastUpdateMs = typeof lastUpdateStr === 'number' ? lastUpdateStr : Date.parse(lastUpdateStr);
@@ -115,8 +117,18 @@ async function main() {
             orderInDb.stalledMessageId = sentMessage.message_id;
             await db.updateOrder(orderInDb);
         }
+        
+        // Wait 3 seconds between messages to avoid Telegram rate limits (20 msgs/min in groups)
+        await new Promise(resolve => setTimeout(resolve, 3000));
       } catch (error) {
         logger.error('[TELEGRAM] Failed to send stalled order notification:', error);
+        
+        // If we hit a rate limit, wait for the specified time before continuing the loop
+        if (error.response && error.response.error_code === 429) {
+          const retryAfter = (error.response.parameters && error.response.parameters.retry_after) || 35;
+          logger.info(`[TELEGRAM] Rate limited. Pausing notifications for ${retryAfter} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+        }
       }
     }
   }, 1000 * 60 * 60);
