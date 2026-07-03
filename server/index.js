@@ -108,9 +108,19 @@ async function main() {
   Last Update: ${new Date(order.lastUpdatedAt || order.receivedAt).toLocaleString()}
       `;
       try {
-        const sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, {
-          reply_to_message_id: order.telegramMessageId,
-        });
+        let sentMessage;
+        try {
+          sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, {
+            reply_to_message_id: order.telegramMessageId,
+          });
+        } catch (sendErr) {
+          if (sendErr.response && sendErr.response.error_code === 400 && sendErr.response.description.includes('message to be replied not found')) {
+            // The original message was likely deleted, send without replying
+            sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message);
+          } else {
+            throw sendErr;
+          }
+        }
         // Store the message ID so we can delete it later
         const orderInDb = await db.getOrder(order.orderId);
         if (orderInDb) {

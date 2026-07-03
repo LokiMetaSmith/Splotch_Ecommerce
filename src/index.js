@@ -3633,13 +3633,23 @@ function handleGenerateCutline(skipPrompt = false) {
         }
 
         if (significantContours.length === 0) {
-           ctx.putImageData(originalCanvasData, 0, 0);
-           showNotification("Could not detect a usable outline. Try an image with a transparent background.", "error");
-           if (btn) {
-              btn.disabled = false;
-              btn.innerHTML = originalText;
+           if (selectedShape === "circle" || selectedShape === "square") {
+             // Fallback to full image bounds for basic shapes if trace fails (e.g. non-transparent image)
+             significantContours = [[
+               { x: 0, y: 0 },
+               { x: scaledWidth, y: 0 },
+               { x: scaledWidth, y: scaledHeight },
+               { x: 0, y: scaledHeight }
+             ]];
+           } else {
+             ctx.putImageData(originalCanvasData, 0, 0);
+             showNotification("Could not detect a usable outline. Try an image with a transparent background.", "error");
+             if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+             }
+             return;
            }
-           return;
         }
 
         if (selectedShape === "circle" || selectedShape === "square") {
