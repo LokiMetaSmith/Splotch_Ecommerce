@@ -30,12 +30,14 @@
     {
       "id": "pp_standard",
       "name": "Standard Polypropylene",
-      "costMultiplier": 1.0
+      "costMultiplier": 1.0,
+      "supportedLayers": ["white", "cmyk", "clear"]
     },
     {
       "id": "pvc_laminated",
       "name": "Laminated PVC",
-      "costMultiplier": 1.5
+      "costMultiplier": 1.5,
+      "supportedLayers": ["white", "cmyk", "clear"]
     }
   ],
   "complexity": {
