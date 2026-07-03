@@ -1242,7 +1242,9 @@ async function startServer(
                     material,
                     dimensions.bounds,
                     dimensions.cutline,
-                    resolution
+                    resolution,
+                    null,
+                    orderDetails.customLayers
                 );
 
                 let expectedTotal = priceResult.total;

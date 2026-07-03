@@ -40,6 +40,8 @@ function calculateStickerPrice(
     bounds,
     cutline,
     resolution,
+    existingPerimeterPixels = null,
+    customLayers = []
 ) {
     if (!pricingConfig) {
         logger.error("Pricing config not loaded.");
@@ -58,7 +60,7 @@ function calculateStickerPrice(
     const materialInfo = pricingConfig.materials.find((m) => m.id === material);
     const materialMultiplier = materialInfo ? materialInfo.costMultiplier : 1.0;
 
-    const perimeterPixels = calculatePerimeter(cutline);
+    const perimeterPixels = typeof existingPerimeterPixels === 'number' ? existingPerimeterPixels : calculatePerimeter(cutline);
     const perimeterInches = perimeterPixels / ppi;
     let complexityMultiplier = 1.0;
 
@@ -71,6 +73,16 @@ function calculateStickerPrice(
             if (perimeterInches <= threshold) {
                 complexityMultiplier = tier.multiplier;
                 break;
+            }
+        }
+    }
+
+    let layerMultiplier = 1.0;
+    if (customLayers && customLayers.length > 0 && pricingConfig.layers) {
+        for (const layerId of customLayers) {
+            const layerConfig = pricingConfig.layers.find((l) => l.id === layerId);
+            if (layerConfig) {
+                layerMultiplier *= layerConfig.costMultiplier;
             }
         }
     }
@@ -92,7 +104,8 @@ function calculateStickerPrice(
         quantity *
         materialMultiplier *
         complexityMultiplier *
-        resolutionMultiplier;
+        resolutionMultiplier *
+        layerMultiplier;
     const discountedTotal = totalCents * (1 - discount);
 
     return {
