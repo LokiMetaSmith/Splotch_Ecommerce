@@ -173,7 +173,7 @@
                   id="file"
                   name="file"
                   type="file"
-                  accept="image/*"
+                  accept="image/*, image/svg+xml, .svg"
                   aria-describedby="file-helper"
                 />
               </div>
@@ -406,19 +406,24 @@
             <div class="flex flex-col justify-center items-center">
               <span class="text-xs text-gray-500 mb-1">Dimensions</span>
               <div class="flex items-center space-x-1">
-                <span
-                  id="widthDisplay"
+                <input
+                  type="number"
+                  id="widthInput"
                   aria-label="Calculated Width"
-                  class="w-24 inline-block text-center text-xs border rounded bg-gray-50 text-gray-700 p-1"
-                  >---</span
-                >
-                <span class="text-xs text-gray-400">x</span>
-                <span
-                  id="heightDisplay"
+                  class="w-20 inline-block text-center text-xs border border-gray-300 rounded bg-white text-gray-700 p-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  step="0.1"
+                  min="0.5"
+                />
+                <span class="text-xs text-gray-400">w x</span>
+                <input
+                  type="number"
+                  id="heightInput"
                   aria-label="Calculated Height"
-                  class="w-24 inline-block text-center text-xs border rounded bg-gray-50 text-gray-700 p-1"
-                  >---</span
-                >
+                  class="w-20 inline-block text-center text-xs border border-gray-300 rounded bg-white text-gray-700 p-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  step="0.1"
+                  min="0.5"
+                />
+                <span class="text-xs text-gray-400">h</span>
               </div>
             </div>
             <button
@@ -441,6 +446,14 @@
             >
               Sepia
             </button>
+            <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
+              <span class="text-xs text-gray-500 mb-1">Shape</span>
+              <select id="cutShapeSelect" class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <option value="trace">Trace Contour</option>
+                <option value="circle">Circle</option>
+                <option value="square">Square</option>
+              </select>
+            </div>
             <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
               <span class="text-xs text-gray-500 mb-1">Cut Type</span>
               <label for="cutTypeToggle" class="flex items-center cursor-pointer space-x-2">

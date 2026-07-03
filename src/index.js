@@ -110,7 +110,7 @@ let rotateLeftBtnEl,
   grayscaleBtnEl,
   sepiaBtnEl;
 let submitPaymentBtn;
-let widthDisplayEl, heightDisplayEl;
+let widthInputEl, heightInputEl;
 let canvasPlaceholder;
 let canvasLegendContainer;
 
@@ -234,8 +234,50 @@ async function BootStrap() {
   submitPaymentBtn = document.getElementById("submitPaymentBtn");
   canvasPlaceholder = document.getElementById("canvas-placeholder");
 
-  widthDisplayEl = document.getElementById("widthDisplay");
-  heightDisplayEl = document.getElementById("heightDisplay");
+  widthInputEl = document.getElementById("widthInput");
+  heightInputEl = document.getElementById("heightInput");
+  
+  const updateSizeFromInput = (e) => {
+    if (!currentBounds) return;
+    let targetWidth = parseFloat(widthInputEl.value);
+    let targetHeight = parseFloat(heightInputEl.value);
+    
+    const resolutionId = stickerResolutionSelect ? (stickerResolutionSelect.value || "dpi_300") : "dpi_300";
+    const selectedResolution = pricingConfig && pricingConfig.resolutions ? pricingConfig.resolutions.find(r => r.id === resolutionId) : null;
+    const ppi = selectedResolution ? selectedResolution.ppi : 300;
+    
+    let currentCutlineWidth = currentBounds.width / ppi;
+    let currentCutlineHeight = currentBounds.height / ppi;
+    
+    const isMetric = document.getElementById("unitToggle") && document.getElementById("unitToggle").checked;
+    if (isMetric) {
+      currentCutlineWidth *= 25.4;
+      currentCutlineHeight *= 25.4;
+    }
+    
+    let scaleFactor = 1;
+    if (e.target === widthInputEl) {
+       scaleFactor = targetWidth / currentCutlineWidth;
+       targetHeight = currentCutlineHeight * scaleFactor;
+       if (heightInputEl) heightInputEl.value = targetHeight.toFixed(2);
+    } else {
+       scaleFactor = targetHeight / currentCutlineHeight;
+       targetWidth = currentCutlineWidth * scaleFactor;
+       if (widthInputEl) widthInputEl.value = targetWidth.toFixed(2);
+    }
+    
+    const resizeSliderEl = document.getElementById("resizeSlider");
+    if (resizeSliderEl) {
+       let currentSliderValue = parseFloat(resizeSliderEl.value);
+       let newSliderValue = currentSliderValue * scaleFactor;
+       resizeSliderEl.value = newSliderValue;
+       resizeSliderEl.dispatchEvent(new Event("input"));
+    }
+  };
+  
+  if (widthInputEl) widthInputEl.addEventListener("change", updateSizeFromInput);
+  if (heightInputEl) heightInputEl.addEventListener("change", updateSizeFromInput);
+
   canvasLegendContainer = document.getElementById("canvas-legend");
 
   rotateLeftBtnEl = document.getElementById("rotateLeftBtn");
@@ -441,6 +483,15 @@ async function BootStrap() {
       }
     });
   }
+  const cutShapeSelect = document.getElementById("cutShapeSelect");
+  if (cutShapeSelect) {
+    cutShapeSelect.addEventListener("change", () => {
+      if (originalImage) {
+        handleGenerateCutline(true);
+      }
+    });
+  }
+
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
   if (generateCutlineBtn)
     generateCutlineBtn.addEventListener("click", handleGenerateCutline);
@@ -1008,8 +1059,8 @@ function calculateAndUpdatePrice() {
   if (!bounds || !cutline || !selectedResolution) {
     currentOrderAmountCents = 0;
     calculatedPriceDisplay.innerHTML = `Price: <span class="text-gray-500">---</span>`;
-    if (widthDisplayEl) widthDisplayEl.textContent = "---";
-    if (heightDisplayEl) heightDisplayEl.textContent = "---";
+    if (widthInputEl) widthInputEl.value = "";
+    if (heightInputEl) heightInputEl.value = "";
     return;
   }
 
@@ -1097,10 +1148,10 @@ function calculateAndUpdatePrice() {
     unit = "mm";
   }
 
-  if (widthDisplayEl)
-    widthDisplayEl.textContent = `${width.toFixed(2)} ${unit}`;
-  if (heightDisplayEl)
-    heightDisplayEl.textContent = `${height.toFixed(2)} ${unit}`;
+  if (widthInputEl && document.activeElement !== widthInputEl)
+    widthInputEl.value = width.toFixed(2);
+  if (heightInputEl && document.activeElement !== heightInputEl)
+    heightInputEl.value = height.toFixed(2);
 
   let markupHtml = "";
   if (creatorProfitCents > 0) {
@@ -1223,11 +1274,21 @@ async function fetchInventory() {
 function checkInventoryStatus(materialId) {
   if (!stickerMaterialSelect) return;
 
+  if (pricingConfig && pricingConfig.materials) {
+    const materialData = pricingConfig.materials.find(m => m.id === materialId);
+    if (materialData && materialData.description) {
+      const helperEl = document.getElementById("material-helper");
+      if (helperEl) {
+        helperEl.innerHTML = `<span class="block mt-2 p-2 bg-blue-50 border border-blue-100 rounded text-blue-800 text-xs">${materialData.description}</span>`;
+      }
+    }
+  }
+
   let warningEl = document.getElementById("material-warning");
   if (!warningEl) {
     warningEl = document.createElement("p");
     warningEl.id = "material-warning";
-    warningEl.className = "text-xs text-red-600 font-bold mt-1";
+    warningEl.className = "text-xs text-red-500 mt-1";
     stickerMaterialSelect.parentNode.appendChild(warningEl);
   }
 
@@ -1781,7 +1842,7 @@ function saveCleanState() {
   cachedTempCanvas = null; // Invalidate cache
 }
 
-function restoreCleanState() {
+function restoreCleanState(drawOffset = { x: 0, y: 0 }) {
   if (!canvas || !ctx || !cleanCanvasState) return;
 
   if (!cachedTempCanvas || cachedTempCanvas.width !== cleanCanvasState.width || cachedTempCanvas.height !== cleanCanvasState.height) {
@@ -1792,17 +1853,7 @@ function restoreCleanState() {
   }
   const tempCanvas = cachedTempCanvas;
 
-  let drawOffset = { x: 0, y: 0 };
-  if (
-    basePolygons.length === 0 &&
-    currentBounds &&
-    (currentBounds.left < 0 || currentBounds.top < 0)
-  ) {
-    drawOffset = {
-      x: -currentBounds.left + 20,
-      y: -currentBounds.top + 20,
-    };
-  }
+  // Let drawOffset be passed in so it aligns exactly with decorations
 
   ctx.save();
   // Clip the canvas to the bounding box to visually crop the image
@@ -2421,7 +2472,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
       }
     }
 
-    if (cleanCanvasState) restoreCleanState();
+    if (cleanCanvasState) restoreCleanState(drawOffset);
   }
 
   drawBoundingBox(bounds, drawOffset);
@@ -3342,6 +3393,11 @@ function handleGenerateCutline(skipPrompt = false) {
     ? parseInt(lazyLassoSlider.value, 10)
     : 50;
 
+  const cutShapeSelect = document.getElementById("cutShapeSelect");
+  const selectedShape = cutShapeSelect ? cutShapeSelect.value : "trace";
+
+
+
   try {
     const dpr = window.devicePixelRatio || 1;
     const logicalCanvasWidth = canvas.width / dpr;
@@ -3437,6 +3493,41 @@ function handleGenerateCutline(skipPrompt = false) {
               btn.innerHTML = originalText;
            }
            return;
+        }
+
+        if (selectedShape === "circle" || selectedShape === "square") {
+           let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+           significantContours.forEach(c => {
+             c.forEach(p => {
+               if (p.x < minX) minX = p.x;
+               if (p.x > maxX) maxX = p.x;
+               if (p.y < minY) minY = p.y;
+               if (p.y > maxY) maxY = p.y;
+             });
+           });
+           
+           const hw = (maxX - minX) / 2;
+           const hh = (maxY - minY) / 2;
+           const cx = minX + hw;
+           const cy = minY + hh;
+           let poly = [];
+           
+           if (selectedShape === "circle") {
+             const r = Math.sqrt(hw * hw + hh * hh); 
+             const steps = 64;
+             for(let i=0; i<steps; i++) {
+               const theta = (i / steps) * 2 * Math.PI;
+               poly.push({ x: cx + r * Math.cos(theta), y: cy + r * Math.sin(theta) });
+             }
+           } else {
+             poly = [
+               { x: minX, y: minY },
+               { x: maxX, y: minY },
+               { x: maxX, y: maxY },
+               { x: minX, y: maxY }
+             ];
+           }
+           significantContours = [poly];
         }
 
         const scale = 100;
