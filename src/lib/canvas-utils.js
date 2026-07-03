@@ -15,27 +15,33 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
     const majorMarkSpacing = isMetric ? 10 * ppi / 25.4 : ppi; // 10mm or 1in
     const minorMarkSpacing = isMetric ? majorMarkSpacing / 10 : majorMarkSpacing / 8; // 1mm or 1/8in
 
+    // Calculate a scale factor so ticks and text are visible on large images
+    const scale = Math.max(bounds.width, bounds.height) / 500;
+    const fontSize = Math.max(12, Math.round(12 * scale));
+    const tickScale = Math.max(1, scale);
+
     ctx.save();
     ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
     ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    ctx.font = "10px Arial";
-    ctx.lineWidth = 1;
+    ctx.font = `${fontSize}px Arial`;
+    ctx.lineWidth = Math.max(1, 1.5 * scale);
 
     // Bolt Optimization: Batch drawing calls to reduce overhead
     // Top ruler
     ctx.beginPath();
     for (let i = 0; i * minorMarkSpacing <= bounds.width; i++) {
-        const x = offset.x + i * minorMarkSpacing;
-        const y = offset.y - 10;
+        const x = bounds.left + offset.x + i * minorMarkSpacing;
+        const y = bounds.top + offset.y; // Start exactly at the bounding box
         const isMajorMark = i % (isMetric ? 10 : 8) === 0;
-        const markHeight = isMajorMark ? 10 : 5;
+        const markHeight = isMajorMark ? 15 * tickScale : 8 * tickScale;
 
+        // Draw ticks going OUTWARDS (up) from the bounding box
         ctx.moveTo(x, y);
-        ctx.lineTo(x, y + markHeight);
+        ctx.lineTo(x, y - markHeight);
 
         if (isMajorMark && i > 0) {
             const label = isMetric ? (i / 10) : (i / 8);
-            ctx.fillText(label, x - 3, y - 2);
+            ctx.fillText(label, x + (3 * scale), y - markHeight - (2 * scale));
         }
     }
     ctx.stroke();
@@ -43,17 +49,18 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
     // Left ruler
     ctx.beginPath();
     for (let i = 0; i * minorMarkSpacing <= bounds.height; i++) {
-        const y = offset.y + i * minorMarkSpacing;
-        const x = offset.x - 10;
+        const y = bounds.top + offset.y + i * minorMarkSpacing;
+        const x = bounds.left + offset.x; // Start exactly at the bounding box
         const isMajorMark = i % (isMetric ? 10 : 8) === 0;
-        const markWidth = isMajorMark ? 10 : 5;
+        const markWidth = isMajorMark ? 15 * tickScale : 8 * tickScale;
 
+        // Draw ticks going OUTWARDS (left) from the bounding box
         ctx.moveTo(x, y);
-        ctx.lineTo(x + markWidth, y);
+        ctx.lineTo(x - markWidth, y);
 
         if (isMajorMark && i > 0) {
             const label = isMetric ? (i / 10) : (i / 8);
-            ctx.fillText(label, x - 12, y + 3);
+            ctx.fillText(label, x - markWidth - (5 * scale) - (ctx.measureText(label).width), y + (fontSize / 3));
         }
     }
     ctx.stroke();

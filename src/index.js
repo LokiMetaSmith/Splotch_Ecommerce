@@ -1125,9 +1125,9 @@ function calculateAndUpdatePrice() {
     discountTableContainer.classList.remove("hidden");
     discountTableBody.innerHTML = "";
     
-    // Convert discounts object to array and sort by quantity ascending for display
-    const discounts = Object.entries(pricingConfig.quantityDiscounts)
-      .map(([q, d]) => ({ minQty: parseInt(q, 10), discountPercent: d * 100 }))
+    // Convert discounts array and sort by quantity ascending for display
+    const discounts = [...pricingConfig.quantityDiscounts]
+      .map((d) => ({ minQty: d.quantity, discountPercent: Math.round(d.discount * 100) }))
       .sort((a, b) => a.minQty - b.minQty);
       
     discounts.forEach(tier => {
@@ -1978,7 +1978,14 @@ function restoreCleanState(drawOffset = { x: 0, y: 0 }) {
   ctx.rect(drawOffset.x, drawOffset.y, baseCanvasWidth, baseCanvasHeight);
   ctx.clip();
 
-  ctx.drawImage(tempCanvas, drawOffset.x, drawOffset.y);
+  const dpr = window.devicePixelRatio || 1;
+  ctx.drawImage(
+    tempCanvas, 
+    drawOffset.x, 
+    drawOffset.y, 
+    tempCanvas.width / dpr, 
+    tempCanvas.height / dpr
+  );
   ctx.restore();
 }
 
@@ -2157,9 +2164,6 @@ function redrawAll() {
           // Generate the cutline without translation first
           let cutline = generateCutLine(rasterCutlinePoly, cutlineOffset, currentLassoRadius);
 
-          // Clip to bounding box (also without translation since bounding box is fixed)
-          cutline = clipPolygonToBoundingBox(cutline, baseCanvasWidth, baseCanvasHeight);
-
           currentCutline = cutline;
           currentBounds = getPolygonsBounds(cutline);
         }
@@ -2194,16 +2198,19 @@ function redrawAll() {
     return;
   }
 
-  // Set canvas size based on the final cutline bounds
-  const logicalWidth = currentBounds.right - currentBounds.left + 40; // Add padding
-  const logicalHeight = currentBounds.bottom - currentBounds.top + 40;
+  // Set canvas size based on the final cutline bounds and scale padding
+  const scale = Math.max(currentBounds.width, currentBounds.height) / 500;
+  const padding = Math.max(40, Math.round(40 * scale));
+  
+  const logicalWidth = currentBounds.right - currentBounds.left + (padding * 2);
+  const logicalHeight = currentBounds.bottom - currentBounds.top + (padding * 2);
   setCanvasSize(logicalWidth, logicalHeight);
   ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
   // Create an offset for drawing, so the shape isn't at the very edge
   const drawOffset = {
-    x: -currentBounds.left + 20,
-    y: -currentBounds.top + 20,
+    x: -currentBounds.left + padding,
+    y: -currentBounds.top + padding,
   };
 
   // Draw everything
@@ -2598,28 +2605,30 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
   // In Raster Mode (where basePolygons is empty), we need to handle canvas resizing
   // and restoring the clean image first to wipe old decorations.
   if (basePolygons.length === 0) {
-    if (bounds.left < 0 || bounds.top < 0) {
-      const logicalWidth = bounds.right - bounds.left + 40; // Add padding
-      const logicalHeight = bounds.bottom - bounds.top + 40;
+    // ALWAYS pad the canvas so measurement guides (rulers/text) don't get clipped.
+    // Scale padding based on canvas size so guides fit on high-res images.
+    const scale = Math.max(bounds.width, bounds.height) / 500;
+    const padding = Math.max(40, Math.round(40 * scale));
+    
+    // Expand canvas to fit bounds + padding
+    const logicalWidth = bounds.right - bounds.left + (padding * 2); 
+    const logicalHeight = bounds.bottom - bounds.top + (padding * 2);
+    
+    // Bolt Fix: Prevent infinite reallocation lag by only resizing if the canvas dimensions actually changed
+    const dpr = window.devicePixelRatio || 1;
+    const targetPhysicalWidth = Math.round(logicalWidth * dpr);
+    const targetPhysicalHeight = Math.round(logicalHeight * dpr);
+    
+    if (Math.round(canvas.width) !== targetPhysicalWidth || Math.round(canvas.height) !== targetPhysicalHeight) {
       setCanvasSize(logicalWidth, logicalHeight);
-      ctx.clearRect(0, 0, logicalWidth, logicalHeight);
-      drawOffset = {
-        x: -bounds.left + 20 + offset.x,
-        y: -bounds.top + 20 + offset.y,
-      };
-    } else if (cleanCanvasState) {
-      // Ensure canvas is at least original size
-      const dpr = window.devicePixelRatio || 1;
-      // We must compare against the display/logical dimensions, not the raw pixel dimensions
-      const logicalOrigW = cleanCanvasState.width / dpr;
-      if (canvas && canvas.width !== cleanCanvasState.width) {
-        // Need to set it back to original state if we shrank the cutline back
-        setCanvasSize(logicalOrigW, cleanCanvasState.height / dpr);
-        ctx.clearRect(0, 0, logicalOrigW, cleanCanvasState.height / dpr);
-      } else {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
     }
+    
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    
+    drawOffset = {
+      x: -bounds.left + padding + offset.x,
+      y: -bounds.top + padding + offset.y,
+    };
 
     if (cleanCanvasState) restoreCleanState(drawOffset);
   }
@@ -2653,24 +2662,17 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
   // The previous implementation calculated a dash length from PPI, which was often
   // too large to be visible on smaller images. A fixed dash pattern is more reliable.
 
-  // Set color to grey as requested.
-  ctx.strokeStyle = "rgba(128, 128, 128, 0.9)"; // A strong, visible grey
+  // Set color to light grey as a subtle backdrop for the measurement guides.
+  ctx.strokeStyle = "rgba(128, 128, 128, 0.4)"; // Faint grey
 
   // Constant hairline width
-  const baseLineWidth = getConstantLineWidth(isBoxActive ? 3.0 : 2.0);
+  const baseLineWidth = getConstantLineWidth(isBoxActive ? 2.0 : 1.0);
   ctx.lineWidth = baseLineWidth;
 
   if (isOtherActive) {
     ctx.globalAlpha = 0.3;
   } else {
     ctx.globalAlpha = 1.0;
-  }
-
-  // Use a fixed dash pattern that is visible at most scales.
-  if (isBoxActive) {
-    ctx.setLineDash([]); // Solid when active
-  } else {
-    ctx.setLineDash([getConstantLineWidth(10), getConstantLineWidth(5)]);
   }
 
   // Stroke is centered on the path, so we offset by half the line width to keep it inside/visible
@@ -2705,22 +2707,33 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
     unit = "mm";
   }
 
-  ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-  ctx.font = "14px Arial";
+  // Scale the font size relative to the bounds so it's readable on large images
+  const scale = Math.max(bounds.width, bounds.height) / 500;
+  const fontSize = Math.max(16, Math.round(18 * scale));
+
+  // Add a slight drop shadow so it stands out against any background
+  ctx.save();
+  ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+  ctx.font = `bold ${fontSize}px Arial`;
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
+
   // Position the text slightly above the top edge of the bounding box
-  ctx.fillText(
-    `${width.toFixed(1)} ${unit}`,
-    offset.x + bounds.width / 2,
-    offset.y - 10,
-  );
+  // Position the text slightly above the top edge of the bounding box and outside the ruler
+  const x = bounds.left + offset.x + bounds.width / 2;
+  const y = bounds.top + offset.y - Math.max(30, 40 * scale);
+  ctx.fillText(`${width.toFixed(1)} ${unit}`, x, y);
 
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
-  ctx.save();
   // Position the text slightly to the left of the left edge, rotated
-  ctx.translate(offset.x - 10, offset.y + bounds.height / 2);
+  // Position the text slightly to the left of the left edge and outside the ruler, rotated
+  const leftX = bounds.left + offset.x - Math.max(30, 45 * scale);
+  const leftY = bounds.top + offset.y + bounds.height / 2;
+  
+  ctx.translate(leftX, leftY);
   ctx.rotate(-Math.PI / 2);
   ctx.fillText(`${height.toFixed(1)} ${unit}`, 0, 0);
   ctx.restore();
@@ -3507,9 +3520,14 @@ function handleGenerateCutline(skipPrompt = false) {
     return;
   }
 
-  // --- Feedforward Check ---
-  // Pass the imageData to the function
-  const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  // Pass the raw cleanCanvasState if available so we don't trace the bounding box and rulers.
+  // We use a temporary canvas to get the ImageData if it's stored as ImageData.
+  let currentImageData;
+  if (cleanCanvasState) {
+    currentImageData = cleanCanvasState;
+  } else {
+    currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  }
 
   showNotification("Generating smart cutline...", "info");
 
@@ -3694,7 +3712,8 @@ function handleGenerateCutline(skipPrompt = false) {
           // Bolt Optimization: Apply smoothing to round sharp corners ("surface energy minimization")
           // 3 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
           // Note: contour is already simplified.
-          const smoothedContour = smoothPolygon(contour, 3);
+          // Don't apply heavy smoothing to square shape, let the offset algorithm handle its natural corner rounding.
+          const smoothedContour = selectedShape === "square" ? contour : smoothPolygon(contour, 3);
 
           // Clean the polygon to remove self-intersections and other issues before offsetting.
           // This requires scaling up for Clipper's integer math.

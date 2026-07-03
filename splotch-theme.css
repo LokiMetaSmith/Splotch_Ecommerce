@@ -89,7 +89,7 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
 }
 
 #imageCanvas {
-    border: 3px dashed var(--splotch-red) !important; /* Red dashed border for canvas */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important; /* Faint grey drop shadow */
     background-color: rgba(255, 255, 255, 0.9) !important;
     border-radius: 15px !important;
 }
