@@ -66,6 +66,9 @@ let easterEggUnlocked = false;
 let hoveredLegendTab = null;
 let selectedLegendTab = null;
 
+// Layer controls state
+let customLayers = [];
+
 let textInput,
   textSizeInput,
   textSizeSlider,
@@ -73,6 +76,7 @@ let textInput,
   addTextBtn,
   textFontFamilySelect,
   textEditingControlsContainer,
+  layerControlsContainer,
   cutlineOffsetSlider,
   cutlineOffsetValueDisplay,
   cutTypeToggle,
@@ -393,7 +397,10 @@ async function BootStrap() {
     }
   }
   if (stickerMaterialSelect) {
-    stickerMaterialSelect.addEventListener("change", calculateAndUpdatePrice);
+    stickerMaterialSelect.addEventListener("change", (e) => {
+      calculateAndUpdatePrice();
+      populateLayerDropdown(e.target.value);
+    });
   }
   if (stickerResolutionSelect) {
     stickerResolutionSelect.addEventListener("change", () => {
@@ -947,6 +954,7 @@ async function BootStrap() {
       );
       const lazyLassoContainer = document.getElementById("lazyLassoContainer");
       const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+      layerControlsContainer = document.getElementById("layer-controls-container");
 
       if (grayBtn) {
         grayBtn.style.display = "block";
@@ -981,6 +989,10 @@ async function BootStrap() {
             "",
           );
         }
+      }
+
+      if (layerControlsContainer) {
+        layerControlsContainer.style.display = "block";
       }
 
       updateEditingButtonsState(isDisabled);
@@ -1250,6 +1262,11 @@ async function fetchPricingInfo() {
     console.log("[CLIENT] Pricing config loaded:", pricingConfig);
     // Once config is loaded, populate the dropdown
     populateResolutionDropdown();
+
+    // Initial layers population based on default material
+    if (stickerMaterialSelect) {
+      populateLayerDropdown(stickerMaterialSelect.value);
+    }
   } catch (error) {
     console.error("[CLIENT] Error fetching pricing info:", error);
     showPaymentStatus(
@@ -1258,6 +1275,104 @@ async function fetchPricingInfo() {
     );
   }
 }
+
+function populateLayerDropdown(materialId) {
+  const layerSelect = document.getElementById("layerSelect");
+  if (!layerSelect || !pricingConfig) return;
+
+  layerSelect.innerHTML = "";
+
+  const material = pricingConfig.materials.find(m => m.id === materialId);
+  if (material && material.supportedLayers) {
+    material.supportedLayers.forEach(layer => {
+      const option = document.createElement("option");
+      option.value = layer;
+      // Capitalize first letter
+      option.textContent = layer.charAt(0).toUpperCase() + layer.slice(1);
+      layerSelect.appendChild(option);
+    });
+  }
+}
+
+function renderLayerList() {
+  const layerList = document.getElementById("layerList");
+  if (!layerList) return;
+
+  layerList.innerHTML = "";
+
+  customLayers.forEach((layer, index) => {
+    const li = document.createElement("li");
+    li.className = "flex items-center justify-between bg-white p-2 border border-gray-200 rounded shadow-sm text-sm cursor-move";
+    li.draggable = true;
+    li.dataset.index = index;
+
+    // Drag events for reordering
+    li.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", index);
+      e.target.classList.add("opacity-50");
+    });
+    li.addEventListener("dragend", (e) => {
+      e.target.classList.remove("opacity-50");
+    });
+    li.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      li.classList.add("border-indigo-400");
+    });
+    li.addEventListener("dragleave", () => {
+      li.classList.remove("border-indigo-400");
+    });
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      li.classList.remove("border-indigo-400");
+      const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+      const toIndex = index;
+      if (fromIndex !== toIndex && !isNaN(fromIndex)) {
+        const movedLayer = customLayers.splice(fromIndex, 1)[0];
+        customLayers.splice(toIndex, 0, movedLayer);
+        renderLayerList();
+      }
+    });
+
+    li.innerHTML = `
+      <div class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+        <span class="font-medium text-gray-700">${index + 1}. ${layer.charAt(0).toUpperCase() + layer.slice(1)}</span>
+      </div>
+      <button type="button" class="text-red-500 hover:text-red-700 p-1 delete-layer-btn" data-index="${index}" aria-label="Remove layer">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    `;
+
+    layerList.appendChild(li);
+  });
+
+  // Attach delete handlers
+  layerList.querySelectorAll(".delete-layer-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const idx = parseInt(e.currentTarget.dataset.index, 10);
+      customLayers.splice(idx, 1);
+      renderLayerList();
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const addLayerBtn = document.getElementById("addLayerBtn");
+  if (addLayerBtn) {
+    addLayerBtn.addEventListener("click", () => {
+      const layerSelect = document.getElementById("layerSelect");
+      if (layerSelect && layerSelect.value) {
+        customLayers.push(layerSelect.value);
+        renderLayerList();
+      }
+    });
+  }
+});
+
 
 async function fetchInventory() {
   try {
@@ -1526,6 +1641,7 @@ async function handlePaymentFormSubmit(event) {
       material: stickerMaterialSelect ? stickerMaterialSelect.value : "unknown",
       stickerName: stickerName,
       promoAddon: promoAddonCheckbox ? promoAddonCheckbox.checked : false,
+      customLayers: customLayers.length > 0 ? customLayers : null,
     };
     if (cutLinePath) {
       orderDetails.cutLinePath = cutLinePath;
@@ -1883,8 +1999,40 @@ function loadFileAsImage(file, isMascot = false) {
 
   const reader = new FileReader();
 
+  // Hande API-based conversions for TIFF, PDF, and AI
+  if (
+    file.type === "image/tiff" ||
+    file.type === "application/pdf" ||
+    file.type === "application/postscript" ||
+    file.name.toLowerCase().endsWith(".ai") ||
+    file.name.toLowerCase().endsWith(".pdf") ||
+    file.name.toLowerCase().endsWith(".tiff")
+  ) {
+    showNotification("Converting file to preview format. This may take a moment...", "info");
+    const formData = new FormData();
+    formData.append("file", file);
+
+    fetch("/api/convert-image", {
+      method: "POST",
+      body: formData,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Conversion failed");
+        return res.blob();
+      })
+      .then((blob) => {
+        const convertedFile = new File([blob], file.name + ".png", { type: "image/png" });
+        loadFileAsImage(convertedFile, isMascot);
+      })
+      .catch((err) => {
+        console.error(err);
+        showNotification("Failed to convert file format.", "error");
+      });
+    return;
+  }
+
   // Handle SVGs differently from other images
-  if (file.type === "image/svg+xml") {
+  if (file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg")) {
     // Reset raster image state
     originalImage = null;
     reader.onload = (e) => {
@@ -1892,7 +2040,7 @@ function loadFileAsImage(file, isMascot = false) {
     };
     reader.onerror = () => showNotification("Error reading SVG file.", "error");
     reader.readAsText(file);
-  } else if (file.type.startsWith("image/")) {
+  } else if (file.type.startsWith("image/") || file.name.toLowerCase().endsWith(".png") || file.name.toLowerCase().endsWith(".jpg") || file.name.toLowerCase().endsWith(".jpeg")) {
     // Reset vector state
     currentPolygons = [];
     basePolygons = [];
@@ -2794,10 +2942,8 @@ function setTemplate(templateId) {
       ctx.drawImage(originalImage, 0, 0, img.width, img.height);
       
       const dpr = window.devicePixelRatio || 1;
-      const logicalWidth = canvas.width / dpr;
-      const logicalHeight = canvas.height / dpr;
       
-      currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       currentBounds = {
         minX: 0,
         minY: 0,
@@ -2807,7 +2953,7 @@ function setTemplate(templateId) {
         height: canvas.height
       };
       
-      clearCanvasAndDraw();
+      redrawAll();
       updateEditingButtonsState(false);
       
       // Auto-populate text based on template

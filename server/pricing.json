@@ -31,30 +31,35 @@
       "id": "pp_standard",
       "name": "Standard Polypropylene",
       "costMultiplier": 1.0,
+      "supportedLayers": ["white", "cmyk", "clear"],
       "description": "Custom White Adhesive Sticker. Gloss white 2mil thick wrap vinyl. Indoor rated, air release adhesive for easy bubble-free application."
     },
     {
       "id": "pvc_laminated",
       "name": "Laminated PVC",
       "costMultiplier": 1.5,
+      "supportedLayers": ["white", "cmyk", "clear"],
       "description": "Extra Durable PVC + Lamination. Outdoor rated (5-7 yrs), air release adhesive for easy bubble-free application over flat and curved surfaces alike."
     },
     {
       "id": "finish_holographic",
       "name": "Holographic",
       "costMultiplier": 2.0,
+      "supportedLayers": ["white", "cmyk", "clear"],
       "description": "Premium Iridescent finish that catches the light. Perfect for limited edition prints and retro aesthetic designs."
     },
     {
       "id": "finish_glitter",
       "name": "Glitter",
       "costMultiplier": 2.2,
+      "supportedLayers": ["white", "cmyk", "clear"],
       "description": "Sparkly, textured glitter finish for a highly reflective and premium look."
     },
     {
       "id": "finish_matte",
       "name": "Matte Soft-Touch",
       "costMultiplier": 1.8,
+      "supportedLayers": ["white", "cmyk", "clear"],
       "description": "A velvety, soft-touch matte finish that diffuses light and feels incredibly premium."
     }
   ],

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <style>
+      .layer { fill: none; stroke-width: 2; }
+      .layer-bg { opacity: 0.1; }
+      .text { font-family: sans-serif; font-size: 14px; }
+      .title { font-family: sans-serif; font-size: 18px; font-weight: bold; }
+    </style>
+  </defs>
+
+  <text x="200" y="30" text-anchor="middle" class="title">Sticker Layer Construction</text>
+
+  <!-- Substrate -->
+  <g transform="translate(100, 220)">
+    <polygon points="0,20 150,-30 200,-10 50,40" fill="#e0e0e0" stroke="#999" class="layer"/>
+    <polygon points="0,20 150,-30 200,-10 50,40" fill="#000" class="layer-bg"/>
+    <text x="210" y="0" class="text" fill="#666">1. Substrate (Material)</text>
+  </g>
+
+  <!-- White Underbase -->
+  <g transform="translate(100, 170)">
+    <polygon points="0,20 150,-30 200,-10 50,40" fill="#ffffff" stroke="#ccc" class="layer" stroke-dasharray="4"/>
+    <polygon points="0,20 150,-30 200,-10 50,40" fill="#fff" class="layer-bg" opacity="0.5"/>
+    <text x="210" y="0" class="text" fill="#333">2. White Underbase (Optional)</text>
+  </g>
+
+  <!-- CMYK / Art -->
+  <g transform="translate(100, 120)">
+    <polygon points="0,20 150,-30 200,-10 50,40" fill="#ffeb3b" stroke="#fbc02d" class="layer"/>
+    <circle cx="100" cy="0" r="15" fill="#f44336"/>
+    <rect x="50" y="-10" width="20" height="20" fill="#2196f3" transform="rotate(20 60 0)"/>
+    <polygon points="0,20 150,-30 200,-10 50,40" fill="#fbc02d" class="layer-bg"/>
+    <text x="210" y="0" class="text" fill="#333">3. CMYK Artwork (Colors)</text>
+  </g>
+
+  <!-- Clear Coat / Varnish -->
+  <g transform="translate(100, 70)">
+    <polygon points="0,20 150,-30 200,-10 50,40" fill="#e3f2fd" stroke="#90caf9" class="layer" opacity="0.7"/>
+    <polygon points="0,20 150,-30 200,-10 50,40" fill="#e3f2fd" class="layer-bg" opacity="0.3"/>
+    <text x="210" y="0" class="text" fill="#333">4. Clear Coat / Varnish (Optional)</text>
+  </g>
+
+  <!-- Dotted connection lines -->
+  <path d="M 120 220 L 120 70" stroke="#ccc" stroke-width="1" stroke-dasharray="2,2" fill="none"/>
+  <path d="M 230 190 L 230 40" stroke="#ccc" stroke-width="1" stroke-dasharray="2,2" fill="none"/>
+
+</svg>
