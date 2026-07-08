@@ -1973,10 +1973,6 @@ function restoreCleanState(drawOffset = { x: 0, y: 0 }) {
   // Let drawOffset be passed in so it aligns exactly with decorations
 
   ctx.save();
-  // Clip the canvas to the bounding box to visually crop the image
-  ctx.beginPath();
-  ctx.rect(drawOffset.x, drawOffset.y, baseCanvasWidth, baseCanvasHeight);
-  ctx.clip();
 
   const dpr = window.devicePixelRatio || 1;
   ctx.drawImage(
@@ -3443,8 +3439,8 @@ function handleStandardResize(targetInches) {
     currentPolygons = newPolygons;
     redrawAll();
   } else if (originalImage) {
-    const prevWidth = canvas.width;
-    const prevHeight = canvas.height;
+    const prevWidth = cleanCanvasState ? cleanCanvasState.width : canvas.width;
+    const prevHeight = cleanCanvasState ? cleanCanvasState.height : canvas.height;
 
     // Raster Image Resizing - always use the original image to prevent quality loss
     const newWidth = originalImage.width * scale;
@@ -3565,8 +3561,10 @@ function handleGenerateCutline(skipPrompt = false) {
 
   try {
     const dpr = window.devicePixelRatio || 1;
-    const logicalCanvasWidth = canvas.width / dpr;
-    const logicalCanvasHeight = canvas.height / dpr;
+    const sourceWidth = cleanCanvasState ? cleanCanvasState.width : canvas.width;
+    const sourceHeight = cleanCanvasState ? cleanCanvasState.height : canvas.height;
+    const logicalCanvasWidth = sourceWidth / dpr;
+    const logicalCanvasHeight = sourceHeight / dpr;
 
     // --- Performance Optimization: Downscale before tracing ---
     const maxDim = 500;
@@ -3577,10 +3575,10 @@ function handleGenerateCutline(skipPrompt = false) {
     let scaledImageData;
     if (scaleFactor < 1 || dpr !== 1) {
       const tempCanvas1 = document.createElement('canvas');
-      tempCanvas1.width = canvas.width;
-      tempCanvas1.height = canvas.height;
+      tempCanvas1.width = sourceWidth;
+      tempCanvas1.height = sourceHeight;
       const tempCtx1 = tempCanvas1.getContext('2d');
-      if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
+      if (cleanCanvasState) {
         tempCtx1.putImageData(cleanCanvasState, 0, 0);
       } else {
         tempCtx1.drawImage(canvas, 0, 0);
@@ -3593,7 +3591,7 @@ function handleGenerateCutline(skipPrompt = false) {
       tempCtx2.drawImage(tempCanvas1, 0, 0, tempCanvas1.width, tempCanvas1.height, 0, 0, scaledWidth, scaledHeight);
       scaledImageData = tempCtx2.getImageData(0, 0, scaledWidth, scaledHeight);
     } else {
-      if (cleanCanvasState && cleanCanvasState.width === canvas.width && cleanCanvasState.height === canvas.height) {
+      if (cleanCanvasState) {
         scaledImageData = cleanCanvasState;
       } else {
         scaledImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -3609,7 +3607,7 @@ function handleGenerateCutline(skipPrompt = false) {
         // Filter contours to remove noise (e.g. area < 400 pixels)
         // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
         // INCREASED threshold to 0.1% to aggressively filter alpha noise spots before they are magnified by offset.
-        const imageArea = canvas.width * canvas.height;
+        const imageArea = sourceWidth * sourceHeight;
         const minIslandArea = Math.max(400, imageArea * 0.001); 
         // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
         // This changes O(N*M) check to O(N*m) where m << M.
