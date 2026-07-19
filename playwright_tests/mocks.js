@@ -4,7 +4,7 @@ export async function mockAPIs(page) {
   });
   await page.route('**/api/pricing-info', route => {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-      pricePerSquareInchCents: 15,
+      pricePerSquareInchCents: 13,
       resolutions: [{ id: 'dpi_300', name: '300 DPI', ppi: 300, costMultiplier: 1.3 }],
       materials: [{ id: 'pp_standard', name: 'Standard PP', costMultiplier: 1.0 }],
       complexity: { tiers: [{ thresholdInches: 12, multiplier: 1.0 }] },

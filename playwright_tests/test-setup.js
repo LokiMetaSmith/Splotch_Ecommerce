@@ -11,7 +11,7 @@ const pricingConfig = {
     { "id": "dpi_1200", "name": "1200 DPI (Archival)", "ppi": 1200, "costMultiplier": 1.8 }
   ],
   "materials": [
-    { "id": "pp_standard", "name": "Standard Polypropylene", "costMultiplier": 1.0 },
+    { "id": "pp_standard", "name": "Gloss White Air Release", "costMultiplier": 1.0 },
     { "id": "pvc_laminated", "name": "Laminated PVC", "costMultiplier": 1.5 }
   ],
   "complexity": {

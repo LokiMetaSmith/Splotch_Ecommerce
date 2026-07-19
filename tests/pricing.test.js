@@ -8,13 +8,13 @@ import { calculateStickerPrice, generateSvgFromCutline } from '../src/lib/pricin
 
 // Define a test configuration that mirrors the production config structure
 const pricingConfig = {
-    "pricePerSquareInchCents": 15,
+    "pricePerSquareInchCents": 13,
     "resolutions": [
         { "id": "dpi_96", "name": "96 DPI (Draft)", "ppi": 96, "costMultiplier": 1.0 },
         { "id": "dpi_300", "name": "300 DPI (Standard)", "ppi": 300, "costMultiplier": 1.3 }
     ],
     "materials": [
-      { "id": "pp_standard", "name": "Standard Polypropylene", "costMultiplier": 1.0 },
+      { "id": "pp_standard", "name": "Gloss White Air Release", "costMultiplier": 1.0 },
       { "id": "pvc_laminated", "name": "Laminated PVC", "costMultiplier": 1.5 }
     ],
     "complexity": {

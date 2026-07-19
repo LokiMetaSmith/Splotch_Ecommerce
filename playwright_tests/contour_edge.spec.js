@@ -14,7 +14,7 @@ test.describe('Contour Edge Toggle and Offset Logic', () => {
     await page.route('**/api/pricing-info', route => route.fulfill({
       status: 200,
       json: {
-        pricePerSquareInchCents: 15,
+        pricePerSquareInchCents: 13,
         resolutions: [{ id: 'dpi_300', ppi: 300 }],
         complexity: { tiers: [] },
         quantityDiscounts: []
