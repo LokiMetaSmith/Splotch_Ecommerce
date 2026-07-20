@@ -1,4 +1,4 @@
-importScripts("https://cdn.jsdelivr.net/npm/clipper-lib@1.0.0/clipper.js");
+import * as ClipperLib from 'clipper-lib';
 
 function smoothPolygon(polygon, iterations = 1) {
     if (polygon.length < 3) return polygon;
@@ -25,7 +25,7 @@ function smoothPolygon(polygon, iterations = 1) {
     return smoothed;
 }
 
-onmessage = function(e) {
+self.addEventListener('message', function(e) {
     try {
         const { messageId, polygons, offsetAmount, lassoRadius } = e.data;
 
@@ -93,4 +93,4 @@ onmessage = function(e) {
     } catch (error) {
         postMessage({ success: false, messageId: messageId, error: error.message });
     }
-};
+});

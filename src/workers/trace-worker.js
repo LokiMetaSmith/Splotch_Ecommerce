@@ -141,12 +141,12 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
   });
 }
 
-onmessage = async function(e) {
+self.addEventListener('message', async function(e) {
   try {
     const { imageData, cutlineSensitivity, scaleFactor } = e.data;
     const contours = await traceContours(imageData, cutlineSensitivity, scaleFactor);
     postMessage({ success: true, contours });
   } catch (error) {
-    postMessage({ success: false, error: error.message });
+    self.postMessage({ success: false, error: error.message });
   }
-};
+});

@@ -26,8 +26,8 @@ const locationId = "LTS82DEX24XR0";
 const serverUrl = ""; // Define server URL once
 
 // Web Workers for heavy processing
-const traceWorker = new Worker(new URL('./workers/trace-worker.js', import.meta.url));
-const offsetWorker = new Worker(new URL('./workers/offset-worker.js', import.meta.url));
+const traceWorker = new Worker(new URL('./workers/trace-worker.js', import.meta.url), { type: "module" });
+const offsetWorker = new Worker(new URL('./workers/offset-worker.js', import.meta.url), { type: "module" });
 
 // Catch Worker Errors
 traceWorker.onerror = (error) => {
