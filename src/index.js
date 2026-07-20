@@ -501,6 +501,10 @@ async function BootStrap() {
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
   if (generateCutlineBtn)
     generateCutlineBtn.addEventListener("click", handleGenerateCutline);
+    
+  const generateFromBaseBtn = document.getElementById("generateFromBaseBtn");
+  if (generateFromBaseBtn)
+    generateFromBaseBtn.addEventListener("click", handleGenerateFromBase);
 
   function debounce(func, wait) {
     let timeout;
@@ -1086,12 +1090,7 @@ function updateCompositeImage() {
     lastCalculatedPerimeterCutlineRef = cutline;
   }
 
-  const allCustomLayers = designLayers.reduce((acc, layer) => {
-    if (layer.customLayers) {
-      return acc.concat(layer.customLayers);
-    }
-    return acc;
-  }, []);
+  const allCustomLayers = customPrintLayers.map(l => l.type);
 
   const priceResult = calculateStickerPrice(
     pricingConfig,
@@ -1305,89 +1304,6 @@ function populateLayerDropdown(materialId) {
     });
   }
 }
-
-function renderLayerList() {
-  const layerList = document.getElementById("layerList");
-  if (!layerList) return;
-
-  layerList.innerHTML = "";
-
-  const activeLayer = getActiveLayer();
-  const customLayers = activeLayer && activeLayer.customLayers ? activeLayer.customLayers : [];
-
-  customLayers.forEach((layer, index) => {
-    const li = document.createElement("li");
-    li.className = "flex items-center justify-between bg-white p-2 border border-gray-200 rounded shadow-sm text-sm cursor-move";
-    li.draggable = true;
-    li.dataset.index = index;
-
-    // Drag events for reordering
-    li.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", index);
-      e.target.classList.add("opacity-50");
-    });
-    li.addEventListener("dragend", (e) => {
-      e.target.classList.remove("opacity-50");
-    });
-    li.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      li.classList.add("border-indigo-400");
-    });
-    li.addEventListener("dragleave", () => {
-      li.classList.remove("border-indigo-400");
-    });
-    li.addEventListener("drop", (e) => {
-      e.preventDefault();
-      li.classList.remove("border-indigo-400");
-      const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
-      const toIndex = index;
-      if (fromIndex !== toIndex && !isNaN(fromIndex)) {
-        const movedLayer = customLayers.splice(fromIndex, 1)[0];
-        customLayers.splice(toIndex, 0, movedLayer);
-        renderLayerList();
-      }
-    });
-
-    li.innerHTML = `
-      <div class="flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-        <span class="font-medium text-gray-700">${index + 1}. ${layer.charAt(0).toUpperCase() + layer.slice(1)}</span>
-      </div>
-      <button type="button" class="text-red-500 hover:text-red-700 p-1 delete-layer-btn" data-index="${index}" aria-label="Remove layer">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    `;
-
-    layerList.appendChild(li);
-  });
-
-  // Attach delete handlers
-  layerList.querySelectorAll(".delete-layer-btn").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      const idx = parseInt(e.currentTarget.dataset.index, 10);
-      customLayers.splice(idx, 1);
-      renderLayerList();
-    });
-  });
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const addLayerBtn = document.getElementById("add-layer-btn");
-  if (addLayerBtn) {
-    addLayerBtn.addEventListener("click", () => {
-      const layerSelect = document.getElementById("layerSelect");
-      if (layerSelect && layerSelect.value) {
-        getActiveLayer()?.customLayers?.push(layerSelect.value);
-        renderLayerList();
-      }
-    });
-  }
-});
-
 
 async function fetchInventory() {
   try {
@@ -1645,12 +1561,7 @@ async function handlePaymentFormSubmit(event) {
     const fileInput = document.getElementById("fileInput");
     const stickerName = fileInput && fileInput.files && fileInput.files.length > 0 ? fileInput.files[0].name : "Custom Sticker";
 
-    const allCustomLayers = designLayers.reduce((acc, layer) => {
-      if (layer.customLayers) {
-        return acc.concat(layer.customLayers);
-      }
-      return acc;
-    }, []);
+    const allCustomLayers = customPrintLayers.map(l => l.type);
 
     // 4. Create JSON payload for the order
     const orderDetails = {
@@ -1841,11 +1752,6 @@ function updateUnitUI(isMetric) {
 }
 
 function updateEditingButtonsState(disabled) {
-  const panel = document.getElementById("layer-editor-panel");
-  if (panel) {
-    if (disabled) panel.classList.add("hidden");
-    else panel.classList.remove("hidden");
-  }
   const elements = [
     rotateLeftBtnEl,
     rotateRightBtnEl,
@@ -2079,12 +1985,38 @@ function loadFileAsImage(file, isMascot = false) {
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
+        const activeTab = getActiveLineId() || "base";
+
+        if (activeTab !== "base" && activeTab !== "cutline") {
+          // Custom Layer Upload
+          const customLayer = customPrintLayers.find(l => l.id === activeTab);
+          if (customLayer) {
+            // Apply grayscale to the image
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = img.width;
+            tempCanvas.height = img.height;
+            const tempCtx = tempCanvas.getContext("2d");
+            tempCtx.filter = "grayscale(100%)";
+            tempCtx.drawImage(img, 0, 0);
+            
+            const processedImg = new Image();
+            processedImg.onload = () => {
+              customLayer.image = processedImg;
+              showNotification(`Image loaded to ${customLayer.name} layer.`, "success");
+              redrawAllForHighlight();
+            };
+            processedImg.src = tempCanvas.toDataURL();
+          }
+          return; // Stop here, don't reset base design
+        }
+
+        // Base Layer Upload
         originalImage = img;
         const newLayer = addLayer(img, file.name || "Upload", 0, 0, img.width, img.height);
         setActiveLayer(designLayers.length - 1);
         updateEditingButtonsState(false);
         if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-        showNotification("Image loaded successfully.", "success");
+        showNotification("Base image loaded successfully.", "success");
         let newWidth = img.width,
           newHeight = img.height;
         if (canvas && ctx) {
@@ -2160,7 +2092,7 @@ function loadFileAsImage(file, isMascot = false) {
           currentPolygons = []; // Clear any previous SVG data
 
           // Show the legend tabs since an image is loaded
-          renderLegend();
+          renderLayerTabs();
         }
       };
       img.onerror = () =>
@@ -2194,7 +2126,15 @@ function redrawAll() {
 
         // Apply translation offset during drawing decorations
         ctx.clearRect(0, 0, canvas.width, canvas.height); // wipe it
-        drawCanvasDecorations(currentBounds, { x: 0, y: 0 });
+        
+        const activeTabId = getActiveLineId();
+        let customImageToDraw = null;
+        if (activeTabId && activeTabId !== "base" && activeTabId !== "cutline") {
+           const customLayer = customPrintLayers.find(l => l.id === activeTabId);
+           if (customLayer && customLayer.image) customImageToDraw = customLayer.image;
+        }
+
+        drawCanvasDecorations(currentBounds, { x: 0, y: 0 }, customImageToDraw);
     }
     return;
   }
@@ -2320,7 +2260,7 @@ function handleSvgUpload(svgText) {
     }
 
     // Show legend since SVG is loaded
-    renderLegend();
+    renderLayerTabs();
   } catch (error) {
     showNotification(`SVG Processing Error: ${error.message}`, "error");
     console.error(error);
@@ -2621,7 +2561,7 @@ function drawPolygonsToCanvas(
   ctx.restore();
 }
 
-function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
+function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDraw = null) {
   if (!bounds) return;
 
   let drawOffset = offset;
@@ -2654,7 +2594,13 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }) {
       y: -bounds.top + padding + offset.y,
     };
 
-    if (cleanCanvasState) restoreCleanState(drawOffset);
+    if (customImageToDraw) {
+       ctx.save();
+       ctx.drawImage(customImageToDraw, drawOffset.x, drawOffset.y, customImageToDraw.width, customImageToDraw.height);
+       ctx.restore();
+    } else if (cleanCanvasState) {
+       restoreCleanState(drawOffset);
+    }
   }
 
   drawBoundingBox(bounds, drawOffset);
@@ -2763,20 +2709,29 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
   ctx.restore();
 }
 
-let legendInitialized = false;
+let layerTabsInitialized = false;
+let customPrintLayers = []; // Store custom layer objects { id, type, image, name, visible }
 
-function renderLegend() {
-  if (!canvasLegendContainer) return;
+function renderLayerTabs() {
+  const layerTabsContainer = document.getElementById("layer-tabs");
+  if (!layerTabsContainer) return;
 
   // Only show if there's an image or svg loaded
   if (!originalImage && basePolygons.length === 0) {
-    canvasLegendContainer.style.display = "none";
+    layerTabsContainer.style.display = "none";
     return;
   }
 
-  canvasLegendContainer.style.display = "flex";
+  layerTabsContainer.style.display = "flex";
 
   const tabs = [
+    {
+      id: "base",
+      label: "Base Design",
+      color: "#4f46e5", // Indigo
+      borderColor: "#4f46e5",
+      bgColor: "#e0e7ff",
+    },
     {
       id: "cutline",
       label: "Cutline",
@@ -2784,73 +2739,106 @@ function renderLegend() {
       borderColor: "#ef4444",
       bgColor: "#fee2e2",
     },
-    {
-      id: "box",
-      label: "Bounding Box",
-      color: "grey",
-      borderColor: "#9ca3af",
+    ...customPrintLayers.map(layer => ({
+      id: layer.id,
+      label: layer.name,
+      color: "#4b5563",
+      borderColor: "#6b7280",
       bgColor: "#f3f4f6",
-    },
+    }))
   ];
 
-  if (!legendInitialized) {
-    canvasLegendContainer.innerHTML = ""; // Clear once on init
+  layerTabsContainer.innerHTML = ""; // Always rebuild to handle dynamic tabs
 
-    tabs.forEach((tab) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.id = `legend-tab-${tab.id}`;
-      btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`;
+  tabs.forEach((tab) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = `layer-tab-${tab.id}`;
+    btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 flex items-center gap-1`;
 
-      // Default style
-      btn.style.color = tab.color;
-      btn.style.borderColor = tab.borderColor;
-      btn.style.fontFamily = "var(--font-baumans)";
-      btn.textContent = tab.label;
+    // Default style
+    btn.style.color = tab.color;
+    btn.style.borderColor = tab.borderColor;
+    btn.style.fontFamily = "var(--font-baumans)";
+    btn.textContent = tab.label;
 
-      // Interactivity
-      btn.addEventListener("mouseenter", () => {
-        hoveredLegendTab = tab.id;
-        updateLegendStyles();
-        redrawAllForHighlight();
-      });
+    if (tab.id !== "base" && tab.id !== "cutline") {
+       // Add a delete button for custom layers
+       const deleteBtn = document.createElement("span");
+       deleteBtn.textContent = "×";
+       deleteBtn.className = "text-gray-500 hover:text-red-500 ml-2 rounded-full px-1 cursor-pointer";
+       deleteBtn.title = "Delete Layer";
+       deleteBtn.onclick = (e) => {
+         e.stopPropagation(); // Prevent tab click
+         deleteCustomLayer(tab.id);
+       };
+       btn.appendChild(deleteBtn);
+    }
 
-      btn.addEventListener("mouseleave", () => {
-        if (hoveredLegendTab === tab.id) {
-          hoveredLegendTab = null;
-          updateLegendStyles();
-          redrawAllForHighlight();
-        }
-      });
-
-      btn.addEventListener("click", () => {
-        if (selectedLegendTab === tab.id) {
-          selectedLegendTab = null; // Toggle off
-        } else {
-          selectedLegendTab = tab.id;
-        }
-        updateLegendStyles();
-        redrawAllForHighlight();
-      });
-
-      canvasLegendContainer.appendChild(btn);
+    // Interactivity
+    btn.addEventListener("mouseenter", () => {
+      hoveredLegendTab = tab.id;
+      updateLayerTabsStyles();
+      redrawAllForHighlight();
     });
 
-    legendInitialized = true;
+    btn.addEventListener("mouseleave", () => {
+      if (hoveredLegendTab === tab.id) {
+        hoveredLegendTab = null;
+        updateLayerTabsStyles();
+        redrawAllForHighlight();
+      }
+    });
+
+    btn.addEventListener("click", () => {
+      if (selectedLegendTab === tab.id) {
+        // Toggle off - default to base
+        selectedLegendTab = "base"; 
+      } else {
+        selectedLegendTab = tab.id;
+      }
+      updateLayerTabsStyles();
+      redrawAllForHighlight();
+      updateEditingControlsForActiveLayer();
+    });
+
+    layerTabsContainer.appendChild(btn);
+  });
+
+  // Add the "+" tab
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = `px-3 py-1 text-xs font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 border-b-0 rounded-t-lg transition-colors`;
+  addBtn.textContent = "+";
+  addBtn.title = "Add Layer";
+  addBtn.onclick = () => {
+    const type = prompt("Enter layer type (e.g., White, Clear):", "White");
+    if (type) {
+      addCustomLayer(type);
+    }
+  };
+  layerTabsContainer.appendChild(addBtn);
+
+  // Default to base design tab if nothing selected
+  if (!selectedLegendTab) {
+    selectedLegendTab = "base";
   }
 
-  updateLegendStyles();
+  updateLayerTabsStyles();
+  updateEditingControlsForActiveLayer();
 }
 
-function updateLegendStyles() {
-  if (!canvasLegendContainer) return;
+function updateLayerTabsStyles() {
+  const layerTabsContainer = document.getElementById("layer-tabs");
+  if (!layerTabsContainer) return;
   const tabs = [
+    { id: "base", bgColor: "#e0e7ff" },
     { id: "cutline", bgColor: "#fee2e2" },
-    { id: "box", bgColor: "#f3f4f6" },
+    ...customPrintLayers.map(layer => ({ id: layer.id, bgColor: "#f3f4f6" }))
   ];
 
   tabs.forEach((tab) => {
-    const btn = document.getElementById(`legend-tab-${tab.id}`);
+    const btn = document.getElementById(`layer-tab-${tab.id}`);
     if (btn) {
       const isActive = getActiveLineId() === tab.id;
       if (isActive) {
@@ -2862,8 +2850,65 @@ function updateLegendStyles() {
   });
 }
 
+function updateEditingControlsForActiveLayer() {
+  const activeTabId = getActiveLineId() || "base";
+  
+  const baseControls = document.querySelector(".control-group-base");
+  const cutlineControls = document.querySelector(".control-group-cutline");
+  const customControls = document.querySelector(".control-group-custom");
+  
+  if (baseControls) baseControls.style.display = activeTabId === "base" ? "flex" : "none";
+  if (cutlineControls) cutlineControls.style.display = activeTabId === "cutline" ? "flex" : "none";
+  
+  // Custom Layers
+  if (customControls) {
+    if (activeTabId !== "base" && activeTabId !== "cutline") {
+       customControls.style.display = "flex";
+       // Update dropzone text if we have it
+       const label = document.querySelector('label[for="imageUpload"]');
+       if (label) {
+           const layer = customPrintLayers.find(l => l.id === activeTabId);
+           label.textContent = `Upload image for ${layer ? layer.name : 'Custom'} Layer:`;
+       }
+    } else {
+       customControls.style.display = "none";
+       const label = document.querySelector('label[for="imageUpload"]');
+       if (label) label.textContent = "Upload Sticker Design Image:";
+    }
+  }
+}
+
+function addCustomLayer(type) {
+  const newLayer = {
+     id: `custom_${Date.now()}`,
+     name: type,
+     type: type.toLowerCase(),
+     image: null,
+     visible: true
+  };
+  customPrintLayers.push(newLayer);
+  selectedLegendTab = newLayer.id;
+  renderLayerTabs();
+  calculateAndUpdatePrice();
+}
+
+function deleteCustomLayer(id) {
+  customPrintLayers = customPrintLayers.filter(l => l.id !== id);
+  if (selectedLegendTab === id) selectedLegendTab = "base";
+  renderLayerTabs();
+  calculateAndUpdatePrice();
+}
+
 function redrawAllForHighlight() {
   // A lightweight redraw to just update the canvas decorations when hover state changes.
+  
+  const activeTabId = getActiveLineId();
+  let customImageToDraw = null;
+  if (activeTabId && activeTabId !== "base" && activeTabId !== "cutline") {
+     const customLayer = customPrintLayers.find(l => l.id === activeTabId);
+     if (customLayer && customLayer.image) customImageToDraw = customLayer.image;
+  }
+
   if (basePolygons.length > 0) {
     // For SVG Vector Mode
     const drawOffset = {
@@ -2871,12 +2916,26 @@ function redrawAllForHighlight() {
       y: -currentBounds.top + 20,
     };
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawPolygonsToCanvas(currentPolygons, "black", drawOffset);
+    
+    // In vector mode, we just draw the vector polygons for base design.
+    // If a custom image exists, maybe draw it instead? 
+    // Since custom masks are likely raster, we might need to handle them differently in vector mode.
+    // But for now, just draw base polygons unless it's a custom layer.
+    if (customImageToDraw) {
+       ctx.save();
+       const dpr = window.devicePixelRatio || 1;
+       ctx.drawImage(customImageToDraw, drawOffset.x, drawOffset.y, customImageToDraw.width, customImageToDraw.height);
+       ctx.restore();
+    } else {
+       drawPolygonsToCanvas(currentPolygons, "black", drawOffset);
+    }
+    
     drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
     drawCanvasDecorations(currentBounds, drawOffset);
   } else if (originalImage) {
     // For Raster Mode, we can just call drawCanvasDecorations which first restores the clean state
-    drawCanvasDecorations(currentBounds, { x: 0, y: 0 });
+    // But we pass customImageToDraw if we have one.
+    drawCanvasDecorations(currentBounds, { x: 0, y: 0 }, customImageToDraw);
   }
 }
 
@@ -2934,7 +2993,7 @@ function handleClearImage() {
   calculateAndUpdatePrice();
 
   // Hide legend on clear
-  renderLegend();
+  renderLayerTabs();
 
   if (clearFileBtn) clearFileBtn.classList.add("hidden");
   if (fileInputGlobalRef) fileInputGlobalRef.focus();
@@ -3031,7 +3090,7 @@ function setTemplate(templateId) {
       }
       updateEditingButtonsState(true);
       calculateAndUpdatePrice();
-      renderLegend();
+      renderLayerTabs();
       if (clearFileBtn) clearFileBtn.classList.add("hidden");
     } else {
       // Revert button if they cancel
@@ -3535,6 +3594,38 @@ function handleStandardResize(targetInches) {
 
 // --- Smart Cutline Generation ---
 
+function handleGenerateFromBase() {
+  if (!originalImage) {
+    showNotification("Please upload a base image first.", "error");
+    return;
+  }
+  const activeTabId = getActiveLineId();
+  if (!activeTabId || activeTabId === "base" || activeTabId === "cutline") {
+    showNotification("Please select a custom layer to generate the mask into.", "error");
+    return;
+  }
+
+  const customLayer = customPrintLayers.find(l => l.id === activeTabId);
+  if (!customLayer) return;
+
+  showNotification("Generating mask from base design...", "info");
+
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = originalImage.width;
+  tempCanvas.height = originalImage.height;
+  const tempCtx = tempCanvas.getContext("2d");
+  tempCtx.filter = "grayscale(100%)";
+  tempCtx.drawImage(originalImage, 0, 0);
+  
+  const processedImg = new Image();
+  processedImg.onload = () => {
+    customLayer.image = processedImg;
+    showNotification(`Generated mask for ${customLayer.name} layer.`, "success");
+    redrawAllForHighlight();
+  };
+  processedImg.src = tempCanvas.toDataURL();
+}
+
 function handleGenerateCutline(skipPrompt = false) {
   if (!canvas || !ctx || !originalImage) {
     showNotification(
@@ -4026,7 +4117,7 @@ async function handleRemoteImageLoad(imageUrl) {
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
 
     // Show Legend
-    renderLegend();
+    renderLayerTabs();
 
     showNotification("Design loaded! You can now adjust options.", "success");
   };
@@ -4138,7 +4229,7 @@ async function loadProductForBuyer(productId) {
       drawCanvasDecorations(currentBounds);
 
       // Show Legend
-      renderLegend();
+      renderLayerTabs();
 
       showNotification("Design loaded!", "success");
     };
