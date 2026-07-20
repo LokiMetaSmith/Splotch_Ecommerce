@@ -377,7 +377,7 @@ export class LowDbAdapter {
             }
             return user;
         }
-        return Object.values(this.db.data.users).find(u => u.email === email);
+        return undefined;
     }
 
     async createUser(user) {
@@ -395,6 +395,13 @@ export class LowDbAdapter {
         // In case the key strategy changed or we are updating a user found by scan
         // We should ensure we update the correct entry.
         // But for LowDbAdapter simplicity, let's assume standard key usage.
+        const existingUser = this.db.data.users[key];
+
+        // Clean up old email index if email changed or was removed
+        if (existingUser && existingUser.email && existingUser.email !== user.email) {
+            delete this.db.data.emailIndex[existingUser.email];
+        }
+
         this.db.data.users[key] = user;
         if (user.email) {
             this.db.data.emailIndex[user.email] = key;
