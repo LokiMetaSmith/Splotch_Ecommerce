@@ -17,7 +17,7 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
 
     // Calculate a scale factor so ticks and text are visible on large images
     const scale = Math.max(bounds.width, bounds.height) / 500;
-    const fontSize = Math.max(12, Math.round(12 * scale));
+    const fontSize = Math.max(12, Math.round(24 * scale));
     const tickScale = Math.max(1, scale);
 
     ctx.save();

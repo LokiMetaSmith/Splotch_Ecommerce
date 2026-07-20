@@ -17,6 +17,7 @@ import {
   filterInternalContours,
 } from "./lib/image-processing.js";
 import { showNotification } from "./notifications.js";
+import { designLayers, activeLayerIndex, addLayer, removeLayer, moveLayer, setActiveLayer, getActiveLayer, clearLayers } from "./lib/layers.js";
 
 // index.js
 
@@ -42,7 +43,7 @@ offsetWorker.onerror = (error) => {
 
 // Declare globals for SDK objects and key DOM elements
 let payments, card, csrfToken;
-let originalImage = null;
+let originalImage = null; // now managed by layers
 let canvas, ctx;
 
 // Globals for SVG processing state
@@ -67,7 +68,7 @@ let hoveredLegendTab = null;
 let selectedLegendTab = null;
 
 // Layer controls state
-let customLayers = [];
+
 
 let textInput,
   textSizeInput,
@@ -330,41 +331,39 @@ async function BootStrap() {
   await Promise.all([fetchPricingInfo(), fetchInventory()]);
 
   // Initialize Square Payments SDK
-    if (!window.PLAYWRIGHT_TEST_MODE) {
-        console.log(
-          `[CLIENT] Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`,
-        );
+  if (!window.PLAYWRIGHT_TEST_MODE) {
+    console.log(
+      `[CLIENT] Initializing Square SDK with appId: ${appId}, locationId: ${locationId}`,
+    );
+    let retryCount = 0;
+    const maxRetries = 3;
+    while (retryCount < maxRetries) {
+      try {
+        if (!window.Square || !window.Square.payments) {
+          throw new Error("Square SDK is not loaded.");
+        }
         payments = window.Square.payments(appId, locationId);
         card = await initializeCard(payments);
-    } else {
-        console.log("[CLIENT] PLAYWRIGHT_TEST_MODE: Skipping Square initialization.");
-    }
-  let retryCount = 0;
-  const maxRetries = 3;
-  while (retryCount < maxRetries) {
-    try {
-      if (!window.Square || !window.Square.payments) {
-        throw new Error("Square SDK is not loaded.");
-      }
-      payments = window.Square.payments(appId, locationId);
-      card = await initializeCard(payments);
-      break; // Success
-    } catch (error) {
-      retryCount++;
-      console.warn(`[CLIENT] Square SDK init failed (attempt ${retryCount}/${maxRetries}):`, error);
-      if (retryCount >= maxRetries) {
-        let msg = `Failed to initialize payments: ${error.message}`;
-        if (error.message.includes("Network") || typeof Square === "undefined") {
-          msg += " (Check your AdBlocker)";
-          showAdBlockerWarning();
+        break; // Success
+      } catch (error) {
+        retryCount++;
+        console.warn(`[CLIENT] Square SDK init failed (attempt ${retryCount}/${maxRetries}):`, error);
+        if (retryCount >= maxRetries) {
+          let msg = `Failed to initialize payments: ${error.message}`;
+          if (error.message.includes("Network") || typeof Square === "undefined") {
+            msg += " (Check your AdBlocker)";
+            showAdBlockerWarning();
+          }
+          showPaymentStatus(msg, "error");
+          console.error("[CLIENT] Failed to initialize Square payments SDK:", error);
+        } else {
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
-        showPaymentStatus(msg, "error");
-        console.error("[CLIENT] Failed to initialize Square payments SDK:", error);
-      } else {
-        // Wait before retrying
-        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
+  } else {
+    console.log("[CLIENT] PLAYWRIGHT_TEST_MODE: Skipping Square initialization.");
   }
 
   // Attach event listeners
@@ -1032,7 +1031,12 @@ function showAdBlockerWarning() {
   }
 }
 
-function calculateAndUpdatePrice() {
+function updateCompositeImage() {
+     // Redraw the active layer bounding box if necessary
+     // In a real multi-layer engine we would draw ALL layers here, 
+     // but for now, we just update the UI state.
+  }
+  function calculateAndUpdatePrice() {
   if (
     !pricingConfig ||
     !stickerQuantityInput ||
@@ -1082,6 +1086,13 @@ function calculateAndUpdatePrice() {
     lastCalculatedPerimeterCutlineRef = cutline;
   }
 
+  const allCustomLayers = designLayers.reduce((acc, layer) => {
+    if (layer.customLayers) {
+      return acc.concat(layer.customLayers);
+    }
+    return acc;
+  }, []);
+
   const priceResult = calculateStickerPrice(
     pricingConfig,
     quantity,
@@ -1090,7 +1101,7 @@ function calculateAndUpdatePrice() {
     cutline,
     selectedResolution,
     lastCalculatedPerimeter,
-    customLayers
+    allCustomLayers
   );
 
   // --- Creator Markup Logic ---
@@ -1301,6 +1312,9 @@ function renderLayerList() {
 
   layerList.innerHTML = "";
 
+  const activeLayer = getActiveLayer();
+  const customLayers = activeLayer && activeLayer.customLayers ? activeLayer.customLayers : [];
+
   customLayers.forEach((layer, index) => {
     const li = document.createElement("li");
     li.className = "flex items-center justify-between bg-white p-2 border border-gray-200 rounded shadow-sm text-sm cursor-move";
@@ -1362,12 +1376,12 @@ function renderLayerList() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const addLayerBtn = document.getElementById("addLayerBtn");
+  const addLayerBtn = document.getElementById("add-layer-btn");
   if (addLayerBtn) {
     addLayerBtn.addEventListener("click", () => {
       const layerSelect = document.getElementById("layerSelect");
       if (layerSelect && layerSelect.value) {
-        customLayers.push(layerSelect.value);
+        getActiveLayer()?.customLayers?.push(layerSelect.value);
         renderLayerList();
       }
     });
@@ -1631,6 +1645,13 @@ async function handlePaymentFormSubmit(event) {
     const fileInput = document.getElementById("fileInput");
     const stickerName = fileInput && fileInput.files && fileInput.files.length > 0 ? fileInput.files[0].name : "Custom Sticker";
 
+    const allCustomLayers = designLayers.reduce((acc, layer) => {
+      if (layer.customLayers) {
+        return acc.concat(layer.customLayers);
+      }
+      return acc;
+    }, []);
+
     // 4. Create JSON payload for the order
     const orderDetails = {
       resolution: stickerResolutionSelect
@@ -1642,7 +1663,7 @@ async function handlePaymentFormSubmit(event) {
       material: stickerMaterialSelect ? stickerMaterialSelect.value : "unknown",
       stickerName: stickerName,
       promoAddon: promoAddonCheckbox ? promoAddonCheckbox.checked : false,
-      customLayers: customLayers.length > 0 ? customLayers : null,
+      customLayers: allCustomLayers.length > 0 ? allCustomLayers : null,
     };
     if (cutLinePath) {
       orderDetails.cutLinePath = cutLinePath;
@@ -1820,6 +1841,11 @@ function updateUnitUI(isMetric) {
 }
 
 function updateEditingButtonsState(disabled) {
+  const panel = document.getElementById("layer-editor-panel");
+  if (panel) {
+    if (disabled) panel.classList.add("hidden");
+    else panel.classList.remove("hidden");
+  }
   const elements = [
     rotateLeftBtnEl,
     rotateRightBtnEl,
@@ -2054,6 +2080,8 @@ function loadFileAsImage(file, isMascot = false) {
       const img = new Image();
       img.onload = () => {
         originalImage = img;
+        const newLayer = addLayer(img, file.name || "Upload", 0, 0, img.width, img.height);
+        setActiveLayer(designLayers.length - 1);
         updateEditingButtonsState(false);
         if (clearFileBtn) clearFileBtn.classList.remove("hidden");
         showNotification("Image loaded successfully.", "success");
@@ -3686,7 +3714,7 @@ function handleGenerateCutline(skipPrompt = false) {
            let poly = [];
            
            if (selectedShape === "circle") {
-             const r = Math.sqrt(hw * hw + hh * hh); 
+             const r = Math.max(hw, hh); 
              const steps = 64;
              for(let i=0; i<steps; i++) {
                const theta = (i / steps) * 2 * Math.PI;

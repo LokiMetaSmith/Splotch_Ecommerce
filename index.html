@@ -211,9 +211,12 @@
             </p>
           </div>
 
-          <!-- Canvas for Image Editing -->
-          <div class="bg-gray-50 p-4 rounded-lg shadow-inner mb-6">
-            <div
+          <!-- Canvas & Layer Editor -->
+          <div class="flex flex-col lg:flex-row gap-4 mb-6">
+            <!-- Canvas for Image Editing -->
+            <div class="bg-gray-50 p-4 rounded-lg shadow-inner flex-grow min-w-0">
+              <div
+
               id="canvas-container"
               class="relative w-fit mx-auto outline-none"
               contenteditable="true"
@@ -287,6 +290,22 @@
             >
               Keep important elements 2-3mm from edge!
             </p>
+            </div>
+            
+            <!-- Layer Editor Panel -->
+            <div id="layer-editor-panel" class="bg-white p-4 rounded-lg shadow-md border border-gray-200 w-full lg:w-72 flex flex-col hidden">
+               <h3 class="text-lg font-bold text-gray-700 mb-3 border-b pb-2 flex justify-between items-center">
+                 Layers
+                 <div class="flex items-center gap-2">
+                    <select id="layerSelect" class="text-xs border rounded p-1"></select>
+                    <button id="add-layer-btn" type="button" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold" title="Add Layer">+ Add</button>
+                 </div>
+               </h3>
+               <div id="layer-list" class="flex flex-col gap-2 overflow-y-auto max-h-[400px] flex-grow">
+                 <!-- Populated by JS -->
+                 <p class="text-sm text-gray-500 italic text-center my-4">No layers yet. Upload an image to start!</p>
+               </div>
+            </div>
           </div>
 
           <!-- Basic Image Editing Controls -->
@@ -489,6 +508,28 @@
                 >
               </div>
             </div>
+            
+            <!-- Bleed Gradient Controls -->
+            <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
+              <span class="text-xs text-gray-500 mb-1">Bleed Gradient</span>
+              <div class="flex items-center gap-2">
+                <input
+                  type="color"
+                  id="bleedColor1"
+                  value="#000000"
+                  class="w-8 h-8 p-0 border-0 rounded cursor-pointer"
+                  data-tooltip="Gradient Start Color"
+                />
+                <input
+                  type="color"
+                  id="bleedColor2"
+                  value="#000000"
+                  class="w-8 h-8 p-0 border-0 rounded cursor-pointer"
+                  data-tooltip="Gradient End Color"
+                />
+              </div>
+            </div>
+            
             <div
               id="cutlineSensitivityContainer"
               style="display: none"
@@ -903,31 +944,7 @@
               </p>
             </div>
 
-            <div id="layer-controls-container" class="field mt-4 border border-gray-200 rounded-md p-4" style="display: none;">
-              <h4 class="text-md font-semibold text-gray-700 mb-2">Custom Printing Layers</h4>
-              <p class="text-xs text-gray-500 mb-4" style="font-family: var(--font-baumans)">
-                Specify custom layers from bottom to top (e.g., White Underbase, CMYK, Clear Coat). Drag to reorder.
-              </p>
 
-              <div class="flex flex-col md:flex-row gap-4">
-                <div class="w-full md:w-1/2">
-                  <img src="/layer-graphic.svg" alt="Layer Construction Graphic" class="w-full h-auto max-w-[200px] mx-auto border border-gray-200 rounded-md p-2 bg-white" />
-                </div>
-                <div class="w-full md:w-1/2 flex flex-col gap-2">
-                  <div class="flex gap-2">
-                    <select id="layerSelect" class="input flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                      <!-- Populated by JS -->
-                    </select>
-                    <button type="button" id="addLayerBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-3 rounded-md transition-colors">Add</button>
-                  </div>
-
-                  <ul id="layerList" class="mt-2 space-y-2 max-h-[150px] overflow-y-auto">
-                    <!-- Layer items go here -->
-                  </ul>
-                  <p class="text-xs text-gray-400 mt-1 italic">Top layer is at the bottom of the list</p>
-                </div>
-              </div>
-            </div>
 
             <div class="field bg-indigo-50 rounded-md border border-indigo-100 p-4 mt-4">
               <label class="flex items-start gap-3 cursor-pointer">
