@@ -1,5 +1,5 @@
 {
-  "pricePerSquareInchCents": 15,
+  "pricePerSquareInchCents": 13,
   "resolutions": [
     {
       "id": "dpi_96",
@@ -29,10 +29,10 @@
   "materials": [
     {
       "id": "pp_standard",
-      "name": "Standard Polypropylene",
+      "name": "Gloss White Air Release",
       "costMultiplier": 1.0,
       "supportedLayers": ["white", "cmyk", "clear"],
-      "description": "Custom White Adhesive Sticker. Gloss white 2mil thick wrap vinyl. Indoor rated, air release adhesive for easy bubble-free application."
+      "description": "Gloss white 2mil thick wrap vinyl. Outdoor rated, air release adhesive for easy bubble-free application over flat and curved surfaces alike. 3 Year Outdoor Rated Ink and Vinyl"
     },
     {
       "id": "pvc_laminated",
