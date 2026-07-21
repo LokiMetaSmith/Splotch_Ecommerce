@@ -14,6 +14,7 @@ describe('Canvas Utils: drawRuler', () => {
             lineTo: jest.fn(),
             stroke: jest.fn(),
             fillText: jest.fn(),
+            measureText: jest.fn(() => ({ width: 10 })),
             strokeStyle: '',
             fillStyle: '',
             font: '',
