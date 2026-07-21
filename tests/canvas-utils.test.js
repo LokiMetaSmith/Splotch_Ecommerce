@@ -79,4 +79,74 @@ describe('Canvas Utils: drawRuler', () => {
         // Check for fillText calls
         expect(mockCtx.fillText).toHaveBeenCalled();
     });
+
+    describe('Dynamic Scale Constants and Units', () => {
+        const checkConstantScale = (mockCtx) => {
+            expect(mockCtx.font).toBe('12px Arial');
+            expect(mockCtx.lineWidth).toBe(1);
+        };
+
+        it('should use mils for imperial images < 2 inches', () => {
+            const ppi = 300;
+            const bounds = { width: 1.5 * ppi, height: 1.5 * ppi }; // 1.5 inches
+            drawRuler(mockCtx, bounds, {x:0, y:0}, ppi, false);
+
+            checkConstantScale(mockCtx);
+            expect(mockCtx.fillText).toHaveBeenCalledWith(expect.stringContaining('mil'), expect.any(Number), expect.any(Number));
+        });
+
+        it('should use inches for imperial images >= 2 and < 24 inches', () => {
+            const ppi = 300;
+            const bounds = { width: 10 * ppi, height: 10 * ppi }; // 10 inches
+            drawRuler(mockCtx, bounds, {x:0, y:0}, ppi, false);
+
+            checkConstantScale(mockCtx);
+            expect(mockCtx.fillText).toHaveBeenCalledWith(expect.stringContaining('in'), expect.any(Number), expect.any(Number));
+        });
+
+        it('should use feet for imperial images >= 24 inches', () => {
+            const ppi = 300;
+            const bounds = { width: 30 * ppi, height: 30 * ppi }; // 30 inches
+            drawRuler(mockCtx, bounds, {x:0, y:0}, ppi, false);
+
+            checkConstantScale(mockCtx);
+            expect(mockCtx.fillText).toHaveBeenCalledWith(expect.stringContaining('ft'), expect.any(Number), expect.any(Number));
+        });
+
+        it('should use micrometers for metric images < 1mm', () => {
+            const ppi = 300;
+            const bounds = { width: (0.5 / 25.4) * ppi, height: (0.5 / 25.4) * ppi }; // 0.5 mm
+            drawRuler(mockCtx, bounds, {x:0, y:0}, ppi, true);
+
+            checkConstantScale(mockCtx);
+            expect(mockCtx.fillText).toHaveBeenCalledWith(expect.stringContaining('µm'), expect.any(Number), expect.any(Number));
+        });
+
+        it('should use small mm for metric images < 20mm', () => {
+            const ppi = 300;
+            const bounds = { width: (15 / 25.4) * ppi, height: (15 / 25.4) * ppi }; // 15 mm
+            drawRuler(mockCtx, bounds, {x:0, y:0}, ppi, true);
+
+            checkConstantScale(mockCtx);
+            expect(mockCtx.fillText).toHaveBeenCalledWith(expect.stringContaining('mm'), expect.any(Number), expect.any(Number));
+        });
+
+        it('should use normal mm for metric images >= 20mm and < 1000mm', () => {
+            const ppi = 300;
+            const bounds = { width: (500 / 25.4) * ppi, height: (500 / 25.4) * ppi }; // 500 mm
+            drawRuler(mockCtx, bounds, {x:0, y:0}, ppi, true);
+
+            checkConstantScale(mockCtx);
+            expect(mockCtx.fillText).toHaveBeenCalledWith(expect.stringContaining('mm'), expect.any(Number), expect.any(Number));
+        });
+
+        it('should use meters for metric images >= 1000mm', () => {
+            const ppi = 300;
+            const bounds = { width: (1500 / 25.4) * ppi, height: (1500 / 25.4) * ppi }; // 1500 mm
+            drawRuler(mockCtx, bounds, {x:0, y:0}, ppi, true);
+
+            checkConstantScale(mockCtx);
+            expect(mockCtx.fillText).toHaveBeenCalledWith(expect.stringContaining('m'), expect.any(Number), expect.any(Number));
+        });
+    });
 });
