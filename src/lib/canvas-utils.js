@@ -12,19 +12,77 @@
 export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
     if (!ctx || !bounds || !ppi) return;
 
-    const majorMarkSpacing = isMetric ? 10 * ppi / 25.4 : ppi; // 10mm or 1in
-    const minorMarkSpacing = isMetric ? majorMarkSpacing / 10 : majorMarkSpacing / 8; // 1mm or 1/8in
+    let majorMarkSpacing, minorMarkSpacing;
+    let ticksPerMajor;
+    let labelMultiplier;
+    let labelSuffix = '';
 
-    // Calculate a scale factor so ticks and text are visible on large images
-    const scale = Math.max(bounds.width, bounds.height) / 500;
-    const fontSize = Math.max(12, Math.round(24 * scale));
-    const tickScale = Math.max(1, scale);
+    const physicalWidthInches = bounds.width / ppi;
+    const physicalWidthMm = (bounds.width / ppi) * 25.4;
+
+    if (isMetric) {
+        if (physicalWidthMm < 1) {
+            // < 1mm: switch to micrometers (major every 100µm, minor every 10µm)
+            majorMarkSpacing = (100 / 1000) * ppi / 25.4; // 100µm
+            minorMarkSpacing = majorMarkSpacing / 10;
+            ticksPerMajor = 10;
+            labelMultiplier = 100;
+            labelSuffix = 'µm';
+        } else if (physicalWidthMm < 20) {
+            // < 20mm: small mm (major every 1mm, minor every 0.1mm)
+            majorMarkSpacing = 1 * ppi / 25.4; // 1mm
+            minorMarkSpacing = majorMarkSpacing / 10;
+            ticksPerMajor = 10;
+            labelMultiplier = 1;
+            labelSuffix = 'mm';
+        } else if (physicalWidthMm >= 1000) {
+            // >= 1000mm: meters (major every 0.1m (100mm), minor every 0.01m (10mm))
+            majorMarkSpacing = 100 * ppi / 25.4; // 0.1m
+            minorMarkSpacing = majorMarkSpacing / 10;
+            ticksPerMajor = 10;
+            labelMultiplier = 0.1;
+            labelSuffix = 'm';
+        } else {
+            // Default: mm (major every 10mm, minor every 1mm)
+            majorMarkSpacing = 10 * ppi / 25.4; // 10mm
+            minorMarkSpacing = majorMarkSpacing / 10;
+            ticksPerMajor = 10;
+            labelMultiplier = 10;
+            labelSuffix = 'mm';
+        }
+    } else {
+        if (physicalWidthInches < 2) {
+            // < 2 inches: mils (major every 100 mils, minor every 10 mils)
+            majorMarkSpacing = (100 / 1000) * ppi; // 100 mils
+            minorMarkSpacing = majorMarkSpacing / 10;
+            ticksPerMajor = 10;
+            labelMultiplier = 100;
+            labelSuffix = 'mil';
+        } else if (physicalWidthInches >= 24) {
+            // >= 24 inches: feet (major every 1 foot, minor every 1 inch)
+            majorMarkSpacing = 12 * ppi; // 1 foot
+            minorMarkSpacing = majorMarkSpacing / 12;
+            ticksPerMajor = 12;
+            labelMultiplier = 1;
+            labelSuffix = 'ft';
+        } else {
+            // Default: inches (major every 1 inch, minor every 1/8 inch)
+            majorMarkSpacing = ppi; // 1 inch
+            minorMarkSpacing = majorMarkSpacing / 8;
+            ticksPerMajor = 8;
+            labelMultiplier = 1;
+            labelSuffix = 'in';
+        }
+    }
+
+    const fontSize = 12;
+    const tickScale = 1;
 
     ctx.save();
     ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
     ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
     ctx.font = `${fontSize}px Arial`;
-    ctx.lineWidth = Math.max(1, 1.5 * scale);
+    ctx.lineWidth = 1;
 
     // Bolt Optimization: Batch drawing calls to reduce overhead
     // Top ruler
@@ -32,7 +90,7 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
     for (let i = 0; i * minorMarkSpacing <= bounds.width; i++) {
         const x = bounds.left + offset.x + i * minorMarkSpacing;
         const y = bounds.top + offset.y; // Start exactly at the bounding box
-        const isMajorMark = i % (isMetric ? 10 : 8) === 0;
+        const isMajorMark = i % ticksPerMajor === 0;
         const markHeight = isMajorMark ? 15 * tickScale : 8 * tickScale;
 
         // Draw ticks going OUTWARDS (up) from the bounding box
@@ -40,8 +98,9 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
         ctx.lineTo(x, y - markHeight);
 
         if (isMajorMark && i > 0) {
-            const label = isMetric ? (i / 10) : (i / 8);
-            ctx.fillText(label, x + (3 * scale), y - markHeight - (2 * scale));
+            const labelValue = (i / ticksPerMajor) * labelMultiplier;
+            const label = `${Number.isInteger(labelValue) ? labelValue : labelValue.toFixed(1)}${labelSuffix}`;
+            ctx.fillText(label, x + 3, y - markHeight - 2);
         }
     }
     ctx.stroke();
@@ -51,7 +110,7 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
     for (let i = 0; i * minorMarkSpacing <= bounds.height; i++) {
         const y = bounds.top + offset.y + i * minorMarkSpacing;
         const x = bounds.left + offset.x; // Start exactly at the bounding box
-        const isMajorMark = i % (isMetric ? 10 : 8) === 0;
+        const isMajorMark = i % ticksPerMajor === 0;
         const markWidth = isMajorMark ? 15 * tickScale : 8 * tickScale;
 
         // Draw ticks going OUTWARDS (left) from the bounding box
@@ -59,8 +118,9 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
         ctx.lineTo(x - markWidth, y);
 
         if (isMajorMark && i > 0) {
-            const label = isMetric ? (i / 10) : (i / 8);
-            ctx.fillText(label, x - markWidth - (5 * scale) - (ctx.measureText(label).width), y + (fontSize / 3));
+            const labelValue = (i / ticksPerMajor) * labelMultiplier;
+            const label = `${Number.isInteger(labelValue) ? labelValue : labelValue.toFixed(1)}${labelSuffix}`;
+            ctx.fillText(label, x - markWidth - 5 - (ctx.measureText(label).width), y + (fontSize / 3));
         }
     }
     ctx.stroke();
