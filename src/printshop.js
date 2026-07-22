@@ -284,7 +284,7 @@ function setLoggedInState(token, username) {
 
     ui.authStatus.textContent = `Welcome, ${username}!`;
     ui.loginBtn.textContent = 'Log Out';
-    ui.registerBtn.style.display = 'block'; // Show registration button for admins
+    ui.registerBtn.classList.remove("hidden"); // Show registration button for admins
 
     // Clear and attach the correct event listener
     ui.loginBtn.removeEventListener('click', showLoginModal);
@@ -303,7 +303,7 @@ function logout() {
 
     ui.authStatus.textContent = '';
     ui.loginBtn.textContent = 'Login';
-    ui.registerBtn.style.display = 'none';
+    ui.registerBtn.classList.add("hidden");
 
     // Clear and attach the correct event listener
     ui.loginBtn.removeEventListener('click', logout);
@@ -315,7 +315,7 @@ function logout() {
 
     const noOrdersText = document.getElementById('no-orders-text');
     if (noOrdersText) noOrdersText.textContent = 'Please log in to view orders.';
-    ui.noOrdersMessage.style.display = 'block';
+    ui.noOrdersMessage.classList.remove("hidden");
 }
 
 /**
@@ -532,7 +532,7 @@ async function fetchAndDisplayOrders(query = '') {
     showLoadingIndicator();
     updateConnectionStatus('connecting');
     if (noOrdersText) noOrdersText.textContent = 'Loading orders...';
-    ui.noOrdersMessage.style.display = 'block';
+    ui.noOrdersMessage.classList.remove("hidden");
 
     try {
         const endpoint = query ? `${serverUrl}/api/orders/search?q=${encodeURIComponent(query)}` : `${serverUrl}/api/orders`;
@@ -627,9 +627,9 @@ function filterAndDisplayOrders(status) {
         ui.ordersList.appendChild(ui.noOrdersMessage);
 
         if (noOrdersText) noOrdersText.textContent = `No orders found with status: ${status}.`;
-        ui.noOrdersMessage.style.display = 'block';
+        ui.noOrdersMessage.classList.remove("hidden");
     } else {
-        ui.noOrdersMessage.style.display = 'none';
+        ui.noOrdersMessage.classList.add("hidden");
 
         // Bolt Optimization: Use map + join + innerHTML for batch DOM update
         // Note: original code used fragment.prepend(), effectively reversing the list.
@@ -758,7 +758,7 @@ export function displayOrder(order) {
             ${dropdownHtml}
         </div>
 
-        <div class="mt-4" id="tracking-info-${orderId}" style="display: ${trackingDisplay};">
+        <div class="mt-4 ${trackingDisplay === 'none' ? 'hidden' : ''}" id="tracking-info-${orderId}">
             <input class="border rounded-md p-2" type="text" id="tracking-number-${orderId}" placeholder="Enter Tracking Number">
             <select class="border rounded-md p-2" id="courier-${orderId}">
                 ${courierOptions}

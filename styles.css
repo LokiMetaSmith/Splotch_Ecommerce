@@ -1,2 +1,165 @@
 @import "tailwindcss";
 @config "./tailwind.config.js";
+
+/* Extracted from index.html */
+.size-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        background-color: #f3f4f6;
+        border: 1px solid #d1d5db;
+        transition: background-color 0.2s;
+        cursor: pointer;
+      }
+      .size-btn:hover {
+        background-color: #e5e7eb;
+      }
+      .size-btn:focus-visible {
+        outline: 2px solid #2563eb;
+        outline-offset: 2px;
+        background-color: #e5e7eb;
+      }
+      /* Top Menu Bar CSS */
+      .top-menu-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 1rem;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+        z-index: 9999;
+      }
+      .menu-item {
+        pointer-events: auto;
+        background: #2a284d; /* splotch-navy fallback */
+        background: var(--splotch-navy, #2a284d);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 9999px;
+        font-family: var(--font-baumans, sans-serif);
+        font-weight: bold;
+        text-decoration: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition:
+          transform 0.2s,
+          background-color 0.2s;
+      }
+      .menu-item:hover {
+        transform: translateY(-2px);
+        background: #00a99d; /* splotch-teal fallback */
+        background: var(--splotch-teal, #00a99d);
+      }
+      .menu-item:focus-visible {
+        outline: 3px solid #ff003a; /* splotch-red */
+        outline-offset: 2px;
+      }
+
+      /* Toggle Switch CSS */
+      input:checked ~ .dot {
+        transform: translateX(100%);
+        background-color: #48bb78;
+      }
+
+/* Extracted from printshop.html */
+body {
+        font-family: "Baumans", sans-serif;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: "Modak", cursive;
+      }
+      .order-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease-in-out;
+      }
+      .order-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+      .sticker-peel-container {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 5px;
+        background: white;
+        box-shadow:
+          0 1px 3px rgba(0, 0, 0, 0.12),
+          0 1px 2px rgba(0, 0, 0, 0.24);
+        border-radius: 2px;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transform-origin: center;
+      }
+      .sticker-peel-container:hover {
+        box-shadow:
+          0 14px 28px rgba(0, 0, 0, 0.25),
+          0 10px 10px rgba(0, 0, 0, 0.22);
+        transform: scale(1.05) rotate(-2deg);
+        z-index: 10;
+      }
+      .order-card img.sticker-design {
+        max-width: 200px;
+        max-height: 200px;
+        display: block;
+      }
+      .order-details dt {
+        font-weight: bold;
+      }
+      .order-details dd {
+        margin-left: 0;
+        margin-bottom: 0.5em;
+      }
+      .filter-btn {
+        background-color: #e2e8f0;
+        color: #4a5568;
+        transition: all 0.2s ease-in-out;
+      }
+      .filter-btn:hover {
+        background-color: #cbd5e0;
+      }
+      /* Specific active states matching status colors - Darker shades for WCAG AA contrast (>4.5:1) with white text */
+      .filter-btn[data-status="ALL"].active {
+        background-color: #374151;
+        color: white;
+        font-weight: bold;
+      } /* Gray-700 */
+      .filter-btn[data-status="NEW"].active {
+        background-color: #2563eb;
+        color: white;
+        font-weight: bold;
+      } /* Blue-600 */
+      .filter-btn[data-status="ACCEPTED"].active {
+        background-color: #b45309;
+        color: white;
+        font-weight: bold;
+      } /* Amber-700 */
+      .filter-btn[data-status="PRINTING"].active {
+        background-color: #7c3aed;
+        color: white;
+        font-weight: bold;
+      } /* Violet-600 */
+      .filter-btn[data-status="SHIPPED"].active {
+        background-color: #047857;
+        color: white;
+        font-weight: bold;
+      } /* Emerald-700 */
+      .filter-btn[data-status="DELIVERED"].active {
+        background-color: #4f46e5;
+        color: white;
+        font-weight: bold;
+      } /* Indigo-600 */
+      .filter-btn[data-status="COMPLETED"].active {
+        background-color: #15803d;
+        color: white;
+        font-weight: bold;
+      } /* Green-700 */
+      .filter-btn[data-status="CANCELED"].active {
+        background-color: #dc2626;
+        color: white;
+        font-weight: bold;
+      } /* Red-600 */

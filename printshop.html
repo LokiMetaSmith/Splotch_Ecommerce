@@ -12,110 +12,6 @@
       href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap"
       rel="stylesheet"
     />
-    <style>
-      body {
-        font-family: "Baumans", sans-serif;
-      }
-      h1,
-      h2,
-      h3 {
-        font-family: "Modak", cursive;
-      }
-      .order-card {
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 16px;
-        background-color: #f9f9f9;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease-in-out;
-      }
-      .order-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-      }
-      .sticker-peel-container {
-        display: inline-block;
-        margin-top: 10px;
-        padding: 5px;
-        background: white;
-        box-shadow:
-          0 1px 3px rgba(0, 0, 0, 0.12),
-          0 1px 2px rgba(0, 0, 0, 0.24);
-        border-radius: 2px;
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        transform-origin: center;
-      }
-      .sticker-peel-container:hover {
-        box-shadow:
-          0 14px 28px rgba(0, 0, 0, 0.25),
-          0 10px 10px rgba(0, 0, 0, 0.22);
-        transform: scale(1.05) rotate(-2deg);
-        z-index: 10;
-      }
-      .order-card img.sticker-design {
-        max-width: 200px;
-        max-height: 200px;
-        display: block;
-      }
-      .order-details dt {
-        font-weight: bold;
-      }
-      .order-details dd {
-        margin-left: 0;
-        margin-bottom: 0.5em;
-      }
-      .filter-btn {
-        background-color: #e2e8f0;
-        color: #4a5568;
-        transition: all 0.2s ease-in-out;
-      }
-      .filter-btn:hover {
-        background-color: #cbd5e0;
-      }
-      /* Specific active states matching status colors - Darker shades for WCAG AA contrast (>4.5:1) with white text */
-      .filter-btn[data-status="ALL"].active {
-        background-color: #374151;
-        color: white;
-        font-weight: bold;
-      } /* Gray-700 */
-      .filter-btn[data-status="NEW"].active {
-        background-color: #2563eb;
-        color: white;
-        font-weight: bold;
-      } /* Blue-600 */
-      .filter-btn[data-status="ACCEPTED"].active {
-        background-color: #b45309;
-        color: white;
-        font-weight: bold;
-      } /* Amber-700 */
-      .filter-btn[data-status="PRINTING"].active {
-        background-color: #7c3aed;
-        color: white;
-        font-weight: bold;
-      } /* Violet-600 */
-      .filter-btn[data-status="SHIPPED"].active {
-        background-color: #047857;
-        color: white;
-        font-weight: bold;
-      } /* Emerald-700 */
-      .filter-btn[data-status="DELIVERED"].active {
-        background-color: #4f46e5;
-        color: white;
-        font-weight: bold;
-      } /* Indigo-600 */
-      .filter-btn[data-status="COMPLETED"].active {
-        background-color: #15803d;
-        color: white;
-        font-weight: bold;
-      } /* Green-700 */
-      .filter-btn[data-status="CANCELED"].active {
-        background-color: #dc2626;
-        color: white;
-        font-weight: bold;
-      } /* Red-600 */
-    </style>
-
     <script src="/lib/clipper.js"></script>
     <script src="/lib/parallel.js"></script>
     <!-- Lightweight QR Code generator -->
@@ -183,8 +79,7 @@
             </button>
             <button
               id="registerBtn"
-              class="ml-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
-              style="display: none"
+              class="ml-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 hidden"
             >
               Register New Key
             </button>
@@ -201,7 +96,6 @@
         >.
       </div>
     </header>
-
     <div class="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
       <!-- View Switcher -->
       <div class="flex space-x-4 border-b mb-4">
@@ -219,9 +113,7 @@
         </button>
       </div>
     </div>
-
     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
       <!-- Scan to Update Banner -->
       <div id="scan-mode-banner" class="hidden bg-purple-100 border-l-4 border-purple-500 text-purple-700 p-4 mb-6 rounded shadow-md flex items-center justify-between">
         <div>
@@ -242,7 +134,6 @@
             <button id="closeScanModeBtn" class="text-purple-700 hover:text-purple-900 font-bold">&times; Close</button>
         </div>
       </div>
-
       <!-- Dashboard View -->
       <div id="dashboard-view">
         <!-- Filter Buttons -->
@@ -312,7 +203,6 @@
             <button id="deselectAllOrdersBtn" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">Deselect All</button>
           </div>
         </div>
-
         <!-- Sales and Uptime Monitor -->
         <div id="sales-uptime-monitor" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
@@ -332,7 +222,6 @@
                 <p class="text-2xl font-bold text-gray-800 mt-1" id="metric-server-status">Loading...</p>
             </div>
         </div>
-
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div class="lg:col-span-2">
             <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">
@@ -363,8 +252,7 @@
                   </svg>
                 </div>
                 <h3
-                  class="text-lg font-medium text-gray-900 mb-1"
-                  style="font-family: var(--font-modak); letter-spacing: 0.05em"
+                  class="text-lg font-medium text-gray-900 mb-1 font-modak tracking-wider"
                 >
                   Order Status
                 </h3>
@@ -484,14 +372,12 @@
           </div>
         </div>
       </div>
-
       <!-- Settings View -->
       <div id="settings-view" class="hidden">
         <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto">
           <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-6">
             Odoo Integration Settings
           </h2>
-
           <form id="odoo-config-form" class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -539,7 +425,6 @@
                 />
               </div>
             </div>
-
             <div class="flex items-center space-x-4">
               <button
                 type="button"
@@ -553,9 +438,7 @@
                 class="text-sm font-bold"
               ></span>
             </div>
-
             <hr class="border-t border-gray-300" />
-
             <h3 class="text-xl font-bold">Defaults</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -581,14 +464,11 @@
                 />
               </div>
             </div>
-
             <hr class="border-t border-gray-300" />
-
             <h3 class="text-xl font-bold">Material Mapping</h3>
             <p class="text-sm text-gray-500">
               Map Print Shop materials to Odoo Product IDs.
             </p>
-
             <div class="overflow-x-auto">
               <table class="min-w-full bg-white border">
                 <thead>
@@ -602,7 +482,6 @@
                 </tbody>
               </table>
             </div>
-
             <div class="flex justify-end pt-4">
               <button
                 type="submit"
@@ -642,7 +521,6 @@
             &times;
           </button>
         </div>
-
         <form id="login-form" class="space-y-4">
           <div>
             <label for="username-input" class="block font-bold">Username</label>
@@ -674,13 +552,11 @@
             Login with Password
           </button>
         </form>
-
         <div class="my-6 flex items-center">
           <hr class="flex-grow border-t border-gray-300" />
           <span class="mx-4 text-gray-500">OR</span>
           <hr class="flex-grow border-t border-gray-300" />
         </div>
-
         <button
           id="webauthn-login-btn"
           class="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
@@ -700,7 +576,6 @@
         &copy; 2026 Splotch Creative LLC
        | <span class="text-xs text-gray-400 ml-2">v<span class="app-version-display"></span></span></div>
     </footer>
-
     <div
       id="loading-indicator"
       class="hidden fixed top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center"
@@ -713,7 +588,6 @@
         class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"
       ></div>
     </div>
-
     <div
       id="error-toast"
       class="fixed bottom-0 right-0 mb-4 mr-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-md z-[100] transition-all duration-300 ease-in-out transform translate-y-full opacity-0 pointer-events-none"
@@ -730,7 +604,6 @@
         &times;
       </button>
     </div>
-
     <div
       id="success-toast"
       class="fixed bottom-0 right-0 mb-4 mr-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-md z-[100] transition-all duration-300 ease-in-out transform translate-y-full opacity-0 pointer-events-none"
