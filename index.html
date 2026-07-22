@@ -426,15 +426,11 @@
               </div>
               <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
                 <span class="text-xs text-gray-500 mb-1">Cut Type</span>
-                <label for="cutTypeToggle" class="flex items-center cursor-pointer space-x-2">
-                  <span class="text-xs font-bold text-gray-600">Edge</span>
-                  <div class="relative">
-                    <input type="checkbox" id="cutTypeToggle" class="sr-only peer" role="switch" aria-label="Toggle Cut Type">
-                    <div class="block bg-gray-600 w-14 h-8 rounded-full peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 transition-shadow"></div>
-                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
-                  </div>
-                  <span class="text-xs font-bold text-gray-600">Contour</span>
-                </label>
+                <div class="flex items-center justify-center gap-2">
+                  <span class="text-xs font-bold text-gray-600 mb-0" style="margin-right: 0.5rem; margin-top: 4px;">Edge</span>
+                  <jelly-switch id="cutTypeToggle" aria-label="Toggle Cut Type"></jelly-switch>
+                  <span class="text-xs font-bold text-gray-600 mb-0" style="margin-left: 0.5rem; margin-top: 4px;">Contour</span>
+                </div>
               </div>
               <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
                 <label
@@ -699,15 +695,14 @@
                   for="stickerQuantity"
                   >Quantity:</label
                 >
-                <div class="control flex items-center mt-1">
-                  <button
+                <div class="control flex items-center mt-1 gap-2">
+                  <jelly-button
                     type="button"
                     id="decreaseQuantityBtn"
-                    class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-l-md border border-r-0 border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Decrease quantity"
                   >
                     -
-                  </button>
+                  </jelly-button>
                   <input
                     class="input block w-full px-3 py-2 bg-white border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-center z-10"
                     id="stickerQuantity"
@@ -717,14 +712,13 @@
                     min="1"
                     class="rounded-none"
                   />
-                  <button
+                  <jelly-button
                     type="button"
                     id="increaseQuantityBtn"
-                    class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-r-md border border-l-0 border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Increase quantity"
                   >
                     +
-                  </button>
+                  </jelly-button>
                 </div>
                 <!-- DISCOUNT TABLE HERE -->
                 <div id="discountTableContainer" class="mt-3 text-xs text-gray-600 hidden">
@@ -828,7 +822,7 @@
             <div class="field bg-indigo-50 rounded-md border border-indigo-100 p-4 mt-4">
               <label class="flex items-start gap-3 cursor-pointer">
                 <div class="flex items-center h-5">
-                  <input id="promoAddonCheckbox" name="promoAddonCheckbox" type="checkbox" class="w-4 h-4 text-indigo-600 bg-white border-gray-300 rounded focus:ring-indigo-500">
+                  <jelly-checkbox id="promoAddonCheckbox" name="promoAddonCheckbox"></jelly-checkbox>
                 </div>
                 <div class="text-sm">
                   <span class="font-medium text-indigo-900">Add Holographic Promo Sticker</span>
@@ -1059,13 +1053,14 @@
           ></div>
           <div class="field">
             <div class="control">
-              <button
+              <jelly-button
                 id="submitPaymentBtn"
-                class="button is-primary w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 disabled:opacity-75 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                class="w-full flex justify-center items-center gap-2"
+                variant="mint"
                 type="submit"
               >
                 <span>Pay & Process Order</span>
-              </button>
+              </jelly-button>
             </div>
           </div>
         </div>
