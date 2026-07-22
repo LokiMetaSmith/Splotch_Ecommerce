@@ -18,6 +18,7 @@ import {
 } from "./lib/image-processing.js";
 import { showNotification } from "./notifications.js";
 import { designLayers, activeLayerIndex, addLayer, removeLayer, moveLayer, setActiveLayer, getActiveLayer, clearLayers } from "./lib/layers.js";
+import Sortable from 'sortablejs';
 
 // index.js
 
@@ -2127,14 +2128,7 @@ function redrawAll() {
         // Apply translation offset during drawing decorations
         ctx.clearRect(0, 0, canvas.width, canvas.height); // wipe it
         
-        const activeTabId = getActiveLineId();
-        let customImageToDraw = null;
-        if (activeTabId && activeTabId !== "base" && activeTabId !== "cutline") {
-           const customLayer = customPrintLayers.find(l => l.id === activeTabId);
-           if (customLayer && customLayer.image) customImageToDraw = customLayer.image;
-        }
-
-        drawCanvasDecorations(currentBounds, { x: 0, y: 0 }, customImageToDraw);
+        drawCanvasDecorations(currentBounds, { x: 0, y: 0 }, null);
     }
     return;
   }
@@ -2177,10 +2171,8 @@ function redrawAll() {
     y: -currentBounds.top + padding,
   };
 
-  // Draw everything
-  drawPolygonsToCanvas(currentPolygons, "black", drawOffset);
-  drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
-  drawCanvasDecorations(currentBounds, drawOffset);
+  // Draw everything using drawCanvasDecorations which respects globalLayerOrder
+  drawCanvasDecorations(currentBounds, { x: 0, y: 0 }, null);
 
   // After redrawing, the bounds may have changed, so update the price.
   calculateAndUpdatePrice();
@@ -2566,14 +2558,14 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
 
   let drawOffset = offset;
 
+  // ALWAYS pad the canvas so measurement guides (rulers/text) don't get clipped.
+  // Scale padding based on canvas size so guides fit on high-res images.
+  const scale = Math.max(bounds.width, bounds.height) / 500;
+  const padding = Math.max(40, Math.round(40 * scale));
+
   // In Raster Mode (where basePolygons is empty), we need to handle canvas resizing
   // and restoring the clean image first to wipe old decorations.
   if (basePolygons.length === 0) {
-    // ALWAYS pad the canvas so measurement guides (rulers/text) don't get clipped.
-    // Scale padding based on canvas size so guides fit on high-res images.
-    const scale = Math.max(bounds.width, bounds.height) / 500;
-    const padding = Math.max(40, Math.round(40 * scale));
-    
     // Expand canvas to fit bounds + padding
     const logicalWidth = bounds.right - bounds.left + (padding * 2); 
     const logicalHeight = bounds.bottom - bounds.top + (padding * 2);
@@ -2594,27 +2586,53 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
       y: -bounds.top + padding + offset.y,
     };
 
-    if (customImageToDraw) {
-       ctx.save();
-       ctx.drawImage(customImageToDraw, drawOffset.x, drawOffset.y, customImageToDraw.width, customImageToDraw.height);
-       ctx.restore();
-    } else if (cleanCanvasState) {
-       restoreCleanState(drawOffset);
-    }
+    // Draw layers in globalLayerOrder
+    globalLayerOrder.forEach(layerId => {
+       if (layerId === "base") {
+           if (cleanCanvasState) restoreCleanState(drawOffset);
+       } else if (layerId === "cutline") {
+           if (currentCutline && currentCutline.length > 0) {
+               drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
+           }
+       } else {
+           const customLayer = customPrintLayers.find(l => l.id === layerId);
+           if (customLayer && customLayer.image) {
+               ctx.save();
+               ctx.drawImage(customLayer.image, drawOffset.x, drawOffset.y, customLayer.image.width, customLayer.image.height);
+               ctx.restore();
+           }
+       }
+    });
+
+  } else {
+    // Vector mode
+    drawOffset = {
+      x: -bounds.left + padding,
+      y: -bounds.top + padding,
+    };
+    // No need to clear here, it's done in redrawAll for vector mode.
+    // We also only want to draw if customImageToDraw logic isn't interfering, but we refactored it!
+    globalLayerOrder.forEach(layerId => {
+       if (layerId === "base") {
+           drawPolygonsToCanvas(currentPolygons, "black", drawOffset);
+       } else if (layerId === "cutline") {
+           if (currentCutline && currentCutline.length > 0) {
+               drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
+           }
+       } else {
+           const customLayer = customPrintLayers.find(l => l.id === layerId);
+           if (customLayer && customLayer.image) {
+               ctx.save();
+               ctx.drawImage(customLayer.image, drawOffset.x, drawOffset.y, customLayer.image.width, customLayer.image.height);
+               ctx.restore();
+           }
+       }
+    });
   }
 
   drawBoundingBox(bounds, drawOffset);
   drawSizeIndicator(bounds, drawOffset);
   drawRuler(bounds, drawOffset);
-
-  // In Raster Mode, we draw the cutline overlay manually
-  if (
-    basePolygons.length === 0 &&
-    currentCutline &&
-    currentCutline.length > 0
-  ) {
-    drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
-  }
 }
 
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
@@ -2711,14 +2729,23 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
 
 let layerTabsInitialized = false;
 let customPrintLayers = []; // Store custom layer objects { id, type, image, name, visible }
+let globalLayerOrder = ["base", "cutline"];
+let sortableInstance = null;
 
 function renderLayerTabs() {
   const layerTabsContainer = document.getElementById("layer-tabs");
   if (!layerTabsContainer) return;
 
-  // Only show if there's an image or svg loaded
-  if (!originalImage && basePolygons.length === 0) {
+  // Only show if there's an image or svg loaded AND easter egg is unlocked
+  if ((!originalImage && basePolygons.length === 0) || !easterEggUnlocked) {
     layerTabsContainer.style.display = "none";
+
+    // If not unlocked, also force hide the text/custom editing controls just in case
+    const textControls = document.getElementById("text-editing-controls");
+    const customControls = document.querySelector(".control-group-custom");
+    if (textControls) textControls.style.display = "none";
+    if (customControls) customControls.style.display = "none";
+
     return;
   }
 
@@ -2750,11 +2777,24 @@ function renderLayerTabs() {
 
   layerTabsContainer.innerHTML = ""; // Always rebuild to handle dynamic tabs
 
-  tabs.forEach((tab) => {
+  // Ensure globalLayerOrder contains all current tabs and no stale tabs
+  const tabIds = tabs.map(t => t.id);
+  globalLayerOrder = globalLayerOrder.filter(id => tabIds.includes(id));
+  tabIds.forEach(id => {
+      if (!globalLayerOrder.includes(id)) {
+          globalLayerOrder.push(id);
+      }
+  });
+
+  // Sort tabs array to match globalLayerOrder for visual rendering
+  const sortedTabs = globalLayerOrder.map(id => tabs.find(t => t.id === id)).filter(Boolean);
+
+  sortedTabs.forEach((tab) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = `layer-tab-${tab.id}`;
     btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 flex items-center gap-1`;
+    btn.setAttribute("data-id", tab.id);
 
     // Default style
     btn.style.color = tab.color;
@@ -2811,13 +2851,85 @@ function renderLayerTabs() {
   addBtn.className = `px-3 py-1 text-xs font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 border-b-0 rounded-t-lg transition-colors`;
   addBtn.textContent = "+";
   addBtn.title = "Add Layer";
-  addBtn.onclick = () => {
-    const type = prompt("Enter layer type (e.g., White, Clear):", "White");
-    if (type) {
-      addCustomLayer(type);
-    }
+  addBtn.classList.add('add-layer-btn'); // Add a class so Sortable can ignore it
+
+  // Create Dropdown Container
+  const dropdownContainer = document.createElement("div");
+  dropdownContainer.style.position = "relative";
+  dropdownContainer.style.display = "inline-block";
+
+  // Create Dropdown Menu
+  const dropdownMenu = document.createElement("div");
+  dropdownMenu.className = "layer-dropdown-menu";
+  dropdownMenu.style.display = "none";
+  dropdownMenu.style.position = "absolute";
+  dropdownMenu.style.backgroundColor = "white";
+  dropdownMenu.style.boxShadow = "0px 8px 16px 0px rgba(0,0,0,0.2)";
+  dropdownMenu.style.zIndex = "1";
+  dropdownMenu.style.minWidth = "120px";
+  dropdownMenu.style.borderRadius = "4px";
+  dropdownMenu.style.overflow = "hidden";
+  dropdownMenu.style.top = "100%";
+  dropdownMenu.style.left = "0";
+
+  const layerOptions = ["White", "Clear", "Holographic", "Glitter", "Text"];
+  layerOptions.forEach(optionText => {
+      const option = document.createElement("a");
+      option.textContent = optionText;
+      option.href = "#";
+      option.style.color = "black";
+      option.style.padding = "8px 12px";
+      option.style.textDecoration = "none";
+      option.style.display = "block";
+      option.style.fontSize = "12px";
+
+      option.onmouseover = () => option.style.backgroundColor = "#f1f1f1";
+      option.onmouseout = () => option.style.backgroundColor = "white";
+
+      option.onclick = (e) => {
+          e.preventDefault();
+          addCustomLayer(optionText);
+          dropdownMenu.style.display = "none";
+      };
+      dropdownMenu.appendChild(option);
+  });
+
+  addBtn.onclick = (e) => {
+      e.stopPropagation();
+      dropdownMenu.style.display = dropdownMenu.style.display === "block" ? "none" : "block";
   };
-  layerTabsContainer.appendChild(addBtn);
+
+  // Close the dropdown if the user clicks outside of it
+  document.addEventListener("click", function(event) {
+      if (dropdownContainer && !dropdownContainer.contains(event.target)) {
+          dropdownMenu.style.display = "none";
+      }
+  });
+
+  dropdownContainer.appendChild(addBtn);
+  dropdownContainer.appendChild(dropdownMenu);
+  layerTabsContainer.appendChild(dropdownContainer);
+
+  // Initialize SortableJS
+  if (sortableInstance) {
+      sortableInstance.destroy();
+  }
+
+  sortableInstance = new Sortable(layerTabsContainer, {
+      animation: 150,
+      filter: '.add-layer-btn', // Don't allow dragging the + button
+      onEnd: function (evt) {
+          // Rebuild globalLayerOrder based on the new DOM order
+          const newOrder = [];
+          const children = layerTabsContainer.children;
+          for (let i = 0; i < children.length; i++) {
+              const id = children[i].getAttribute("data-id");
+              if (id) newOrder.push(id);
+          }
+          globalLayerOrder = newOrder;
+          redrawAll();
+      }
+  });
 
   // Default to base design tab if nothing selected
   if (!selectedLegendTab) {
@@ -2860,14 +2972,25 @@ function updateEditingControlsForActiveLayer() {
   if (baseControls) baseControls.style.display = activeTabId === "base" ? "flex" : "none";
   if (cutlineControls) cutlineControls.style.display = activeTabId === "cutline" ? "flex" : "none";
   
-  // Custom Layers
+  const standardSizesControls = document.getElementById("standard-sizes-controls");
+  if (standardSizesControls) standardSizesControls.style.display = activeTabId === "base" ? "flex" : "none";
+
+  const textControls = document.getElementById("text-editing-controls");
+  const layer = customPrintLayers.find(l => l.id === activeTabId);
+  const isTextLayer = layer && layer.type === "text";
+
+  // Text layer controls
+  if (textControls) {
+    textControls.style.display = isTextLayer ? "block" : "none";
+  }
+
+  // Custom Layers (but not Text layer)
   if (customControls) {
-    if (activeTabId !== "base" && activeTabId !== "cutline") {
+    if (activeTabId !== "base" && activeTabId !== "cutline" && !isTextLayer) {
        customControls.style.display = "flex";
        // Update dropzone text if we have it
        const label = document.querySelector('label[for="imageUpload"]');
        if (label) {
-           const layer = customPrintLayers.find(l => l.id === activeTabId);
            label.textContent = `Upload image for ${layer ? layer.name : 'Custom'} Layer:`;
        }
     } else {
@@ -2900,43 +3023,8 @@ function deleteCustomLayer(id) {
 }
 
 function redrawAllForHighlight() {
-  // A lightweight redraw to just update the canvas decorations when hover state changes.
-  
-  const activeTabId = getActiveLineId();
-  let customImageToDraw = null;
-  if (activeTabId && activeTabId !== "base" && activeTabId !== "cutline") {
-     const customLayer = customPrintLayers.find(l => l.id === activeTabId);
-     if (customLayer && customLayer.image) customImageToDraw = customLayer.image;
-  }
-
-  if (basePolygons.length > 0) {
-    // For SVG Vector Mode
-    const drawOffset = {
-      x: -currentBounds.left + 20,
-      y: -currentBounds.top + 20,
-    };
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // In vector mode, we just draw the vector polygons for base design.
-    // If a custom image exists, maybe draw it instead? 
-    // Since custom masks are likely raster, we might need to handle them differently in vector mode.
-    // But for now, just draw base polygons unless it's a custom layer.
-    if (customImageToDraw) {
-       ctx.save();
-       const dpr = window.devicePixelRatio || 1;
-       ctx.drawImage(customImageToDraw, drawOffset.x, drawOffset.y, customImageToDraw.width, customImageToDraw.height);
-       ctx.restore();
-    } else {
-       drawPolygonsToCanvas(currentPolygons, "black", drawOffset);
-    }
-    
-    drawPolygonsToCanvas(currentCutline, "red", drawOffset, true);
-    drawCanvasDecorations(currentBounds, drawOffset);
-  } else if (originalImage) {
-    // For Raster Mode, we can just call drawCanvasDecorations which first restores the clean state
-    // But we pass customImageToDraw if we have one.
-    drawCanvasDecorations(currentBounds, { x: 0, y: 0 }, customImageToDraw);
-  }
+  // We can just reuse redrawAll because it respects the globalLayerOrder.
+  redrawAll();
 }
 
 function drawRuler(bounds, offset = { x: 0, y: 0 }) {
@@ -2953,6 +3041,13 @@ function handleAddText() {
     showNotification("Please load an image before adding text.", "error");
     return;
   }
+  const activeTabId = getActiveLineId();
+  const layer = customPrintLayers.find(l => l.id === activeTabId);
+  if (!layer || layer.type !== "text") {
+      showNotification("Please select a Text layer first.", "error");
+      return;
+  }
+
   const text = textInput.value;
   const size = parseInt(textSizeInput.value, 10);
   const color = textColorInput.value;
@@ -2961,12 +3056,27 @@ function handleAddText() {
     showNotification("Please enter valid text and size.", "error");
     return;
   }
-  ctx.font = `${size}px ${font}`;
-  ctx.fillStyle = color;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, (canvas.width / 2), (canvas.height / 2));
-  showNotification(`Text "${text}" added.`, "success");
+
+  // Draw text onto an offscreen canvas to use as the layer image
+  const textCanvas = document.createElement("canvas");
+  textCanvas.width = canvas.width;
+  textCanvas.height = canvas.height;
+  const textCtx = textCanvas.getContext("2d");
+
+  textCtx.font = `${size}px ${font}`;
+  textCtx.fillStyle = color;
+  textCtx.textAlign = "center";
+  textCtx.textBaseline = "middle";
+  textCtx.fillText(text, (textCanvas.width / 2), (textCanvas.height / 2));
+
+  // Set the text canvas as the image for the current text layer
+  const image = new Image();
+  image.onload = () => {
+      layer.image = image;
+      redrawAll();
+      showNotification(`Text "${text}" added to layer.`, "success");
+  };
+  image.src = textCanvas.toDataURL();
 }
 
 function handleClearImage() {
