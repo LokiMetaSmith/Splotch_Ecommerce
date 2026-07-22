@@ -957,6 +957,7 @@ async function BootStrap() {
       );
       const lazyLassoContainer = document.getElementById("lazyLassoContainer");
       const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+      const starterTemplatesSection = document.getElementById("starterTemplatesSection");
       layerControlsContainer = document.getElementById("layer-controls-container");
 
       if (grayBtn) {
@@ -996,6 +997,10 @@ async function BootStrap() {
 
       if (layerControlsContainer) {
         layerControlsContainer.style.display = "block";
+      }
+
+      if (starterTemplatesSection) {
+        starterTemplatesSection.style.display = "block";
       }
 
       updateEditingButtonsState(isDisabled);
