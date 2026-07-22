@@ -145,29 +145,49 @@ async function sanitizeSVGFile(filePath) {
 
 // Load pricing configuration
 let pricingConfig = {};
-try {
-    const pricingData = fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8');
-    pricingConfig = JSON.parse(pricingData);
+const pricingPath = path.join(__dirname, 'pricing.json');
 
-    // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
-    if (pricingConfig.complexity && pricingConfig.complexity.tiers) {
-        pricingConfig.complexity.tiers.sort((a, b) =>
-            a.thresholdInches === "Infinity"
-                ? 1
-                : b.thresholdInches === "Infinity"
-                    ? -1
-                    : a.thresholdInches - b.thresholdInches
-        );
-    }
-    if (pricingConfig.quantityDiscounts) {
-        pricingConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
-    }
+function loadPricingConfig() {
+    try {
+        const pricingData = fs.readFileSync(pricingPath, 'utf8');
+        const newConfig = JSON.parse(pricingData);
 
-    logger.info('[SERVER] Pricing configuration loaded.');
-} catch (error) {
-    logger.error('[SERVER] FATAL: Could not load pricing.json.', error);
-    process.exit(1);
+        // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
+        if (newConfig.complexity && newConfig.complexity.tiers) {
+            newConfig.complexity.tiers.sort((a, b) =>
+                a.thresholdInches === "Infinity"
+                    ? 1
+                    : b.thresholdInches === "Infinity"
+                        ? -1
+                        : a.thresholdInches - b.thresholdInches
+            );
+        }
+        if (newConfig.quantityDiscounts) {
+            newConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
+        }
+
+        pricingConfig = newConfig;
+        logger.info('[SERVER] Pricing configuration loaded/updated.');
+    } catch (error) {
+        if (Object.keys(pricingConfig).length === 0) {
+            logger.error('[SERVER] FATAL: Could not load pricing.json initially.', error);
+            process.exit(1);
+        } else {
+            logger.warn('[SERVER] Warning: Failed to reload pricing.json. Keeping previous config.', error.message);
+        }
+    }
 }
+
+// Initial load
+loadPricingConfig();
+
+// Watch for changes
+fs.watch(pricingPath, (eventType) => {
+    if (eventType === 'change') {
+        logger.info('[SERVER] pricing.json changed, reloading...');
+        loadPricingConfig();
+    }
+});
 
 import { randomBytes } from 'crypto';
 
@@ -762,8 +782,8 @@ async function startServer(
     });
 
     app.get('/api/pricing-info', (req, res) => {
-        // PERFORMANCE: Allow caching for 1 hour as pricing rarely changes
-        res.setHeader('Cache-Control', 'public, max-age=3600');
+        // PERFORMANCE: Temporarily disabled cache during development to allow pricing updates
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.json(pricingConfig);
     });
 

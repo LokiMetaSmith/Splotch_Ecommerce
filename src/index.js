@@ -507,6 +507,18 @@ async function BootStrap() {
   if (generateFromBaseBtn)
     generateFromBaseBtn.addEventListener("click", handleGenerateFromBase);
 
+  const customLayerTypeSelect = document.getElementById("customLayerTypeSelect");
+  if (customLayerTypeSelect) {
+    customLayerTypeSelect.addEventListener("change", (e) => {
+      const activeTabId = getActiveLineId();
+      if (!activeTabId || activeTabId === "base" || activeTabId === "cutline") return;
+      const layer = customPrintLayers.find((l) => l.id === activeTabId);
+      if (layer) {
+        layer.subType = e.target.value;
+      }
+    });
+  }
+
   function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -1018,6 +1030,9 @@ async function BootStrap() {
   
   // Signal for E2E tests that initialization is fully complete
   window.__appInitialized = true;
+
+  // Initialize layer tabs UI state (even without an image) so controls have a tab
+  renderLayerTabs();
 }
 
 // --- Main execution ---
@@ -1096,7 +1111,7 @@ function updateCompositeImage() {
     lastCalculatedPerimeterCutlineRef = cutline;
   }
 
-  const allCustomLayers = customPrintLayers.map(l => l.type);
+  const allCustomLayers = customPrintLayers.map(l => ({ type: l.type, subType: l.subType }));
 
   const priceResult = calculateStickerPrice(
     pricingConfig,
@@ -1256,7 +1271,7 @@ function populateResolutionDropdown() {
 
 async function fetchPricingInfo() {
   try {
-    const response = await fetch(`${serverUrl}/api/pricing-info`);
+    const response = await fetch(`${serverUrl}/api/pricing-info?t=${Date.now()}`);
     if (!response.ok) {
       throw new Error(`Server responded with ${response.status}`);
     }
@@ -1284,6 +1299,9 @@ async function fetchPricingInfo() {
     if (stickerMaterialSelect) {
       populateLayerDropdown(stickerMaterialSelect.value);
     }
+    
+    // Re-render layer tabs now that pricingConfig is loaded
+    renderLayerTabs();
   } catch (error) {
     console.error("[CLIENT] Error fetching pricing info:", error);
     showPaymentStatus(
@@ -1567,7 +1585,7 @@ async function handlePaymentFormSubmit(event) {
     const fileInput = document.getElementById("fileInput");
     const stickerName = fileInput && fileInput.files && fileInput.files.length > 0 ? fileInput.files[0].name : "Custom Sticker";
 
-    const allCustomLayers = customPrintLayers.map(l => l.type);
+    const allCustomLayers = customPrintLayers.map(l => ({ type: l.type, subType: l.subType }));
 
     // 4. Create JSON payload for the order
     const orderDetails = {
@@ -2741,19 +2759,6 @@ function renderLayerTabs() {
   const layerTabsContainer = document.getElementById("layer-tabs");
   if (!layerTabsContainer) return;
 
-  // Only show if there's an image or svg loaded AND easter egg is unlocked
-  if ((!originalImage && basePolygons.length === 0) || !easterEggUnlocked) {
-    layerTabsContainer.style.display = "none";
-
-    // If not unlocked, also force hide the text/custom editing controls just in case
-    const textControls = document.getElementById("text-editing-controls");
-    const customControls = document.querySelector(".control-group-custom");
-    if (textControls) textControls.style.display = "none";
-    if (customControls) customControls.style.display = "none";
-
-    return;
-  }
-
   layerTabsContainer.style.display = "flex";
 
   const tabs = [
@@ -2877,7 +2882,14 @@ function renderLayerTabs() {
   dropdownMenu.style.top = "100%";
   dropdownMenu.style.left = "0";
 
-  const layerOptions = ["White", "Clear", "Holographic", "Glitter", "Text"];
+  // Fallback options in case pricingConfig isn't loaded
+  let layerOptions = ["White", "Clear", "Inlay", "Text"];
+  if (typeof pricingConfig !== "undefined" && pricingConfig && pricingConfig.layers) {
+      layerOptions = pricingConfig.layers
+          .filter(l => l.id !== "cmyk")
+          .map(l => l.name);
+  }
+
   layerOptions.forEach(optionText => {
       const option = document.createElement("a");
       option.textContent = optionText;
@@ -2997,6 +3009,30 @@ function updateEditingControlsForActiveLayer() {
        const label = document.querySelector('label[for="imageUpload"]');
        if (label) {
            label.textContent = `Upload image for ${layer ? layer.name : 'Custom'} Layer:`;
+       }
+       // Update custom layer type select
+       const typeContainer = document.getElementById("customLayerTypeContainer");
+       const typeSelect = document.getElementById("customLayerTypeSelect");
+       if (typeContainer && typeSelect && layer && typeof pricingConfig !== "undefined" && pricingConfig && pricingConfig.layers) {
+         const pricingLayer = pricingConfig.layers.find(l => l.name.toLowerCase() === layer.type.toLowerCase() || l.id === layer.type);
+         if (pricingLayer && pricingLayer.subTypes && pricingLayer.subTypes.length > 0) {
+           typeContainer.style.display = "flex";
+           // Re-populate options if they changed (or if first time)
+           typeSelect.innerHTML = "";
+           pricingLayer.subTypes.forEach(sub => {
+             const option = document.createElement("option");
+             option.value = sub.id;
+             option.textContent = sub.name;
+             typeSelect.appendChild(option);
+           });
+           
+           if (!layer.subType) {
+               layer.subType = pricingLayer.subTypes[0].id;
+           }
+           typeSelect.value = layer.subType;
+         } else {
+           typeContainer.style.display = "none";
+         }
        }
     } else {
        customControls.style.display = "none";

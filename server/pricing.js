@@ -75,14 +75,28 @@ function calculateStickerPrice(
                 break;
             }
         }
-    }
-
-    let layerMultiplier = 1.0;
-    if (customLayers && customLayers.length > 0 && pricingConfig.layers) {
-        for (const layerId of customLayers) {
-            const layerConfig = pricingConfig.layers.find((l) => l.id === layerId);
-            if (layerConfig) {
-                layerMultiplier *= layerConfig.costMultiplier;
+        // Get layer multiplier
+        let layerMultiplier = 1.0;
+        if (customLayers && customLayers.length > 0 && pricingConfig.layers) {
+            for (const layerObj of customLayers) {
+                if (typeof layerObj === "string") {
+                    // Fallback for older data format
+                    const layerConfig = pricingConfig.layers.find((l) => l.id === layerObj || l.name === layerObj);
+                    if (layerConfig) layerMultiplier *= layerConfig.costMultiplier;
+                    continue;
+                }
+      
+                const layerConfig = pricingConfig.layers.find((l) => l.name === layerObj.type);
+                if (layerConfig) {
+                    layerMultiplier *= (layerConfig.costMultiplier || 1.0);
+        
+                    if (layerObj.subType && layerConfig.subTypes) {
+                        const subTypeConfig = layerConfig.subTypes.find(s => s.id === layerObj.subType);
+                        if (subTypeConfig && subTypeConfig.costMultiplier) {
+                            layerMultiplier *= subTypeConfig.costMultiplier;
+                        }
+                    }
+                }
             }
         }
     }

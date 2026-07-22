@@ -66,7 +66,7 @@
   "layers": [
     {
       "id": "white",
-      "name": "White Underbase",
+      "name": "White",
       "costMultiplier": 1.1
     },
     {
@@ -76,8 +76,24 @@
     },
     {
       "id": "clear",
-      "name": "Clear Coat",
+      "name": "Clear",
       "costMultiplier": 1.2
+    },
+    {
+      "id": "inlay",
+      "name": "Inlay",
+      "costMultiplier": 1.5,
+      "subTypes": [
+        { "id": "holographic", "name": "Holographic", "costMultiplier": 1.0 },
+        { "id": "glitter", "name": "Glitter", "costMultiplier": 1.2 },
+        { "id": "silver", "name": "Silver", "costMultiplier": 1.1 },
+        { "id": "gold", "name": "Gold", "costMultiplier": 1.1 }
+      ]
+    },
+    {
+      "id": "text",
+      "name": "Text",
+      "costMultiplier": 1.0
     }
   ],
   "complexity": {
