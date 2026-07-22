@@ -2810,19 +2810,35 @@ function renderLayerTabs() {
     layerTabsContainer.appendChild(btn);
   });
 
-  // Add the "+" tab
+  // Add the "+" tab as a jelly-menu
+  const menu = document.createElement("jelly-menu");
+  menu.setAttribute("placement", "bottom-end");
+
   const addBtn = document.createElement("button");
   addBtn.type = "button";
+  addBtn.slot = "trigger";
   addBtn.className = `px-3 py-1 text-xs font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 border-b-0 rounded-t-lg transition-colors`;
   addBtn.textContent = "+";
   addBtn.title = "Add Layer";
-  addBtn.onclick = () => {
-    const type = prompt("Enter layer type (e.g., White, Clear):", "White");
-    if (type) {
-      addCustomLayer(type);
+
+  menu.appendChild(addBtn);
+
+  if (pricingConfig && pricingConfig.layers) {
+    pricingConfig.layers.forEach((layer) => {
+      const item = document.createElement("jelly-menu-item");
+      item.setAttribute("value", layer.name);
+      item.textContent = layer.name;
+      menu.appendChild(item);
+    });
+  }
+
+  menu.addEventListener("select", (e) => {
+    if (e.detail && e.detail.value) {
+      addCustomLayer(e.detail.value);
     }
-  };
-  layerTabsContainer.appendChild(addBtn);
+  });
+
+  layerTabsContainer.appendChild(menu);
 
   // Default to base design tab if nothing selected
   if (!selectedLegendTab) {
