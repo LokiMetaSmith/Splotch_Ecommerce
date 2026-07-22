@@ -75,14 +75,17 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
         }
     }
 
-    const fontSize = 12;
-    const tickScale = 1;
+    const ppiScale = ppi / 96;
+    const fontSize = Math.max(12, Math.round(12 * ppiScale));
+    const tickScale = Math.max(1, ppiScale);
+    const lineWidth = Math.max(1, Math.round(1 * ppiScale));
+    const labelSpacingOffset = 2 * tickScale;
 
     ctx.save();
     ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
     ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
     ctx.font = `${fontSize}px Arial`;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = lineWidth;
 
     // Bolt Optimization: Batch drawing calls to reduce overhead
     // Top ruler
@@ -100,7 +103,7 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
         if (isMajorMark && i > 0) {
             const labelValue = (i / ticksPerMajor) * labelMultiplier;
             const label = `${Number.isInteger(labelValue) ? labelValue : labelValue.toFixed(1)}${labelSuffix}`;
-            ctx.fillText(label, x + 3, y - markHeight - 2);
+            ctx.fillText(label, x + 3 * tickScale, y - markHeight - labelSpacingOffset);
         }
     }
     ctx.stroke();
@@ -120,7 +123,7 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
         if (isMajorMark && i > 0) {
             const labelValue = (i / ticksPerMajor) * labelMultiplier;
             const label = `${Number.isInteger(labelValue) ? labelValue : labelValue.toFixed(1)}${labelSuffix}`;
-            ctx.fillText(label, x - markWidth - 5 - (ctx.measureText(label).width), y + (fontSize / 3));
+            ctx.fillText(label, x - markWidth - (5 * tickScale) - (ctx.measureText(label).width), y + (fontSize / 3));
         }
     }
     ctx.stroke();
