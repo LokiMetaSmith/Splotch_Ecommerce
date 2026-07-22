@@ -1,0 +1,14 @@
+--- index.html
++++ index.html
+@@ -636,8 +636,11 @@
+             >
+               3"
+             </button>
+-            <div class="ml-4 flex items-center">
+-              <jelly-switch id="unitToggle">in / mm</jelly-switch>
++            <div class="ml-4 flex items-center gap-2">
++              <span class="text-sm font-medium text-gray-700" aria-hidden="true">in</span>
++              <jelly-switch id="unitToggle" aria-label="Use Metric Units"></jelly-switch>
++              <span class="text-sm font-medium text-gray-700" aria-hidden="true">mm</span>
+             </div>
+           </div>

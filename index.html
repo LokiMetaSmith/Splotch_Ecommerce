@@ -467,15 +467,11 @@
               </div>
               <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
                 <span class="text-xs text-gray-500 mb-1">Cut Type</span>
-                <label for="cutTypeToggle" class="flex items-center cursor-pointer space-x-2">
+                <div class="flex items-center space-x-2">
                   <span class="text-xs font-bold text-gray-600">Edge</span>
-                  <div class="relative">
-                    <input type="checkbox" id="cutTypeToggle" class="sr-only peer" role="switch" aria-label="Toggle Cut Type">
-                    <div class="block bg-gray-600 w-14 h-8 rounded-full peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 transition-shadow"></div>
-                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
-                  </div>
+                  <jelly-switch id="cutTypeToggle" aria-label="Toggle Cut Type"></jelly-switch>
                   <span class="text-xs font-bold text-gray-600">Contour</span>
-                </label>
+                </div>
               </div>
               <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
                 <label
@@ -637,7 +633,9 @@
               3"
             </button>
             <div class="ml-4 flex items-center">
-              <jelly-switch id="unitToggle">in / mm</jelly-switch>
+              <span class="text-sm mr-2" aria-hidden="true">in</span>
+              <jelly-switch id="unitToggle" aria-label="Use Metric Units"></jelly-switch>
+              <span class="text-sm ml-2" aria-hidden="true">mm</span>
             </div>
           </div>
 
