@@ -28,7 +28,7 @@ export async function fetchCsrfToken() {
     if (loginStatus) {
       loginStatus.textContent =
         "A security token could not be loaded. Please refresh the page.";
-      loginStatus.style.color = "red";
+      loginStatus.classList.remove("text-blue-500", "text-green-500"); loginStatus.classList.add("text-red-500");
     }
   }
 }
@@ -46,7 +46,7 @@ export function displayOrders(orders, container, noOrdersMessage) {
     container.innerHTML = ""; // Clear content
     if (noOrdersMessage) {
       container.appendChild(noOrdersMessage); // Show the "no orders" message
-      noOrdersMessage.style.display = "block"; // Ensure visibility
+      noOrdersMessage.classList.remove("hidden"); // Ensure visibility
     }
     return;
   }
@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else if (requiresLogin === "true") {
     loginStatus.textContent =
       "Please verify your email via the magic link below to view your order history.";
-    loginStatus.style.color = "blue";
+    loginStatus.classList.remove("text-red-500", "text-green-500"); loginStatus.classList.add("text-blue-500");
   }
 
   // Privacy Event Listeners
@@ -209,7 +209,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const originalText = exportDataBtn.innerHTML;
       setButtonLoading(exportDataBtn, true, originalText, "Exporting...");
       privacyStatus.textContent = "Exporting data...";
-      privacyStatus.style.color = "blue";
+      privacyStatus.classList.remove("text-red-500", "text-green-500"); privacyStatus.classList.add("text-blue-500");
       try {
         const response = await fetch("/api/auth/user/data", {
           headers: {
@@ -230,10 +230,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
         privacyStatus.textContent = "Data exported successfully.";
-        privacyStatus.style.color = "green";
+        privacyStatus.classList.remove("text-red-500", "text-blue-500"); privacyStatus.classList.add("text-green-500");
       } catch (e) {
         privacyStatus.textContent = "Error exporting data: " + e.message;
-        privacyStatus.style.color = "red";
+        privacyStatus.classList.remove("text-blue-500", "text-green-500"); privacyStatus.classList.add("text-red-500");
       } finally {
         setButtonLoading(exportDataBtn, false, originalText);
       }
@@ -253,7 +253,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const originalText = deleteAccountBtn.innerHTML;
       setButtonLoading(deleteAccountBtn, true, originalText, "Deleting...");
       privacyStatus.textContent = "Deleting account...";
-      privacyStatus.style.color = "red";
+      privacyStatus.classList.remove("text-blue-500", "text-green-500"); privacyStatus.classList.add("text-red-500");
       try {
         const response = await fetch("/api/auth/user", {
           method: "DELETE",
@@ -267,7 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.location.href = "/";
       } catch (e) {
         privacyStatus.textContent = "Error deleting account: " + e.message;
-        privacyStatus.style.color = "red";
+        privacyStatus.classList.remove("text-blue-500", "text-green-500"); privacyStatus.classList.add("text-red-500");
         setButtonLoading(deleteAccountBtn, false, originalText);
       }
     });
@@ -280,7 +280,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const email = emailInput.value;
       if (!email) {
         loginStatus.textContent = "Please enter a valid email address.";
-        loginStatus.style.color = "red";
+        loginStatus.classList.remove("text-blue-500", "text-green-500"); loginStatus.classList.add("text-red-500");
         return;
       }
 
@@ -320,13 +320,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (response.ok) {
           success = true;
           loginStatus.textContent = "Magic link sent! Please check your email.";
-          loginStatus.style.color = "green";
+          loginStatus.classList.remove("text-red-500", "text-blue-500"); loginStatus.classList.add("text-green-500");
         } else {
           throw new Error(data.error || "Failed to send magic link.");
         }
       } catch (error) {
         loginStatus.textContent = `Error: ${error.message}`;
-        loginStatus.style.color = "red";
+        loginStatus.classList.remove("text-blue-500", "text-green-500"); loginStatus.classList.add("text-red-500");
       } finally {
         if (!success) {
           loginBtn.disabled = false;
@@ -390,7 +390,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       if (noOrdersMessage) {
         noOrdersMessage.textContent = `Error loading orders: ${error.message}`;
-        noOrdersMessage.style.color = "red";
+        noOrdersMessage.classList.remove("text-blue-500", "text-green-500"); noOrdersMessage.classList.add("text-red-500");
         ordersList.appendChild(noOrdersMessage);
       }
     }

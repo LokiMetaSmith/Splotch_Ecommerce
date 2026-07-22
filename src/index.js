@@ -203,9 +203,9 @@ async function BootStrap() {
       const errorDiv = document.createElement("div");
       errorDiv.textContent =
         "Critical error: Image canvas not found. Please refresh or contact support.";
-      errorDiv.style.color = "red";
-      errorDiv.style.padding = "20px";
-      errorDiv.style.textAlign = "center";
+      errorDiv.classList.remove("text-blue-500", "text-green-500"); errorDiv.classList.add("text-red-500");
+      errorDiv.classList.add("p-5");
+      errorDiv.classList.add("text-center");
       body.prepend(errorDiv);
     }
     return;
@@ -946,7 +946,7 @@ async function BootStrap() {
     if (!easterEggUnlocked) {
       easterEggUnlocked = true;
       const easterEggInput = document.getElementById("easterEggInput");
-      if (easterEggInput) easterEggInput.style.display = "block";
+      if (easterEggInput) easterEggInput.classList.remove("hidden");
 
       // Attempt to find elements again if globals are null
       const grayBtn = document.getElementById("grayscaleBtn");
@@ -961,20 +961,20 @@ async function BootStrap() {
       layerControlsContainer = document.getElementById("layer-controls-container");
 
       if (grayBtn) {
-        grayBtn.style.display = "block";
+        grayBtn.classList.remove("hidden");
       }
       if (sepBtn) {
-        sepBtn.style.display = "block";
+        sepBtn.classList.remove("hidden");
       }
 
       if (cutlineSensitivityContainer) {
-        cutlineSensitivityContainer.style.display = "flex";
+        cutlineSensitivityContainer.classList.remove("hidden");
       }
       if (lazyLassoContainer) {
-        lazyLassoContainer.style.display = "flex";
+        lazyLassoContainer.classList.remove("hidden");
       }
       if (generateCutlineBtn) {
-        generateCutlineBtn.style.display = "flex";
+        generateCutlineBtn.classList.remove("hidden");
       }
 
       const isDisabled = !originalImage && basePolygons.length === 0;
@@ -982,11 +982,11 @@ async function BootStrap() {
         if (isDisabled) {
           textContainer.hidden = true;
           textContainer.setAttribute("hidden", "");
-          textContainer.style.display = "none";
+          textContainer.classList.add("hidden");
         } else {
           textContainer.hidden = false;
           textContainer.removeAttribute("hidden");
-          textContainer.style.display = "block";
+          textContainer.classList.remove("hidden");
           // Also need to clear any inline style preventing display
           textContainer.style.cssText = textContainer.style.cssText.replace(
             /display:\s*none;?/g,
@@ -996,11 +996,11 @@ async function BootStrap() {
       }
 
       if (layerControlsContainer) {
-        layerControlsContainer.style.display = "block";
+        layerControlsContainer.classList.remove("hidden");
       }
 
       if (starterTemplatesSection) {
-        starterTemplatesSection.style.display = "block";
+        starterTemplatesSection.classList.remove("hidden");
       }
 
       updateEditingButtonsState(isDisabled);
@@ -1013,7 +1013,7 @@ async function BootStrap() {
   if (!productIdParam) {
     updateEditingButtonsState(!originalImage);
   }
-  if (designMarginNote) designMarginNote.style.display = "none";
+  if (designMarginNote) designMarginNote.classList.add("hidden");
   
   // Signal for E2E tests that initialization is fully complete
   window.__appInitialized = true;
@@ -1036,7 +1036,7 @@ function showAdBlockerWarning() {
   // For example, make a hidden div visible
   const warningBanner = document.getElementById("adblock-warning");
   if (warningBanner) {
-    warningBanner.style.display = "block";
+    warningBanner.classList.remove("hidden");
   }
 }
 
@@ -1349,9 +1349,9 @@ function checkInventoryStatus(materialId) {
   if (typeof qty === "number" && qty <= 0) {
     warningEl.textContent =
       "⚠️ Low Stock / Out of Stock - Order may be delayed.";
-    warningEl.style.display = "block";
+    warningEl.classList.remove("hidden");
   } else {
-    warningEl.style.display = "none";
+    warningEl.classList.add("hidden");
   }
 }
 
@@ -1672,7 +1672,7 @@ function showPaymentStatus(message, type = "info") {
     return;
   }
   paymentStatusContainer.textContent = message;
-  paymentStatusContainer.style.visibility = "visible";
+  paymentStatusContainer.classList.remove("invisible");
   paymentStatusContainer.classList.remove(
     "payment-success",
     "payment-error",
@@ -1782,22 +1782,22 @@ function updateEditingButtonsState(disabled) {
     }
   });
   if (designMarginNote)
-    designMarginNote.style.display = disabled ? "none" : "block";
+    disabled ? designMarginNote.classList.add("hidden") : designMarginNote.classList.remove("hidden");
   const textContainer = document.getElementById("text-editing-controls");
   if (textContainer) {
     if (!easterEggUnlocked) {
       textContainer.hidden = true;
       textContainer.setAttribute("hidden", "");
-      textContainer.style.display = "none";
+      textContainer.classList.add("hidden");
     } else {
       if (disabled) {
         textContainer.hidden = true;
         textContainer.setAttribute("hidden", "");
-        textContainer.style.display = "none";
+        textContainer.classList.add("hidden");
       } else {
         textContainer.hidden = false;
         textContainer.removeAttribute("hidden");
-        textContainer.style.display = "block";
+        textContainer.classList.remove("hidden");
         textContainer.style.cssText = textContainer.style.cssText.replace(
           /display:\s*none;?/g,
           "",
@@ -1816,31 +1816,31 @@ function updateEditingButtonsState(disabled) {
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
 
   if (!easterEggUnlocked) {
-    if (grayBtn) grayBtn.style.display = "none";
-    if (sepBtn) sepBtn.style.display = "none";
+    if (grayBtn) grayBtn.classList.add("hidden");
+    if (sepBtn) sepBtn.classList.add("hidden");
     if (cutlineSensitivityContainer)
-      cutlineSensitivityContainer.style.display = "none";
-    if (lazyLassoContainer) lazyLassoContainer.style.display = "none";
-    if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
+      cutlineSensitivityContainer.classList.add("hidden");
+    if (lazyLassoContainer) lazyLassoContainer.classList.add("hidden");
+    if (generateCutlineBtn) generateCutlineBtn.classList.add("hidden");
   } else {
     if (grayBtn) {
-      grayBtn.style.display = disabled ? "none" : "block";
+      disabled ? grayBtn.classList.add("hidden") : grayBtn.classList.remove("hidden");
     }
     if (sepBtn) {
-      sepBtn.style.display = disabled ? "none" : "block";
+      disabled ? sepBtn.classList.add("hidden") : sepBtn.classList.remove("hidden");
     }
     if (cutlineSensitivityContainer) {
-      cutlineSensitivityContainer.style.display = disabled ? "none" : "flex";
+      disabled ? cutlineSensitivityContainer.classList.add("hidden") : cutlineSensitivityContainer.classList.remove("hidden");
     }
     if (lazyLassoContainer) {
-      lazyLassoContainer.style.display = disabled ? "none" : "flex";
+      disabled ? lazyLassoContainer.classList.add("hidden") : lazyLassoContainer.classList.remove("hidden");
     }
     if (generateCutlineBtn) {
-      generateCutlineBtn.style.display = disabled ? "none" : "flex";
+      disabled ? generateCutlineBtn.classList.add("hidden") : generateCutlineBtn.classList.remove("hidden");
     }
   }
   if (canvasPlaceholder)
-    canvasPlaceholder.style.display = disabled ? "flex" : "none";
+    disabled ? canvasPlaceholder.classList.remove("hidden") : canvasPlaceholder.classList.add("hidden");
 }
 
 function setCanvasSize(logicalWidth, logicalHeight) {
@@ -2723,11 +2723,11 @@ function renderLayerTabs() {
 
   // Only show if there's an image or svg loaded
   if (!originalImage && basePolygons.length === 0) {
-    layerTabsContainer.style.display = "none";
+    layerTabsContainer.classList.add("hidden");
     return;
   }
 
-  layerTabsContainer.style.display = "flex";
+  layerTabsContainer.classList.remove("hidden");
 
   const tabs = [
     {
@@ -2764,7 +2764,7 @@ function renderLayerTabs() {
     // Default style
     btn.style.color = tab.color;
     btn.style.borderColor = tab.borderColor;
-    btn.style.fontFamily = "var(--font-baumans)";
+    btn.classList.add("font-baumans");
     btn.textContent = tab.label;
 
     if (tab.id !== "base" && tab.id !== "cutline") {
@@ -2810,19 +2810,35 @@ function renderLayerTabs() {
     layerTabsContainer.appendChild(btn);
   });
 
-  // Add the "+" tab
+  // Add the "+" tab as a jelly-menu
+  const menu = document.createElement("jelly-menu");
+  menu.setAttribute("placement", "bottom-end");
+
   const addBtn = document.createElement("button");
   addBtn.type = "button";
+  addBtn.slot = "trigger";
   addBtn.className = `px-3 py-1 text-xs font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 border-b-0 rounded-t-lg transition-colors`;
   addBtn.textContent = "+";
   addBtn.title = "Add Layer";
-  addBtn.onclick = () => {
-    const type = prompt("Enter layer type (e.g., White, Clear):", "White");
-    if (type) {
-      addCustomLayer(type);
+
+  menu.appendChild(addBtn);
+
+  if (pricingConfig && pricingConfig.layers) {
+    pricingConfig.layers.forEach((layer) => {
+      const item = document.createElement("jelly-menu-item");
+      item.setAttribute("value", layer.name);
+      item.textContent = layer.name;
+      menu.appendChild(item);
+    });
+  }
+
+  menu.addEventListener("select", (e) => {
+    if (e.detail && e.detail.value) {
+      addCustomLayer(e.detail.value);
     }
-  };
-  layerTabsContainer.appendChild(addBtn);
+  });
+
+  layerTabsContainer.appendChild(menu);
 
   // Default to base design tab if nothing selected
   if (!selectedLegendTab) {
@@ -2862,13 +2878,13 @@ function updateEditingControlsForActiveLayer() {
   const cutlineControls = document.querySelector(".control-group-cutline");
   const customControls = document.querySelector(".control-group-custom");
   
-  if (baseControls) baseControls.style.display = activeTabId === "base" ? "flex" : "none";
-  if (cutlineControls) cutlineControls.style.display = activeTabId === "cutline" ? "flex" : "none";
+  if (baseControls) activeTabId === "base" ? baseControls.classList.remove("hidden") : baseControls.classList.add("hidden");
+  if (cutlineControls) activeTabId === "cutline" ? cutlineControls.classList.remove("hidden") : cutlineControls.classList.add("hidden");
   
   // Custom Layers
   if (customControls) {
     if (activeTabId !== "base" && activeTabId !== "cutline") {
-       customControls.style.display = "flex";
+       customControls.classList.remove("hidden");
        // Update dropzone text if we have it
        const label = document.querySelector('label[for="imageUpload"]');
        if (label) {
@@ -2876,7 +2892,7 @@ function updateEditingControlsForActiveLayer() {
            label.textContent = `Upload image for ${layer ? layer.name : 'Custom'} Layer:`;
        }
     } else {
-       customControls.style.display = "none";
+       customControls.classList.add("hidden");
        const label = document.querySelector('label[for="imageUpload"]');
        if (label) label.textContent = "Upload Sticker Design Image:";
     }
@@ -3031,7 +3047,7 @@ function setTemplate(templateId) {
   if (rotateRightBtnEl) rotateRightBtnEl.disabled = isTemplate;
   const uploadSection = document.getElementById("uploadFileSection");
   if (uploadSection) {
-    uploadSection.style.display = isTemplate ? 'none' : 'block';
+    isTemplate ? uploadSection.classList.add("hidden") : uploadSection.classList.remove("hidden");
   }
   
   if (isTemplate) {
@@ -4215,11 +4231,11 @@ async function loadProductForBuyer(productId) {
 
       // Hide "Sell" button
       const sellBtn = document.getElementById("sellDesignBtn");
-      if (sellBtn) sellBtn.style.display = "none";
+      if (sellBtn) sellBtn.classList.add("hidden");
 
       // Hide Upload Input
       if (fileInputGlobalRef)
-        fileInputGlobalRef.closest(".field").style.display = "none";
+        fileInputGlobalRef.closest(".field").classList.add("hidden");
 
       // Show "Supporting" message
       if (product.creatorName) {

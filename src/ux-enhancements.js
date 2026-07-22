@@ -40,10 +40,10 @@ export function setupTooltips() {
   // White background, Navy border/text, rounded corners, shadow.
   tooltip.className =
     "fixed z-[10000] px-3 py-2 text-xs rounded shadow-lg pointer-events-none transition-opacity duration-200 opacity-0 border-2 border-splotch-navy bg-white text-splotch-navy";
-  tooltip.style.fontFamily = "var(--font-baumans)";
-  tooltip.style.fontWeight = "bold";
-  tooltip.style.borderColor = "var(--splotch-navy)";
-  tooltip.style.color = "var(--splotch-navy)";
+  tooltip.classList.add("font-baumans");
+  tooltip.classList.add("font-bold");
+  tooltip.classList.add("border-splotch-navy");
+  tooltip.classList.add("text-splotch-navy");
 
   // Create the arrow element
   const arrow = document.createElement("div");
@@ -103,15 +103,15 @@ export function setupTooltips() {
       // Border-bottom color should be Navy.
       arrow.style.top = "-16px"; // 2 * borderWidth
       arrow.style.bottom = "auto";
-      arrow.style.borderBottomColor = "var(--splotch-navy)";
-      arrow.style.borderTopColor = "transparent";
+      arrow.classList.add("border-b-splotch-navy"); arrow.classList.remove("border-t-splotch-navy");
+      arrow.classList.add("border-t-transparent");
     } else {
       // Tooltip is ABOVE. Arrow should be at BOTTOM, pointing DOWN.
       // Border-top color should be Navy.
       arrow.style.top = "auto";
       arrow.style.bottom = "-16px"; // 2 * borderWidth
-      arrow.style.borderTopColor = "var(--splotch-navy)";
-      arrow.style.borderBottomColor = "transparent";
+      arrow.classList.add("border-t-splotch-navy"); arrow.classList.remove("border-b-splotch-navy");
+      arrow.classList.add("border-b-transparent");
     }
 
     tooltip.classList.remove("opacity-0");
@@ -251,7 +251,7 @@ export function setupShortcutsHelp() {
   modal.setAttribute("aria-labelledby", "shortcutsModalTitle");
 
   modal.innerHTML = `
-    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4 transform transition-all scale-100" style="font-family: var(--font-baumans)">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4 transform transition-all scale-100 font-baumans">
       <div class="flex justify-between items-center mb-4 border-b pb-2">
         <h2 id="shortcutsModalTitle" class="text-xl font-bold text-splotch-navy">Keyboard Shortcuts</h2>
         <button type="button" class="close-modal text-gray-400 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded" aria-label="Close shortcuts modal">
