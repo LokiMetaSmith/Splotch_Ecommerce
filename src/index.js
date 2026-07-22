@@ -958,6 +958,7 @@ async function BootStrap() {
       );
       const lazyLassoContainer = document.getElementById("lazyLassoContainer");
       const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+      const starterTemplatesSection = document.getElementById("starterTemplatesSection");
       layerControlsContainer = document.getElementById("layer-controls-container");
 
       if (grayBtn) {
@@ -998,6 +999,8 @@ async function BootStrap() {
       if (layerControlsContainer) {
         layerControlsContainer.style.display = "block";
       }
+
+
 
       updateEditingButtonsState(isDisabled);
 
@@ -2855,6 +2858,7 @@ function renderLayerTabs() {
 
   // Create Dropdown Container
   const dropdownContainer = document.createElement("div");
+  dropdownContainer.className = "layer-dropdown-container";
   dropdownContainer.style.position = "relative";
   dropdownContainer.style.display = "inline-block";
 
@@ -2888,7 +2892,7 @@ function renderLayerTabs() {
 
       option.onclick = (e) => {
           e.preventDefault();
-          addCustomLayer(optionText);
+          addCustomLayer(optionText === "Text" ? "text" : optionText);
           dropdownMenu.style.display = "none";
       };
       dropdownMenu.appendChild(option);
@@ -2900,11 +2904,17 @@ function renderLayerTabs() {
   };
 
   // Close the dropdown if the user clicks outside of it
-  document.addEventListener("click", function(event) {
-      if (dropdownContainer && !dropdownContainer.contains(event.target)) {
-          dropdownMenu.style.display = "none";
+
+      if (window._closeDropdownListener) {
+          document.removeEventListener("click", window._closeDropdownListener);
       }
-  });
+      window._closeDropdownListener = function(event) {
+          if (dropdownContainer && !dropdownContainer.contains(event.target)) {
+              dropdownMenu.style.display = "none";
+          }
+      };
+      document.addEventListener("click", window._closeDropdownListener);
+
 
   dropdownContainer.appendChild(addBtn);
   dropdownContainer.appendChild(dropdownMenu);
@@ -2917,7 +2927,7 @@ function renderLayerTabs() {
 
   sortableInstance = new Sortable(layerTabsContainer, {
       animation: 150,
-      filter: '.add-layer-btn', // Don't allow dragging the + button
+      filter: '.layer-dropdown-container', // Don't allow dragging the + button
       onEnd: function (evt) {
           // Rebuild globalLayerOrder based on the new DOM order
           const newOrder = [];
