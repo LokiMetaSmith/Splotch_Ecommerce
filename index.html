@@ -20,66 +20,6 @@
     <!-- Your Tailwind CSS -->
     <link rel="stylesheet" href="./splotch-theme.css" />
     <!-- Your Splotch Theme CSS -->
-    <style>
-      .size-btn {
-        padding: 0.5rem 1rem;
-        border-radius: 0.375rem;
-        background-color: #f3f4f6;
-        border: 1px solid #d1d5db;
-        transition: background-color 0.2s;
-        cursor: pointer;
-      }
-      .size-btn:hover {
-        background-color: #e5e7eb;
-      }
-      .size-btn:focus-visible {
-        outline: 2px solid #2563eb;
-        outline-offset: 2px;
-        background-color: #e5e7eb;
-      }
-      /* Top Menu Bar CSS */
-      .top-menu-bar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        padding: 1rem;
-        display: flex;
-        justify-content: space-between;
-        pointer-events: none;
-        z-index: 9999;
-      }
-      .menu-item {
-        pointer-events: auto;
-        background: #2a284d; /* splotch-navy fallback */
-        background: var(--splotch-navy, #2a284d);
-        color: white;
-        padding: 0.75rem 1.5rem;
-        border-radius: 9999px;
-        font-family: var(--font-baumans, sans-serif);
-        font-weight: bold;
-        text-decoration: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition:
-          transform 0.2s,
-          background-color 0.2s;
-      }
-      .menu-item:hover {
-        transform: translateY(-2px);
-        background: #00a99d; /* splotch-teal fallback */
-        background: var(--splotch-teal, #00a99d);
-      }
-      .menu-item:focus-visible {
-        outline: 3px solid #ff003a; /* splotch-red */
-        outline-offset: 2px;
-      }
-
-      /* Toggle Switch CSS */
-      input:checked ~ .dot {
-        transform: translateX(100%);
-        background-color: #48bb78;
-      }
-    </style>
     <link
       href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap"
       rel="stylesheet"
@@ -99,18 +39,9 @@
     </nav>
     <div
       id="adblock-warning"
-      style="
-        display: none;
-        padding: 1rem;
-        background-color: #fffbe6;
-        border: 1px solid #facc15;
-        border-radius: 0.5rem;
-        color: #713f12;
-        margin: 1rem auto;
-        max-width: 800px;
-      "
+      class="hidden p-4 bg-yellow-50 border border-yellow-400 rounded-lg text-yellow-900 my-4 mx-auto max-w-[800px]"
     >
-      <p style="font-weight: bold">Payment Form Blocked 🛡️</p>
+      <p class="font-bold">Payment Form Blocked 🛡️</p>
       <p>
         It looks like an ad blocker is preventing our secure payment form from
         loading. Please disable it for this site to complete your purchase.
@@ -133,16 +64,13 @@
           </button>
         </div>
       </div>
-
       <!-- PeerJS Connection Status -->
       <div
         id="peerjs-status-container"
-        class="mb-4 p-3 rounded-md text-sm text-white bg-gray-400"
-        style="visibility: hidden; text-align: center"
+        class="mb-4 p-3 rounded-md text-sm text-white bg-gray-400 invisible text-center"
       >
         PeerJS Status: Initializing...
       </div>
-
       <form id="payment-form">
         <!-- Sticker Design and Options Box -->
         <div
@@ -151,16 +79,15 @@
           tabindex="-1"
         >
           <!-- STARTER TEMPLATES -->
-          <div class="field mb-6 border-b border-gray-200 pb-4" id="starterTemplatesSection" style="display: none;">
+          <div class="field mb-6 border-b border-gray-200 pb-4" id="starterTemplatesSection" class="hidden">
             <label class="label text-sm font-medium text-gray-700 block mb-2">Starter Templates:</label>
             <div class="flex flex-wrap gap-2">
               <button type="button" id="templateBlankBtn" class="template-btn active px-4 py-2 bg-indigo-100 text-indigo-700 rounded-md font-semibold text-sm border border-indigo-200 hover:bg-indigo-200 transition-colors focus:ring-2 focus:ring-indigo-500 outline-none" data-template="blank">Blank Canvas</button>
               <button type="button" id="templateHelloBtn" class="template-btn px-4 py-2 bg-white text-gray-700 rounded-md font-semibold text-sm border border-gray-300 hover:bg-gray-100 transition-colors focus:ring-2 focus:ring-indigo-500 outline-none" data-template="hello_badge">Hello Badge</button>
               <button type="button" id="templateThankYouBtn" class="template-btn px-4 py-2 bg-white text-gray-700 rounded-md font-semibold text-sm border border-gray-300 hover:bg-gray-100 transition-colors focus:ring-2 focus:ring-indigo-500 outline-none" data-template="thank_you">Thank You</button>
             </div>
-            <p class="text-xs text-gray-500 mt-2" style="font-family: var(--font-baumans)">Select a template to start with a predefined layout, or choose "Blank Canvas" to upload your own design.</p>
+            <p class="text-xs text-gray-500 mt-2 font-baumans">Select a template to start with a predefined layout, or choose "Blank Canvas" to upload your own design.</p>
           </div>
-
           <!-- UPLOAD STICKER FILE -->
           <div class="field mb-6" id="uploadFileSection">
             <label class="label text-sm font-medium text-gray-700" for="file"
@@ -177,7 +104,6 @@
                   aria-describedby="file-helper"
                 />
               </div>
-
               <button
                 type="button"
                 id="clearFileBtn"
@@ -204,24 +130,21 @@
             </div>
             <p
               id="file-helper"
-              class="text-xs text-gray-500 mt-1"
-              style="font-family: var(--font-baumans)"
+              class="text-xs text-gray-500 mt-1 font-baumans"
             >
               This is the main image for your sticker design.
             </p>
           </div>
-
           <!-- Canvas & Layer Editor -->
           <div class="flex flex-col lg:flex-row gap-4 mb-6">
             <!-- Canvas for Image Editing -->
             <div class="bg-gray-50 p-4 rounded-lg shadow-inner flex-grow min-w-0">
               <div
-
               id="canvas-container"
               class="relative w-fit mx-auto outline-none"
               contenteditable="true"
               inputmode="none"
-              style="caret-color: transparent"
+              class="caret-transparent"
             >
               <canvas
                 id="imageCanvas"
@@ -254,47 +177,38 @@
                   ></path>
                 </svg>
                 <p
-                  class="text-lg font-medium text-gray-600 pointer-events-none"
-                  style="font-family: var(--font-baumans)"
+                  class="text-lg font-medium text-gray-600 pointer-events-none font-baumans"
                 >
                   Drag & Drop Image Here
                 </p>
                 <p
-                  class="text-sm text-gray-500 mt-1 pointer-events-none"
-                  style="font-family: var(--font-baumans)"
+                  class="text-sm text-gray-500 mt-1 pointer-events-none font-baumans"
                 >
                   or click to upload
                 </p>
                 <p
-                  class="text-xs text-splotch-teal font-bold mt-2 pointer-events-none animate-pulse"
-                  style="font-family: var(--font-baumans)"
+                  class="text-xs text-splotch-teal font-bold mt-2 pointer-events-none animate-pulse font-baumans"
                 >
                   (Tip: Drag the mascot here to try it!)
                 </p>
               </div>
             </div>
-
             <!-- Interactive Layer Tabs -->
             <div
               id="layer-tabs"
-              class="flex justify-center gap-2 mt-4 transition-opacity duration-300"
-              style="display: none"
+              class="flex justify-center gap-2 mt-4 transition-opacity duration-300 hidden"
             >
               <!-- Populated by JS -->
             </div>
             <p
               id="designMarginNote"
-              class="text-xs text-splotch-red bg-white border border-red-200 rounded-full shadow-sm px-3 py-1.5 mx-auto mt-4 w-fit"
-              style="font-family: var(--font-baumans); display: none"
+              class="text-xs text-splotch-red bg-white border border-red-200 rounded-full shadow-sm px-3 py-1.5 mx-auto mt-4 w-fit font-baumans hidden"
               contenteditable="false"
             >
               Keep important elements 2-3mm from edge!
             </p>
             </div>
-            
-
           </div>
-
           <!-- Basic Image Editing Controls -->
           <div
             id="editing-controls"
@@ -307,13 +221,7 @@
                 id="rotateLeftBtn"
                 data-tooltip="Rotate Left 90°"
                 aria-label="Rotate Left"
-                class="justify-self-center flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy"
-                style="
-                  width: 3rem !important;
-                  height: 3rem !important;
-                  padding: 0 !important;
-                  border-radius: 50% !important;
-                "
+                class="justify-self-center flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy !w-12 !h-12 !p-0 !rounded-full"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -360,13 +268,7 @@
                 id="rotateRightBtn"
                 data-tooltip="Rotate Right 90°"
                 aria-label="Rotate Right"
-                class="justify-self-center flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy"
-                style="
-                  width: 3rem !important;
-                  height: 3rem !important;
-                  padding: 0 !important;
-                  border-radius: 50% !important;
-                "
+                class="justify-self-center flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy !w-12 !h-12 !p-0 !rounded-full"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -499,8 +401,7 @@
               id="grayscaleBtn"
               data-tooltip="Apply Grayscale Filter"
               aria-pressed="false"
-              class="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded"
-              style="display: none"
+              class="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy rounded hidden"
             >
               Grayscale
             </button>
@@ -509,13 +410,12 @@
               id="sepiaBtn"
               data-tooltip="Apply Sepia Filter"
               aria-pressed="false"
-              class="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red rounded"
-              style="display: none"
+              class="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red rounded hidden"
             >
               Sepia
             </button>
             <!-- Cutline Controls -->
-            <div class="control-group-cutline flex flex-wrap justify-center items-center gap-4" style="display: none;">
+            <div class="control-group-cutline flex flex-wrap justify-center items-center gap-4 hidden">
               <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
                 <span class="text-xs text-gray-500 mb-1">Shape</span>
                 <select id="cutShapeSelect" class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500">
@@ -559,7 +459,6 @@
                   >
                 </div>
               </div>
-              
               <!-- Bleed Gradient Controls -->
               <div class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]">
                 <span class="text-xs text-gray-500 mb-1">Bleed Gradient</span>
@@ -580,11 +479,9 @@
                   />
                 </div>
               </div>
-              
               <div
                 id="cutlineSensitivityContainer"
-                style="display: none"
-                class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
+                class="hidden flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
               >
                 <label
                   for="cutlineSensitivitySlider"
@@ -611,8 +508,7 @@
               </div>
               <div
                 id="lazyLassoContainer"
-                style="display: none"
-                class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
+                class="hidden flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
               >
                 <label for="lazyLassoSlider" class="text-xs text-gray-500 mb-1"
                   >Lazy Lasso</label
@@ -638,16 +534,14 @@
               <button
                 type="button"
                 id="generateCutlineBtn"
-                style="display: none"
-                class="bg-teal-500 text-white flex justify-center items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500 w-full sm:w-auto"
+                class="hidden bg-teal-500 text-white flex justify-center items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500 w-full sm:w-auto"
                 data-tooltip="Generate Cutline from Image Alpha"
               >
                 Generate Smart Cutline
               </button>
             </div>
-
             <!-- Custom Layer Controls -->
-            <div class="control-group-custom flex flex-wrap justify-center items-center gap-4" style="display: none;">
+            <div class="control-group-custom flex flex-wrap justify-center items-center gap-4 hidden">
               <button
                 type="button"
                 id="generateFromBaseBtn"
@@ -658,18 +552,15 @@
               </button>
             </div>
           </div>
-
-
           <!-- Text Editing Controls -->
           <div
             id="text-editing-controls"
             class="my-6 p-4 border border-gray-200 rounded-md shadow-sm bg-slate-100"
             hidden
-            style="display: none"
+            class="hidden"
           >
             <h3
-              class="text-lg font-semibold text-splotch-navy mb-3"
-              style="font-family: var(--font-modak)"
+              class="text-lg font-semibold text-splotch-navy mb-3 font-modak"
             >
               Add Text to Sticker
             </h3>
@@ -679,8 +570,7 @@
               <div>
                 <label
                   for="textInput"
-                  class="block text-sm font-medium text-splotch-navy"
-                  style="font-family: var(--font-baumans)"
+                  class="block text-sm font-medium text-splotch-navy font-baumans"
                   >Text:</label
                 >
                 <input
@@ -693,8 +583,7 @@
               <div>
                 <label
                   for="textSizeInput"
-                  class="block text-sm font-medium text-splotch-navy"
-                  style="font-family: var(--font-baumans)"
+                  class="block text-sm font-medium text-splotch-navy font-baumans"
                   >Size (px):</label
                 >
                 <div class="flex items-center gap-2 mt-1">
@@ -720,26 +609,20 @@
               <div>
                 <label
                   for="textColorInput"
-                  class="block text-sm font-medium text-splotch-navy"
-                  style="font-family: var(--font-baumans)"
+                  class="block text-sm font-medium text-splotch-navy font-baumans"
                   >Color:</label
                 >
                 <input
                   type="color"
                   id="textColorInput"
                   value="#2A284D"
-                  class="input mt-1 h-10 w-full p-1 border-2 rounded-md cursor-pointer"
-                  style="border-color: var(--splotch-navy)"
+                  class="input mt-1 h-10 w-full p-1 border-2 rounded-md cursor-pointer border-splotch-navy"
                 />
               </div>
               <button
                 type="button"
                 id="addTextBtn"
-                class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2.5 px-4 rounded-full shadow-md transition duration-150 ease-in-out transform hover:scale-105 self-end focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red"
-                style="
-                  font-family: var(--font-baumans);
-                  text-transform: uppercase;
-                "
+                class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2.5 px-4 rounded-full shadow-md transition duration-150 ease-in-out transform hover:scale-105 self-end focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red font-baumans uppercase"
               >
                 Add Text
               </button>
@@ -747,69 +630,65 @@
             <div class="mt-4">
               <label
                 for="textFontFamily"
-                class="block text-sm font-medium text-splotch-navy"
-                style="font-family: var(--font-baumans)"
+                class="block text-sm font-medium text-splotch-navy font-baumans"
                 >Font:</label
               >
               <select id="textFontFamily" class="input mt-1 w-full md:w-1/2">
-                <option value="Arial" style="font-family: Arial, sans-serif">
+                <option value="Arial" class="[font-family:Arial,sans-serif]">
                   Arial
                 </option>
                 <option
                   value="Verdana"
-                  style="font-family: Verdana, sans-serif"
+                  class="[font-family:Verdana,sans-serif]"
                 >
                   Verdana
                 </option>
                 <option
                   value="Times New Roman"
-                  style="font-family: &quot;Times New Roman&quot;, serif"
+                  class="[font-family:'Times_New_Roman',serif]"
                 >
                   Times New Roman
                 </option>
                 <option
                   value="Courier New"
-                  style="font-family: &quot;Courier New&quot;, monospace"
+                  class="[font-family:'Courier_New',monospace]"
                 >
                   Courier New
                 </option>
-                <option value="Georgia" style="font-family: Georgia, serif">
+                <option value="Georgia" class="[font-family:Georgia,serif]">
                   Georgia
                 </option>
                 <option
                   value="Modak"
-                  style="font-family: &quot;Modak&quot;, cursive"
+                  class="font-modak"
                 >
                   Modak (Display)
                 </option>
                 <option
                   value="Baumans"
-                  style="font-family: &quot;Baumans&quot;, sans-serif"
+                  class="font-baumans"
                 >
                   Baumans (Body)
                 </option>
                 <option
                   value="Monofett"
-                  style="font-family: &quot;Monofett&quot;, cursive"
+                  class="font-monofett"
                 >
                   Monofett (Display)
                 </option>
               </select>
             </div>
             <p
-              class="text-xs text-gray-500 mt-2"
-              style="font-family: var(--font-baumans)"
+              class="text-xs text-gray-500 mt-2 font-baumans"
             >
               Note: Text is added to the center. Advanced text positioning may
               require other tools.
             </p>
           </div>
-
           <!-- Sticker Options -->
           <div class="space-y-4">
             <h3
-              class="text-xl font-semibold text-splotch-navy pt-2"
-              style="font-family: var(--font-modak)"
+              class="text-xl font-semibold text-splotch-navy pt-2 font-modak"
             >
               Sticker Options
             </h3>
@@ -836,7 +715,7 @@
                     type="number"
                     value="50"
                     min="1"
-                    style="border-radius: 0"
+                    class="rounded-none"
                   />
                   <button
                     type="button"
@@ -891,8 +770,7 @@
                 </div>
                 <p
                   id="material-helper"
-                  class="text-xs text-gray-500 mt-1"
-                  style="font-family: var(--font-baumans)"
+                  class="text-xs text-gray-500 mt-1 font-baumans"
                 >
                   Standard PP: Up to 1 yr outdoor. PVC: 5-7 yrs outdoor,
                   laminated.
@@ -916,8 +794,7 @@
                 </div>
                 <p
                   id="resolution-helper"
-                  class="text-xs text-gray-500 mt-1"
-                  style="font-family: var(--font-baumans)"
+                  class="text-xs text-gray-500 mt-1 font-baumans"
                 >
                   Higher DPI (Dots Per Inch) results in a sharper, higher
                   quality print.
@@ -942,16 +819,12 @@
               </div>
               <p
                 id="cutline-helper"
-                class="text-xs text-gray-500 mt-1"
-                style="font-family: var(--font-baumans)"
+                class="text-xs text-gray-500 mt-1 font-baumans"
               >
                 For custom shapes, please provide a vector cut line (.ai, .svg,
                 .eps, .pdf). We can assist if needed (additional fee may apply).
               </p>
             </div>
-
-
-
             <div class="field bg-indigo-50 rounded-md border border-indigo-100 p-4 mt-4">
               <label class="flex items-start gap-3 cursor-pointer">
                 <div class="flex items-center h-5">
@@ -964,7 +837,6 @@
                 </div>
               </label>
             </div>
-
             <div class="field mt-4 border-t border-gray-200 pt-4">
               <div class="flex justify-between items-end mb-2">
                 <span class="label text-sm font-medium text-gray-700"
@@ -982,28 +854,22 @@
           </div>
           <!-- End Sticker Options -->
         </div>
-
         <div
           id="payment-status-container"
-          class="mb-4 p-3 rounded-md text-sm text-white"
-          style="visibility: hidden"
+          class="mb-4 p-3 rounded-md text-sm text-white invisible"
           role="alert"
           aria-live="polite"
         ></div>
-
         <!-- Payment Status and IPFS Link Containers -->
         <div
           id="ipfsLinkContainer"
-          class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow"
-          style="visibility: hidden; word-wrap: break-word"
+          class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow invisible break-words"
         ></div>
-
         <!-- Payment Form -->
         <div class="space-y-6 bg-gray-50 p-6 rounded-lg shadow-md">
           <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">
             Order Your Custom Stickers & Pay
           </h2>
-
           <h3 class="text-lg font-semibold text-gray-700 mt-6 pt-4 border-t">
             Billing Information
           </h3>
@@ -1014,8 +880,7 @@
                 for="firstName"
                 >First Name
                 <span
-                  class="text-red-500"
-                  style="color: var(--splotch-red) !important"
+                  class="text-red-500 text-splotch-red"
                   aria-hidden="true"
                   >*</span
                 ></label
@@ -1039,8 +904,7 @@
                 for="lastName"
                 >Last Name
                 <span
-                  class="text-red-500"
-                  style="color: var(--splotch-red) !important"
+                  class="text-red-500 text-splotch-red"
                   aria-hidden="true"
                   >*</span
                 ></label
@@ -1062,8 +926,7 @@
               <label class="label text-sm font-medium text-gray-700" for="email"
                 >Email
                 <span
-                  class="text-red-500"
-                  style="color: var(--splotch-red) !important"
+                  class="text-red-500 text-splotch-red"
                   aria-hidden="true"
                   >*</span
                 ></label
@@ -1102,8 +965,7 @@
                 for="address"
                 >Address
                 <span
-                  class="text-red-500"
-                  style="color: var(--splotch-red) !important"
+                  class="text-red-500 text-splotch-red"
                   aria-hidden="true"
                   >*</span
                 ></label
@@ -1125,8 +987,7 @@
               <label class="label text-sm font-medium text-gray-700" for="city"
                 >City
                 <span
-                  class="text-red-500"
-                  style="color: var(--splotch-red) !important"
+                  class="text-red-500 text-splotch-red"
                   aria-hidden="true"
                   >*</span
                 ></label
@@ -1148,8 +1009,7 @@
               <label class="label text-sm font-medium text-gray-700" for="state"
                 >State
                 <span
-                  class="text-red-500"
-                  style="color: var(--splotch-red) !important"
+                  class="text-red-500 text-splotch-red"
                   aria-hidden="true"
                   >*</span
                 ></label
@@ -1173,8 +1033,7 @@
                 for="postalCode"
                 >Postal Code
                 <span
-                  class="text-red-500"
-                  style="color: var(--splotch-red) !important"
+                  class="text-red-500 text-splotch-red"
                   aria-hidden="true"
                   >*</span
                 ></label
@@ -1215,7 +1074,6 @@
           class="mt-6 p-4 border rounded-md text-sm bg-gray-50 shadow"
         ></div>
       </form>
-
       <!-- Product Creation Modal -->
       <div
         id="productModal"
@@ -1302,7 +1160,6 @@
         </div>
       </div>
     </main>
-
     <footer class="bg-white shadow-md mt-8">
       <div class="container mx-auto px-6 py-3 text-center text-gray-500">
         &copy; 2025 Splotch |
@@ -1311,7 +1168,6 @@
         >
        | <span class="text-xs text-gray-400 ml-2">v<span class="app-version-display"></span></span></div>
     </footer>
-
     <div
       id="mascot-container"
       title="Hi! I'm the Splotch Mascot!"
