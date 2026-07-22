@@ -8,7 +8,7 @@ import { calculateStickerPrice, generateSvgFromCutline } from '../src/lib/pricin
 
 // Define a test configuration that mirrors the production config structure
 const pricingConfig = {
-    "pricePerSquareInchCents": 13,
+    "pricePerSquareInchCents": 15,
     "resolutions": [
         { "id": "dpi_96", "name": "96 DPI (Draft)", "ppi": 96, "costMultiplier": 1.0 },
         { "id": "dpi_300", "name": "300 DPI (Standard)", "ppi": 300, "costMultiplier": 1.3 }
