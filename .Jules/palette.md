@@ -25,3 +25,7 @@
 ## 2026-03-10 - Explicit Modal ARIA Attributes
 **Learning:** Custom HTML modal implementations (like `#login-modal` containers) require explicit `role="dialog"`, `aria-modal="true"`, and an `aria-labelledby` attribute pointing to the modal's title ID to ensure proper screen reader accessibility. Without these, screen readers may not announce the content appropriately as an active dialog box.
 **Action:** Always include `role="dialog"`, `aria-modal="true"`, and `aria-labelledby="[TitleID]"` on dynamically toggled or custom-built modal containers.
+
+## 2026-07-23 - Explaining Technical Terms using Tooltips
+**Learning:** Using an `(i)` info icon next to technical labels (like "Lazy Lasso" or "Edge Sensitivity") is an excellent way to provide explanations through tooltips without cluttering the UI with permanent helper text. Placing the `data-tooltip` on the `(i)` icon rather than the input itself clarifies what is being explained.
+**Action:** When encountering potentially confusing or technical terminology in the interface, add an `(i)` icon with a `cursor-help` class and a `data-tooltip` containing a brief, clear explanation next to the corresponding label.
