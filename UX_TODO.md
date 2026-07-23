@@ -18,7 +18,7 @@ This is a list of proposed UX improvements for the Print Shop interface, ordered
 - [ ] **Visual Feedback:** Add a loading spinner or progress bar to the [GENERATE SMART CUTLINE] button.
 - [ ] **Real-time Preview:** If possible, decouple the sliders to update the cutline in real-time as the user scrubs them.
 - [ ] **Information Architecture:** Group settings better (e.g. "Shape/Size" for Magic Edge, "Detail/Smoothing" for Sensitivity and Lasso).
-- [ ] **Tooltips:** Add (i) icons with tooltips explaining technical terms like "Lazy Lasso".
+- [x] **Tooltips:** Add (i) icons with tooltips explaining technical terms like "Lazy Lasso".
 - [ ] **Smart Presets:** Add preset buttons (Tight, Bubble, Smooth) for one-click configuration of edge and sensitivity sliders.
 - [ ] **Contrast Toggle:** Add a button to toggle the canvas background between light, dark, and transparent to help see edges better.
 - [ ] **Manual Node Editing (Advanced):** Allow users to click and drag specific points on the generated path to tweak the cutline.
