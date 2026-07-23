@@ -2016,7 +2016,8 @@ function handleCustomLayerUpload(event) {
 function reprocessCustomLayer(layer) {
   if (!layer.originalImage) return;
   
-  processCustomLayerMask(layer.originalImage, layer.alphaColorHex, layer.maskColorHex).then(processedImg => {
+  const isCmyk = layer.type === "cmyk artwork" || layer.type === "cmyk";
+  processCustomLayerMask(layer.originalImage, layer.alphaColorHex, layer.maskColorHex, !isCmyk).then(processedImg => {
     layer.image = processedImg;
     redrawAll();
     showNotification(`Mask applied for ${layer.name}.`, "success");

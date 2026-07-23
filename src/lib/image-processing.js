@@ -683,7 +683,7 @@ export function filterInternalContours(
   return result;
 }
 
-export function processCustomLayerMask(img, alphaColorHex, maskColorHex) {
+export function processCustomLayerMask(img, alphaColorHex, maskColorHex, isGrayscale = true) {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
     canvas.width = img.width || img.naturalWidth;
@@ -715,10 +715,12 @@ export function processCustomLayerMask(img, alphaColorHex, maskColorHex) {
         continue;
       }
 
-      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-      data[i] = gray;
-      data[i + 1] = gray;
-      data[i + 2] = gray;
+      if (isGrayscale) {
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        data[i] = gray;
+        data[i + 1] = gray;
+        data[i + 2] = gray;
+      }
     }
 
     ctx.putImageData(imageData, 0, 0);

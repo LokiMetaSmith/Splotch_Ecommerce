@@ -68,6 +68,8 @@ h2[style*="var(--font-modak)"] {
     -webkit-text-stroke: 1.5px var(--splotch-white) !important;
     text-shadow: 2px 2px 0px var(--splotch-teal) !important;
     letter-spacing: 0.5px;
+    font-size: var(--step-4) !important;
+    line-height: 1.2 !important;
 }
 
 form h2.text-xl { /* Form Subtitle: "Payment Information" */

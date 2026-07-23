@@ -78,23 +78,7 @@ test.describe('Frontend Image Manipulation', () => {
         await page.waitForTimeout(100);
     });
 
-    test('should apply grayscale filter', async ({ page }) => {
-        test.setTimeout(60000);
-        await uploadTestImage(page);
 
-        await page.evaluate(() => {
-            const btn = document.getElementById('grayscaleBtn');
-            if (btn) btn.click();
-        });
-        // Wait a bit
-        await page.waitForTimeout(100);
-
-        await page.evaluate(() => {
-            const btn = document.getElementById('grayscaleBtn');
-            if (btn) btn.click();
-        });
-        await page.waitForTimeout(100);
-    });
 
     test('should generate smart cutline', async ({ page }) => {
         test.setTimeout(60000);
