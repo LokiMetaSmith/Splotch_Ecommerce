@@ -15,6 +15,7 @@ import {
   smoothPolygon,
   imageHasTransparentBorder,
   filterInternalContours,
+  processCustomLayerMask,
 } from "./lib/image-processing.js";
 import { showNotification } from "./notifications.js";
 import { designLayers, activeLayerIndex, addLayer, removeLayer, moveLayer, setActiveLayer, getActiveLayer, clearLayers } from "./lib/layers.js";
@@ -85,7 +86,11 @@ let textInput,
   cutlineSensitivitySlider,
   cutlineSensitivityValueDisplay,
   lazyLassoSlider,
-  lazyLassoValueDisplay;
+  lazyLassoValueDisplay,
+  customLayerImageUpload,
+  alphaColorPicker,
+  maskColorPicker,
+  cutTypeSelect;
 let cutlineSensitivity = 42; // Default sensitivity
 let  stickerMaterialSelect,
   stickerResolutionSelect,
@@ -239,6 +244,10 @@ async function BootStrap() {
   paymentFormGlobalRef = document.getElementById("payment-form");
   submitPaymentBtn = document.getElementById("submitPaymentBtn");
   canvasPlaceholder = document.getElementById("canvas-placeholder");
+  customLayerImageUpload = document.getElementById("customLayerImageUpload");
+  alphaColorPicker = document.getElementById("alphaColorPicker");
+  maskColorPicker = document.getElementById("maskColorPicker");
+  cutTypeSelect = document.getElementById("cutTypeSelect");
 
   widthInputEl = document.getElementById("widthInput");
   heightInputEl = document.getElementById("heightInput");
@@ -771,6 +780,41 @@ async function BootStrap() {
   if (fileInputGlobalRef) {
     fileInputGlobalRef.addEventListener("change", handleFileChange);
   }
+
+  if (customLayerImageUpload) {
+    customLayerImageUpload.addEventListener("change", handleCustomLayerUpload);
+  }
+  
+  if (alphaColorPicker) {
+    alphaColorPicker.addEventListener("input", (e) => {
+      const activeLayer = getActiveLayer();
+      if (activeLayer) {
+        activeLayer.alphaColorHex = e.target.value;
+        if (activeLayer.originalImage) {
+          reprocessCustomLayer(activeLayer);
+        }
+      }
+    });
+  }
+  
+  if (maskColorPicker) {
+    maskColorPicker.addEventListener("input", (e) => {
+      const activeLayer = getActiveLayer();
+      if (activeLayer) {
+        activeLayer.maskColorHex = e.target.value;
+        if (activeLayer.originalImage) {
+          reprocessCustomLayer(activeLayer);
+        }
+      }
+    });
+  }
+
+  if (cutTypeSelect) {
+    cutTypeSelect.addEventListener("change", () => {
+      calculateAndUpdatePrice();
+    });
+  }
+
 
   // Add paste listeners to the canvas
   if (canvas) {
@@ -1596,6 +1640,7 @@ async function handlePaymentFormSubmit(event) {
         ? parseInt(stickerQuantityInput.value, 10)
         : 0,
       material: stickerMaterialSelect ? stickerMaterialSelect.value : "unknown",
+      cutType: cutTypeSelect ? cutTypeSelect.value : "die_cut",
       stickerName: stickerName,
       promoAddon: promoAddonCheckbox ? promoAddonCheckbox.checked : false,
       customLayers: allCustomLayers.length > 0 ? allCustomLayers : null,
@@ -1942,6 +1987,45 @@ function restoreCleanState(drawOffset = { x: 0, y: 0 }) {
 }
 
 // --- Image Loading and Editing Functions ---
+function handleCustomLayerUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const activeLayer = getActiveLayer();
+  if (!activeLayer || activeLayer.id === "base" || activeLayer.id === "cutline" || activeLayer.type === "text") {
+    showNotification("Please select a Custom Layer first.", "error");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      activeLayer.originalImage = img;
+      if (!activeLayer.alphaColorHex) activeLayer.alphaColorHex = alphaColorPicker ? alphaColorPicker.value : "#ffffff";
+      if (!activeLayer.maskColorHex) activeLayer.maskColorHex = maskColorPicker ? maskColorPicker.value : "#000000";
+      
+      reprocessCustomLayer(activeLayer);
+    };
+    img.onerror = () => showNotification("Failed to load mask image.", "error");
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function reprocessCustomLayer(layer) {
+  if (!layer.originalImage) return;
+  
+  processCustomLayerMask(layer.originalImage, layer.alphaColorHex, layer.maskColorHex).then(processedImg => {
+    layer.image = processedImg;
+    redrawAll();
+    showNotification(`Mask applied for ${layer.name}.`, "success");
+  }).catch(err => {
+    console.error("Mask processing error:", err);
+    showNotification("Failed to process mask.", "error");
+  });
+}
+
 function handleFileChange(event) {
   const file = event.target.files[0];
   if (file) {
@@ -2621,7 +2705,10 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
            const customLayer = customPrintLayers.find(l => l.id === layerId);
            if (customLayer && customLayer.image) {
                ctx.save();
-               ctx.drawImage(customLayer.image, drawOffset.x, drawOffset.y, customLayer.image.width, customLayer.image.height);
+               const dpr = window.devicePixelRatio || 1;
+               const layerWidth = cleanCanvasState ? cleanCanvasState.width / dpr : baseCanvasWidth;
+               const layerHeight = cleanCanvasState ? cleanCanvasState.height / dpr : baseCanvasHeight;
+               ctx.drawImage(customLayer.image, drawOffset.x, drawOffset.y, layerWidth, layerHeight);
                ctx.restore();
            }
        }
@@ -2646,7 +2733,10 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
            const customLayer = customPrintLayers.find(l => l.id === layerId);
            if (customLayer && customLayer.image) {
                ctx.save();
-               ctx.drawImage(customLayer.image, drawOffset.x, drawOffset.y, customLayer.image.width, customLayer.image.height);
+               const dpr = window.devicePixelRatio || 1;
+               const layerWidth = cleanCanvasState ? cleanCanvasState.width / dpr : baseCanvasWidth;
+               const layerHeight = cleanCanvasState ? cleanCanvasState.height / dpr : baseCanvasHeight;
+               ctx.drawImage(customLayer.image, drawOffset.x, drawOffset.y, layerWidth, layerHeight);
                ctx.restore();
            }
        }
@@ -2883,10 +2973,9 @@ function renderLayerTabs() {
   dropdownMenu.style.left = "0";
 
   // Fallback options in case pricingConfig isn't loaded
-  let layerOptions = ["White", "Clear", "Inlay", "Text"];
+  let layerOptions = ["White", "Clear", "Inlay", "Text", "CMYK Artwork"];
   if (typeof pricingConfig !== "undefined" && pricingConfig && pricingConfig.layers) {
       layerOptions = pricingConfig.layers
-          .filter(l => l.id !== "cmyk")
           .map(l => l.name);
   }
 
@@ -3034,6 +3123,9 @@ function updateEditingControlsForActiveLayer() {
            typeContainer.style.display = "none";
          }
        }
+       
+       if (alphaColorPicker) alphaColorPicker.value = layer.alphaColorHex || "#ffffff";
+       if (maskColorPicker) maskColorPicker.value = layer.maskColorHex || "#000000";
     } else {
        customControls.style.display = "none";
        const label = document.querySelector('label[for="imageUpload"]');

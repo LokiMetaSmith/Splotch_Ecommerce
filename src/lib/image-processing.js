@@ -682,3 +682,48 @@ export function filterInternalContours(
 
   return result;
 }
+
+export function processCustomLayerMask(img, alphaColorHex, maskColorHex) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width || img.naturalWidth;
+    canvas.height = img.height || img.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    const hexToRgb = (hex) => {
+      let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+    };
+
+    const alphaRGB = hexToRgb(alphaColorHex);
+    const maskRGB = hexToRgb(maskColorHex);
+    const tolerance = 40;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      
+      if (a < 10) continue;
+
+      if (alphaRGB && Math.abs(r - alphaRGB.r) <= tolerance && Math.abs(g - alphaRGB.g) <= tolerance && Math.abs(b - alphaRGB.b) <= tolerance) {
+        data[i + 3] = 0;
+        continue;
+      }
+
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      data[i] = gray;
+      data[i + 1] = gray;
+      data[i + 2] = gray;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    const processedImg = new Image();
+    processedImg.onload = () => resolve(processedImg);
+    processedImg.src = canvas.toDataURL();
+  });
+}

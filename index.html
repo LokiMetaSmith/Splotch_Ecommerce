@@ -228,6 +228,7 @@
                 width="500"
                 height="400"
                 class="block border-2 border-dashed border-gray-300 rounded-md bg-white"
+                style="background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(135deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(135deg, transparent 75%, #ccc 75%); background-size: 20px 20px; background-position: 0 0, 10px 0, 10px -10px, 0px 10px; background-color: white;"
               >
                 Your browser does not support the HTML5 canvas tag.
               </canvas>
@@ -635,6 +636,13 @@
                   >
                 </div>
               </div>
+              <div class="flex items-center gap-2" id="cutTypeContainer" style="display: none;">
+                <label for="cutTypeSelect" class="text-sm font-medium text-gray-700">Cut Type:</label>
+                <select id="cutTypeSelect" class="input px-2 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                  <option value="die_cut">Die Cut (Through backer)</option>
+                  <option value="kiss_cut">Kiss Cut (Sticker only)</option>
+                </select>
+              </div>
               <button
                 type="button"
                 id="generateCutlineBtn"
@@ -654,6 +662,22 @@
                   <!-- Populated by JS -->
                 </select>
               </div>
+
+              <div class="flex items-center gap-2">
+                <label for="customLayerImageUpload" class="text-sm font-medium text-gray-700">Upload Mask Image:</label>
+                <input type="file" id="customLayerImageUpload" class="input block text-sm text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept="image/*, image/svg+xml, .png,.jpeg,.jpg,.webp,.tiff,.svg,.pdf,.ai">
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label for="alphaColorPicker" class="text-sm font-medium text-gray-700" data-tooltip="The color in the uploaded image to make transparent (e.g. White background)">Alpha Color:</label>
+                <input type="color" id="alphaColorPicker" value="#ffffff" class="w-8 h-8 p-0 border-0 rounded cursor-pointer">
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label for="maskColorPicker" class="text-sm font-medium text-gray-700" data-tooltip="The color in the uploaded image to convert to the mask (e.g. Red square)">Mask Color:</label>
+                <input type="color" id="maskColorPicker" value="#000000" class="w-8 h-8 p-0 border-0 rounded cursor-pointer">
+              </div>
+
               <button
                 type="button"
                 id="generateFromBaseBtn"
@@ -814,7 +838,7 @@
           <!-- Sticker Options -->
           <div class="space-y-4">
             <h3
-              class="text-xl font-semibold text-splotch-navy pt-2"
+              class="text-3xl font-semibold text-splotch-navy pt-2"
               style="font-family: var(--font-modak)"
             >
               Sticker Options
@@ -1006,10 +1030,9 @@
 
         <!-- Payment Form -->
         <div class="space-y-6 bg-gray-50 p-6 rounded-lg shadow-md">
-          <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">
+          <h2 class="text-3xl font-semibold text-splotch-navy pb-2" style="font-family: var(--font-modak)">
             Order Your Custom Stickers & Pay
           </h2>
-
           <h3 class="text-lg font-semibold text-gray-700 mt-6 pt-4 border-t">
             Billing Information
           </h3>
@@ -1311,7 +1334,7 @@
 
     <footer class="bg-white shadow-md mt-8">
       <div class="container mx-auto px-6 py-3 text-center text-gray-500">
-        &copy; 2025 Splotch |
+        &copy; 2026 Splotch Creative LLC|
         <a href="/terms.html" class="text-splotch-red hover:underline"
           >Terms & FAQ</a
         >
