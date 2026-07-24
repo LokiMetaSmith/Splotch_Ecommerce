@@ -584,38 +584,8 @@ async function BootStrap() {
 
   if (cutTypeToggle) {
     cutTypeToggle.addEventListener("change", (e) => {
-      if (e.target.checked) {
-        // Contour Cut
-        handleGenerateCutline(true);
-      } else {
-        // Edge Cut
-        if (originalImage && canvas) {
-          const dpr = window.devicePixelRatio || 1;
-          const logicalWidth = canvas.width / dpr;
-          const logicalHeight = canvas.height / dpr;
-          rasterCutlinePoly = [
-            [
-              { x: 0, y: 0 },
-              { x: logicalWidth, y: 0 },
-              { x: logicalWidth, y: logicalHeight },
-              { x: 0, y: logicalHeight },
-            ],
-          ];
-          const currentLassoRadius = lazyLassoSlider && lazyLassoSlider.value ? parseInt(lazyLassoSlider.value, 10) : 50;
-          let currentOffset = cutlineOffset;
-          if (cutlineOffsetSlider && cutlineOffsetSlider.value) {
-            const step = parseInt(cutlineOffsetSlider.value, 10);
-            if (step === 0) currentOffset = 0;
-            else if (step === 1) currentOffset = 15;
-            else if (step === 2) currentOffset = 35;
-          }
-          generateCutLineAsync(rasterCutlinePoly, currentOffset, currentLassoRadius).then(cutline => {
-              currentCutline = cutline;
-              currentBounds = getPolygonsBounds(cutline);
-              redrawAll();
-              calculateAndUpdatePrice();
-          });
-        }
+      if (originalImage && canvas) {
+          handleGenerateCutline(true);
       }
     });
   }
@@ -1884,7 +1854,9 @@ function updateEditingButtonsState(disabled) {
     if (sepBtn) sepBtn.style.display = "none";
     if (cutlineSensitivityContainer)
       cutlineSensitivityContainer.style.display = "none";
-    if (lazyLassoContainer) lazyLassoContainer.style.display = "none";
+    if (lazyLassoContainer) {
+      lazyLassoContainer.style.display = "none";
+    }
     if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
   } else {
     if (grayBtn) {
@@ -2162,41 +2134,15 @@ function loadFileAsImage(file, isMascot = false) {
             canvas.width,
             canvas.height,
           );
-          const dpr = window.devicePixelRatio || 1;
-          const logicalWidth = canvas.width / dpr;
-          const logicalHeight = canvas.height / dpr;
-
+          
           if (imageHasTransparentBorder(currentImageData)) {
             if (cutTypeToggle) cutTypeToggle.checked = true;
-            // Auto-generate smart cutline for transparent images
-            handleGenerateCutline(true); // Pass true to skip confirmation prompt
+            if (cutShapeSelect) cutShapeSelect.value = "trace";
+            handleGenerateCutline(true);
           } else {
             if (cutTypeToggle) cutTypeToggle.checked = false;
-            // Setup a rectangular rasterCutlinePoly for non-transparent images
-            rasterCutlinePoly = [
-              [
-                { x: 0, y: 0 },
-                { x: logicalWidth, y: 0 },
-                { x: logicalWidth, y: logicalHeight },
-                { x: 0, y: logicalHeight },
-              ],
-            ];
-
-            // Set slider to 10 (1mm) offset
-            cutlineOffset = 15;
-            if (cutlineOffsetSlider) {
-              cutlineOffsetSlider.value = 1;
-            }
-            if (cutlineOffsetValueDisplay) {
-              cutlineOffsetValueDisplay.textContent = "A little white";
-            }
-
-            const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
-            currentCutline = cutline;
-            currentBounds = getPolygonsBounds(cutline);
-
-            calculateAndUpdatePrice();
-            drawCanvasDecorations(currentBounds);
+            if (cutShapeSelect) cutShapeSelect.value = "square";
+            handleGenerateCutline(true);
           }
           currentPolygons = []; // Clear any previous SVG data
 
@@ -2694,6 +2640,40 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
       y: -bounds.top + padding + offset.y,
     };
 
+    // Draw Bleed and Vinyl Background BEFORE base image
+      if (currentCutline && currentCutline.length > 0) {
+        ctx.save();
+        ctx.beginPath();
+        currentCutline.forEach(poly => {
+          if (!poly || poly.length === 0) return;
+          ctx.moveTo(poly[0].x + drawOffset.x, poly[0].y + drawOffset.y);
+          for(let i=1; i<poly.length; i++) ctx.lineTo(poly[i].x + drawOffset.x, poly[i].y + drawOffset.y);
+          ctx.closePath();
+        });
+        
+        // Bleed Gradient
+        const bColor1 = document.getElementById("bleedColor1")?.value || "#000000";
+        const bColor2 = document.getElementById("bleedColor2")?.value || "#000000";
+        const cutBounds = getPolygonsBounds(currentCutline);
+        const gradient = ctx.createLinearGradient(
+           cutBounds.left + drawOffset.x, cutBounds.top + drawOffset.y, 
+           cutBounds.right + drawOffset.x, cutBounds.bottom + drawOffset.y
+        );
+        gradient.addColorStop(0, bColor1);
+        gradient.addColorStop(1, bColor2);
+        
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = gradient;
+        // Stroke should be wider to act as bleed outside the cutline
+        ctx.lineWidth = 20; 
+        ctx.stroke();
+
+        // White Vinyl Fill
+        ctx.fillStyle = "white";
+        ctx.fill();
+        ctx.restore();
+      }
+
     // Draw layers in globalLayerOrder
     globalLayerOrder.forEach(layerId => {
        if (layerId === "base") {
@@ -2721,6 +2701,40 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
       x: -bounds.left + padding,
       y: -bounds.top + padding,
     };
+    
+    // Draw Bleed and Vinyl Background BEFORE base image
+      if (currentCutline && currentCutline.length > 0) {
+        ctx.save();
+        ctx.beginPath();
+        currentCutline.forEach(poly => {
+          if (!poly || poly.length === 0) return;
+          ctx.moveTo(poly[0].x + drawOffset.x, poly[0].y + drawOffset.y);
+          for(let i=1; i<poly.length; i++) ctx.lineTo(poly[i].x + drawOffset.x, poly[i].y + drawOffset.y);
+          ctx.closePath();
+        });
+        
+        // Bleed Gradient
+        const bColor1 = document.getElementById("bleedColor1")?.value || "#000000";
+        const bColor2 = document.getElementById("bleedColor2")?.value || "#000000";
+        const cutBounds = getPolygonsBounds(currentCutline);
+        const gradient = ctx.createLinearGradient(
+           cutBounds.left + drawOffset.x, cutBounds.top + drawOffset.y, 
+           cutBounds.right + drawOffset.x, cutBounds.bottom + drawOffset.y
+        );
+        gradient.addColorStop(0, bColor1);
+        gradient.addColorStop(1, bColor2);
+        
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 20; 
+        ctx.stroke();
+
+        // White Vinyl Fill
+        ctx.fillStyle = "white";
+        ctx.fill();
+        ctx.restore();
+      }
+
     // No need to clear here, it's done in redrawAll for vector mode.
     // We also only want to draw if customImageToDraw logic isn't interfering, but we refactored it!
     globalLayerOrder.forEach(layerId => {
@@ -3388,29 +3402,12 @@ function handleResetImage() {
 
       if (imageHasTransparentBorder(currentImageData)) {
         if (cutTypeToggle) cutTypeToggle.checked = true;
+        if (cutShapeSelect) cutShapeSelect.value = "trace";
         handleGenerateCutline(true);
       } else {
         if (cutTypeToggle) cutTypeToggle.checked = false;
-        rasterCutlinePoly = [
-          [
-            { x: 0, y: 0 },
-            { x: logicalWidth, y: 0 },
-            { x: logicalWidth, y: logicalHeight },
-            { x: 0, y: logicalHeight },
-          ],
-        ];
-
-        cutlineOffset = 15;
-        if (cutlineOffsetSlider) {
-          cutlineOffsetSlider.value = 1;
-        }
-        if (cutlineOffsetValueDisplay) {
-          cutlineOffsetValueDisplay.textContent = "A little white";
-        }
-
-        const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
-        currentCutline = cutline;
-        currentBounds = getPolygonsBounds(cutline);
+        if (cutShapeSelect) cutShapeSelect.value = "square";
+        handleGenerateCutline(true);
       }
 
       updateFilterButtonVisuals();
@@ -4417,29 +4414,12 @@ async function loadProductForBuyer(productId) {
 
       if (imageHasTransparentBorder(currentImageData)) {
         if (cutTypeToggle) cutTypeToggle.checked = true;
+        if (cutShapeSelect) cutShapeSelect.value = "trace";
         handleGenerateCutline(true);
       } else {
         if (cutTypeToggle) cutTypeToggle.checked = false;
-        rasterCutlinePoly = [
-          [
-            { x: 0, y: 0 },
-            { x: logicalWidth, y: 0 },
-            { x: logicalWidth, y: logicalHeight },
-            { x: 0, y: logicalHeight },
-          ],
-        ];
-
-        cutlineOffset = 15;
-        if (cutlineOffsetSlider) {
-          cutlineOffsetSlider.value = 1;
-        }
-        if (cutlineOffsetValueDisplay) {
-          cutlineOffsetValueDisplay.textContent = "A little white";
-        }
-
-        const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
-        currentCutline = cutline;
-        currentBounds = getPolygonsBounds(cutline);
+        if (cutShapeSelect) cutShapeSelect.value = "square";
+        handleGenerateCutline(true);
       }
       // If the product had a complex cutline, we aren't loading it visually here for the buyer
       // unless we fetch and parse the SVG.
