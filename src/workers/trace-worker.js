@@ -4,8 +4,9 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
     const height = imageData.height;
     const data = imageData.data;
 
-    // Use a fixed sensitivity mapped to a sensible threshold
-    const alphaThreshold = Math.max(1, Math.min(254, Math.floor(255 - (sensitivity / 100) * 255)));
+    // Use a fixed sensitivity mapped to a sensible threshold, but make it more inclusive of semi-transparent pixels.
+    // By default (sensitivity 50), allow alpha > 75 instead of alpha > 127, to avoid cutting off soft edges.
+    const alphaThreshold = Math.max(1, Math.min(254, Math.floor(255 - Math.pow(sensitivity / 100, 0.5) * 255)));
 
     const u32 = new Uint32Array(data.buffer, data.byteOffset, data.length >> 2);
     const IS_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([0x12345678]).buffer)[0] === 0x78;

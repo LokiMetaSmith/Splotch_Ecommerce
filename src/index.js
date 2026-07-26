@@ -1004,24 +1004,8 @@ async function BootStrap() {
         generateCutlineBtn.style.display = "flex";
       }
 
-      const isDisabled = !originalImage && basePolygons.length === 0;
-      if (textContainer) {
-        if (isDisabled) {
-          textContainer.hidden = true;
-          textContainer.setAttribute("hidden", "");
-          textContainer.style.display = "none";
-        } else {
-          textContainer.hidden = false;
-          textContainer.removeAttribute("hidden");
-          textContainer.style.display = "block";
-          // Also need to clear any inline style preventing display
-          textContainer.style.cssText = textContainer.style.cssText.replace(
-            /display:\s*none;?/g,
-            "",
-          );
-        }
-      }
 
+      const isDisabled = !originalImage && basePolygons.length === 0;
       if (layerControlsContainer) {
         layerControlsContainer.style.display = "block";
       }
@@ -1817,28 +1801,7 @@ function updateEditingButtonsState(disabled) {
   });
   if (designMarginNote)
     designMarginNote.style.display = disabled ? "none" : "block";
-  const textContainer = document.getElementById("text-editing-controls");
-  if (textContainer) {
-    if (!easterEggUnlocked) {
-      textContainer.hidden = true;
-      textContainer.setAttribute("hidden", "");
-      textContainer.style.display = "none";
-    } else {
-      if (disabled) {
-        textContainer.hidden = true;
-        textContainer.setAttribute("hidden", "");
-        textContainer.style.display = "none";
-      } else {
-        textContainer.hidden = false;
-        textContainer.removeAttribute("hidden");
-        textContainer.style.display = "block";
-        textContainer.style.cssText = textContainer.style.cssText.replace(
-          /display:\s*none;?/g,
-          "",
-        );
-      }
-    }
-  }
+
 
   // Update styles for filter buttons based on easterEggUnlocked
   const grayBtn = document.getElementById("grayscaleBtn");
@@ -2097,7 +2060,7 @@ function loadFileAsImage(file, isMascot = false) {
         setActiveLayer(designLayers.length - 1);
         updateEditingButtonsState(false);
         if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-        showNotification("Base image loaded successfully.", "success");
+        showNotification("Image loaded successfully.", "success");
         let newWidth = img.width,
           newHeight = img.height;
         if (canvas && ctx) {
@@ -2211,8 +2174,14 @@ function redrawAll() {
   }
 
   // Set canvas size based on the final cutline bounds and scale padding
+  let ppi = 300;
+  if (typeof pricingConfig !== "undefined" && pricingConfig && typeof stickerResolutionSelect !== "undefined" && stickerResolutionSelect) {
+    const selectedRes = pricingConfig.resolutions.find(r => r.id === (stickerResolutionSelect.value || "dpi_300"));
+    if (selectedRes) ppi = selectedRes.ppi;
+  }
+  const ppiScale = ppi / 96;
   const scale = Math.max(currentBounds.width, currentBounds.height) / 500;
-  const padding = Math.max(40, Math.round(40 * scale));
+  const padding = Math.max(Math.round(60 * ppiScale), Math.round(40 * scale));
   
   const logicalWidth = currentBounds.right - currentBounds.left + (padding * 2);
   const logicalHeight = currentBounds.bottom - currentBounds.top + (padding * 2);
@@ -2516,22 +2485,7 @@ function generateCutLine(polygons, rawOffset, rawLazyRadius = 0) {
     co.Execute(final_paths, Math.round(offsetPx * scale));
   }
 
-  // Filter for positive offsets to ensure a single contiguous boundary
-  if (offsetPx > 0 && final_paths.length > 1) {
-    let maxArea = -Infinity;
-    let maxPathIndex = 0;
-    // Find the largest polygon area
-    for (let i = 0; i < final_paths.length; i++) {
-      // Clipper.Area returns positive for outer polygons
-      const area = Math.abs(ClipperLib.Clipper.Area(final_paths[i]));
-      if (area > maxArea) {
-        maxArea = area;
-        maxPathIndex = i;
-      }
-    }
-    final_paths = [final_paths[maxPathIndex]];
-  }
-
+  // Removed filter for positive offsets to allow disconnected sticker components
   // Scale back down
   // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
   const cutline = new Array(final_paths.length);
@@ -2614,8 +2568,14 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
 
   // ALWAYS pad the canvas so measurement guides (rulers/text) don't get clipped.
   // Scale padding based on canvas size so guides fit on high-res images.
+  let ppi = 300;
+  if (typeof pricingConfig !== "undefined" && pricingConfig && typeof stickerResolutionSelect !== "undefined" && stickerResolutionSelect) {
+    const selectedRes = pricingConfig.resolutions.find(r => r.id === (stickerResolutionSelect.value || "dpi_300"));
+    if (selectedRes) ppi = selectedRes.ppi;
+  }
+  const ppiScale = ppi / 96;
   const scale = Math.max(bounds.width, bounds.height) / 500;
-  const padding = Math.max(40, Math.round(40 * scale));
+  const padding = Math.max(Math.round(60 * ppiScale), Math.round(40 * scale));
 
   // In Raster Mode (where basePolygons is empty), we need to handle canvas resizing
   // and restoring the clean image first to wipe old decorations.
@@ -2759,7 +2719,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
   }
 
   drawBoundingBox(bounds, drawOffset);
-  drawSizeIndicator(bounds, drawOffset);
+  // Removed drawSizeIndicator(bounds, drawOffset); as dimensions are displayed in UI
   drawRuler(bounds, drawOffset);
 }
 
@@ -3103,6 +3063,7 @@ function updateEditingControlsForActiveLayer() {
   // Text layer controls
   if (textControls) {
     textControls.style.display = isTextLayer ? "block" : "none";
+    textControls.hidden = !isTextLayer;
   }
 
   // Custom Layers (but not Text layer)
@@ -3885,7 +3846,9 @@ function handleGenerateCutline(skipPrompt = false) {
     currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   }
 
-  showNotification("Generating smart cutline...", "info");
+    if (!skipPrompt) {
+      showNotification("Generating smart cutline...", "info");
+    }
 
   // START LOADING STATE
   const btn = document.getElementById("generateCutlineBtn");
@@ -4145,7 +4108,9 @@ function handleGenerateCutline(skipPrompt = false) {
               generateCutlineBtn.classList.remove("opacity-50", "cursor-not-allowed");
               generateCutlineBtn.innerHTML = "Generate Smart Cutline";
             }
-            showNotification("Smart cutline generated successfully.", "success");
+            if (!skipPrompt) {
+              showNotification("Smart cutline generated successfully.", "success");
+            }
         }).catch(err => {
             console.error('generateCutLineAsync failed:', err);
             showNotification(`Error: ${err.message}`, "error");

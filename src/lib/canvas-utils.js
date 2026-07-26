@@ -21,21 +21,7 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
     const physicalWidthMm = (bounds.width / ppi) * 25.4;
 
     if (isMetric) {
-        if (physicalWidthMm < 1) {
-            // < 1mm: switch to micrometers (major every 100µm, minor every 10µm)
-            majorMarkSpacing = (100 / 1000) * ppi / 25.4; // 100µm
-            minorMarkSpacing = majorMarkSpacing / 10;
-            ticksPerMajor = 10;
-            labelMultiplier = 100;
-            labelSuffix = 'µm';
-        } else if (physicalWidthMm < 20) {
-            // < 20mm: small mm (major every 1mm, minor every 0.1mm)
-            majorMarkSpacing = 1 * ppi / 25.4; // 1mm
-            minorMarkSpacing = majorMarkSpacing / 10;
-            ticksPerMajor = 10;
-            labelMultiplier = 1;
-            labelSuffix = 'mm';
-        } else if (physicalWidthMm >= 1000) {
+        if (physicalWidthMm >= 1000) {
             // >= 1000mm: meters (major every 0.1m (100mm), minor every 0.01m (10mm))
             majorMarkSpacing = 100 * ppi / 25.4; // 0.1m
             minorMarkSpacing = majorMarkSpacing / 10;
@@ -43,7 +29,7 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
             labelMultiplier = 0.1;
             labelSuffix = 'm';
         } else {
-            // Default: mm (major every 10mm, minor every 1mm)
+            // Default: mm (major every 10mm (1cm), minor every 1mm)
             majorMarkSpacing = 10 * ppi / 25.4; // 10mm
             minorMarkSpacing = majorMarkSpacing / 10;
             ticksPerMajor = 10;
@@ -51,20 +37,20 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
             labelSuffix = 'mm';
         }
     } else {
-        if (physicalWidthInches < 2) {
-            // < 2 inches: mils (major every 100 mils, minor every 10 mils)
-            majorMarkSpacing = (100 / 1000) * ppi; // 100 mils
-            minorMarkSpacing = majorMarkSpacing / 10;
-            ticksPerMajor = 10;
-            labelMultiplier = 100;
-            labelSuffix = 'mil';
-        } else if (physicalWidthInches >= 24) {
+        if (physicalWidthInches >= 24) {
             // >= 24 inches: feet (major every 1 foot, minor every 1 inch)
             majorMarkSpacing = 12 * ppi; // 1 foot
             minorMarkSpacing = majorMarkSpacing / 12;
             ticksPerMajor = 12;
             labelMultiplier = 1;
             labelSuffix = 'ft';
+        } else if (physicalWidthInches <= 3) {
+            // <= 3 inches: (major every 0.5 inch, minor every 1/16 inch)
+            majorMarkSpacing = ppi / 2; // 0.5 inch
+            minorMarkSpacing = majorMarkSpacing / 8; // 1/16 inch
+            ticksPerMajor = 8;
+            labelMultiplier = 0.5;
+            labelSuffix = 'in';
         } else {
             // Default: inches (major every 1 inch, minor every 1/8 inch)
             majorMarkSpacing = ppi; // 1 inch
