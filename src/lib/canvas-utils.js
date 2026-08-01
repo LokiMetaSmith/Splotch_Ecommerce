@@ -20,6 +20,10 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
     const physicalWidthInches = bounds.width / ppi;
     const physicalWidthMm = (bounds.width / ppi) * 25.4;
 
+    // Do not draw ruler for very small images where it would become illegible
+    if (isMetric && physicalWidthMm < 20) return;
+    if (!isMetric && physicalWidthInches < 2) return;
+
     if (isMetric) {
         if (physicalWidthMm >= 1000) {
             // >= 1000mm: meters (major every 0.1m (100mm), minor every 0.01m (10mm))

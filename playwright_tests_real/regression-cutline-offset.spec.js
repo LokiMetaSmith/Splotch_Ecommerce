@@ -29,12 +29,17 @@ test('reproduce multiple cutlines bug', async ({ page }) => {
   // Wait for image to load
   await expect(page.locator('#toast-container')).toContainText('Image loaded successfully', { timeout: 15000 });
 
-  // 3. Generate Smart Cutline (needed for rasterCutlinePoly)
+  // 3. Switch to Cutline tab (required for the button to be visible)
+  const cutlineTab = page.locator('#layer-tab-cutline');
+  await cutlineTab.click();
+
+  // 4. Generate Smart Cutline (needed for rasterCutlinePoly)
   const generateBtn = page.locator('#generateCutlineBtn');
+  await expect(generateBtn).toBeVisible({ timeout: 10000 });
   await expect(generateBtn).toBeEnabled();
   await generateBtn.click();
 
-  // 4. Wait for generation to complete
+  // 5. Wait for generation to complete
   await expect(page.locator('#toast-container')).toContainText('Smart cutline generated successfully', { timeout: 30000 });
 
   // 5. Move the slider multiple times to trigger the bug

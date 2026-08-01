@@ -1186,7 +1186,8 @@ async function startServer(
             material: orderDetails.material,
             resolution: orderDetails.resolution,
             cutLinePath: orderDetails.cutLinePath,
-            promoAddon: orderDetails.promoAddon || false
+            promoAddon: orderDetails.promoAddon || false,
+            customLayers: orderDetails.customLayers || []
         };
 
         // --- Product / Creator Payout Logic ---
@@ -1286,6 +1287,9 @@ async function startServer(
                 // Allow a small tolerance (e.g., 5 cents) for rounding differences
                 if (Math.abs(expectedTotal - submittedTotal) > 5) {
                     logger.warn(`[SECURITY] Price mismatch for Order. Expected: ${expectedTotal}, Received: ${submittedTotal}. Diff: ${expectedTotal - submittedTotal}`);
+                    logger.warn(`[SECURITY] Breakdown - Base Price: ${priceResult.total}, Promo: ${orderDetails.promoAddon ? 200 : 0}, Creator: ${product ? (product.creatorProfitCents * quantity) : 0}`);
+                    logger.warn(`[SECURITY] PriceResult Detail: ${JSON.stringify(priceResult)}`);
+                    logger.warn(`[SECURITY] Inputs: q=${quantity}, mat=${material}, res=${resolution.id}, layers=${JSON.stringify(orderDetails.customLayers)}, bounds=${JSON.stringify(dimensions.bounds)}`);
                     return res.status(400).json({ error: 'Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.' });
                 } else {
                     logger.info(`[SECURITY] Price validated. Expected: ${expectedTotal}, Received: ${submittedTotal}`);

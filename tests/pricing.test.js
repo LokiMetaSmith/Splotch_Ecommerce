@@ -52,8 +52,8 @@ describe('Sticker Pricing Calculation', () => {
         const material = 'pp_standard';
         const price = calculateStickerPrice(pricingConfig, quantity, material, simpleBounds, simpleCutline, draftResolution).total;
 
-        // Expected: 9 sq.in * 15 cents/sq.in * 10 quantity * 1.0 material * 1.0 complexity * 1.0 resolution * 1.0 discount = 1350
-        expect(price).toBe(1350);
+        // Expected: 9 sq.in * 13 cents/sq.in * 10 quantity * 1.0 material * 1.0 complexity * 1.0 resolution * 1.0 discount = 1170
+        expect(price).toBe(1170);
     });
 
     it('should apply material cost multipliers', () => {
@@ -61,8 +61,8 @@ describe('Sticker Pricing Calculation', () => {
         const material = 'pvc_laminated'; // 1.5x multiplier
         const price = calculateStickerPrice(pricingConfig, quantity, material, simpleBounds, simpleCutline, draftResolution).total;
 
-        // Expected: 1350 * 1.5 = 2025
-        expect(price).toBe(2025);
+        // Expected: 1170 * 1.5 = 1755
+        expect(price).toBe(1755);
     });
 
     it('should apply complexity multipliers', () => {
@@ -72,14 +72,10 @@ describe('Sticker Pricing Calculation', () => {
         const complexCutline = [[ { x: 0, y: 0 }, { x: 10 * ppi, y: 0 }, { x: 10 * ppi, y: 2.5 * ppi }, { x: 0, y: 2.5 * ppi } ]]; // Perimeter = 25 inches
         const complexBounds = { width: 10 * ppi, height: 2.5 * ppi }; // 25 sq inches
         // Perimeter is 25", which is > 24", so it falls into the "Infinity" tier with a 1.25 multiplier
-
+        // 25 * 13 * 10 * 1.0 * 1.25 = 4062.5 -> Math.round -> 4063
         const priceResult = calculateStickerPrice(pricingConfig, quantity, material, complexBounds, complexCutline, draftResolution);
-
-        // Expected: 25 sq.in * 15 cents * 10 quantity = 3750
-        // Multiplier for 25" perimeter is 1.25
-        // Expected: 3750 * 1.25 = 4687.5 -> 4688
         expect(priceResult.complexityMultiplier).toBe(1.25);
-        expect(priceResult.total).toBe(4688);
+        expect(priceResult.total).toBe(4063);
     });
 
     it('should apply quantity discounts', () => {
@@ -87,15 +83,15 @@ describe('Sticker Pricing Calculation', () => {
         const material = 'pp_standard';
         const price = calculateStickerPrice(pricingConfig, quantity, material, simpleBounds, simpleCutline, draftResolution).total;
 
-        // Base total for 250: 9 * 15 * 250 * 1.0 (complexity) = 33750
-        // Discount of 10%: 33750 * 0.9 = 30375
-        expect(price).toBe(30375);
+        // Base total for 250: 9 * 13 * 250 * 1.0 (complexity) = 29250
+        // Discount of 10%: 29250 * 0.9 = 26325
+        expect(price).toBe(26325);
 
         const largeQuantity = 600; // Should trigger 15% discount
         const price2 = calculateStickerPrice(pricingConfig, largeQuantity, material, simpleBounds, simpleCutline, draftResolution).total;
-        // Base total for 600: 9 * 15 * 600 * 1.0 (complexity) = 81000
-        // Discount of 15%: 81000 * 0.85 = 68850
-        expect(price2).toBe(68850);
+        // Base total for 600: 9 * 13 * 600 * 1.0 = 70200
+        // Discount of 15%: 70200 * 0.85 = 59670
+        expect(price2).toBe(59670);
     });
 
     it('should generate correct SVG from cutline', () => {

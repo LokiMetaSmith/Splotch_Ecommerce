@@ -54,8 +54,8 @@ test.describe('Order and Fulfillment Flow', () => {
         await expect(priceDisplay).not.toContainText('$0.00', { timeout: 10000 });
         
         // Wait for Dimensions to populate so we know originalImage is processed
-        const widthDisplay = page.locator('#widthDisplay');
-        await expect(widthDisplay).not.toContainText('---', { timeout: 15000 });
+        const widthInput = page.locator('#widthInput');
+        await expect(widthInput).not.toHaveValue('', { timeout: 15000 });
 
         await page.locator('#firstName').fill('Test');
         await page.locator('#lastName').fill('User');
@@ -135,5 +135,32 @@ test.describe('Order and Fulfillment Flow', () => {
         // Since we changed the select, wait for toast
         await expect(page.locator('#success-toast')).toBeVisible({ timeout: 10000 });
         await expect(orderToFulfill).toContainText('COMPLETED', { timeout: 10000 });
+        
+        // 4. Test Nesting functionality
+        // Check the checkbox for this order
+        const checkbox = orderToFulfill.locator('.order-select-checkbox');
+        await checkbox.check();
+        
+        // Click Nest Selected Orders
+        const nestBtn = page.locator('#nestStickersBtn');
+        await expect(nestBtn).toBeVisible();
+        
+        
+        await page.locator('#spacingInput').fill('300');
+        await nestBtn.click();
+        
+        // Wait for nesting to complete (success toast)
+        await expect(page.locator('#success-toast')).toContainText('Nesting complete', { timeout: 30000 });
+
+        // Handle the download
+        const downloadBtn = page.locator('#downloadCutFileBtn');
+        const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+        await downloadBtn.click();
+        const download = await downloadPromise;
+        
+        // Save it to a known location
+        const downloadPath = 'C:\\Users\\Loki-VR\\.gemini\\antigravity\\brain\\07d60c4a-10d3-4967-9f62-b6d0b3550176\\nested_print_sheet.svg';
+        await download.saveAs(downloadPath);
+        console.log('Downloaded nested print sheet to:', downloadPath);
     });
 });

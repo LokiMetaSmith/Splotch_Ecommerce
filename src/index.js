@@ -974,6 +974,9 @@ async function BootStrap() {
       easterEggUnlocked = true;
       const easterEggInput = document.getElementById("easterEggInput");
       if (easterEggInput) easterEggInput.style.display = "block";
+      
+      const easterEggControls = document.getElementById("easter-egg-controls");
+      if (easterEggControls) easterEggControls.classList.remove("hidden");
 
       // Attempt to find elements again if globals are null
       const grayBtn = document.getElementById("grayscaleBtn");
@@ -1110,6 +1113,7 @@ function updateCompositeImage() {
   }
 
   const allCustomLayers = customPrintLayers.map(l => ({ type: l.type, subType: l.subType }));
+  const numImageLayers = (typeof designLayers !== 'undefined' && designLayers) ? designLayers.length : 1;
 
   const priceResult = calculateStickerPrice(
     pricingConfig,
@@ -1119,7 +1123,8 @@ function updateCompositeImage() {
     cutline,
     selectedResolution,
     lastCalculatedPerimeter,
-    allCustomLayers
+    allCustomLayers,
+    numImageLayers
   );
 
   // --- Creator Markup Logic ---
@@ -1690,7 +1695,7 @@ function showPaymentStatus(message, type = "info") {
     return;
   }
   paymentStatusContainer.textContent = message;
-  paymentStatusContainer.style.visibility = "visible";
+  paymentStatusContainer.style.display = "block";
   paymentStatusContainer.classList.remove(
     "payment-success",
     "payment-error",

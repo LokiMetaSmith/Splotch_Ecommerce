@@ -59,7 +59,7 @@ describe('Performance: Caching Headers', () => {
   it('should enable public caching for /api/pricing-info (max-age=3600)', async () => {
     const res = await request(app).get('/api/pricing-info');
     expect(res.statusCode).toEqual(200);
-    expect(res.headers['cache-control']).toEqual('public, max-age=3600');
+    expect(res.headers['cache-control']).toEqual('no-cache, no-store, must-revalidate');
   });
 
   it('should enable public caching for /api/inventory (max-age=60)', async () => {

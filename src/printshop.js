@@ -4,7 +4,7 @@ import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
 import DOMPurify from 'dompurify';
 import { SvgNest } from './lib/svgnest.js';
 import { SVGParser } from './lib/svgparser.js';
-import { generateCutFile } from './lib/cut_file_generator.js';
+import { generateCutFile, generatePltFile } from './lib/cut_file_generator.js';
 import * as jose from 'jose';
 import { jsPDF } from "jspdf";
 import "svg2pdf.js";
@@ -1044,12 +1044,66 @@ async function handleNesting(e) {
             }
 
             const promise = (async () => {
+                let cutlineSvgText = '';
                 if (cutFilePath) {
-                    return (await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' })).text();
+                    cutlineSvgText = await (await fetch(`${serverUrl}${cutFilePath}`, { credentials: 'include' })).text();
                 } else {
                     const svgString = await (await fetch(img.src, { credentials: 'include' })).text();
-                    return generateCutFile(svgString);
+                    cutlineSvgText = generateCutFile(svgString);
                 }
+
+                // Fetch the PNG and convert to base64
+                const pngResponse = await fetch(img.src, { credentials: 'include' });
+                const pngBlob = await pngResponse.blob();
+                const pngBase64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(pngBlob);
+                });
+
+                const parser = new DOMParser();
+                const cutlineDoc = parser.parseFromString(cutlineSvgText, 'image/svg+xml');
+                const cutlineRoot = cutlineDoc.documentElement;
+                const width = cutlineRoot.getAttribute('width') || '100%';
+                const height = cutlineRoot.getAttribute('height') || '100%';
+                let viewBox = cutlineRoot.getAttribute('viewBox');
+                if (!viewBox && width !== '100%' && height !== '100%') {
+                    // fallback if no viewBox
+                    viewBox = `0 0 ${parseFloat(width)} ${parseFloat(height)}`;
+                }
+
+                const unifiedSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                if (width) unifiedSvg.setAttribute('width', width);
+                if (height) unifiedSvg.setAttribute('height', height);
+                if (viewBox) unifiedSvg.setAttribute('viewBox', viewBox);
+
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                group.setAttribute('class', 'nest-group'); 
+
+                const imageEl = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+                imageEl.setAttribute('href', pngBase64);
+                imageEl.setAttribute('width', width); 
+                imageEl.setAttribute('height', height);
+                
+                if (viewBox) {
+                    const parts = viewBox.split(/[\s,]+/);
+                    if (parts.length === 4) {
+                        imageEl.setAttribute('x', parts[0]);
+                        imageEl.setAttribute('y', parts[1]);
+                        imageEl.setAttribute('width', parts[2]);
+                        imageEl.setAttribute('height', parts[3]);
+                    }
+                }
+
+                group.appendChild(imageEl);
+
+                // Add cut lines on top
+                Array.from(cutlineRoot.childNodes).forEach(child => {
+                     group.appendChild(child.cloneNode(true));
+                });
+                
+                unifiedSvg.appendChild(group);
+                return new XMLSerializer().serializeToString(unifiedSvg);
             })();
 
             svgCache.set(cacheKey, promise);
@@ -1073,51 +1127,87 @@ async function handleNesting(e) {
 
         const resultSvg = nest.start();
 
-        // Generate a combined Tracking Batch ID
-        const batchIds = checkedCheckboxes.map(cb => cb.dataset.orderId.substring(0, 8)).join('-');
-        const trackingCode = `BATCH-${batchIds.substring(0, 30)}`; // limit length
+        // Generate a 6-digit Cut File ID (like 100018)
+        const cutFileId = Math.floor(100000 + Math.random() * 900000).toString();
+        // The QR code contains the filename with the ~ terminator if needed, but we'll just put the ID.
+        const trackingCode = `${cutFileId}~`;
+        window.currentCutFileId = cutFileId; // Save for download button
 
-        // 4. Inject QR Code into SVG
-        let finalSvg = resultSvg;
-        if (window.QRCode) {
-            try {
-                // Generate QR as data URI
-                const qrCanvas = document.createElement('canvas');
-                await QRCode.toCanvas(qrCanvas, trackingCode, { width: 100, margin: 1 });
-                const qrDataUri = qrCanvas.toDataURL('image/png');
-
-                // Parse the nested SVG string back to DOM to inject the QR
+                // 4. Inject Printing Marks & QR Codes into SVG
                 const parser = new DOMParser();
-                const svgDoc = parser.parseFromString(finalSvg, 'image/svg+xml');
+                const svgDoc = parser.parseFromString(resultSvg, 'image/svg+xml');
                 const rootSvg = svgDoc.documentElement;
 
-                // Create an image element for the QR code
-                const qrImg = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'image');
-                qrImg.setAttribute('href', qrDataUri);
-                // Place it in the bottom left corner (assuming binWidth/Height are logical dimensions)
-                qrImg.setAttribute('x', '10');
-                qrImg.setAttribute('y', String((binHeight) - 110)); // 110px from bottom
-                qrImg.setAttribute('width', '100');
-                qrImg.setAttribute('height', '100');
+                const markShape = document.getElementById('alignmentMarkShape').value || 'circle';
 
-                // Add text label
-                const textNode = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'text');
-                textNode.setAttribute('x', '10');
-                textNode.setAttribute('y', String((binHeight) - 115));
-                textNode.setAttribute('font-family', 'sans-serif');
-                textNode.setAttribute('font-size', '12');
-                textNode.setAttribute('fill', 'black');
-                textNode.textContent = trackingCode;
+                // Helper to create alignment mark
+                const createMark = (cx, cy) => {
+                    if (markShape === 'square') {
+                        const rect = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        rect.setAttribute('x', String(cx - 12));
+                        rect.setAttribute('y', String(cy - 12));
+                        rect.setAttribute('width', '24');
+                        rect.setAttribute('height', '24');
+                        rect.setAttribute('fill', 'black');
+                        return rect;
+                    } else {
+                        const circle = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', String(cx));
+                        circle.setAttribute('cy', String(cy));
+                        circle.setAttribute('r', '12');
+                        circle.setAttribute('fill', 'black');
+                        return circle;
+                    }
+                };
 
-                rootSvg.appendChild(qrImg);
-                rootSvg.appendChild(textNode);
+                // Add 4 corner marks
+                // Top-Left
+                rootSvg.appendChild(createMark(135, 60));
+                // Top-Right
+                rootSvg.appendChild(createMark(binWidth - 135, 60));
+                // Bottom-Left
+                rootSvg.appendChild(createMark(135, binHeight - 60));
+                // Bottom-Right
+                rootSvg.appendChild(createMark(binWidth - 135, binHeight - 60));
 
+                if (window.QRCode) {
+                    try {
+                        const qrCanvas = document.createElement('canvas');
+                        await QRCode.toCanvas(qrCanvas, trackingCode, { width: 100, margin: 1 });
+                        const qrDataUri = qrCanvas.toDataURL('image/png');
+
+                        // Helper to add QR and label
+                        const addQR = (x, y) => {
+                            const qrImg = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'image');
+                            qrImg.setAttribute('href', qrDataUri);
+                            qrImg.setAttribute('x', String(x));
+                            qrImg.setAttribute('y', String(y));
+                            qrImg.setAttribute('width', '100');
+                            qrImg.setAttribute('height', '100');
+
+                            const textNode = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'text');
+                            textNode.setAttribute('x', String(x));
+                            textNode.setAttribute('y', String(y - 5));
+                            textNode.setAttribute('font-family', 'sans-serif');
+                            textNode.setAttribute('font-size', '12');
+                            textNode.setAttribute('fill', 'black');
+                            textNode.textContent = trackingCode;
+
+                            rootSvg.appendChild(qrImg);
+                            rootSvg.appendChild(textNode);
+                        };
+
+                        // Top-Left QR Code
+                        addQR(10, 10);
+                        // Bottom-Left QR Code
+                        addQR(10, binHeight - 110);
+                    } catch (qrErr) {
+                        console.error("Failed to inject QR code into SVG", qrErr);
+                    }
+                }
+                
                 // Serialize back to string
-                finalSvg = new XMLSerializer().serializeToString(svgDoc);
-            } catch (qrErr) {
-                console.error("Failed to inject QR code into SVG", qrErr);
-            }
-        }
+                let finalSvg = new XMLSerializer().serializeToString(svgDoc);
 
         // 5. Display result
         const sanitizedSvg = DOMPurify.sanitize(finalSvg, { USE_PROFILES: { svg: true } });
@@ -1144,7 +1234,33 @@ function handleDownloadCutFile() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'cut-file.svg';
+    
+    // Use the generated ID or fallback to 'cut-file'
+    const filename = window.currentCutFileId ? `${window.currentCutFileId}.svg` : 'cut-file.svg';
+    a.download = filename;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function handleDownloadCutFilePlt() {
+    if (!window.nestedSvg) {
+        showErrorToast('No nested SVG to generate a cut file from.');
+        return;
+    }
+
+    const pltFileString = generatePltFile(window.nestedSvg);
+    const blob = new Blob([pltFileString], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Use the generated ID or fallback to 'cut-file'
+    const filename = window.currentCutFileId ? `${window.currentCutFileId}.plt` : 'cut-file.plt';
+    a.download = filename;
+    
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1385,7 +1501,7 @@ export async function init() {
     await getServerSessionToken();
 
     // Assign all DOM elements to the ui object
-    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'addPrintingMarks', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text', 'login-form'];
+    const ids = ['orders-list', 'no-orders-message', 'refreshOrdersBtn', 'nestStickersBtn', 'nested-svg-container', 'spacingInput', 'addPrintingMarks', 'registerBtn', 'loginBtn', 'auth-status', 'loading-indicator', 'error-toast', 'error-message', 'close-error-toast', 'success-toast', 'success-message', 'close-success-toast', 'searchInput', 'searchBtn', 'downloadCutFileBtn', 'downloadCutFilePltBtn', 'exportPdfBtn', 'login-modal', 'close-modal-btn', 'username-input', 'password-input', 'password-login-btn', 'webauthn-login-btn', 'webauthn-register-btn', 'connection-status-dot', 'connection-status-text', 'login-form'];
     ids.forEach(id => {
         // Convert kebab-case to camelCase for keys
         const key = id.replace(/-(\w)/g, (match, letter) => letter.toUpperCase());
@@ -1409,6 +1525,7 @@ export async function init() {
     ui.closeSuccessToast?.addEventListener('click', hideSuccessToast);
     ui.nestStickersBtn?.addEventListener('click', handleNesting);
     ui.downloadCutFileBtn?.addEventListener('click', handleDownloadCutFile);
+    ui.downloadCutFilePltBtn?.addEventListener('click', handleDownloadCutFilePlt);
     ui.exportPdfBtn?.addEventListener('click', handleExportPdf);
     ui.searchBtn?.addEventListener('click', handleSearch);
     ui.searchInput?.addEventListener('keyup', (e) => {

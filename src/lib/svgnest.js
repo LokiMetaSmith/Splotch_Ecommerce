@@ -314,6 +314,9 @@ export class SvgNest {
         let idCounter = 0;
         
         const processElement = (el) => {
+            // Check if this element is part of a nest-group
+            const nestGroup = el.closest ? el.closest('.nest-group') : null;
+
             // Recurse into containers
             if (['svg', 'g', 'defs', 'symbol'].includes(el.tagName)) {
                 Array.from(el.children).forEach(child => processElement(child));
@@ -328,7 +331,30 @@ export class SvgNest {
 
                 if (cleanedPoly && cleanedPoly.length > 2 && Math.abs(GeometryUtil.polygonArea(cleanedPoly)) > this.config.curveTolerance * this.config.curveTolerance) {
                     cleanedPoly.id = idCounter++;
-                    cleanedPoly.element = el; // Keep reference to original DOM element
+                    // If part of a nest-group, we assign the group as the element to place
+                    // But we ONLY want one polygon per group to act as its bounds!
+                    // If a cutline has multiple disconnected sub-paths, they might yield multiple polygons.
+                    // For now, we add each polygon. The PlacementWorker places polygons independently.
+                    // To keep the group together, we MUST only yield ONE polygon per group!
+                    if (nestGroup) {
+                        // If we already added a polygon for this nest-group, we should ideally merge them or take the largest.
+                        // Let's just add it, but it might duplicate the image if there are multiple paths!
+                        cleanedPoly.element = nestGroup;
+                        
+                        // Check if we already have a polygon for this nestGroup to avoid duplicates
+                        const existingPoly = polygons.find(p => p.element === nestGroup);
+                        if (existingPoly) {
+                            // If we already have one, keep the one with the larger area (the outer bound)
+                            if (Math.abs(GeometryUtil.polygonArea(cleanedPoly)) > Math.abs(GeometryUtil.polygonArea(existingPoly))) {
+                                // Replace existing
+                                Object.assign(existingPoly, cleanedPoly);
+                                existingPoly.id = cleanedPoly.id; // restore original ID? actually doesn't matter
+                            }
+                            return; // Don't push a duplicate
+                        }
+                    } else {
+                        cleanedPoly.element = el; // Keep reference to original DOM element
+                    }
                     polygons.push(cleanedPoly);
                 } else {
                      console.warn(`Part skipped: Area too small or invalid.`);

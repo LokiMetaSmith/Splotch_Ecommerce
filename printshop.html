@@ -389,7 +389,7 @@
                   class="w-20 p-1 border rounded-md"
                 />
               </div>
-              <div class="mt-2">
+              <div class="mt-2 flex flex-col space-y-2">
                 <label class="inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -398,6 +398,13 @@
                   />
                   <span class="ml-2 text-gray-700">Add Printing Marks</span>
                 </label>
+                <div>
+                  <label for="alignmentMarkShape" class="mr-2 text-sm text-gray-700">Alignment Mark Type:</label>
+                  <select id="alignmentMarkShape" class="p-1 border rounded-md text-sm">
+                    <option value="circle">Circle</option>
+                    <option value="square">Square</option>
+                  </select>
+                </div>
               </div>
               <div class="mt-4 border-t pt-4">
                 <h3 class="text-lg font-bold mb-2">Media Margins (px)</h3>
@@ -466,7 +473,13 @@
                 id="downloadCutFileBtn"
                 class="mt-4 w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600"
               >
-                Download Cut File
+                Download Cut File (SVG)
+              </button>
+              <button
+                id="downloadCutFilePltBtn"
+                class="mt-4 w-full px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+              >
+                Download Cut File (PLT)
               </button>
               <button
                 id="exportPdfBtn"

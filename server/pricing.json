@@ -98,6 +98,7 @@
   ],
   "complexity": {
     "description": "Multiplier based on the perimeter of the cut path.",
+    "perLayerMultiplier": 0.1,
     "tiers": [
       {
         "thresholdInches": 12,
