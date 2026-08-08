@@ -1061,8 +1061,8 @@ async function handleNesting(e) {
                     reader.readAsDataURL(pngBlob);
                 });
 
-                const parser = new DOMParser();
-                const cutlineDoc = parser.parseFromString(cutlineSvgText, 'image/svg+xml');
+                const domParser = new DOMParser();
+                const cutlineDoc = domParser.parseFromString(cutlineSvgText, 'image/svg+xml');
                 const cutlineRoot = cutlineDoc.documentElement;
                 const width = cutlineRoot.getAttribute('width') || '100%';
                 const height = cutlineRoot.getAttribute('height') || '100%';
@@ -1134,8 +1134,8 @@ async function handleNesting(e) {
         window.currentCutFileId = cutFileId; // Save for download button
 
                 // 4. Inject Printing Marks & QR Codes into SVG
-                const parser = new DOMParser();
-                const svgDoc = parser.parseFromString(resultSvg, 'image/svg+xml');
+                const domParser = new DOMParser();
+                const svgDoc = domParser.parseFromString(resultSvg, 'image/svg+xml');
                 const rootSvg = svgDoc.documentElement;
 
                 const markShape = document.getElementById('alignmentMarkShape').value || 'circle';
