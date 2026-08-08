@@ -82,7 +82,6 @@ let textInput,
   layerControlsContainer,
   cutlineOffsetSlider,
   cutlineOffsetValueDisplay,
-  cutTypeToggle,
   cutlineSensitivitySlider,
   cutlineSensitivityValueDisplay,
   lazyLassoSlider,
@@ -304,7 +303,6 @@ async function BootStrap() {
   const resizeUnitLabelEl = document.getElementById("resizeUnitLabel");
   grayscaleBtnEl = document.getElementById("grayscaleBtn");
   sepiaBtnEl = document.getElementById("sepiaBtn");
-  cutTypeToggle = document.getElementById("cutTypeToggle");
   cutlineOffsetSlider = document.getElementById("cutlineOffsetSlider");
   cutlineOffsetValueDisplay = document.getElementById("cutlineOffsetValue");
   cutlineSensitivitySlider = document.getElementById(
@@ -543,16 +541,16 @@ async function BootStrap() {
   if (cutlineOffsetSlider) {
     const handleSliderInput = debounce((e) => {
       const step = parseInt(e.target.value, 10);
-      let textLabel = "A little white";
+      let textLabel = "1.5mm";
       if (step === 0) {
         cutlineOffset = 0;
-        textLabel = "No bleed";
+        textLabel = "0mm (None)";
       } else if (step === 1) {
         cutlineOffset = 15;
-        textLabel = "A little white";
+        textLabel = "1.5mm";
       } else if (step === 2) {
         cutlineOffset = 35;
-        textLabel = "Pillowy outline";
+        textLabel = "3mm";
       }
 
       if (cutlineOffsetValueDisplay)
@@ -580,14 +578,6 @@ async function BootStrap() {
 
     // Fallback for tests that fire change without input
     cutlineOffsetSlider.addEventListener("change", handleSliderInput);
-  }
-
-  if (cutTypeToggle) {
-    cutTypeToggle.addEventListener("change", (e) => {
-      if (originalImage && canvas) {
-          handleGenerateCutline(true);
-      }
-    });
   }
 
   if (cutlineSensitivitySlider) {
@@ -1794,8 +1784,7 @@ function updateEditingButtonsState(disabled) {
     addTextBtn,
     textFontFamilySelect,
     cutlineOffsetSlider,
-    cutTypeToggle,
-  ];
+    ];
   const disabledClasses = ["opacity-50", "cursor-not-allowed"];
   elements.forEach((el) => {
     if (el) {
@@ -2104,11 +2093,9 @@ function loadFileAsImage(file, isMascot = false) {
           );
           
           if (imageHasTransparentBorder(currentImageData)) {
-            if (cutTypeToggle) cutTypeToggle.checked = true;
             if (cutShapeSelect) cutShapeSelect.value = "trace";
             handleGenerateCutline(true);
           } else {
-            if (cutTypeToggle) cutTypeToggle.checked = false;
             if (cutShapeSelect) cutShapeSelect.value = "square";
             handleGenerateCutline(true);
           }
@@ -2272,12 +2259,6 @@ function handleSvgUpload(svgText) {
     if (clearFileBtn) clearFileBtn.classList.remove("hidden");
     showNotification("SVG processed and cutline generated.", "success");
     updateEditingButtonsState(false); // Enable editing buttons
-
-    // Explicitly disable the cutTypeToggle for SVG files
-    if (cutTypeToggle) {
-      cutTypeToggle.disabled = true;
-      cutTypeToggle.checked = false;
-    }
 
     // Show legend since SVG is loaded
     renderLayerTabs();
@@ -3367,11 +3348,9 @@ function handleResetImage() {
       const logicalHeight = canvas.height / dpr;
 
       if (imageHasTransparentBorder(currentImageData)) {
-        if (cutTypeToggle) cutTypeToggle.checked = true;
         if (cutShapeSelect) cutShapeSelect.value = "trace";
         handleGenerateCutline(true);
       } else {
-        if (cutTypeToggle) cutTypeToggle.checked = false;
         if (cutShapeSelect) cutShapeSelect.value = "square";
         handleGenerateCutline(true);
       }
@@ -4297,10 +4276,10 @@ async function handleRemoteImageLoad(imageUrl) {
     const logicalHeight = canvas.height / dpr;
 
     if (imageHasTransparentBorder(currentImageData)) {
-      if (cutTypeToggle) cutTypeToggle.checked = true;
+      if (cutShapeSelect) cutShapeSelect.value = "trace";
       handleGenerateCutline(true);
     } else {
-      if (cutTypeToggle) cutTypeToggle.checked = false;
+      if (cutShapeSelect) cutShapeSelect.value = "square";
       rasterCutlinePoly = [
         [
           { x: 0, y: 0 },
@@ -4315,7 +4294,7 @@ async function handleRemoteImageLoad(imageUrl) {
         cutlineOffsetSlider.value = 1;
       }
       if (cutlineOffsetValueDisplay) {
-        cutlineOffsetValueDisplay.textContent = "A little white";
+        cutlineOffsetValueDisplay.textContent = "1.5mm";
       }
 
       const cutline = generateCutLine(rasterCutlinePoly, cutlineOffset);
@@ -4383,11 +4362,9 @@ async function loadProductForBuyer(productId) {
       const logicalHeight = canvas.height / dpr;
 
       if (imageHasTransparentBorder(currentImageData)) {
-        if (cutTypeToggle) cutTypeToggle.checked = true;
         if (cutShapeSelect) cutShapeSelect.value = "trace";
         handleGenerateCutline(true);
       } else {
-        if (cutTypeToggle) cutTypeToggle.checked = false;
         if (cutShapeSelect) cutShapeSelect.value = "square";
         handleGenerateCutline(true);
       }
