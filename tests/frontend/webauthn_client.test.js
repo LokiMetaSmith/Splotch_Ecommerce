@@ -72,7 +72,7 @@ jest.unstable_mockModule('../../src/lib/svgparser.js', () => ({
     SVGParser: class {},
 }));
 jest.unstable_mockModule('../../src/lib/cut_file_generator.js', () => ({
-    generateCutFile: jest.fn(),
+    generateCutFile: jest.fn(), generatePltFile: jest.fn(),
 }));
 
 
