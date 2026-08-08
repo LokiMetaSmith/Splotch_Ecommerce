@@ -548,51 +548,25 @@
             </div>
             <!-- Cutline Controls -->
             <div
-              class="control-group-cutline flex flex-wrap justify-center items-center gap-4"
+              class="control-group-cutline grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 bg-blue-50 rounded-lg"
               style="display: none"
             >
               <div
-                class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
+                class="flex flex-col justify-center items-center w-full"
               >
-                <span class="text-xs text-gray-500 mb-1">Shape</span>
+                <span class="text-xs text-gray-500 mb-1">Cut Shape</span>
                 <select
                   id="cutShapeSelect"
-                  class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-[200px]"
                 >
-                  <option value="trace">Trace Contour</option>
-                  <option value="circle">Circle</option>
-                  <option value="square">Square</option>
+                  <option value="trace">Custom Contour</option>
+                  <option value="circle">Standard Circle</option>
+                  <option value="square">Standard Square</option>
                 </select>
               </div>
+
               <div
-                class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
-              >
-                <span class="text-xs text-gray-500 mb-1">Cut Type</span>
-                <label
-                  for="cutTypeToggle"
-                  class="flex items-center cursor-pointer space-x-2"
-                >
-                  <span class="text-xs font-bold text-gray-600">Edge</span>
-                  <div class="relative">
-                    <input
-                      type="checkbox"
-                      id="cutTypeToggle"
-                      class="sr-only peer"
-                      role="switch"
-                      aria-label="Toggle Cut Type"
-                    />
-                    <div
-                      class="block bg-gray-600 w-14 h-8 rounded-full peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 transition-shadow"
-                    ></div>
-                    <div
-                      class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"
-                    ></div>
-                  </div>
-                  <span class="text-xs font-bold text-gray-600">Contour</span>
-                </label>
-              </div>
-              <div
-                class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
+                class="flex flex-col justify-center items-center w-full"
               >
                 <label
                   for="cutlineOffsetSlider"
@@ -612,28 +586,28 @@
                   <span
                     id="cutlineOffsetValue"
                     class="text-xs min-w-[80px] text-center text-gray-600 font-mono whitespace-nowrap"
-                    >A little white</span
+                    >1.5mm</span
                   >
                 </div>
               </div>
 
-              <!-- Bleed Gradient Controls -->
+              <!-- Background Color Controls -->
               <div
-                class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
+                class="flex flex-col justify-center items-center w-full"
               >
-                <span class="text-xs text-gray-500 mb-1">Bleed Gradient</span>
+                <span class="text-xs text-gray-500 mb-1">Background Color</span>
                 <div class="flex items-center gap-2">
                   <input
                     type="color"
                     id="bleedColor1"
-                    value="#000000"
+                    value="#3b82f6"
                     class="w-8 h-8 p-0 border-0 rounded cursor-pointer"
                     data-tooltip="Gradient Start Color"
                   />
                   <input
                     type="color"
                     id="bleedColor2"
-                    value="#000000"
+                    value="#1d4ed8"
                     class="w-8 h-8 p-0 border-0 rounded cursor-pointer"
                     data-tooltip="Gradient End Color"
                   />
