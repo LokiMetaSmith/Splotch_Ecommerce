@@ -3960,9 +3960,9 @@ function handleGenerateCutline(skipPrompt = false) {
              // Fallback to full image bounds for basic shapes if trace fails (e.g. non-transparent image)
              significantContours = [[
                { x: 0, y: 0 },
-               { x: scaledWidth, y: 0 },
-               { x: scaledWidth, y: scaledHeight },
-               { x: 0, y: scaledHeight }
+               { x: logicalCanvasWidth, y: 0 },
+               { x: logicalCanvasWidth, y: logicalCanvasHeight },
+               { x: 0, y: logicalCanvasHeight }
              ]];
            } else {
              ctx.putImageData(originalCanvasData, 0, 0);
@@ -3993,7 +3993,7 @@ function handleGenerateCutline(skipPrompt = false) {
            let poly = [];
            
            if (selectedShape === "circle") {
-             const r = Math.max(hw, hh); 
+             const r = Math.sqrt(hw * hw + hh * hh);
              const steps = 64;
              for(let i=0; i<steps; i++) {
                const theta = (i / steps) * 2 * Math.PI;
