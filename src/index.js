@@ -510,6 +510,10 @@ async function BootStrap() {
   if (generateCutlineBtn)
     generateCutlineBtn.addEventListener("click", handleGenerateCutline);
     
+  const downloadCutlineBtn = document.getElementById("downloadCutlineBtn");
+  if (downloadCutlineBtn)
+    downloadCutlineBtn.addEventListener("click", handleDownloadCutline);
+    
   const generateFromBaseBtn = document.getElementById("generateFromBaseBtn");
   if (generateFromBaseBtn)
     generateFromBaseBtn.addEventListener("click", handleGenerateFromBase);
@@ -1805,6 +1809,7 @@ function updateEditingButtonsState(disabled) {
   );
   const lazyLassoContainer = document.getElementById("lazyLassoContainer");
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+  const downloadCutlineBtn = document.getElementById("downloadCutlineBtn");
 
   if (!easterEggUnlocked) {
     if (grayBtn) grayBtn.style.display = "none";
@@ -1815,6 +1820,7 @@ function updateEditingButtonsState(disabled) {
       lazyLassoContainer.style.display = "none";
     }
     if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
+    if (downloadCutlineBtn) downloadCutlineBtn.style.display = "none";
   } else {
     if (grayBtn) {
       grayBtn.style.display = disabled ? "none" : "block";
@@ -1830,6 +1836,10 @@ function updateEditingButtonsState(disabled) {
     }
     if (generateCutlineBtn) {
       generateCutlineBtn.style.display = disabled ? "none" : "flex";
+    }
+    if (downloadCutlineBtn) {
+      const hasCutline = currentCutline && currentCutline.length > 0;
+      downloadCutlineBtn.style.display = (disabled || !hasCutline) ? "none" : "flex";
     }
   }
   if (canvasPlaceholder)
@@ -3810,6 +3820,29 @@ function handleGenerateFromBase() {
     redrawAllForHighlight();
   };
   processedImg.src = tempCanvas.toDataURL();
+}
+
+function handleDownloadCutline() {
+  if (!currentCutline || currentCutline.length === 0) {
+    showNotification("No cutline generated to download.", "error");
+    return;
+  }
+  try {
+    const svgContent = generateSvgFromCutline(currentCutline, currentBounds);
+    const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "splotch-cutline.svg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showNotification("Cutline downloaded successfully.", "success");
+  } catch (error) {
+    console.error("Error downloading cutline:", error);
+    showNotification("Failed to download cutline.", "error");
+  }
 }
 
 function handleGenerateCutline(skipPrompt = false) {
