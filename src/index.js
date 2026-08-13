@@ -1413,10 +1413,10 @@ async function handlePaymentFormSubmit(event) {
   }
 
   showPaymentStatus("Processing order...", "info");
-  console.log("BROWSER LOG: Processing order check originalImage:", !!originalImage);
+  console.log("BROWSER LOG: Processing order check designLayers length:", designLayers.length);
 
-  // Ensure there is an image to submit
-  if (!originalImage) {
+  // --- NEW VALIDATION: Ensure an image exists before proceeding ---
+  if (designLayers.length === 0 && basePolygons.length === 0) {
     showPaymentStatus(
       "Please upload a sticker design image before submitting.",
       "error",

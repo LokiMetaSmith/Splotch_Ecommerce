@@ -39,6 +39,9 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    watch: {
+      ignored: ['**/test-results/**', '**/playwright-report/**', '**/server/**', '**/*.json']
+    },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:3000',
