@@ -3945,15 +3945,15 @@ function handleGenerateCutline(skipPrompt = false) {
         let contours = e.data.contours;
 
         // Filter contours to remove noise
-        // Lower threshold to 0.005% of image area, minimum 25 pixels, to preserve small disconnected features like flames/sparks
+        // Balanced threshold: 0.02% of image area, minimum 100 pixels, to preserve small disconnected features but discard tiny specs
         const imageArea = sourceWidth * sourceHeight;
-        const minIslandArea = Math.max(25, imageArea * 0.00005); 
+        const minIslandArea = Math.max(100, imageArea * 0.0002); 
         // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
         // This changes O(N*M) check to O(N*m) where m << M.
-        // Epsilon set to 1.5 to smooth out fractal/jagged edges on soft alpha gradients.
+        // Epsilon set to 2.0 to aggressively reduce points for clipper-lib performance
         let significantContours = contours
           .filter((c) => getPolygonArea(c) > minIslandArea)
-          .map((c) => simplifyPolygon(c, 1.5)); 
+          .map((c) => simplifyPolygon(c, 2.0)); 
 
         // Suppress "island cuts" (internal holes) that are larger than 2mm.
         // Constraint: "we can have internal cuts, but they should be less than 2mm"

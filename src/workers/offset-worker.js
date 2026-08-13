@@ -52,13 +52,16 @@ self.addEventListener('message', function(e) {
         if (lassoRadius && lassoRadius > 0) {
             const tempCo = new ClipperLib.ClipperOffset();
             const tempPaths = new ClipperLib.Paths();
-            tempCo.AddPaths(scaledPolygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+            // Use jtMiter for intermediate lasso to drastically improve performance with many contours
+            tempCo.MiterLimit = 2.0;
+            tempCo.AddPaths(scaledPolygons, ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
             const r = Math.max(1, Math.round(lassoRadius * scale));
             tempCo.Execute(tempPaths, r);
 
             const tempCo2 = new ClipperLib.ClipperOffset();
             const tempPaths2 = new ClipperLib.Paths();
-            tempCo2.AddPaths(tempPaths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+            tempCo2.MiterLimit = 2.0;
+            tempCo2.AddPaths(tempPaths, ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
             tempCo2.Execute(tempPaths2, -r);
 
             initialPolygons = tempPaths2;
