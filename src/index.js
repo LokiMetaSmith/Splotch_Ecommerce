@@ -3944,14 +3944,13 @@ function handleGenerateCutline(skipPrompt = false) {
       if (e.data.success) {
         let contours = e.data.contours;
 
-        // Filter contours to remove noise (e.g. area < 400 pixels)
-        // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
-        // INCREASED threshold to 0.1% to aggressively filter alpha noise spots before they are magnified by offset.
+        // Filter contours to remove noise
+        // Lower threshold to 0.005% of image area, minimum 25 pixels, to preserve small disconnected features like flames/sparks
         const imageArea = sourceWidth * sourceHeight;
-        const minIslandArea = Math.max(400, imageArea * 0.001); 
+        const minIslandArea = Math.max(25, imageArea * 0.00005); 
         // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
         // This changes O(N*M) check to O(N*m) where m << M.
-        // INCREASED epsilon to 1.5 to smooth out fractal/jagged edges on soft alpha gradients.
+        // Epsilon set to 1.5 to smooth out fractal/jagged edges on soft alpha gradients.
         let significantContours = contours
           .filter((c) => getPolygonArea(c) > minIslandArea)
           .map((c) => simplifyPolygon(c, 1.5)); 

@@ -130,7 +130,7 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
              // Mark visited inside the contour area (simplified approximation for safety)
              // The trace itself marks the boundary in the do-while loop above
 
-             if (contour.length > 10) {
+             if (contour.length > 2) {
                  contours.push(contour);
              }
           }
