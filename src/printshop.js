@@ -708,11 +708,12 @@ function filterAndDisplayOrders(status) {
           <table class="w-full text-sm text-left text-gray-500">
             <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b">
               <tr>
-                <th scope="col" class="px-4 py-3">Select</th>
+                <th scope="col" class="px-4 py-3 w-12">Select</th>
+                <th scope="col" class="px-4 py-3 w-20">QR</th>
                 <th scope="col" class="px-4 py-3">Order Details</th>
                 <th scope="col" class="px-4 py-3">Customer</th>
                 <th scope="col" class="px-4 py-3">Sticker</th>
-                <th scope="col" class="px-4 py-3">Status & Actions</th>
+                <th scope="col" class="px-4 py-3">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -773,13 +774,11 @@ function displayOrderRow(order) {
   );
 
   const serverPrefix = serverUrl;
-  const originalImagePath = `${serverPrefix}${order.originalImage}`;
-  const cutFilePath = order.cutFile ? `${serverPrefix}${order.cutFile}` : null;
+  const designImagePath = `${serverPrefix}${escapeHtml(order.designImagePath || "")}`;
+  const cutFilePath = escapeHtml(
+    order.orderDetails?.cutLinePath || order.cutLinePath || "",
+  );
   const pltFilePath = order.pltFile ? `${serverPrefix}${order.pltFile}` : null;
-  const designImagePath =
-    order.layers && order.layers.length > 0 && order.layers[0].imagePath
-      ? `${serverPrefix}${order.layers[0].imagePath}`
-      : originalImagePath;
 
   const statuses = [
     "NEW",
@@ -814,6 +813,11 @@ function displayOrderRow(order) {
         <input type="checkbox" class="order-select-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" value="${orderId}">
       </td>
       <td class="px-4 py-3">
+        <div class="qr-code-container w-12 h-12" data-order-id="${orderId}">
+            <canvas id="qr-${orderId}" width="48" height="48"></canvas>
+        </div>
+      </td>
+      <td class="px-4 py-3">
         <div class="font-bold text-gray-900">${orderId.substring(0, 8)}...</div>
         <div class="text-xs text-gray-500">${receivedAt}</div>
         <div class="mt-1 font-semibold text-green-600">$${price}</div>
@@ -824,12 +828,12 @@ function displayOrderRow(order) {
       </td>
       <td class="px-4 py-3">
         <div class="flex items-center gap-2">
-            <a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                <img src="${designImagePath}" alt="Design" class="w-full h-full object-contain" loading="lazy" decoding="async">
-            </a>
+            ${designImagePath && order.designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
+                <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" loading="lazy" decoding="async">
+            </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">N/A</div>`}
             <div>
                 <div class="text-xs font-semibold">Qty: ${quantity}</div>
-                ${cutFilePath ? `<a href="${cutFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block mt-1">Download SVG</a>` : ""}
+                ${cutFilePath ? `<a href="${serverPrefix}${cutFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block mt-1">Download SVG</a>` : ""}
                 ${pltFilePath ? `<a href="${pltFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block ml-1 mt-1">Download PLT</a>` : ""}
             </div>
         </div>
@@ -837,9 +841,6 @@ function displayOrderRow(order) {
       <td class="px-4 py-3">
         <div class="flex flex-col gap-2">
             ${dropdownHtml}
-            <div class="qr-code-container w-12 h-12" data-order-id="${orderId}">
-                <canvas id="qr-${orderId}" width="48" height="48"></canvas>
-            </div>
         </div>
       </td>
     </tr>
@@ -1261,8 +1262,8 @@ async function handleNesting(e) {
   );
   const svgElements = checkedCheckboxes
     .map((cb) => {
-      const orderCard = cb.closest(".order-card");
-      return orderCard.querySelector(".sticker-design");
+      const orderContainer = cb.closest(".order-card, .order-row");
+      return orderContainer ? orderContainer.querySelector(".sticker-design") : null;
     })
     .filter((img) => img !== null);
 
@@ -1275,8 +1276,14 @@ async function handleNesting(e) {
 
   try {
     // 1. Generate the complex bin polygon
-    const binWidth = 12 * 96; // 12 inches
-    const binHeight = 12 * 96; // 12 inches
+    const isRollMedia = document.getElementById("rollMedia")?.checked || false;
+    const sheetWidthInches = parseFloat(document.getElementById("sheetWidth")?.value) || 12;
+    let sheetHeightInches = parseFloat(document.getElementById("sheetHeight")?.value) || 12;
+    if (isRollMedia) {
+        sheetHeightInches = 1200; // 100 feet virtual canvas for roll packing
+    }
+    const binWidth = sheetWidthInches * 96; 
+    let binHeight = sheetHeightInches * 96; 
     const scale = 10000; // Use a high scale for precision
 
     const cpr = new ClipperLib.Clipper();
@@ -1444,7 +1451,11 @@ async function handleNesting(e) {
 
         // Add cut lines on top
         Array.from(cutlineRoot.childNodes).forEach((child) => {
-          group.appendChild(child.cloneNode(true));
+          const clone = child.cloneNode(true);
+          if (clone.nodeType === 1) { // ELEMENT_NODE
+            clone.setAttribute("class", (clone.getAttribute("class") || "") + " cut-line-element");
+          }
+          group.appendChild(clone);
         });
 
         unifiedSvg.appendChild(group);
@@ -1503,6 +1514,32 @@ async function handleNesting(e) {
         const domParser = new DOMParser();
         const svgDoc = domParser.parseFromString(resultSvg, "image/svg+xml");
         const rootSvg = svgDoc.documentElement;
+
+        // Auto-shrink length for roll media
+        if (isRollMedia) {
+            let maxPlacedY = 0;
+            const groups = svgDoc.querySelectorAll('.nest-group');
+            groups.forEach(group => {
+                const transform = group.getAttribute('transform') || '';
+                const match = transform.match(/translate\(([^,]+),\s*([^)]+)\)/);
+                let y = 0;
+                if (match) {
+                    y = parseFloat(match[2]);
+                }
+                const img = group.querySelector('image');
+                const h = img ? parseFloat(img.getAttribute('height')) : 0;
+                if (y + h > maxPlacedY) {
+                    maxPlacedY = y + h;
+                }
+            });
+            // Bottom margin and extra padding for fiducials so we don't clip them
+            binHeight = maxPlacedY + marginBottom + 100; 
+        }
+
+        // Force the SVG to be the size of the bin so fiducials and QRs aren't clipped
+        rootSvg.setAttribute("width", String(binWidth));
+        rootSvg.setAttribute("height", String(binHeight));
+        rootSvg.setAttribute("viewBox", `0 0 ${binWidth} ${binHeight}`);
 
         const markShape =
           document.getElementById("alignmentMarkShape").value || "circle";
@@ -1579,10 +1616,10 @@ async function handleNesting(e) {
               rootSvg.appendChild(textNode);
             };
 
-            // Top-Left QR Code
-            addQR(10, 10);
-            // Bottom-Left QR Code
-            addQR(10, binHeight - 110);
+            // Top-Left QR Code (placed next to fiducial at cx=135, cy=60)
+            addQR(155, 10);
+            // Bottom-Right QR Code (placed next to fiducial at cx=binWidth-135, cy=binHeight-60)
+            addQR(binWidth - 255, binHeight - 110);
           } catch (qrErr) {
             console.error("Failed to inject QR code into SVG", qrErr);
           }
@@ -1646,8 +1683,15 @@ function handleDownloadCutFilePlt() {
     return;
   }
 
+  const cutOptions = {
+    mediaType: document.getElementById("mediaType")?.value || "vinyl",
+    thickness: parseFloat(document.getElementById("mediaThickness")?.value) || 0.1,
+    cutPressure: parseInt(document.getElementById("cutPressure")?.value) || 10,
+    cutType: document.getElementById("cutType")?.value || "normal_cut"
+  };
+
   window.nestedSvgs.forEach((nestedSvg, index) => {
-      const pltFileString = generatePltFile(nestedSvg);
+      const pltFileString = generatePltFile(nestedSvg, cutOptions);
       const blob = new Blob([pltFileString], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -1695,6 +1739,10 @@ async function handleExportPdf() {
           showErrorToast("Invalid SVG dimensions for PDF export on sheet " + (i+1));
           return;
         }
+
+        // Remove cut lines and bin outlines for PDF export so we only print the image layer
+        // Stickers are PNG <image> tags, fiducials are <circle>/<rect>, QRs are <image>/<text>.
+        svgElement.querySelectorAll('path, polygon, polyline, line').forEach(el => el.remove());
 
         if (i === 0) {
             // Create the PDF with the correct dimensions from the start.
@@ -1953,6 +2001,12 @@ export async function init() {
     "downloadCutFileBtn",
     "downloadCutFilePltBtn",
     "exportPdfBtn",
+    "scan-mode-banner",
+    "scanTargetStatus",
+    "closeScanModeBtn",
+    "previewCutlinesToggle",
+    "rollMedia",
+    "sheetHeight",
     "login-modal",
     "close-modal-btn",
     "username-input",
@@ -1994,6 +2048,24 @@ export async function init() {
   ui.downloadCutFilePltBtn?.addEventListener("click", handleDownloadCutFilePlt);
   ui.exportPdfBtn?.addEventListener("click", handleExportPdf);
   ui.searchBtn?.addEventListener("click", handleSearch);
+
+  ui.previewCutlinesToggle?.addEventListener("change", (e) => {
+    if (e.target.checked) {
+      ui.nestedSvgContainer.classList.remove("hide-cutlines");
+    } else {
+      ui.nestedSvgContainer.classList.add("hide-cutlines");
+    }
+  });
+
+  ui.rollMedia?.addEventListener("change", (e) => {
+    if (e.target.checked) {
+      ui.sheetHeight.disabled = true;
+      ui.sheetHeight.classList.add("bg-gray-200");
+    } else {
+      ui.sheetHeight.disabled = false;
+      ui.sheetHeight.classList.remove("bg-gray-200");
+    }
+  });
   ui.searchInput?.addEventListener("keyup", (e) => {
     if (e.key === "Enter") handleSearch();
   });

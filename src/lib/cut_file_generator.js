@@ -18,7 +18,7 @@ export function generateCutFile(svgString) {
     return new XMLSerializer().serializeToString(cutFileSvg);
 }
 
-export function generatePltFile(svgString) {
+export function generatePltFile(svgString, options = {}) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgString, 'image/svg+xml');
     const svgElement = doc.documentElement;
@@ -42,6 +42,19 @@ export function generatePltFile(svgString) {
     }
 
     let hpgl = "IN;\n"; // Initialize
+    
+    if (options.mediaType) {
+        hpgl += `CO Media: ${options.mediaType};\n`;
+    }
+    if (options.thickness) {
+        hpgl += `CO Thickness: ${options.thickness}mm;\n`;
+    }
+    if (options.cutType) {
+        hpgl += `CO CutType: ${options.cutType};\n`;
+    }
+    if (options.cutPressure) {
+        hpgl += `FS${options.cutPressure};\n`; // Force Select command
+    }
     
     const elements = svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline');
     

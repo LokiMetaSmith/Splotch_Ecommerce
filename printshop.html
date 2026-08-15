@@ -121,6 +121,16 @@
     <!-- Lightweight QR Code generator -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
     <script type="module" src="/src/printshop.js"></script>
+    <style>
+      @media print {
+        .cut-line-element {
+          display: none !important;
+        }
+      }
+      .hide-cutlines .cut-line-element {
+        display: none !important;
+      }
+    </style>
   </head>
   <body class="bg-slate-200 text-slate-800">
     <header class="bg-white shadow-md">
@@ -398,6 +408,25 @@
               <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">
                 Nesting
               </h2>
+              <div class="mt-4 border-b pb-4">
+                <h3 class="text-lg font-bold mb-2">Sheet Dimensions (Inches)</h3>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label for="sheetWidth" class="block text-sm text-gray-600">Width</label>
+                    <input type="number" id="sheetWidth" step="0.1" value="12" class="w-full p-1 border rounded-md" />
+                  </div>
+                  <div>
+                    <label for="sheetHeight" class="block text-sm text-gray-600">Height</label>
+                    <input type="number" id="sheetHeight" step="0.1" value="12" class="w-full p-1 border rounded-md" />
+                  </div>
+                </div>
+                <div class="mt-2">
+                  <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="rollMedia" class="form-checkbox h-5 w-5 text-blue-600" />
+                    <span class="ml-2 text-sm text-gray-700 font-bold">Roll Media (Auto-Length)</span>
+                  </label>
+                </div>
+              </div>
               <div class="mt-4">
                 <label for="spacingInput" class="mr-2">Spacing:</label>
                 <input
@@ -428,40 +457,49 @@
                 <h3 class="text-lg font-bold mb-2">Media Margins (px)</h3>
                 <div class="grid grid-cols-2 gap-2">
                   <div>
-                    <label for="marginTop">Top:</label
-                    ><input
-                      type="number"
-                      id="marginTop"
-                      value="10"
-                      class="w-full p-1 border rounded-md"
-                    />
+                    <label for="marginTop" class="block text-sm text-gray-600">Top:</label>
+                    <input type="number" id="marginTop" value="100" class="w-full p-1 border rounded-md" />
                   </div>
                   <div>
-                    <label for="marginBottom">Bottom:</label
-                    ><input
-                      type="number"
-                      id="marginBottom"
-                      value="10"
-                      class="w-full p-1 border rounded-md"
-                    />
+                    <label for="marginBottom" class="block text-sm text-gray-600">Bottom:</label>
+                    <input type="number" id="marginBottom" value="100" class="w-full p-1 border rounded-md" />
                   </div>
                   <div>
-                    <label for="marginLeft">Left:</label
-                    ><input
-                      type="number"
-                      id="marginLeft"
-                      value="10"
-                      class="w-full p-1 border rounded-md"
-                    />
+                    <label for="marginLeft" class="block text-sm text-gray-600">Left:</label>
+                    <input type="number" id="marginLeft" value="150" class="w-full p-1 border rounded-md" />
                   </div>
                   <div>
-                    <label for="marginRight">Right:</label
-                    ><input
-                      type="number"
-                      id="marginRight"
-                      value="10"
-                      class="w-full p-1 border rounded-md"
-                    />
+                    <label for="marginRight" class="block text-sm text-gray-600">Right:</label>
+                    <input type="number" id="marginRight" value="150" class="w-full p-1 border rounded-md" />
+                  </div>
+                </div>
+              </div>
+              <div class="mt-4 border-t pt-4">
+                <h3 class="text-lg font-bold mb-2">Cut Settings</h3>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label for="mediaType" class="block text-sm text-gray-600">Media Type</label>
+                    <select id="mediaType" class="w-full p-1 border rounded-md text-sm">
+                      <option value="vinyl">Vinyl</option>
+                      <option value="paper">Paper</option>
+                      <option value="cardstock">Cardstock</option>
+                      <option value="pet">PET / Polyester</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="mediaThickness" class="block text-sm text-gray-600">Thickness (mm)</label>
+                    <input type="number" id="mediaThickness" step="0.1" value="0.1" class="w-full p-1 border rounded-md" />
+                  </div>
+                  <div>
+                    <label for="cutPressure" class="block text-sm text-gray-600">Cut Pressure (Force)</label>
+                    <input type="number" id="cutPressure" value="10" class="w-full p-1 border rounded-md" />
+                  </div>
+                  <div>
+                    <label for="cutType" class="block text-sm text-gray-600">Cut Type</label>
+                    <select id="cutType" class="w-full p-1 border rounded-md text-sm">
+                      <option value="kiss_cut">Kiss Cut</option>
+                      <option value="normal_cut">Normal (Die) Cut</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -477,16 +515,17 @@
                   id="keepoutAreas"
                   class="w-full p-1 border rounded-md"
                   rows="4"
-                >
-[]</textarea
-                >
+                >[]</textarea>
               </div>
-              <button
-                id="nestStickersBtn"
-                class="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-              >
-                Nest Stickers
-              </button>
+              <div class="mt-4 flex items-center justify-between">
+                <button id="nestStickersBtn" class="flex-1 mr-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-bold text-lg">
+                  Nest Stickers
+                </button>
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="previewCutlinesToggle" checked class="form-checkbox h-5 w-5 text-red-600" />
+                  <span class="ml-2 text-sm text-gray-700">Preview Cutlines</span>
+                </label>
+              </div>
               <button
                 id="downloadCutFileBtn"
                 class="mt-4 w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600"
@@ -565,6 +604,7 @@
                 <input
                   type="password"
                   id="odoo-password"
+                  autocomplete="current-password"
                   class="w-full p-2 border rounded-md"
                   placeholder="********"
                 />
