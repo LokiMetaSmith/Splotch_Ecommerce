@@ -6,31 +6,55 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
 
     // Use a fixed sensitivity mapped to a sensible threshold, but make it more inclusive of semi-transparent pixels.
     // By default (sensitivity 50), allow alpha > 75 instead of alpha > 127, to avoid cutting off soft edges.
-    const alphaThreshold = Math.max(1, Math.min(254, Math.floor(255 - Math.pow(sensitivity / 100, 0.5) * 255)));
+    const alphaThreshold = Math.max(
+      1,
+      Math.min(254, Math.floor(255 - Math.pow(sensitivity / 100, 0.5) * 255)),
+    );
 
     const u32 = new Uint32Array(data.buffer, data.byteOffset, data.length >> 2);
-    const IS_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([0x12345678]).buffer)[0] === 0x78;
+    const IS_LITTLE_ENDIAN =
+      new Uint8Array(new Uint32Array([0x12345678]).buffer)[0] === 0x78;
 
     // Detect solid background from corners to act as a "Magic Wand" for opaque images
     let bgColor = null;
     const getRGB = (pixel) => {
       if (IS_LITTLE_ENDIAN) {
-        return { r: pixel & 0xFF, g: (pixel >>> 8) & 0xFF, b: (pixel >>> 16) & 0xFF, a: (pixel >>> 24) };
+        return {
+          r: pixel & 0xff,
+          g: (pixel >>> 8) & 0xff,
+          b: (pixel >>> 16) & 0xff,
+          a: pixel >>> 24,
+        };
       } else {
-        return { r: (pixel >>> 24) & 0xFF, g: (pixel >>> 16) & 0xFF, b: (pixel >>> 8) & 0xFF, a: pixel & 0xFF };
+        return {
+          r: (pixel >>> 24) & 0xff,
+          g: (pixel >>> 16) & 0xff,
+          b: (pixel >>> 8) & 0xff,
+          a: pixel & 0xff,
+        };
       }
     };
-    
-    const cornerIndices = [0, width - 1, (height - 1) * width, (height - 1) * width + width - 1];
-    const corners = cornerIndices.map(idx => getRGB(u32[idx]));
+
+    const cornerIndices = [
+      0,
+      width - 1,
+      (height - 1) * width,
+      (height - 1) * width + width - 1,
+    ];
+    const corners = cornerIndices.map((idx) => getRGB(u32[idx]));
     const c0 = corners[0];
-    
+
     // Only detect solid backgrounds if the corners are opaque and roughly the same color
     if (c0.a > 250) {
       let allMatch = true;
       for (let i = 1; i < 4; i++) {
         const c = corners[i];
-        if (c.a < 250 || Math.abs(c0.r - c.r) > 15 || Math.abs(c0.g - c.g) > 15 || Math.abs(c0.b - c.b) > 15) {
+        if (
+          c.a < 250 ||
+          Math.abs(c0.r - c.r) > 15 ||
+          Math.abs(c0.g - c.g) > 15 ||
+          Math.abs(c0.b - c.b) > 15
+        ) {
           allMatch = false;
           break;
         }
@@ -49,24 +73,44 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
 
     let isSolid;
     let checkPixel;
-    
+
     // Tolerance for background removal
     const isBgColor = (rgb) => {
       if (!bgColor) return false;
-      return Math.abs(bgColor.r - rgb.r) <= 25 && Math.abs(bgColor.g - rgb.g) <= 25 && Math.abs(bgColor.b - rgb.b) <= 25;
+      return (
+        Math.abs(bgColor.r - rgb.r) <= 25 &&
+        Math.abs(bgColor.g - rgb.g) <= 25 &&
+        Math.abs(bgColor.b - rgb.b) <= 25
+      );
     };
 
     if (IS_LITTLE_ENDIAN) {
       isSolid = (x, y) => {
         if (x < 0 || x >= width || y < 0 || y >= height) return false;
         const pixel = u32[y * width + x];
-        if ((pixel >>> 24) < alphaThreshold) return false;
-        if (bgColor && isBgColor({ r: pixel & 0xFF, g: (pixel >>> 8) & 0xFF, b: (pixel >>> 16) & 0xFF })) return false;
+        if (pixel >>> 24 < alphaThreshold) return false;
+        if (
+          bgColor &&
+          isBgColor({
+            r: pixel & 0xff,
+            g: (pixel >>> 8) & 0xff,
+            b: (pixel >>> 16) & 0xff,
+          })
+        )
+          return false;
         return true;
       };
       checkPixel = (pixel) => {
-        if ((pixel >>> 24) < alphaThreshold) return false;
-        if (bgColor && isBgColor({ r: pixel & 0xFF, g: (pixel >>> 8) & 0xFF, b: (pixel >>> 16) & 0xFF })) return false;
+        if (pixel >>> 24 < alphaThreshold) return false;
+        if (
+          bgColor &&
+          isBgColor({
+            r: pixel & 0xff,
+            g: (pixel >>> 8) & 0xff,
+            b: (pixel >>> 16) & 0xff,
+          })
+        )
+          return false;
         return true;
       };
     } else {
@@ -74,12 +118,28 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
         if (x < 0 || x >= width || y < 0 || y >= height) return false;
         const pixel = u32[y * width + x];
         if ((pixel & 0xff) < alphaThreshold) return false;
-        if (bgColor && isBgColor({ r: (pixel >>> 24) & 0xFF, g: (pixel >>> 16) & 0xFF, b: (pixel >>> 8) & 0xFF })) return false;
+        if (
+          bgColor &&
+          isBgColor({
+            r: (pixel >>> 24) & 0xff,
+            g: (pixel >>> 16) & 0xff,
+            b: (pixel >>> 8) & 0xff,
+          })
+        )
+          return false;
         return true;
       };
       checkPixel = (pixel) => {
         if ((pixel & 0xff) < alphaThreshold) return false;
-        if (bgColor && isBgColor({ r: (pixel >>> 24) & 0xFF, g: (pixel >>> 16) & 0xFF, b: (pixel >>> 8) & 0xFF })) return false;
+        if (
+          bgColor &&
+          isBgColor({
+            r: (pixel >>> 24) & 0xff,
+            g: (pixel >>> 16) & 0xff,
+            b: (pixel >>> 8) & 0xff,
+          })
+        )
+          return false;
         return true;
       };
     }
@@ -125,14 +185,14 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
         if (!visited[idx] && checkPixel(u32[idx])) {
           // Check if it's a boundary pixel (left is transparent or edge)
           if (x === 0 || !checkPixel(u32[idx - 1])) {
-             const contour = traceContour(x, y);
+            const contour = traceContour(x, y);
 
-             // Mark visited inside the contour area (simplified approximation for safety)
-             // The trace itself marks the boundary in the do-while loop above
+            // Mark visited inside the contour area (simplified approximation for safety)
+            // The trace itself marks the boundary in the do-while loop above
 
-             if (contour.length > 5) {
-                 contours.push(contour);
-             }
+            if (contour.length > 5) {
+              contours.push(contour);
+            }
           }
         }
       }
@@ -142,10 +202,14 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
   });
 }
 
-self.addEventListener('message', async function(e) {
+self.addEventListener("message", async function (e) {
   try {
     const { imageData, cutlineSensitivity, scaleFactor } = e.data;
-    const contours = await traceContours(imageData, cutlineSensitivity, scaleFactor);
+    const contours = await traceContours(
+      imageData,
+      cutlineSensitivity,
+      scaleFactor,
+    );
     postMessage({ success: true, contours });
   } catch (error) {
     self.postMessage({ success: false, error: error.message });

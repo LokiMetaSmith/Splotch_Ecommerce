@@ -18,6 +18,10 @@ export function addLayer(image, name, x, y, width, height) {
     offsetPoly: null,
     cleanCanvasState: null, // Used if there are filters
     customLayers: [],
+    basePolygons: [],
+    currentPolygons: [],
+    currentCutline: [],
+    rasterCutlinePoly: null,
   };
   designLayers.push(newLayer);
   activeLayerIndex = designLayers.length - 1;

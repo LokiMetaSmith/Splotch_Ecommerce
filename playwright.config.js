@@ -34,6 +34,6 @@ export default defineConfig({
       use: { ...devices['iPhone 12'] },
     },
   ],
-  testDir: 'playwright_tests',
+  testDir: 'playwright_tests_real',
   reporter: 'list',
 });

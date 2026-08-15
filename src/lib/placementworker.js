@@ -13,7 +13,7 @@ export class PlacementWorker {
         this.nfpCache = nfpCache;
     }
 
-    placePaths(paths) {
+    async placePaths(paths, onProgress) {
         if (!paths || paths.length === 0) return null;
 
         const placements = [];
@@ -50,6 +50,12 @@ export class PlacementWorker {
             const part = paths[i];
             const id = this.ids[i];
             const rotation = this.rotations[i];
+
+            if (onProgress) {
+                onProgress(i, paths.length);
+                // Yield to the main thread so the UI can update
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
 
             // Bolt Optimization: Combine rotation, bounding box calculation, zeroing, and clipper conversion
             // into a single 2-pass O(N) operation to avoid creating intermediate O(N) arrays and objects.

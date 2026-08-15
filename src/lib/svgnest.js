@@ -203,7 +203,7 @@ export class SvgNest {
         this.binBounds = GeometryUtil.getPolygonBounds(this.binPolygon);
     }
 
-    start() {
+    async start() {
         if (!this.binPolygon || !this.tree || this.tree.length === 0) {
             console.error("Bin or parts not set or empty.");
             return '';
@@ -214,40 +214,67 @@ export class SvgNest {
         const adam = this.tree.slice(0);
         adam.sort((a, b) => Math.abs(GeometryUtil.polygonArea(b)) - Math.abs(GeometryUtil.polygonArea(a)));
 
-        // Bolt Optimization: Since we only use the first individual in this synchronous implementation,
-        // force populationSize to 1 to avoid generating unused mutants in the GA constructor.
         const runConfig = { ...this.config, populationSize: 1 };
         this.GA = new GeneticAlgorithm(adam, this.binPolygon, runConfig);
         const individual = this.GA.population[0];
         
-        const worker = new PlacementWorker(this.binPolygon, this.tree, individual.placement.map(p => p.id), individual.rotation, this.config, {});
-        const result = worker.placePaths(individual.placement);
+        // Multi-bin overflow logic
+        let remainingIds = individual.placement.map(p => p.id);
+        const allPlacements = [];
+        let failsafe = 100; // max 100 bins to prevent infinite loops
+
+        while (remainingIds.length > 0 && failsafe > 0) {
+            failsafe--;
+            const sheetNumber = allPlacements.length + 1;
+            
+            const worker = new PlacementWorker(this.binPolygon, this.tree, remainingIds, individual.rotation, this.config, {});
+            // Filter the placement order to only include remaining items
+            const currentPlacementOrder = individual.placement.filter(p => remainingIds.includes(p.id));
+            
+            const result = await worker.placePaths(currentPlacementOrder, (partIndex, totalParts) => {
+                 if (this.config.onProgress) {
+                     this.config.onProgress(`Nesting sheet ${sheetNumber}: placed ${partIndex} of ${totalParts} parts...`);
+                 }
+            });
+            
+            const placedBin = result.placements[0] || [];
+            allPlacements.push(placedBin);
+            
+            const placedIds = new Set(placedBin.map(p => p.id));
+            const newRemainingIds = remainingIds.filter(id => !placedIds.has(id));
+            
+            if (newRemainingIds.length === remainingIds.length) {
+                console.error("A part is too large to fit in the bin, or could not be placed! Aborting to prevent infinite loop.");
+                break;
+            }
+            remainingIds = newRemainingIds;
+        }
         
-        this.best = result;
+        this.best = { fitness: 0, placements: allPlacements };
         return this.applyPlacement(this.best.placements);
     }
 
     applyPlacement(placements) {
-        if (!placements || placements.length === 0) return '';
+        if (!placements || placements.length === 0) return [];
         
-        const newSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        newSvg.setAttribute('viewBox', `0 0 ${this.binBounds.width} ${this.binBounds.height}`);
-        newSvg.setAttribute('width', `${this.binBounds.width}px`);
-        newSvg.setAttribute('height', `${this.binBounds.height}px`);
+        return placements.map(placedGroup => {
+            const newSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            newSvg.setAttribute('viewBox', `0 0 ${this.binBounds.width} ${this.binBounds.height}`);
+            newSvg.setAttribute('width', `${this.binBounds.width}px`);
+            newSvg.setAttribute('height', `${this.binBounds.height}px`);
 
-        const placedGroup = placements[0]; // Assuming one bin
-        placedGroup.forEach(p => {
-            const originalElement = this.tree.find(part => part.id === p.id)?.element;
-            if (originalElement) {
-                const clone = originalElement.cloneNode(true);
-                clone.setAttribute('transform', `translate(${p.x} ${p.y}) rotate(${p.rotation})`);
-                newSvg.appendChild(clone);
-            }
-        });
-        
-        // --- Add Printing Marks ---
-        if (this.config.addPrintingMarks) {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            placedGroup.forEach(p => {
+                const originalElement = this.tree.find(part => part.id === p.id)?.element;
+                if (originalElement) {
+                    const clone = originalElement.cloneNode(true);
+                    clone.setAttribute('transform', `translate(${p.x} ${p.y}) rotate(${p.rotation})`);
+                    newSvg.appendChild(clone);
+                }
+            });
+            
+            // --- Add Printing Marks ---
+            if (this.config.addPrintingMarks) {
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
             placedGroup.forEach(p => {
                 const originalPart = this.tree.find(part => part.id === p.id);
@@ -302,11 +329,11 @@ export class SvgNest {
                 newSvg.appendChild(createMark(`M ${bounds.right + markOffset} ${bounds.bottom + markOffset + markLength} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
                 newSvg.appendChild(createMark(`M ${bounds.right + markOffset + markLength} ${bounds.bottom + markOffset} L ${bounds.right + markOffset} ${bounds.bottom + markOffset}`));
             }
-        }
+            }
 
-
-        const serializer = new XMLSerializer();
-        return serializer.serializeToString(newSvg);
+            const serializer = new XMLSerializer();
+            return serializer.serializeToString(newSvg);
+        });
     }
 
     _getParts(elements) {

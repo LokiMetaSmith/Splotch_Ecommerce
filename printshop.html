@@ -308,8 +308,26 @@
             Canceled
           </button>
           <div class="ml-auto flex items-center space-x-2 pl-4 border-l border-gray-300">
+            <button id="toggle-view-btn" class="px-2 py-1 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500" title="Toggle List/Card View">
+                <!-- SVG Icon for List/Grid Toggle -->
+                <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                </svg>
+                View
+            </button>
+            <div class="h-6 border-l border-gray-300 mx-1"></div>
             <button id="selectAllOrdersBtn" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">Select All</button>
             <button id="deselectAllOrdersBtn" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">Deselect All</button>
+            <div class="h-6 border-l border-gray-300 mx-1"></div>
+            <select id="bulk-status-select" class="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">
+                <option value="">Bulk Action...</option>
+                <option value="ACCEPTED">Mark Accepted</option>
+                <option value="PRINTING">Mark Printing</option>
+                <option value="SHIPPED">Mark Shipped</option>
+                <option value="DELIVERED">Mark Delivered</option>
+                <option value="COMPLETED">Mark Completed</option>
+                <option value="CANCELED">Mark Canceled</option>
+            </select>
           </div>
         </div>
 

@@ -45,7 +45,8 @@ async function main() {
         await db.connect();
         logger.info('[SERVER] Connected to MongoDB.');
     } else {
-        const dbPath = path.join(__dirname, 'db.json');
+        const isTest = process.env.NODE_ENV === 'test';
+        const dbPath = path.join(__dirname, isTest ? 'db.test.json' : 'db.json');
         const defaultData = { orders: {}, users: {}, credentials: {}, config: {} };
         let lowDbInstance;
 
@@ -144,6 +145,6 @@ async function main() {
   }, 1000 * 60 * 60);
 }
 
-if (process.argv[1] === __filename) {
+if (process.argv[1] && process.argv[1].toLowerCase() === __filename.toLowerCase()) {
     main();
 }

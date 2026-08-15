@@ -1447,17 +1447,29 @@ async function startServer(
       let totalOrders = 0;
       let totalRevenueCents = 0;
       let recentOrders = 0;
+      let acceptedOrders = 0;
 
       const now = new Date();
       const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
 
       allOrders.forEach(order => {
         if (order.status !== 'CANCELED') {
            totalOrders++;
-           totalRevenueCents += (order.amount || 0);
+        }
+        
+        if (order.status === 'ACCEPTED') {
+           acceptedOrders++;
         }
 
         const receivedDate = new Date(order.receivedAt);
+        
+        // Only count completed sales for this month in revenue
+        if (order.status === 'COMPLETED' && receivedDate.getMonth() === currentMonth && receivedDate.getFullYear() === currentYear) {
+           totalRevenueCents += (order.amount || 0);
+        }
+
         if (receivedDate >= twentyFourHoursAgo && order.status !== 'CANCELED') {
             recentOrders++;
         }
@@ -1465,6 +1477,7 @@ async function startServer(
 
       res.status(200).json({
           totalOrders,
+          acceptedOrders,
           totalRevenue: totalRevenueCents / 100, // format to dollars
           recentOrders
       });
@@ -1632,6 +1645,63 @@ async function startServer(
           res.status(200).json({ success: true, order: order });
       } catch (error) {
         await logAndEmailError(error, 'Error updating order status');
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+
+    app.post('/api/admin/orders/bulk-status', authenticateToken, [
+      body('orderIds').isArray().notEmpty().withMessage('orderIds array is required'),
+      body('status').notEmpty().withMessage('status is required').isIn(VALID_STATUSES).withMessage('Invalid status'),
+    ], async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      // Check for admin role
+      if (!await isAdmin(req.user)) {
+          return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+
+      const { orderIds, status } = req.body;
+      const updatedOrders = [];
+
+      try {
+        for (const orderId of orderIds) {
+          const order = await db.getOrder(orderId);
+          if (order) {
+            order.status = status;
+            order.lastUpdatedAt = new Date().toISOString();
+
+            if (order.stalledMessageId) {
+                if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
+                   try {
+                       await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.stalledMessageId);
+                   } catch (err) {
+                       logger.error('[TELEGRAM] Failed to delete stalled message:', err);
+                   }
+                }
+                delete order.stalledMessageId;
+            }
+
+            await db.updateOrder(order);
+            updatedOrders.push(order);
+
+            // Update Telegram message
+            if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID') && order.telegramMessageId) {
+               try {
+                  await scheduleTelegram('update-status', { orderId: order.orderId, status: order.status });
+               } catch (error) {
+                  logger.error('[TELEGRAM] Failed to queue status update:', error);
+               }
+            }
+          }
+        }
+        
+        logger.info(`[SERVER] Bulk updated ${updatedOrders.length} orders to status ${status}.`);
+        res.status(200).json({ success: true, updatedCount: updatedOrders.length });
+      } catch (error) {
+        await logAndEmailError(error, 'Error in bulk order status update');
         res.status(500).json({ error: 'Internal Server Error' });
       }
     });

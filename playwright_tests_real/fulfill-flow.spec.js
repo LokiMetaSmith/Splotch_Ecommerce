@@ -162,5 +162,14 @@ test.describe('Order and Fulfillment Flow', () => {
         const downloadPath = 'C:\\Users\\Loki-VR\\.gemini\\antigravity\\brain\\07d60c4a-10d3-4967-9f62-b6d0b3550176\\nested_print_sheet.svg';
         await download.saveAs(downloadPath);
         console.log('Downloaded nested print sheet to:', downloadPath);
+
+        // Also test the PLT download
+        const pltDownloadBtn = page.locator('#downloadCutFilePltBtn');
+        const pltDownloadPromise = page.waitForEvent('download', { timeout: 30000 });
+        await pltDownloadBtn.click();
+        const pltDownload = await pltDownloadPromise;
+        const pltDownloadPath = 'C:\\Users\\Loki-VR\\.gemini\\antigravity\\brain\\07d60c4a-10d3-4967-9f62-b6d0b3550176\\nested_print_sheet.plt';
+        await pltDownload.saveAs(pltDownloadPath);
+        console.log('Downloaded PLT file to:', pltDownloadPath);
     });
 });
