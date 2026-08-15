@@ -761,6 +761,9 @@ async function startServer(
     // --- API Endpoints ---
     app.use('/api', apiLimiter);
     app.get('/.well-known/jwks.json', async (req, res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         const jwks = await getJwks();
         res.json(jwks);
     });

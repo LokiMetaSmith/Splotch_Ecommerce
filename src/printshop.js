@@ -261,12 +261,15 @@ async function fetchWithAuth(url, options = {}) {
       throw new Error("Server restarted.");
     } catch (err) {
       console.error(
-        "CRITICAL SECURITY ALERT: Invalid server session token signature! Halting.",
+        "CRITICAL SECURITY ALERT: Invalid server session token signature! Server identity mismatch.",
         err,
       );
-      showErrorToast(
-        "Security Alert: Server identity mismatch. Disconnecting.",
-      );
+      // If the signature fails, it might be an attacker, OR the server just fully hard-reset its keys
+      // while the browser aggressively cached jwks.json.
+      // In either case, the safest recovery is to clear local storage and force the user to re-authenticate.
+      localStorage.removeItem("serverSessionToken");
+      localStorage.removeItem("authToken");
+      window.location.reload();
       throw new Error("Invalid server token signature.");
     }
   }
