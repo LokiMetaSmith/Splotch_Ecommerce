@@ -82,14 +82,14 @@ describe('PlacementWorker', () => {
         }
     });
 
-    it('should place a simple rect in a bin', () => {
-        // Bin: 1000x1000
-        const bin = [{x:0, y:0}, {x:1000, y:0}, {x:1000, y:1000}, {x:0, y:1000}];
-        // Part: 100x100
-        const part = [{x:0, y:0}, {x:100, y:0}, {x:100, y:100}, {x:0, y:100}];
+    it('should place a simple rect in a bin', async () => {
+        // Bin: 100x100
+        const bin = [{x:0, y:0}, {x:100, y:0}, {x:100, y:100}, {x:0, y:100}];
+        // Part: 10x10
+        const part = [{x:0, y:0}, {x:10, y:0}, {x:10, y:10}, {x:0, y:10}];
 
         const worker = new PlacementWorker(bin, [part], [0], [0], { spacing: 0 }, {});
-        const result = worker.placePaths([part]);
+        const result = await worker.placePaths([part]);
 
         expect(result).not.toBeNull();
         expect(result.placements).toHaveLength(1);
@@ -99,7 +99,7 @@ describe('PlacementWorker', () => {
         expect(p.y).toBeGreaterThanOrEqual(0);
     });
 
-    it('should avoid overlapping parts', () => {
+    it('should avoid overlapping parts', async () => {
         // Bin: 200x100
         const bin = [{x:0, y:0}, {x:200, y:0}, {x:200, y:100}, {x:0, y:100}];
         // Part: 100x100
@@ -111,7 +111,7 @@ describe('PlacementWorker', () => {
 
         const worker = new PlacementWorker(bin, parts, ids, rotations, { spacing: 0 }, {});
         // Passing duplicated parts array to simulate multiple items
-        const result = worker.placePaths([part, part]);
+        const result = await worker.placePaths([part, part]);
 
         expect(result.placements[0]).toHaveLength(2);
         const p1 = result.placements[0][0];
@@ -127,7 +127,7 @@ describe('PlacementWorker', () => {
         expect(p2.y).toBe(0);
     });
 
-    it('should handle complex nesting with multiple parts ensuring bounding box collision check is effective', () => {
+    it('should handle complex nesting with multiple parts ensuring bounding box collision check is effective', async () => {
          // Bin: 500x500
          const bin = [{x:0, y:0}, {x:500, y:0}, {x:500, y:500}, {x:0, y:500}];
 
@@ -144,7 +144,7 @@ describe('PlacementWorker', () => {
          const rotations = [0, 0, 0];
 
          const worker = new PlacementWorker(bin, parts, ids, rotations, { spacing: 10 }, {});
-         const result = worker.placePaths(parts);
+         const result = await worker.placePaths(parts);
 
          expect(result.placements[0]).toHaveLength(3);
 

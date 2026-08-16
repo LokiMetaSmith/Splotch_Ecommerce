@@ -145,7 +145,7 @@ async function sanitizeSVGFile(filePath) {
 
 // Load pricing configuration
 let pricingConfig = {};
-const pricingPath = path.join(__dirname, 'pricing.json');
+const pricingPath = process.env.TEST_PRICING_PATH || path.join(__dirname, 'pricing.json');
 
 function loadPricingConfig() {
     try {
@@ -788,6 +788,30 @@ async function startServer(
         // PERFORMANCE: Temporarily disabled cache during development to allow pricing updates
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.json(pricingConfig);
+    });
+
+    app.post('/api/admin/pricing', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        
+        try {
+            const newPricing = req.body;
+            // Basic structural validation
+            if (!newPricing || typeof newPricing.pricePerSquareInchCents !== 'number') {
+                return res.status(400).json({ error: 'Invalid pricing configuration structure.' });
+            }
+            
+            // Write to pricing.json
+            const currentPricingPath = process.env.TEST_PRICING_PATH || path.join(__dirname, 'pricing.json');
+            await fs.promises.writeFile(currentPricingPath, JSON.stringify(newPricing, null, 2), 'utf8');
+            
+            // Reload the config into memory
+            loadPricingConfig();
+            
+            res.json({ success: true, pricing: pricingConfig });
+        } catch (error) {
+            logger.error('[SERVER] Failed to update pricing.json', error);
+            res.status(500).json({ error: 'Failed to save pricing configuration.' });
+        }
     });
 
     // --- Odoo Endpoints ---
@@ -1457,6 +1481,10 @@ async function startServer(
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
 
+      let ackCount = 0; let totalAckTime = 0;
+      let printCount = 0; let totalPrintTime = 0;
+      let shipCount = 0; let totalShipTime = 0;
+
       allOrders.forEach(order => {
         if (order.status !== 'CANCELED') {
            totalOrders++;
@@ -1476,13 +1504,32 @@ async function startServer(
         if (receivedDate >= twentyFourHoursAgo && order.status !== 'CANCELED') {
             recentOrders++;
         }
+
+        // Metrics logic
+        if (order.acceptedAt && order.receivedAt) {
+            ackCount++;
+            totalAckTime += (new Date(order.acceptedAt) - new Date(order.receivedAt));
+        }
+        if (order.printingAt && order.acceptedAt) {
+            printCount++;
+            totalPrintTime += (new Date(order.printingAt) - new Date(order.acceptedAt));
+        }
+        if (order.shippedAt && order.printingAt) {
+            shipCount++;
+            totalShipTime += (new Date(order.shippedAt) - new Date(order.printingAt));
+        }
       });
+
+      const msToHours = (ms) => ms / (1000 * 60 * 60);
 
       res.status(200).json({
           totalOrders,
           acceptedOrders,
           totalRevenue: totalRevenueCents / 100, // format to dollars
-          recentOrders
+          recentOrders,
+          avgAcknowledgeTimeHours: ackCount > 0 ? msToHours(totalAckTime / ackCount) : 0,
+          avgPrintTimeHours: printCount > 0 ? msToHours(totalPrintTime / printCount) : 0,
+          avgShipTimeHours: shipCount > 0 ? msToHours(totalShipTime / shipCount) : 0
       });
     });
 
@@ -1603,7 +1650,7 @@ async function startServer(
         return res.status(400).json({ errors: errors.array() });
       }
       const { orderId } = req.params;
-      const { status } = req.body;
+      const { status, trackingNumber, courier } = req.body;
       const order = await db.getOrder(orderId);
 
       if (!order) {
@@ -1618,6 +1665,21 @@ async function startServer(
       const oldStatus = order.status;
       order.status = status;
       order.lastUpdatedAt = new Date().toISOString();
+
+      if (status === 'SHIPPED') {
+          if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
+          if (courier !== undefined) order.courier = courier;
+      }
+
+      // Record state transition timestamps for metrics
+      if (oldStatus !== status) {
+          const nowIso = new Date().toISOString();
+          if (status === 'ACCEPTED' && !order.acceptedAt) order.acceptedAt = nowIso;
+          if (status === 'PRINTING' && !order.printingAt) order.printingAt = nowIso;
+          if (status === 'SHIPPED' && !order.shippedAt) order.shippedAt = nowIso;
+          if (status === 'DELIVERED' && !order.deliveredAt) order.deliveredAt = nowIso;
+          if (status === 'COMPLETED' && !order.completedAt) order.completedAt = nowIso;
+      }
 
       // Check for stalled message cleanup
       if (order.stalledMessageId) {
@@ -1643,6 +1705,40 @@ async function startServer(
              } catch (error) {
                 logger.error('[TELEGRAM] Failed to queue status update:', error);
              }
+          }
+          // Trigger Emails
+          if (oldStatus !== status && emailQueue) {
+              const customerEmail = order.customerDetails?.billing?.email || order.customerEmail;
+              if (customerEmail) {
+                  if (status === 'CANCELED') {
+                      emailQueue.add('order-canceled', {
+                          to: customerEmail,
+                          subject: `Your Order #${order.orderId.substring(0, 8)} has been canceled`,
+                          text: `Hi there,\n\nYour order #${order.orderId.substring(0, 8)} has been canceled. If you have any questions, please contact support.\n\nThank you,\nSplotch Team`,
+                          html: `<p>Hi there,</p><p>Your order <strong>#${order.orderId.substring(0, 8)}</strong> has been canceled. If you have any questions, please contact support.</p><p>Thank you,<br>Splotch Team</p>`
+                      });
+                  } else if (status === 'SHIPPED') {
+                      let trackingText = '';
+                      let trackingHtml = '';
+                      if (order.trackingNumber && order.courier) {
+                          trackingText = `\n\nTracking Information:\nCarrier: ${order.courier}\nTracking Number: ${order.trackingNumber}`;
+                          trackingHtml = `<p><strong>Tracking Information:</strong><br>Carrier: ${order.courier}<br>Tracking Number: ${order.trackingNumber}</p>`;
+                      }
+                      emailQueue.add('order-shipped', {
+                          to: customerEmail,
+                          subject: `Your Order #${order.orderId.substring(0, 8)} has shipped!`,
+                          text: `Hi there,\n\nGreat news! Your order #${order.orderId.substring(0, 8)} has shipped and is on its way to you.${trackingText}\n\nThank you,\nSplotch Team`,
+                          html: `<p>Hi there,</p><p>Great news! Your order <strong>#${order.orderId.substring(0, 8)}</strong> has shipped and is on its way to you.</p>${trackingHtml}<p>Thank you,<br>Splotch Team</p>`
+                      });
+                  } else if (status === 'DELIVERED') {
+                      emailQueue.add('order-delivered', {
+                          to: customerEmail,
+                          subject: `Your Order #${order.orderId.substring(0, 8)} has been delivered!`,
+                          text: `Hi there,\n\nYour order #${order.orderId.substring(0, 8)} has been delivered. We hope you love your new stickers!\n\nThank you,\nSplotch Team`,
+                          html: `<p>Hi there,</p><p>Your order <strong>#${order.orderId.substring(0, 8)}</strong> has been delivered. We hope you love your new stickers!</p><p>Thank you,<br>Splotch Team</p>`
+                      });
+                  }
+              }
           }
 
           res.status(200).json({ success: true, order: order });

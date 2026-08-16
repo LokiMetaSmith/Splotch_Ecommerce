@@ -100,8 +100,8 @@ describe('PDF Export Functionality', () => {
             <div id="loading-indicator" class="hidden"></div>
         `;
 
-        // Mock window.nestedSvg
-        window.nestedSvg = '<svg width="100" height="100"><rect x="0" y="0" width="100" height="100"/></svg>';
+        // Mock window.nestedSvgs
+        window.nestedSvgs = ['<svg width="100" height="100"><rect x="0" y="0" width="100" height="100"/></svg>'];
 
         // Import the module dynamically to ensure mocks are applied
         printshop = await import('../../src/printshop.js');
@@ -137,7 +137,7 @@ describe('PDF Export Functionality', () => {
     });
 
     test('should show error if no nested SVG', async () => {
-        window.nestedSvg = null;
+        window.nestedSvgs = [];
         const btn = document.getElementById('exportPdfBtn');
         btn.click();
 
@@ -146,17 +146,17 @@ describe('PDF Export Functionality', () => {
         const errorToast = document.getElementById('error-toast');
         // The toast is visible when opacity-0 is removed
         expect(errorToast.classList.contains('opacity-0')).toBe(false);
-        expect(document.getElementById('error-message').textContent).toBe('No nested SVG to export.');
+        expect(document.getElementById('error-message').textContent).toBe('No nested SVG sheets to export.');
     });
 
     test('should show error for invalid dimensions', async () => {
-        window.nestedSvg = '<svg width="0" height="0"></svg>';
+        window.nestedSvgs = ['<svg width="0" height="0"></svg>'];
         const btn = document.getElementById('exportPdfBtn');
         btn.click();
 
         expect(jsPDFMock).not.toHaveBeenCalled();
          const errorToast = document.getElementById('error-toast');
         expect(errorToast.classList.contains('opacity-0')).toBe(false);
-        expect(document.getElementById('error-message').textContent).toBe('Invalid SVG dimensions for PDF export.');
+        expect(document.getElementById('error-message').textContent).toBe('Invalid SVG dimensions for PDF export on sheet 1');
     });
 });

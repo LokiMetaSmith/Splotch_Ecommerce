@@ -105,7 +105,9 @@ self.addEventListener("message", function (e) {
       }
     }
 
-    postMessage({ success: true, messageId: messageId, cutline: finalCutline });
+    const workerLogs = `offset-worker input polygons length: ${polygons.length}, offsetPolygons length: ${offsetPolygons.length}, offsetAmount: ${offsetAmount}, scale: ${scale}`;
+
+    postMessage({ success: true, messageId: messageId, cutline: finalCutline, workerLogs: workerLogs });
   } catch (error) {
     postMessage({ success: false, messageId: messageId, error: error.message });
   }

@@ -130,6 +130,10 @@
       .hide-cutlines .cut-line-element {
         display: none !important;
       }
+      .qr-code-container canvas {
+        width: 100% !important;
+        height: 100% !important;
+      }
     </style>
   </head>
   <body class="bg-slate-200 text-slate-800">
@@ -262,16 +266,16 @@
         >
           <span class="font-bold mr-2">Filter by status:</span>
           <button
-            class="filter-btn active px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-700 focus-visible:ring-offset-2"
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-700 focus-visible:ring-offset-2"
             data-status="ALL"
-            aria-pressed="true"
+            aria-pressed="false"
           >
             All
           </button>
           <button
-            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            class="filter-btn active px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
             data-status="NEW"
-            aria-pressed="false"
+            aria-pressed="true"
           >
             New
           </button>
@@ -344,7 +348,7 @@
         <!-- Sales and Uptime Monitor -->
         <div id="sales-uptime-monitor" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
-                <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Sales</h3>
+                <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Sales (This Month)</h3>
                 <p class="text-2xl font-bold text-gray-800 mt-1" id="metric-total-revenue">Loading...</p>
             </div>
             <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
@@ -458,19 +462,19 @@
                 <div class="grid grid-cols-2 gap-2">
                   <div>
                     <label for="marginTop" class="block text-sm text-gray-600">Top:</label>
-                    <input type="number" id="marginTop" value="100" class="w-full p-1 border rounded-md" />
+                    <input type="number" id="marginTop" value="150" class="w-full p-1 border rounded-md" />
                   </div>
                   <div>
                     <label for="marginBottom" class="block text-sm text-gray-600">Bottom:</label>
-                    <input type="number" id="marginBottom" value="100" class="w-full p-1 border rounded-md" />
+                    <input type="number" id="marginBottom" value="150" class="w-full p-1 border rounded-md" />
                   </div>
                   <div>
                     <label for="marginLeft" class="block text-sm text-gray-600">Left:</label>
-                    <input type="number" id="marginLeft" value="150" class="w-full p-1 border rounded-md" />
+                    <input type="number" id="marginLeft" value="200" class="w-full p-1 border rounded-md" />
                   </div>
                   <div>
                     <label for="marginRight" class="block text-sm text-gray-600">Right:</label>
-                    <input type="number" id="marginRight" value="150" class="w-full p-1 border rounded-md" />
+                    <input type="number" id="marginRight" value="200" class="w-full p-1 border rounded-md" />
                   </div>
                 </div>
               </div>
@@ -684,6 +688,25 @@
               </button>
             </div>
           </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto mt-8">
+          <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-6">
+            Pricing Configuration
+          </h2>
+          <div id="pricing-editor-container" class="space-y-6">
+            <!-- Dynamically populated pricing editor -->
+            <p class="text-gray-500 text-center py-4">Loading pricing configuration...</p>
+          </div>
+          <div class="flex justify-end pt-4 border-t border-gray-300 mt-6">
+            <button
+              type="button"
+              id="save-pricing-btn"
+              class="px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700"
+            >
+              Save Pricing
+            </button>
+          </div>
         </div>
       </div>
     </main>

@@ -181,3 +181,61 @@ export function generateSvgFromCutline(cutline, bounds) {
 </svg>
     `.trim();
 }
+
+export function generateMultiLayerSvg(designLayers, sheetBoundary, bounds) {
+  if (!bounds) return null;
+
+  const width = bounds.width;
+  const height = bounds.height;
+  const left = bounds.left;
+  const top = bounds.top;
+
+  // Helper to convert polygons to SVG path data string
+  const polysToPathD = (polygons, offsetX, offsetY) => {
+    if (!polygons || polygons.length === 0) return "";
+    let d = "";
+    for (let j = 0; j < polygons.length; j++) {
+      const poly = polygons[j];
+      const len = poly.length;
+      if (len === 0) continue;
+
+      d += "M " + (poly[0].x + offsetX - left) + " " + (poly[0].y + offsetY - top) + " ";
+      for (let i = 1; i < len; i++) {
+        d += "L " + (poly[i].x + offsetX - left) + " " + (poly[i].y + offsetY - top) + " ";
+      }
+      d += "Z ";
+    }
+    return d.trim();
+  };
+
+  let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // 1. Kiss Cuts (Cyan)
+  svgContent += `\n  <g id="Kiss-Cut" stroke="cyan" fill="none" stroke-width="1">`;
+  if (designLayers && designLayers.length > 0) {
+    designLayers.forEach(layer => {
+      if (layer.currentCutline && layer.currentCutline.length > 0 && layer.visible !== false) {
+        const pathData = polysToPathD(layer.currentCutline, layer.x || 0, layer.y || 0);
+        if (pathData) {
+          svgContent += `\n    <path d="${pathData}" />`;
+        }
+      }
+    });
+  }
+  svgContent += `\n  </g>`;
+
+  // 2. Die Cut (Red)
+  svgContent += `\n  <g id="Die-Cut" stroke="red" fill="none" stroke-width="1">`;
+  if (sheetBoundary && sheetBoundary.length > 0) {
+    // sheetBoundary is already in world coordinates, so offsetX/offsetY = 0
+    const pathData = polysToPathD(sheetBoundary, 0, 0);
+    if (pathData) {
+      svgContent += `\n    <path d="${pathData}" />`;
+    }
+  }
+  svgContent += `\n  </g>`;
+
+  svgContent += `\n</svg>`;
+  return svgContent;
+}

@@ -844,6 +844,15 @@ function displayOrderRow(order) {
       <td class="px-4 py-3">
         <div class="flex flex-col gap-2">
             ${dropdownHtml}
+            <div class="mt-2 text-xs flex flex-col gap-1 tracking-inputs" style="display: ${order.status === 'SHIPPED' || order.status === 'DELIVERED' || order.status === 'COMPLETED' ? 'flex' : 'none'};" data-order-id="${orderId}">
+               <select class="border rounded p-1 tracking-courier bg-white" data-order-id="${orderId}">
+                   <option value="USPS" ${order.courier === 'USPS' ? 'selected' : ''}>USPS</option>
+                   <option value="UPS" ${order.courier === 'UPS' ? 'selected' : ''}>UPS</option>
+                   <option value="FedEx" ${order.courier === 'FedEx' ? 'selected' : ''}>FedEx</option>
+                   <option value="DHL" ${order.courier === 'DHL' ? 'selected' : ''}>DHL</option>
+               </select>
+               <input type="text" placeholder="Tracking #" value="${escapeHtml(order.trackingNumber || '')}" class="border rounded p-1 tracking-number bg-white" data-order-id="${orderId}">
+            </div>
         </div>
       </td>
     </tr>
@@ -1045,7 +1054,20 @@ function handleOrderListChange(e) {
       }
     }
 
-    updateOrderStatus(orderId, status, actionDropdown);
+    const payload = { status };
+
+    if (status === 'SHIPPED') {
+        const trackingInput = document.querySelector(`.tracking-number[data-order-id="${orderId}"]`);
+        const courierInput = document.querySelector(`.tracking-courier[data-order-id="${orderId}"]`);
+        if (trackingInput && trackingInput.value.trim()) {
+            payload.trackingNumber = trackingInput.value.trim();
+        }
+        if (courierInput && courierInput.value) {
+            payload.courier = courierInput.value;
+        }
+    }
+
+    updateOrderStatus(orderId, payload, actionDropdown);
   }
 }
 
@@ -1090,20 +1112,25 @@ async function handleTimeLog(orderId, btn) {
 /**
  * Sends a request to the server to update an order's status.
  * @param {string} orderId The ID of the order to update.
- * @param {string} newStatus The new status for the order.
+ * @param {Object|string} payload The new status for the order, or an object with {status, trackingNumber, courier}.
  */
-async function updateOrderStatus(orderId, newStatus, btn) {
+async function updateOrderStatus(orderId, payload, btn) {
   setButtonLoading(btn, true, "Updating...");
+  const body = typeof payload === 'string' ? { status: payload } : payload;
+  const newStatus = body.status;
+
   try {
     await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
       method: "POST",
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify(body),
     });
 
     // Update the order in our local cache
     const orderIndex = allOrders.findIndex((o) => o.orderId === orderId);
     if (orderIndex !== -1) {
       allOrders[orderIndex].status = newStatus;
+      if (body.trackingNumber) allOrders[orderIndex].trackingNumber = body.trackingNumber;
+      if (body.courier) allOrders[orderIndex].courier = body.courier;
     }
 
     showSuccessToast(`Order status updated to ${newStatus}.`);
@@ -1544,88 +1571,99 @@ async function handleNesting(e) {
         rootSvg.setAttribute("height", String(binHeight));
         rootSvg.setAttribute("viewBox", `0 0 ${binWidth} ${binHeight}`);
 
-        const markShape =
-          document.getElementById("alignmentMarkShape").value || "circle";
+        const addPrintingMarks = document.getElementById("addPrintingMarks")?.checked || false;
 
-        // Helper to create alignment mark
-        const createMark = (cx, cy) => {
-          if (markShape === "square") {
-            const rect = svgDoc.createElementNS(
-              "http://www.w3.org/2000/svg",
-              "rect",
-            );
-            rect.setAttribute("x", String(cx - 12));
-            rect.setAttribute("y", String(cy - 12));
-            rect.setAttribute("width", "24");
-            rect.setAttribute("height", "24");
-            rect.setAttribute("fill", "black");
-            return rect;
-          } else {
-            const circle = svgDoc.createElementNS(
-              "http://www.w3.org/2000/svg",
-              "circle",
-            );
-            circle.setAttribute("cx", String(cx));
-            circle.setAttribute("cy", String(cy));
-            circle.setAttribute("r", "12");
-            circle.setAttribute("fill", "black");
-            return circle;
-          }
-        };
+        if (addPrintingMarks) {
+            const markShape =
+            document.getElementById("alignmentMarkShape").value || "circle";
 
-        // Add 4 corner marks
-        // Top-Left
-        rootSvg.appendChild(createMark(135, 60));
-        // Top-Right
-        rootSvg.appendChild(createMark(binWidth - 135, 60));
-        // Bottom-Left
-        rootSvg.appendChild(createMark(135, binHeight - 60));
-        // Bottom-Right
-        rootSvg.appendChild(createMark(binWidth - 135, binHeight - 60));
-
-        if (window.QRCode) {
-          try {
-            const qrCanvas = document.createElement("canvas");
-            await QRCode.toCanvas(qrCanvas, trackingCode, {
-              width: 100,
-              margin: 1,
-            });
-            const qrDataUri = qrCanvas.toDataURL("image/png");
-
-            // Helper to add QR and label
-            const addQR = (x, y) => {
-              const qrImg = svgDoc.createElementNS(
+            // Helper to create alignment mark
+            const createMark = (cx, cy) => {
+            if (markShape === "square") {
+                const rect = svgDoc.createElementNS(
                 "http://www.w3.org/2000/svg",
-                "image",
-              );
-              qrImg.setAttribute("href", qrDataUri);
-              qrImg.setAttribute("x", String(x));
-              qrImg.setAttribute("y", String(y));
-              qrImg.setAttribute("width", "100");
-              qrImg.setAttribute("height", "100");
-
-              const textNode = svgDoc.createElementNS(
+                "rect",
+                );
+                rect.setAttribute("x", String(cx - 12));
+                rect.setAttribute("y", String(cy - 12));
+                rect.setAttribute("width", "24");
+                rect.setAttribute("height", "24");
+                rect.setAttribute("fill", "black");
+                return rect;
+            } else {
+                const circle = svgDoc.createElementNS(
                 "http://www.w3.org/2000/svg",
-                "text",
-              );
-              textNode.setAttribute("x", String(x));
-              textNode.setAttribute("y", String(y - 5));
-              textNode.setAttribute("font-family", "sans-serif");
-              textNode.setAttribute("font-size", "12");
-              textNode.setAttribute("fill", "black");
-              textNode.textContent = trackingCode;
-
-              rootSvg.appendChild(qrImg);
-              rootSvg.appendChild(textNode);
+                "circle",
+                );
+                circle.setAttribute("cx", String(cx));
+                circle.setAttribute("cy", String(cy));
+                circle.setAttribute("r", "12");
+                circle.setAttribute("fill", "black");
+                return circle;
+            }
             };
 
-            // Top-Left QR Code (placed next to fiducial at cx=135, cy=60)
-            addQR(155, 10);
-            // Bottom-Right QR Code (placed next to fiducial at cx=binWidth-135, cy=binHeight-60)
-            addQR(binWidth - 255, binHeight - 110);
-          } catch (qrErr) {
-            console.error("Failed to inject QR code into SVG", qrErr);
-          }
+            // Add 4 corner marks
+            // Top-Left
+            rootSvg.appendChild(createMark(135, 60));
+            // Top-Right
+            rootSvg.appendChild(createMark(binWidth - 135, 60));
+            // Bottom-Left
+            rootSvg.appendChild(createMark(135, binHeight - 60));
+            // Bottom-Right
+            rootSvg.appendChild(createMark(binWidth - 135, binHeight - 60));
+
+            if (window.QRCode) {
+            try {
+                const qrCanvas = document.createElement("canvas");
+                await QRCode.toCanvas(qrCanvas, trackingCode, {
+                width: 100,
+                margin: 1,
+                });
+                const qrDataUri = qrCanvas.toDataURL("image/png");
+
+                // Helper to add QR and label
+                const addQR = (qrX, qrY, textX, textY, textAnchor = "start") => {
+                const qrImg = svgDoc.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "image",
+                );
+                qrImg.setAttribute("href", qrDataUri);
+                qrImg.setAttribute("x", String(qrX));
+                qrImg.setAttribute("y", String(qrY));
+                qrImg.setAttribute("width", "100");
+                qrImg.setAttribute("height", "100");
+
+                const textNode = svgDoc.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "text",
+                );
+                textNode.setAttribute("x", String(textX));
+                textNode.setAttribute("y", String(textY));
+                textNode.setAttribute("font-family", "sans-serif");
+                textNode.setAttribute("font-size", "14");
+                textNode.setAttribute("font-weight", "bold");
+                textNode.setAttribute("fill", "black");
+                textNode.setAttribute("text-anchor", textAnchor);
+                textNode.textContent = trackingCode;
+
+                rootSvg.appendChild(qrImg);
+                rootSvg.appendChild(textNode);
+                };
+
+                // Top-Left QR Code (placed outside fiducial at cx=135, cy=60)
+                // QR is placed to the left of the fiducial (X=20). 
+                // Text is placed inline to the right of the QR code (X=130).
+                addQR(20, 10, 130, 65, "start");
+                
+                // Bottom-Right QR Code (placed outside fiducial at cx=binWidth-135, cy=binHeight-60)
+                // QR is placed to the right of the fiducial (X=binWidth - 120).
+                // Text is placed inline to the left of the QR code (X=binWidth - 130).
+                addQR(binWidth - 120, binHeight - 110, binWidth - 130, binHeight - 55, "end");
+            } catch (qrErr) {
+                console.error("Failed to inject QR code into SVG", qrErr);
+            }
+            }
         }
 
         // Serialize back to string
@@ -2020,6 +2058,8 @@ export async function init() {
     "connection-status-dot",
     "connection-status-text",
     "login-form",
+    "pricing-editor-container",
+    "save-pricing-btn"
   ];
   ids.forEach((id) => {
     // Convert kebab-case to camelCase for keys
@@ -2051,6 +2091,7 @@ export async function init() {
   ui.downloadCutFilePltBtn?.addEventListener("click", handleDownloadCutFilePlt);
   ui.exportPdfBtn?.addEventListener("click", handleExportPdf);
   ui.searchBtn?.addEventListener("click", handleSearch);
+  ui.savePricingBtn?.addEventListener("click", savePricingConfig);
 
   ui.previewCutlinesToggle?.addEventListener("change", (e) => {
     if (e.target.checked) {
@@ -2220,6 +2261,7 @@ export async function init() {
       viewDashboardBtn.classList.add("text-gray-500");
 
       loadOdooConfig();
+      loadPricingConfigEditor();
     });
   }
 
@@ -2260,3 +2302,230 @@ export async function init() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
+
+// --- Pricing Editor UI ---
+let currentPricingConfig = {};
+
+async function loadPricingConfigEditor() {
+  if (!ui.pricingEditorContainer) return;
+  ui.pricingEditorContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Loading pricing configuration...</p>';
+  try {
+    const config = await fetchWithAuth(`${serverUrl}/api/pricing-info`);
+    currentPricingConfig = config;
+    renderPricingEditor(currentPricingConfig);
+  } catch (err) {
+    ui.pricingEditorContainer.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+  }
+}
+
+function renderPricingEditor(config) {
+  let html = `
+    <div class="space-y-4">
+      <div>
+        <label class="block font-bold mb-1">Base Price per Square Inch (Cents)</label>
+        <input type="number" id="pricing-base-price" class="w-full p-2 border rounded-md" value="${config.pricePerSquareInchCents || 0}">
+      </div>
+
+      <!-- Resolutions -->
+      <div class="border p-4 rounded-md bg-gray-50">
+        <h4 class="font-bold mb-2">Resolutions</h4>
+        <div id="pricing-resolutions-list" class="space-y-2">
+          ${(config.resolutions || []).map((r, i) => `
+            <div class="flex gap-2 items-center resolution-row">
+              <input type="text" placeholder="ID" class="p-1 border rounded w-24 res-id" value="${escapeHtml(r.id)}">
+              <input type="text" placeholder="Name" class="p-1 border rounded flex-grow res-name" value="${escapeHtml(r.name)}">
+              <input type="number" placeholder="PPI" class="p-1 border rounded w-20 res-ppi" value="${r.ppi}">
+              <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 res-mult" value="${r.costMultiplier}">
+              <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+            </div>
+          `).join('')}
+        </div>
+        <button type="button" id="add-res-btn" class="mt-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">Add Resolution</button>
+      </div>
+
+      <!-- Materials -->
+      <div class="border p-4 rounded-md bg-gray-50">
+        <h4 class="font-bold mb-2">Materials</h4>
+        <div id="pricing-materials-list" class="space-y-2">
+          ${(config.materials || []).map((m, i) => `
+            <div class="border p-2 bg-white rounded material-row space-y-2">
+              <div class="flex gap-2 items-center">
+                <input type="text" placeholder="ID" class="p-1 border rounded w-32 mat-id" value="${escapeHtml(m.id)}">
+                <input type="text" placeholder="Name" class="p-1 border rounded flex-grow mat-name" value="${escapeHtml(m.name)}">
+                <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 mat-mult" value="${m.costMultiplier}">
+                <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+              </div>
+              <input type="text" placeholder="Supported Layers (comma separated)" class="w-full p-1 border rounded text-sm mat-layers" value="${escapeHtml((m.supportedLayers || []).join(', '))}">
+              <input type="text" placeholder="Description" class="w-full p-1 border rounded text-sm mat-desc" value="${escapeHtml(m.description || '')}">
+            </div>
+          `).join('')}
+        </div>
+        <button type="button" id="add-mat-btn" class="mt-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">Add Material</button>
+      </div>
+      
+      <!-- Layers -->
+      <div class="border p-4 rounded-md bg-gray-50">
+        <h4 class="font-bold mb-2">Layers</h4>
+        <div id="pricing-layers-list" class="space-y-2">
+          ${(config.layers || []).map((l, i) => `
+            <div class="border p-2 bg-white rounded layer-row space-y-2">
+              <div class="flex gap-2 items-center">
+                <input type="text" placeholder="ID" class="p-1 border rounded w-32 layer-id" value="${escapeHtml(l.id)}">
+                <input type="text" placeholder="Name" class="p-1 border rounded flex-grow layer-name" value="${escapeHtml(l.name)}">
+                <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 layer-mult" value="${l.costMultiplier}">
+                <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500">Subtypes (JSON Array)</label>
+                <textarea class="w-full p-1 border rounded text-sm layer-subtypes font-mono" rows="2">${escapeHtml(l.subTypes ? JSON.stringify(l.subTypes) : '[]')}</textarea>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <button type="button" id="add-layer-btn" class="mt-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">Add Layer</button>
+      </div>
+      
+      <!-- Complexity & Discounts -->
+      <div class="border p-4 rounded-md bg-gray-50">
+        <h4 class="font-bold mb-2">Complexity & Discounts</h4>
+        <label class="block text-xs text-gray-500">Complexity Config (JSON Object)</label>
+        <textarea id="pricing-complexity" class="w-full p-1 border rounded text-sm mb-2 font-mono" rows="6">${escapeHtml(JSON.stringify(config.complexity, null, 2) || '{}')}</textarea>
+        
+        <label class="block text-xs text-gray-500">Quantity Discounts (JSON Array)</label>
+        <textarea id="pricing-discounts" class="w-full p-1 border rounded text-sm font-mono" rows="6">${escapeHtml(JSON.stringify(config.quantityDiscounts, null, 2) || '[]')}</textarea>
+      </div>
+    </div>
+  `;
+
+  ui.pricingEditorContainer.innerHTML = html;
+
+  // Add Row Handlers
+  document.getElementById("add-res-btn")?.addEventListener("click", () => {
+    const div = document.createElement('div');
+    div.className = "flex gap-2 items-center resolution-row";
+    div.innerHTML = `
+      <input type="text" placeholder="ID" class="p-1 border rounded w-24 res-id" value="">
+      <input type="text" placeholder="Name" class="p-1 border rounded flex-grow res-name" value="">
+      <input type="number" placeholder="PPI" class="p-1 border rounded w-20 res-ppi" value="300">
+      <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 res-mult" value="1.0">
+      <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+    `;
+    document.getElementById("pricing-resolutions-list").appendChild(div);
+  });
+
+  document.getElementById("add-mat-btn")?.addEventListener("click", () => {
+    const div = document.createElement('div');
+    div.className = "border p-2 bg-white rounded material-row space-y-2";
+    div.innerHTML = `
+      <div class="flex gap-2 items-center">
+        <input type="text" placeholder="ID" class="p-1 border rounded w-32 mat-id" value="">
+        <input type="text" placeholder="Name" class="p-1 border rounded flex-grow mat-name" value="">
+        <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 mat-mult" value="1.0">
+        <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+      </div>
+      <input type="text" placeholder="Supported Layers (comma separated)" class="w-full p-1 border rounded text-sm mat-layers" value="white, cmyk, clear">
+      <input type="text" placeholder="Description" class="w-full p-1 border rounded text-sm mat-desc" value="">
+    `;
+    document.getElementById("pricing-materials-list").appendChild(div);
+  });
+
+  document.getElementById("add-layer-btn")?.addEventListener("click", () => {
+    const div = document.createElement('div');
+    div.className = "border p-2 bg-white rounded layer-row space-y-2";
+    div.innerHTML = `
+      <div class="flex gap-2 items-center">
+        <input type="text" placeholder="ID" class="p-1 border rounded w-32 layer-id" value="">
+        <input type="text" placeholder="Name" class="p-1 border rounded flex-grow layer-name" value="">
+        <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 layer-mult" value="1.0">
+        <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">Subtypes (JSON Array)</label>
+        <textarea class="w-full p-1 border rounded text-sm layer-subtypes font-mono" rows="2">[]</textarea>
+      </div>
+    `;
+    document.getElementById("pricing-layers-list").appendChild(div);
+  });
+
+  // Delegate event for all remove buttons
+  ui.pricingEditorContainer.addEventListener("click", (e) => {
+    if (e.target.classList.contains("remove-row-btn")) {
+      e.target.parentElement.parentElement.tagName === "DIV" && e.target.parentElement.classList.contains("flex") 
+        ? (e.target.closest('.layer-row') || e.target.closest('.material-row') || e.target.parentElement).remove()
+        : e.target.parentElement.remove();
+    }
+  });
+}
+
+async function savePricingConfig() {
+  if (!ui.pricingEditorContainer) return;
+  const btn = ui.savePricingBtn;
+  setButtonLoading(btn, true, "Saving...");
+
+  try {
+    const config = {
+      pricePerSquareInchCents: parseFloat(document.getElementById("pricing-base-price").value) || 0,
+      resolutions: [],
+      materials: [],
+      layers: [],
+      complexity: JSON.parse(document.getElementById("pricing-complexity").value || "{}"),
+      quantityDiscounts: JSON.parse(document.getElementById("pricing-discounts").value || "[]")
+    };
+
+    // Gather Resolutions
+    document.querySelectorAll('.resolution-row').forEach(row => {
+      config.resolutions.push({
+        id: row.querySelector('.res-id').value.trim(),
+        name: row.querySelector('.res-name').value.trim(),
+        ppi: parseInt(row.querySelector('.res-ppi').value) || 300,
+        costMultiplier: parseFloat(row.querySelector('.res-mult').value) || 1.0
+      });
+    });
+
+    // Gather Materials
+    document.querySelectorAll('.material-row').forEach(row => {
+      const layersStr = row.querySelector('.mat-layers').value;
+      config.materials.push({
+        id: row.querySelector('.mat-id').value.trim(),
+        name: row.querySelector('.mat-name').value.trim(),
+        costMultiplier: parseFloat(row.querySelector('.mat-mult').value) || 1.0,
+        supportedLayers: layersStr ? layersStr.split(',').map(s => s.trim()).filter(Boolean) : [],
+        description: row.querySelector('.mat-desc').value.trim()
+      });
+    });
+
+    // Gather Layers
+    document.querySelectorAll('.layer-row').forEach(row => {
+      const layer = {
+        id: row.querySelector('.layer-id').value.trim(),
+        name: row.querySelector('.layer-name').value.trim(),
+        costMultiplier: parseFloat(row.querySelector('.layer-mult').value) || 1.0
+      };
+      try {
+        const subTypesText = row.querySelector('.layer-subtypes').value;
+        const subTypes = JSON.parse(subTypesText);
+        if (Array.isArray(subTypes) && subTypes.length > 0) {
+          layer.subTypes = subTypes;
+        }
+      } catch(e) {
+        throw new Error(`Invalid JSON in subtypes for layer ${layer.id}`);
+      }
+      config.layers.push(layer);
+    });
+
+    // fetchWithAuth throws an error if !response.ok, so if we reach here it was successful.
+    // The response is already the parsed JSON body.
+    const result = await fetchWithAuth(`${serverUrl}/api/admin/pricing`, {
+      method: "POST",
+      body: JSON.stringify(config)
+    });
+
+    showSuccessToast("Pricing configuration saved successfully!");
+    await loadPricingConfigEditor(); // refresh
+
+  } catch (err) {
+    showErrorToast(err.message);
+  } finally {
+    setButtonLoading(btn, false);
+  }
+}

@@ -12,3 +12,13 @@
     padding: 16px;
     /* ... etc ... */
 }
+
+.hide-cutlines .cut-line-element {
+    display: none !important;
+}
+
+@media print {
+    .cut-line-element {
+        display: none !important;
+    }
+}

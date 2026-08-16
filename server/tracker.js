@@ -3,6 +3,7 @@ const EasyPost = EasyPostPkg.default || EasyPostPkg;
 import { getSecret } from './secretManager.js';
 import logger from './logger.js';
 import { LowDbAdapter } from './database/lowdb_adapter.js';
+import { emailQueue } from './queueManager.js';
 
 let db;
 let api;
@@ -73,10 +74,38 @@ async function updateTrackingData() {
                 const orderToUpdate = await db.getOrder(order.orderId);
                 if (orderToUpdate) {
                     orderToUpdate.status = 'DELIVERED';
+                    orderToUpdate.deliveredAt = new Date().toISOString();
                     orderToUpdate.lastUpdatedAt = new Date().toISOString();
                     await db.updateOrder(orderToUpdate);
+                    
+                    const customerEmail = orderToUpdate.customerDetails?.billing?.email || orderToUpdate.customerEmail;
+                    if (customerEmail && emailQueue) {
+                        emailQueue.add('order-delivered', {
+                            to: customerEmail,
+                            subject: `Your Order #${orderToUpdate.orderId.substring(0, 8)} has been delivered!`,
+                            text: `Hi there,\n\nYour order #${orderToUpdate.orderId.substring(0, 8)} has been delivered. We hope you love your new stickers!\n\nThank you,\nSplotch Team`,
+                            html: `<p>Hi there,</p><p>Your order <strong>#${orderToUpdate.orderId.substring(0, 8)}</strong> has been delivered. We hope you love your new stickers!</p><p>Thank you,<br>Splotch Team</p>`
+                        });
+                    }
                 }
             }
+        }
+    }
+
+    // --- NEW LOGIC: Move DELIVERED to COMPLETED after 72 hours ---
+    const allOrders = await db.getAllOrders();
+    const deliveredOrders = allOrders.filter(o => o.status === 'DELIVERED' && o.deliveredAt);
+    const now = Date.now();
+    const seventyTwoHoursMs = 72 * 60 * 60 * 1000;
+
+    for (const order of deliveredOrders) {
+        const deliveredTime = new Date(order.deliveredAt).getTime();
+        if (now - deliveredTime > seventyTwoHoursMs) {
+            logger.info(`[TRACKER] Order ${order.orderId} has been delivered for > 72 hours. Moving to COMPLETED.`);
+            order.status = 'COMPLETED';
+            order.completedAt = new Date().toISOString();
+            order.lastUpdatedAt = new Date().toISOString();
+            await db.updateOrder(order);
         }
     }
 }

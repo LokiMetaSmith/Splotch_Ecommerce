@@ -60,7 +60,7 @@ export function moveLayer(fromIndex, toIndex) {
 }
 
 export function setActiveLayer(index) {
-  if (index >= -1 && index < designLayers.length) {
+  if (index === 'boundary' || (index >= -1 && index < designLayers.length)) {
     activeLayerIndex = index;
     return true;
   }

@@ -63,6 +63,15 @@ export function displayOrders(orders, container, noOrdersMessage) {
       const safeOrderIdShort = escapeHtml(order.orderId.substring(0, 8));
       const safeStatus = escapeHtml(order.status);
       const safeDesignImagePath = escapeHtml(order.designImagePath);
+      const isShippedOrDelivered = order.status === 'SHIPPED' || order.status === 'DELIVERED' || order.status === 'COMPLETED';
+      const hasTracking = order.trackingNumber && order.courier;
+      const trackingHtml = isShippedOrDelivered && hasTracking ? `
+        <div class="mt-2 text-sm bg-blue-50 p-3 rounded border border-blue-100">
+            <p class="font-semibold text-blue-900">Tracking Information</p>
+            <p class="text-blue-800">Carrier: ${escapeHtml(order.courier)}</p>
+            <p class="text-blue-800">Tracking Number: <span class="font-mono bg-white px-1 border border-blue-200 rounded">${escapeHtml(order.trackingNumber)}</span></p>
+        </div>
+      ` : '';
 
       return `
             <div class="order-card p-4 border rounded-lg shadow-sm bg-gray-50">
@@ -81,6 +90,7 @@ export function displayOrders(orders, container, noOrdersMessage) {
                         <p class="text-sm text-gray-600 flex items-center gap-2">
                             Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${safeStatus.toLowerCase()}">${safeStatus}</span>
                         </p>
+                        ${trackingHtml}
                     </div>
                     <div class="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">
                         <img src="${safeDesignImagePath}" alt="Sticker Design" class="w-24 h-24 object-cover border rounded-md">
