@@ -51,10 +51,11 @@ import { emailQueue, telegramQueue, odooQueue, redisAvailable } from './queueMan
 import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
 import { wafMiddleware } from './waf.js';
 import OdooClient from './odoo.js';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import util from 'util';
 
 const execPromise = util.promisify(exec);
+const execFilePromise = util.promisify(execFile);
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
 export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
@@ -893,8 +894,7 @@ async function startServer(
 
         try {
             // Using [0] to extract the first layer/page of multi-page formats (PDF/TIFF/AI)
-            const command = `convert "${inputFile}[0]" "${outputFile}"`;
-            await execPromise(command);
+            await execFilePromise('convert', [`${inputFile}[0]`, outputFile]);
 
             res.sendFile(outputFile, async (err) => {
                 if (err) {
