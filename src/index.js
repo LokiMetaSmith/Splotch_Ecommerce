@@ -2917,6 +2917,7 @@ function drawPolygonsToCanvas(
   style,
   offset = { x: 0, y: 0 },
   stroke = false,
+  isActive = false
 ) {
   if (!ctx || polygons.length === 0) return;
 
@@ -2939,31 +2940,23 @@ function drawPolygonsToCanvas(
   });
 
   if (stroke) {
-    // Determine active state for legend highlighting
-    const activeLineId = getActiveLineId();
-    const isCutlineActive = activeLineId === "cutline";
-    const isOtherActive = activeLineId && !isCutlineActive;
-
     ctx.strokeStyle = style;
 
     // Constant hairline width
-    const baseLineWidth = getConstantLineWidth(isCutlineActive ? 3.0 : 1.5);
+    const baseLineWidth = getConstantLineWidth(isActive ? 3.0 : 1.5);
     ctx.lineWidth = baseLineWidth;
 
-    if (isOtherActive) {
-      ctx.globalAlpha = 0.3; // Dim when another line is selected
+    if (!isActive) {
+      ctx.globalAlpha = 0.5; // Dim when not active
+      ctx.setLineDash([getConstantLineWidth(4), getConstantLineWidth(4)]); // Dashed
     } else {
       ctx.globalAlpha = 1.0;
-    }
-
-    if (isCutlineActive) {
-      ctx.setLineDash([]); // Solid when highlighted
-    } else {
-      ctx.setLineDash([getConstantLineWidth(4), getConstantLineWidth(4)]); // Make the cutline dashed
+      ctx.setLineDash([]); // Solid
     }
 
     ctx.stroke();
     ctx.setLineDash([]); // Reset for other drawing operations
+    ctx.globalAlpha = 1.0; // Reset
   } else {
     ctx.fillStyle = style;
     ctx.fill();
@@ -3106,6 +3099,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
         layer.currentCutline,
         "cyan",
         layerOffset,
+        true,
         isSelected
       );
     }
@@ -3117,6 +3111,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
       organicSheetCutline,
       "red",
       offset,
+      true,
       activeLayerIndex === 'boundary'
     );
   }
