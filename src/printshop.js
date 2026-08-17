@@ -10,6 +10,7 @@ import { SVGParser } from "./lib/svgparser.js";
 import { generateCutFile, generatePltFile } from "./lib/cut_file_generator.js";
 import * as jose from "jose";
 import { jsPDF } from "jspdf";
+import JSZip from "jszip";
 import "svg2pdf.js";
 
 // --- Global Variables ---
@@ -1756,6 +1757,8 @@ async function handleExportPdf() {
 
   try {
     let doc = null;
+    const zip = new JSZip();
+    const baseName = window.currentCutFileId ? window.currentCutFileId : "nested-stickers";
 
     for (let i = 0; i < window.nestedSvgs.length; i++) {
         const svgElement = new DOMParser().parseFromString(
@@ -1785,8 +1788,44 @@ async function handleExportPdf() {
         // Stickers are PNG <image> tags, fiducials are <circle>/<rect>, QRs are <image>/<text>.
         svgElement.querySelectorAll('path, polygon, polyline, line').forEach(el => el.remove());
 
+        // Target 300 DPI (Default SVG scale is usually 96 DPI)
+        const scale = 300 / 96;
+        const targetWidth = Math.round(width * scale);
+        const targetHeight = Math.round(height * scale);
+
+        // Update SVG dimensions for crisp rendering onto canvas
+        svgElement.setAttribute("width", targetWidth);
+        svgElement.setAttribute("height", targetHeight);
+
+        // Serialize back to string
+        const svgString = new XMLSerializer().serializeToString(svgElement);
+        const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+
+        // Load into an Image
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = url;
+        });
+
+        // Draw to a scaled Canvas with white background
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, targetWidth, targetHeight);
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        URL.revokeObjectURL(url);
+
+        // Get JPEG for PDF
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+        // Add to PDF
         if (i === 0) {
-            // Create the PDF with the correct dimensions from the start.
+            // Create the PDF with the correct original dimensions
             doc = new jsPDF({
               unit: "px",
               format: [width, height],
@@ -1795,19 +1834,32 @@ async function handleExportPdf() {
             doc.addPage([width, height]);
         }
 
-        await doc.svg(svgElement, {
-          x: 0,
-          y: 0,
-          width: width,
-          height: height,
-        });
+        doc.addImage(jpegDataUrl, 'JPEG', 0, 0, width, height);
+
+        // Get PNG Blob and add to zip
+        const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const sheetSuffix = window.nestedSvgs.length > 1 ? `-sheet${i + 1}` : '';
+        zip.file(`${baseName}${sheetSuffix}-300dpi.png`, pngBlob);
     }
 
-    const baseName = window.currentCutFileId ? window.currentCutFileId : "nested-stickers";
-    doc.save(`${baseName}.pdf`);
-    showSuccessToast("PDF exported successfully.");
+    // Add PDF to zip
+    const pdfBlob = doc.output('blob');
+    zip.file(`${baseName}-300dpi.pdf`, pdfBlob);
+
+    // Generate zip and trigger download
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement("a");
+    const zipUrl = URL.createObjectURL(zipBlob);
+    a.href = zipUrl;
+    a.download = `${baseName}-print-package.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(zipUrl);
+
+    showSuccessToast("Print package exported successfully.");
   } catch (error) {
-    showErrorToast(`PDF Export Failed: ${error.message}`);
+    showErrorToast(`Print Package Export Failed: ${error.message}`);
     console.error(error);
   }
 }

@@ -13,8 +13,24 @@ global.HTMLAnchorElement = dom.window.HTMLAnchorElement;
 global.Node = dom.window.Node;
 global.URL = dom.window.URL;
 global.Blob = dom.window.Blob;
+class MockImage {
+    constructor() {
+        setTimeout(() => {
+            if (this.onload) this.onload();
+        }, 0);
+    }
+}
+global.Image = MockImage;
 global.XMLSerializer = dom.window.XMLSerializer;
 global.DOMParser = dom.window.DOMParser;
+global.HTMLCanvasElement = dom.window.HTMLCanvasElement;
+HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
+    fillRect: jest.fn(),
+    drawImage: jest.fn(),
+    scale: jest.fn(),
+}));
+HTMLCanvasElement.prototype.toDataURL = jest.fn(() => 'data:image/jpeg;base64,mocked');
+HTMLCanvasElement.prototype.toBlob = jest.fn((cb) => cb(new Blob(['mocked'])));
 global.Text = dom.window.Text;
 
 // Mock localStorage
@@ -33,6 +49,9 @@ global.URL.revokeObjectURL = jest.fn();
 const docMock = {
     save: jest.fn(),
     svg: jest.fn(() => Promise.resolve()),
+    addImage: jest.fn(),
+    output: jest.fn(() => new Blob(['pdf-data'])),
+    addPage: jest.fn(),
 };
 
 const jsPDFMock = jest.fn(() => docMock);
@@ -44,6 +63,15 @@ jest.unstable_mockModule('jspdf', () => ({
 
 jest.unstable_mockModule('svg2pdf.js', () => ({
     default: jest.fn(),
+}));
+
+const mockZipFile = jest.fn();
+const mockZipGenerateAsync = jest.fn(() => Promise.resolve(new Blob(['mock-zip'])));
+jest.unstable_mockModule('jszip', () => ({
+    default: jest.fn().mockImplementation(() => ({
+        file: mockZipFile,
+        generateAsync: mockZipGenerateAsync,
+    }))
 }));
 
 // Mock other dependencies
@@ -111,13 +139,12 @@ describe('PDF Export Functionality', () => {
         await printshop.init();
     });
 
-    test('should call jsPDF and doc.svg when export button is clicked', async () => {
+    test('should call jsPDF, render canvas, and zip when export button is clicked', async () => {
         const btn = document.getElementById('exportPdfBtn');
-        // Trigger the click (it's async but returns a promise we can't await directly from click(), so we rely on mocks)
         btn.click();
 
         // Wait for async operations to complete
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         expect(jsPDFMock).toHaveBeenCalledWith({
             unit: 'px',
@@ -125,15 +152,12 @@ describe('PDF Export Functionality', () => {
         });
 
         const docInstance = jsPDFMock.mock.results[0].value;
-        expect(docInstance.svg).toHaveBeenCalledWith(expect.anything(), {
-            x: 0,
-            y: 0,
-            width: 100,
-            height: 100
-        });
+        expect(docInstance.addImage).toHaveBeenCalledWith('data:image/jpeg;base64,mocked', 'JPEG', 0, 0, 100, 100);
 
-        // Verify save was called on the doc instance
-        expect(docInstance.save).toHaveBeenCalledWith('nested-stickers.pdf');
+        // Verify zip operations
+        expect(mockZipFile).toHaveBeenCalledWith('nested-stickers-300dpi.png', expect.any(Blob));
+        expect(mockZipFile).toHaveBeenCalledWith('nested-stickers-300dpi.pdf', expect.any(Blob));
+        expect(mockZipGenerateAsync).toHaveBeenCalled();
     });
 
     test('should show error if no nested SVG', async () => {
