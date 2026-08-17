@@ -341,6 +341,8 @@ export function setupContrastToggle() {
   const bgDarkBtn = document.getElementById("bgDarkBtn");
   const bgTransBtn = document.getElementById("bgTransBtn");
 
+  const bgMagentaBtn = document.getElementById("bgMagentaBtn");
+
   const originalBgImage = canvas.style.backgroundImage;
 
   if (bgLightBtn) {
@@ -353,7 +355,14 @@ export function setupContrastToggle() {
   if (bgDarkBtn) {
     bgDarkBtn.addEventListener("click", () => {
       canvas.style.backgroundImage = "none";
-      canvas.style.backgroundColor = "#1f2937"; // gray-800
+      canvas.style.backgroundColor = "#000000"; // black
+    });
+  }
+
+  if (bgMagentaBtn) {
+    bgMagentaBtn.addEventListener("click", () => {
+      canvas.style.backgroundImage = "none";
+      canvas.style.backgroundColor = "#ff00ff"; // magenta
     });
   }
 
