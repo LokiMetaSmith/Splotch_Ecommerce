@@ -3039,6 +3039,25 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
         const img = layer.image || layer.originalImage;
         if (img) {
           ctx.save();
+          
+          if (layer.currentCutline && layer.currentCutline.length > 0) {
+            ctx.beginPath();
+            layer.currentCutline.forEach((poly) => {
+              if (!poly || poly.length === 0) return;
+              ctx.moveTo(
+                poly[0].x + offset.x + (layer.x || 0),
+                poly[0].y + offset.y + (layer.y || 0)
+              );
+              for (let i = 1; i < poly.length; i++)
+                ctx.lineTo(
+                  poly[i].x + offset.x + (layer.x || 0),
+                  poly[i].y + offset.y + (layer.y || 0)
+                );
+              ctx.closePath();
+            });
+            ctx.clip();
+          }
+
           const layerWidth = layer.cleanCanvasState
             ? layer.cleanCanvasState.width / dpr
             : layer.width || img.width;

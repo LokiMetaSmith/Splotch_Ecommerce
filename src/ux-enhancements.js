@@ -348,14 +348,14 @@ export function setupContrastToggle() {
   if (bgLightBtn) {
     bgLightBtn.addEventListener("click", () => {
       canvas.style.backgroundImage = "none";
-      canvas.style.backgroundColor = "white";
+      canvas.style.backgroundColor = "none";
     });
   }
 
   if (bgDarkBtn) {
     bgDarkBtn.addEventListener("click", () => {
       canvas.style.backgroundImage = "none";
-      canvas.style.backgroundColor = "#000000"; // black
+      canvas.style.backgroundColor = "#1f2937"; // gray-800
     });
   }
 
