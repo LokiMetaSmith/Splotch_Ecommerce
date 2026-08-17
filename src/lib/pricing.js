@@ -182,7 +182,7 @@ export function generateSvgFromCutline(cutline, bounds) {
     `.trim();
 }
 
-export function generateMultiLayerSvg(designLayers, sheetBoundary, bounds) {
+export function generateMultiLayerSvg(stickers, sheetBoundary, bounds) {
   if (!bounds) return null;
 
   const width = bounds.width;
@@ -226,8 +226,8 @@ export function generateMultiLayerSvg(designLayers, sheetBoundary, bounds) {
 
   // 1. Kiss Cuts (Cyan)
   svgContent += `\n  <g id="Kiss-Cut" stroke="cyan" fill="none" stroke-width="1">`;
-  if (designLayers && designLayers.length > 0) {
-    designLayers.forEach(layer => {
+  if (stickers && stickers.length > 0) {
+    stickers.forEach(layer => {
       if (layer.currentCutline && layer.currentCutline.length > 0 && layer.visible !== false) {
         const pathData = polysToPathD(layer.currentCutline, layer.x || 0, layer.y || 0);
         if (pathData) {
