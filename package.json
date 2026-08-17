@@ -52,6 +52,7 @@
     "js-yaml": "^4.1.1",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^4.1.0",
+    "jszip": "^3.10.1",
     "lowdb": "^7.0.1",
     "lusca": "^1.7.0",
     "multer": "^2.0.1",
