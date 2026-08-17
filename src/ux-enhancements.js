@@ -330,6 +330,41 @@ export function setupShortcutsHelp() {
   });
 }
 
+/**
+ * Sets up background contrast toggle buttons for the image canvas.
+ */
+export function setupContrastToggle() {
+  const canvas = document.getElementById("imageCanvas");
+  if (!canvas) return;
+
+  const bgLightBtn = document.getElementById("bgLightBtn");
+  const bgDarkBtn = document.getElementById("bgDarkBtn");
+  const bgTransBtn = document.getElementById("bgTransBtn");
+
+  const originalBgImage = canvas.style.backgroundImage;
+
+  if (bgLightBtn) {
+    bgLightBtn.addEventListener("click", () => {
+      canvas.style.backgroundImage = "none";
+      canvas.style.backgroundColor = "white";
+    });
+  }
+
+  if (bgDarkBtn) {
+    bgDarkBtn.addEventListener("click", () => {
+      canvas.style.backgroundImage = "none";
+      canvas.style.backgroundColor = "#1f2937"; // gray-800
+    });
+  }
+
+  if (bgTransBtn) {
+    bgTransBtn.addEventListener("click", () => {
+      canvas.style.backgroundImage = originalBgImage;
+      canvas.style.backgroundColor = "white";
+    });
+  }
+}
+
 // Initialize on load
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", () => {
@@ -337,5 +372,6 @@ if (typeof document !== "undefined") {
     setupTooltips();
     setupKeyboardShortcuts();
     setupShortcutsHelp();
+    setupContrastToggle();
   });
 }
