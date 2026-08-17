@@ -7,7 +7,7 @@ describe("generateMultiLayerSvg", () => {
 
     it("should generate a valid multi-layer SVG string", () => {
         const bounds = { width: 100, height: 100, left: 10, top: 10 };
-        const designLayers = [
+        const stickers = [
             {
                 visible: true,
                 x: 5,
@@ -21,7 +21,7 @@ describe("generateMultiLayerSvg", () => {
             [{x: 0, y: 0}, {x: 30, y: 0}, {x: 30, y: 30}, {x: 0, y: 30}]
         ];
 
-        const svg = generateMultiLayerSvg(designLayers, sheetBoundary, bounds);
+        const svg = generateMultiLayerSvg(stickers, sheetBoundary, bounds);
 
         expect(svg).toContain('<?xml version="1.0" encoding="UTF-8"?>');
         expect(svg).toContain('<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">');
@@ -41,10 +41,10 @@ describe("generateMultiLayerSvg", () => {
 
     it("should handle empty currentCutline gracefully", () => {
         const bounds = { width: 100, height: 100, left: 0, top: 0 };
-        const designLayers = [{ visible: true, x: 0, y: 0, currentCutline: [] }];
+        const stickers = [{ visible: true, x: 0, y: 0, currentCutline: [] }];
         const sheetBoundary = [];
 
-        const svg = generateMultiLayerSvg(designLayers, sheetBoundary, bounds);
+        const svg = generateMultiLayerSvg(stickers, sheetBoundary, bounds);
         expect(svg).toContain('<g id="Kiss-Cut" stroke="cyan" fill="none" stroke-width="1">');
         expect(svg).toContain('</g>');
         expect(svg).not.toContain('<path'); // Should have no paths
