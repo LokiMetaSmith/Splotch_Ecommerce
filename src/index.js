@@ -3535,6 +3535,10 @@ function updateEditingControlsForActiveLayer() {
         lazyLassoValueDisplay.textContent = lazyLassoSlider.value;
       }
     }
+    const cutShapeSelect = document.getElementById("cutShapeSelect");
+    if (cutShapeSelect) {
+      cutShapeSelect.value = activeBase.cutShape || "trace";
+    }
   }
 
   const standardSizesControls = document.getElementById(
@@ -4478,6 +4482,7 @@ function handleGenerateCutline(skipPrompt = false) {
 
   const cutShapeSelect = document.getElementById("cutShapeSelect");
   const selectedShape = cutShapeSelect ? cutShapeSelect.value : "trace";
+  activeBase.cutShape = selectedShape;
 
   try {
     const dpr = window.devicePixelRatio || 1;

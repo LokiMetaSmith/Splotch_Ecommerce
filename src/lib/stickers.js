@@ -26,7 +26,8 @@ export function addSticker(image, name, x, y, width, height) {
     cutlineSensitivity: 42,
     lazyLassoRadius: 50,
     isGrayscale: false,
-    isSepia: false
+    isSepia: false,
+    cutShape: 'trace'
   };
   stickers.push(newSticker);
   activeStickerIndex = stickers.length - 1;
