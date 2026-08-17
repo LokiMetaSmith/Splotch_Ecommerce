@@ -191,21 +191,34 @@ export function generateMultiLayerSvg(designLayers, sheetBoundary, bounds) {
   const top = bounds.top;
 
   // Helper to convert polygons to SVG path data string
+  // Bolt Optimization: Replace slow string concatenation in a loop with an array and join().
+  // String concatenation creates a new string object in memory for every iteration,
+  // which generates massive GC pressure for complex SVGs with thousands of points.
   const polysToPathD = (polygons, offsetX, offsetY) => {
     if (!polygons || polygons.length === 0) return "";
-    let d = "";
-    for (let j = 0; j < polygons.length; j++) {
+    let totalPoints = 0;
+    const polysLength = polygons.length;
+    for (let i = 0; i < polysLength; i++) {
+      totalPoints += polygons[i].length;
+    }
+
+    const chunks = new Array(totalPoints + polysLength);
+    let chunkIdx = 0;
+
+    for (let j = 0; j < polysLength; j++) {
       const poly = polygons[j];
       const len = poly.length;
       if (len === 0) continue;
 
-      d += "M " + (poly[0].x + offsetX - left) + " " + (poly[0].y + offsetY - top) + " ";
+      chunks[chunkIdx++] = "M " + (poly[0].x + offsetX - left) + " " + (poly[0].y + offsetY - top);
       for (let i = 1; i < len; i++) {
-        d += "L " + (poly[i].x + offsetX - left) + " " + (poly[i].y + offsetY - top) + " ";
+        chunks[chunkIdx++] = "L " + (poly[i].x + offsetX - left) + " " + (poly[i].y + offsetY - top);
       }
-      d += "Z ";
+      chunks[chunkIdx++] = "Z";
     }
-    return d.trim();
+
+    chunks.length = chunkIdx;
+    return chunks.join(" ");
   };
 
   let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
