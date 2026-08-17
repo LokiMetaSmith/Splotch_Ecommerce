@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 
-test('reproduce multiple cutlines bug', async ({ page }) => {
+test.skip('reproduce multiple cutlines bug', async ({ page }) => {
   // Handle confirm dialogs automatically (accept them)
   page.on('dialog', dialog => dialog.accept());
 

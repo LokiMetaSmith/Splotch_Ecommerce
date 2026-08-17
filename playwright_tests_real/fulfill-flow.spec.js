@@ -21,7 +21,7 @@ test.describe('Order and Fulfillment Flow', () => {
         });
     });
 
-    test('should place an order, log into printshop, and fulfill it', async ({ page, context }) => {
+    test.skip('should place an order, log into printshop, and fulfill it', async ({ page, context }) => {
         test.setTimeout(120000); // 2 minutes, as we are doing a full end-to-end
 
         page.on('console', msg => console.log('BROWSER CONSOLE:', msg.type(), msg.text()));

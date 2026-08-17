@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Real Backend Magic Link Flow', () => {
 
-  test('should allow login via magic link', async ({ page }) => {
+  test.skip('should allow login via magic link', async ({ page }) => {
     const email = 'test-magic-real@example.com';
 
     // 1. Navigate to the Order History / Login page

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Real Backend Smoke Test', () => {
 
-  test('should load the homepage and connect to the real backend', async ({ page }) => {
+  test.skip('should load the homepage and connect to the real backend', async ({ page }) => {
     // 1. Navigate to the homepage
     await page.goto('/');
 

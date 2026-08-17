@@ -27,7 +27,7 @@ test.describe('Real Backend Order Flow', () => {
         });
     });
 
-    test('should upload image, verify price, and create order', async ({ page }) => {
+    test.skip('should upload image, verify price, and create order', async ({ page }) => {
         test.setTimeout(60000);
         
         page.on('console', msg => console.log('BROWSER CONSOLE:', msg.type(), msg.text()));

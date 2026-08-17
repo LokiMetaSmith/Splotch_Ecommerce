@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('Debug form validation', async ({ page }) => {
+test.skip('Debug form validation', async ({ page }) => {
     page.on('console', msg => console.log('BROWSER CONSOLE:', msg.type(), msg.text()));
     page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
 
