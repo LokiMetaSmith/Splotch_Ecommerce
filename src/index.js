@@ -2156,6 +2156,38 @@ function updateUnitUI(isMetric) {
         "Keep important elements 0.08-0.12in from edge!";
     }
   }
+
+  const boundaryMarginLabelEl = document.getElementById("boundaryMarginLabel") || document.querySelector('label[for="boundaryMarginInput"]');
+  const boundaryMarginSliderEl = document.getElementById("boundaryMarginSlider");
+  const boundaryMarginInputEl = document.getElementById("boundaryMarginInput");
+
+  if (boundaryMarginLabelEl) {
+    boundaryMarginLabelEl.textContent = isMetric ? "Bleed Margin (mm)" : "Bleed Margin (inches)";
+  }
+
+  if (boundaryMarginSliderEl && boundaryMarginInputEl) {
+    if (isMetric) {
+      boundaryMarginSliderEl.min = "0";
+      boundaryMarginSliderEl.max = (0.5 * inchesToMm).toFixed(1);
+      boundaryMarginSliderEl.step = "0.5";
+      const mmVal = ((sheetBoundaryConfig.margin || 0) * inchesToMm).toFixed(1);
+      boundaryMarginSliderEl.value = mmVal;
+      boundaryMarginInputEl.min = "0";
+      boundaryMarginInputEl.max = (0.5 * inchesToMm).toFixed(1);
+      boundaryMarginInputEl.step = "0.5";
+      boundaryMarginInputEl.value = mmVal;
+    } else {
+      boundaryMarginSliderEl.min = "0";
+      boundaryMarginSliderEl.max = "0.5";
+      boundaryMarginSliderEl.step = "0.05";
+      const inVal = (sheetBoundaryConfig.margin || 0).toFixed(2);
+      boundaryMarginSliderEl.value = inVal;
+      boundaryMarginInputEl.min = "0";
+      boundaryMarginInputEl.max = "0.5";
+      boundaryMarginInputEl.step = "0.05";
+      boundaryMarginInputEl.value = inVal;
+    }
+  }
 }
 
 function updateEditingButtonsState(disabled) {
@@ -5748,7 +5780,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const updateMargin = (val) => {
-        sheetBoundaryConfig.margin = parseFloat(val);
+        const num = parseFloat(val) || 0;
+        sheetBoundaryConfig.margin = isMetric ? (num / 25.4) : num;
         if (marginSlider) marginSlider.value = val;
         if (marginInput) marginInput.value = val;
         redrawAll();
