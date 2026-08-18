@@ -19,6 +19,8 @@ export class MongoDbAdapter {
             await this.db.collection('orders').createIndex({ telegramMessageId: 1 });
             await this.db.collection('orders').createIndex({ telegramPhotoMessageId: 1 });
 
+            await this.db.collection('batches').createIndex({ batchId: 1 }, { unique: true });
+
             await this.db.collection('users').createIndex({ username: 1 }, { unique: true, sparse: true });
             await this.db.collection('users').createIndex({ email: 1 });
             await this.db.collection('users').createIndex({ id: 1 }, { unique: true });
@@ -50,6 +52,24 @@ export class MongoDbAdapter {
         const { _id, ...doc } = order;
         await this.db.collection('orders').replaceOne({ orderId: order.orderId }, doc);
         return order;
+    }
+
+    // --- Batches ---
+    async getBatch(id) {
+        const batch = await this.db.collection('batches').findOne({ batchId: id });
+        if (batch) delete batch._id;
+        return batch;
+    }
+
+    async createBatch(batch) {
+        await this.db.collection('batches').insertOne({ ...batch });
+        return batch;
+    }
+
+    async updateBatch(batch) {
+        const { _id, ...doc } = batch;
+        await this.db.collection('batches').replaceOne({ batchId: batch.batchId }, doc);
+        return batch;
     }
 
     async getAllOrders() {

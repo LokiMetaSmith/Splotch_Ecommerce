@@ -18,7 +18,7 @@ describe('LowDbAdapter db.json Reloading', () => {
 
     beforeAll(async () => {
         // Create a clean initial test database file
-        const initialData = { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
+        const initialData = { orders: {}, batches: {}, batches: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
         fs.writeFileSync(testDbPath, JSON.stringify(initialData));
 
         // Ensure the server uses the real db logic (not memory adapter) but points to our test file

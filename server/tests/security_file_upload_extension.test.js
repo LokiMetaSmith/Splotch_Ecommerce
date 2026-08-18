@@ -28,7 +28,7 @@ describe('Security: File Extension Spoofing', () => {
 
   beforeAll(async () => {
     // Mock DB structure
-    const data = { orders: {}, users: {}, credentials: {}, config: {}, products: {}, activeOrders: [], shippedOrders: [], userOrderIndex: {} };
+    const data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {}, activeOrders: [], shippedOrders: [], userOrderIndex: {} };
     db = {
       data: data,
       write: async () => { },

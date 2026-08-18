@@ -16,7 +16,7 @@ describe('Admin Users API', () => {
     let testDbPath = path.join(__dirname, '..', 'test_admin_api_db.json');
 
     beforeAll(async () => {
-        const initialData = { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
+        const initialData = { orders: {}, batches: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
         fs.writeFileSync(testDbPath, JSON.stringify(initialData));
 
         process.env.TEST_USE_REAL_DB = 'true';

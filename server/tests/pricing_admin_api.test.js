@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { jest } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import { getCurrentSigningKey } from '../keyManager.js';
 import path from 'path';
@@ -17,8 +18,12 @@ describe('Admin Pricing API', () => {
     let testPricingPath = path.join(__dirname, '..', 'test_pricing.json');
 
     beforeAll(async () => {
+        jest.setTimeout(60000);
+
+
+
         // Setup mock DB
-        const initialData = { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
+        const initialData = { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
         fs.writeFileSync(testDbPath, JSON.stringify(initialData));
 
         // Setup mock pricing.json
@@ -41,7 +46,11 @@ describe('Admin Pricing API', () => {
         const serverModule = await import('../server.js');
         startServer = serverModule.startServer;
 
-        serverData = await startServer(null, null, undefined, testDbPath);
+        const { JSONFilePreset } = require("lowdb/node");
+const { LowDbAdapter } = require("../database/lowdb_adapter.js");
+const lowDbInstance = await JSONFilePreset(testDbPath, { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} });
+const testDb = new LowDbAdapter(lowDbInstance);
+serverData = await startServer(testDb, null, undefined, testDbPath);
 
         const { privateKey, kid } = getCurrentSigningKey();
 

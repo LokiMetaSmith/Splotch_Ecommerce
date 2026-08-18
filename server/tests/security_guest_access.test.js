@@ -18,7 +18,7 @@ describe('Security Guest Access Bypass', () => {
   const testDbPath = path.join(__dirname, 'test-db-guest.json');
 
   beforeAll(async () => {
-    const data = { orders: {}, users: {}, credentials: {}, config: {}, emailIndex: {} };
+    const data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, emailIndex: {} };
     db = {
       data: data,
       write: async () => { },
@@ -36,7 +36,7 @@ describe('Security Guest Access Bypass', () => {
 
   beforeEach(async () => {
     // Reset DB data
-    db.data = { orders: {}, users: {}, credentials: {}, config: {}, emailIndex: {} };
+    db.data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, emailIndex: {} };
 
     // Create a victim user
     const victim = {
