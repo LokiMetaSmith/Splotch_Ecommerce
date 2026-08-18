@@ -3421,55 +3421,53 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
 
   const dpr = window.devicePixelRatio || 1;
 
-  // Pass 1: Draw White Vinyl Backgrounds (Bleeds) for all layers
-  ctx.save();
-  ctx.lineJoin = "round";
-
+  // Combine Pass 1 (White Vinyl) and Pass 2 (Base Images) to fix stacking order
   const bColor1 = document.getElementById("bleedColor1")?.value || "#000000";
   const bColor2 = document.getElementById("bleedColor2")?.value || "#000000";
 
   stickers.forEach((layer) => {
-    if (
-      layer.currentCutline &&
-      layer.currentCutline.length > 0 &&
-      layer.visible !== false
-    ) {
-      ctx.beginPath();
-      layer.currentCutline.forEach((poly) => {
-        if (!poly || poly.length === 0) return;
-        ctx.moveTo(
-          poly[0].x + offset.x + (layer.x || 0),
-          poly[0].y + offset.y + (layer.y || 0)
-        );
-        for (let i = 1; i < poly.length; i++)
-          ctx.lineTo(
-            poly[i].x + offset.x + (layer.x || 0),
-            poly[i].y + offset.y + (layer.y || 0)
-          );
-        ctx.closePath();
-      });
-
-      const cutBounds = getPolygonsBounds(layer.currentCutline);
-      const gradient = ctx.createLinearGradient(
-        cutBounds.left + offset.x + (layer.x || 0),
-        cutBounds.top + offset.y + (layer.y || 0),
-        cutBounds.right + offset.x + (layer.x || 0),
-        cutBounds.bottom + offset.y + (layer.y || 0)
-      );
-      gradient.addColorStop(0, bColor1);
-      gradient.addColorStop(1, bColor2);
-
-      ctx.strokeStyle = gradient;
-      ctx.lineWidth = 20;
-      ctx.stroke();
-
-    }
-  });
-  ctx.restore();
-
-  // Pass 2: Draw Base Images & Polygons for all layers
-  stickers.forEach((layer) => {
     if (layer.visible !== false) {
+      // 1. Draw White Vinyl Background (Bleed)
+      if (layer.currentCutline && layer.currentCutline.length > 0) {
+        ctx.save();
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        layer.currentCutline.forEach((poly) => {
+          if (!poly || poly.length === 0) return;
+          ctx.moveTo(
+            poly[0].x + offset.x + (layer.x || 0),
+            poly[0].y + offset.y + (layer.y || 0)
+          );
+          for (let i = 1; i < poly.length; i++)
+            ctx.lineTo(
+              poly[i].x + offset.x + (layer.x || 0),
+              poly[i].y + offset.y + (layer.y || 0)
+            );
+          ctx.closePath();
+        });
+
+        // Fill with white first
+        ctx.fillStyle = "white";
+        ctx.fill();
+
+        // Stroke with bleed gradient
+        const cutBounds = getPolygonsBounds(layer.currentCutline);
+        const gradient = ctx.createLinearGradient(
+          cutBounds.left + offset.x + (layer.x || 0),
+          cutBounds.top + offset.y + (layer.y || 0),
+          cutBounds.right + offset.x + (layer.x || 0),
+          cutBounds.bottom + offset.y + (layer.y || 0)
+        );
+        gradient.addColorStop(0, bColor1);
+        gradient.addColorStop(1, bColor2);
+
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 20;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 2. Draw Base Images & Polygons
       if (layer.currentPolygons && layer.currentPolygons.length > 0) {
         // Vector mode base drawing
         const layerOffset = {
@@ -3481,9 +3479,28 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
         const img = layer.image || layer.originalImage;
         if (img) {
           ctx.save();
+          // Clip the image to its cutline so any JPEG white background outside the cutline is hidden
+          if (layer.currentCutline && layer.currentCutline.length > 0) {
+            ctx.beginPath();
+            layer.currentCutline.forEach((poly) => {
+              if (!poly || poly.length === 0) return;
+              ctx.moveTo(
+                poly[0].x + offset.x + (layer.x || 0),
+                poly[0].y + offset.y + (layer.y || 0)
+              );
+              for (let i = 1; i < poly.length; i++) {
+                ctx.lineTo(
+                  poly[i].x + offset.x + (layer.x || 0),
+                  poly[i].y + offset.y + (layer.y || 0)
+                );
+              }
+              ctx.closePath();
+            });
+            ctx.clip();
+          }
+
           const layerWidth = layer.width || (img.naturalWidth || img.width);
           const layerHeight = layer.height || (img.naturalHeight || img.height);
-
           const imgX = offset.x + (layer.x || 0);
           const imgY = offset.y + (layer.y || 0);
 
