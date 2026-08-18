@@ -2444,11 +2444,32 @@ function loadFileAsImage(file, isMascot = false) {
     file.name.toLowerCase().endsWith(".svg")
   ) {
     updateCanvasLoading("Parsing SVG...", "Extracting vector paths and print layers");
+
+    let spawnX = 0;
+    let spawnY = 0;
+    const validExistingStickers = stickers.filter(
+      (s) => s.image || s.originalImage || (s.basePolygons && s.basePolygons.length > 0)
+    );
+    if (validExistingStickers.length > 0) {
+      let maxRight = 0;
+      let minTop = Infinity;
+      validExistingStickers.forEach((s) => {
+        const sx = s.x || 0;
+        const sy = s.y || 0;
+        const sw = s.width || (s.image ? (s.image.naturalWidth || s.image.width) : (s.originalImage ? (s.originalImage.naturalWidth || s.originalImage.width) : 0));
+        const sRight = sx + sw;
+        if (sRight > maxRight) maxRight = sRight;
+        if (sy < minTop) minTop = sy;
+      });
+      spawnX = maxRight;
+      spawnY = minTop === Infinity ? 0 : minTop;
+    }
+
     const newLayer = addSticker(
       null, // No raster image
       file.name || "Upload",
-      0,
-      0,
+      spawnX,
+      spawnY,
       baseCanvasWidth,
       baseCanvasHeight,
     );
@@ -2515,13 +2536,33 @@ function loadFileAsImage(file, isMascot = false) {
           return; // Stop here, don't reset base design
         }
 
-        // Base Layer Upload
+        // Base Layer Upload: position new sticker touching the right-most edge of existing stickers, top flush
+        let spawnX = 0;
+        let spawnY = 0;
+        const validExistingStickers = stickers.filter(
+          (s) => s.image || s.originalImage || (s.basePolygons && s.basePolygons.length > 0)
+        );
+        if (validExistingStickers.length > 0) {
+          let maxRight = 0;
+          let minTop = Infinity;
+          validExistingStickers.forEach((s) => {
+            const sx = s.x || 0;
+            const sy = s.y || 0;
+            const sw = s.width || (s.image ? (s.image.naturalWidth || s.image.width) : (s.originalImage ? (s.originalImage.naturalWidth || s.originalImage.width) : 0));
+            const sRight = sx + sw;
+            if (sRight > maxRight) maxRight = sRight;
+            if (sy < minTop) minTop = sy;
+          });
+          spawnX = maxRight;
+          spawnY = minTop === Infinity ? 0 : minTop;
+        }
+
         updateCanvasLoading("Analyzing Image...", "Detecting contours & tracing cutlines");
         const newLayer = addSticker(
           img,
           file.name || "Upload",
-          0,
-          0,
+          spawnX,
+          spawnY,
           img.width,
           img.height,
         );

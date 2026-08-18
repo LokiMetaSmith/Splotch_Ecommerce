@@ -4,12 +4,22 @@ export let stickers = [];
 export let activeStickerIndex = -1;
 
 export function addSticker(image, name, x, y, width, height) {
+  // Clean up any initial placeholder sticker before adding real sticker
+  if (
+    stickers.length === 1 &&
+    !stickers[0].image &&
+    !stickers[0].originalImage &&
+    (!stickers[0].basePolygons || stickers[0].basePolygons.length === 0)
+  ) {
+    stickers.length = 0;
+  }
+
   const newSticker = {
     id: `sticker_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
     image: image,
     name: name || `Sticker ${stickers.length + 1}`,
-    x: x,
-    y: y,
+    x: x || 0,
+    y: y || 0,
     width: width,
     height: height,
     rotation: 0,
