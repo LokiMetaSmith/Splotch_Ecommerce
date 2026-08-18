@@ -30,7 +30,7 @@ describe('Security: Price Manipulation & Logic', () => {
         }
 
         // Setup mock DB
-        db = await JSONFilePreset(testDbPath, { orders: {}, users: {}, credentials: {}, config: {}, products: {} });
+        db = await JSONFilePreset(testDbPath, { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {} });
 
         // Mock Bot
         bot = {

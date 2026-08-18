@@ -68,7 +68,7 @@ describe('Security: Email HTML Injection', () => {
     const dbPath = path.join(__dirname, 'test-db-security.json');
     if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 
-    db = await JSONFilePreset(dbPath, { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} });
+    db = await JSONFilePreset(dbPath, { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} });
   });
 
   afterAll(async () => {

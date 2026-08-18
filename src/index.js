@@ -3056,6 +3056,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
         const img = layer.image || layer.originalImage;
         if (img) {
           ctx.save();
+
           
           if (layer.currentCutline && layer.currentCutline.length > 0) {
             ctx.beginPath();

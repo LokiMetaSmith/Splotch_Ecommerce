@@ -27,7 +27,7 @@ describe('Performance: Caching Headers', () => {
 
   beforeAll(async () => {
     // Mock DB
-    const data = { orders: {}, users: {}, credentials: {}, config: {}, products: {}, inventory_cache: {} };
+    const data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {}, inventory_cache: {} };
     db = {
       data: data,
       write: async () => { },

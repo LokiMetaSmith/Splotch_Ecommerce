@@ -94,7 +94,7 @@ describe('Distributed Rate Limiting', () => {
         const { startServer } = await import('../server.js');
 
         const db = {
-            data: { orders: {}, users: {}, config: {}, emailIndex: {}, credentials: {}, products: {} },
+            data: { orders: {}, batches: {}, users: {}, config: {}, emailIndex: {}, credentials: {}, products: {} },
             write: jest.fn()
         };
 

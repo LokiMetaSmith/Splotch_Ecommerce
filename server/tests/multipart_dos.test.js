@@ -28,7 +28,7 @@ describe('Security: Multipart DoS Protection', () => {
 
   beforeAll(async () => {
     // Mock DB
-    const data = { orders: {}, users: {}, credentials: {}, config: {}, products: {} };
+    const data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {} };
     db = {
       data: data,
       write: async () => { },
@@ -53,7 +53,7 @@ describe('Security: Multipart DoS Protection', () => {
   });
 
   beforeEach(async () => {
-    db.data = { orders: {}, users: {}, credentials: {}, config: {}, emailIndex: {}, products: {} };
+    db.data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, emailIndex: {}, products: {} };
     mockSendEmail.mockClear();
   });
 

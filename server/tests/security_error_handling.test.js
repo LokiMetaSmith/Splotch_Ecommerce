@@ -43,7 +43,7 @@ describe('Security: Error Handling and Information Leakage', () => {
 
     // Mock DB
     db = {
-      data: { orders: {}, users: {}, credentials: {}, config: {}, products: {}, emailIndex: {} },
+      data: { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {}, emailIndex: {} },
       write: async () => { },
       read: async () => { }
     };
