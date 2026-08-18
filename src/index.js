@@ -2526,8 +2526,8 @@ function loadFileAsImage(file, isMascot = false) {
 
                   processCustomLayerMask(
                     activeBase.originalImage,
+                    "underbase",
                     "#ffffff",
-                    "#000000",
                     true,
                   )
                     .then((processedImg) => {

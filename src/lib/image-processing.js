@@ -716,10 +716,24 @@ export function processCustomLayerMask(img, alphaColorHex, maskColorHex, isGrays
       }
 
       if (isGrayscale) {
-        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-        data[i] = gray;
-        data[i + 1] = gray;
-        data[i + 2] = gray;
+        if (alphaColorHex === "underbase") {
+           // White underbase mode: fill non-transparent pixels with the mask color
+           if (maskRGB) {
+             data[i] = maskRGB.r;
+             data[i + 1] = maskRGB.g;
+             data[i + 2] = maskRGB.b;
+           } else {
+             // fallback to white
+             data[i] = 255;
+             data[i + 1] = 255;
+             data[i + 2] = 255;
+           }
+        } else {
+           const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+           data[i] = gray;
+           data[i + 1] = gray;
+           data[i + 2] = gray;
+        }
       }
     }
 
