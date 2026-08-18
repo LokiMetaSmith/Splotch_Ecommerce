@@ -3040,6 +3040,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
         if (img) {
           ctx.save();
 
+          
           if (layer.currentCutline && layer.currentCutline.length > 0) {
             ctx.beginPath();
             layer.currentCutline.forEach((poly) => {
