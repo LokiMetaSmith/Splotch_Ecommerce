@@ -248,7 +248,7 @@
           <div class="flex flex-col lg:flex-row gap-4 mb-6">
             <!-- Layer Editor Panel -->
             <div
-              id="layer-editor-panel"
+              id="sticker-editor-panel"
               class="w-full lg:w-64 bg-white p-4 rounded-lg shadow border border-gray-200 flex flex-col"
               style="display: none"
             >
@@ -256,7 +256,7 @@
                 <h3 class="font-bold text-gray-700">Stickers</h3>
                 <button
                   type="button"
-                  id="add-layer-btn"
+                  id="add-sticker-btn"
                   class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-1 rounded text-sm font-semibold transition-colors"
                   data-tooltip="Add another sticker to create a pack"
                 >
@@ -264,7 +264,7 @@
                 </button>
               </div>
               <ul
-                id="layer-list"
+                id="sticker-list"
                 class="flex-grow overflow-y-auto flex flex-col gap-2 max-h-96"
               >
                 <!-- Populated by JS -->
@@ -298,9 +298,16 @@
                   <button
                     type="button"
                     id="bgDarkBtn"
-                    class="w-6 h-6 rounded border border-gray-600 bg-gray-800 hover:bg-gray-900 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-splotch-teal focus:outline-none"
+                    class="w-6 h-6 rounded border border-gray-600 bg-black hover:bg-gray-900 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-splotch-teal focus:outline-none"
                     aria-label="Dark Background"
                     data-tooltip="Dark Background"
+                  ></button>
+                  <button
+                    type="button"
+                    id="bgMagentaBtn"
+                    class="w-6 h-6 rounded border border-pink-600 bg-pink-500 hover:bg-pink-600 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-splotch-teal focus:outline-none"
+                    aria-label="Magenta Background"
+                    data-tooltip="Magenta Background"
                   ></button>
                   <button
                     type="button"
@@ -393,13 +400,16 @@
                 </div>
               </div>
 
-              <!-- Interactive Layer Tabs -->
-              <div
-                id="layer-tabs"
-                class="flex justify-center gap-2 mt-4 transition-opacity duration-300"
-                style="display: none"
-              >
-                <!-- Populated by JS -->
+              <!-- Interactive Print Ink Tabs -->
+              <div id="print-ink-tabs-container" class="mt-4 flex flex-col items-center">
+                <span class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Editing Print Layers for Selected Sticker:</span>
+                <div
+                  id="print-ink-tabs"
+                  class="flex justify-center gap-2 transition-opacity duration-300"
+                  style="display: none"
+                >
+                  <!-- Populated by JS -->
+                </div>
               </div>
               <p
                 id="designMarginNote"
@@ -619,184 +629,212 @@
             </div>
             <!-- Cutline Controls -->
             <div
-              class="control-group-cutline grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 bg-blue-50 rounded-lg"
+              class="control-group-cutline flex flex-col gap-6 p-4 bg-blue-50 rounded-lg w-full"
               style="display: none"
             >
-              <div class="flex flex-col justify-center items-center w-full">
-                <span class="text-xs text-gray-500 mb-1">Cut Shape</span>
-                <select
-                  id="cutShapeSelect"
-                  class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-[200px]"
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
+                <!-- Shape / Size Group -->
+                <div
+                  class="flex flex-col gap-4 border border-blue-200 p-3 rounded bg-white shadow-sm"
                 >
-                  <option value="trace">Custom Contour</option>
-                  <option value="circle">Standard Circle</option>
-                  <option value="square">Standard Square</option>
-                </select>
-              </div>
+                  <h4
+                    class="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-1"
+                  >
+                    Shape / Size
+                  </h4>
 
-              <div class="flex flex-col justify-center items-center w-full">
-                <label
-                  for="cutlineOffsetSlider"
-                  class="text-xs text-gray-500 mb-1"
-                  >Edge Offset</label
-                >
-                <div class="flex items-center gap-1 w-full px-2">
-                  <input
-                    type="range"
-                    id="cutlineOffsetSlider"
-                    min="0"
-                    max="2"
-                    value="1"
-                    step="1"
-                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
-                  />
-                  <span
-                    id="cutlineOffsetValue"
-                    class="text-xs min-w-[80px] text-center text-gray-600 font-mono whitespace-nowrap"
-                    >1.5mm</span
-                  >
-                </div>
-              </div>
+                  <div class="flex flex-col justify-center items-center w-full">
+                    <span class="text-xs text-gray-500 mb-1">Cut Shape</span>
+                    <select
+                      id="cutShapeSelect"
+                      class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-[200px]"
+                    >
+                      <option value="trace">Custom Contour</option>
+                      <option value="circle">Standard Circle</option>
+                      <option value="square">Standard Square</option>
+                    </select>
+                  </div>
 
-              <!-- Background Color Controls -->
-              <div class="flex flex-col justify-center items-center w-full">
-                <span class="text-xs text-gray-500 mb-1">Background Color</span>
-                <div class="flex items-center gap-2">
-                  <input
-                    type="color"
-                    id="bleedColor1"
-                    value="#3b82f6"
-                    class="w-8 h-8 p-0 border-0 rounded cursor-pointer"
-                    data-tooltip="Gradient Start Color"
-                  />
-                  <input
-                    type="color"
-                    id="bleedColor2"
-                    value="#1d4ed8"
-                    class="w-8 h-8 p-0 border-0 rounded cursor-pointer"
-                    data-tooltip="Gradient End Color"
-                  />
-                </div>
-              </div>
+                  <!-- Background Color Controls -->
+                  <div class="flex flex-col justify-center items-center w-full">
+                    <span class="text-xs text-gray-500 mb-1"
+                      >Background Color</span
+                    >
+                    <div class="flex items-center gap-2">
+                      <input
+                        type="color"
+                        id="bleedColor1"
+                        value="#3b82f6"
+                        class="w-8 h-8 p-0 border-0 rounded cursor-pointer"
+                        data-tooltip="Gradient Start Color"
+                      />
+                      <input
+                        type="color"
+                        id="bleedColor2"
+                        value="#1d4ed8"
+                        class="w-8 h-8 p-0 border-0 rounded cursor-pointer"
+                        data-tooltip="Gradient End Color"
+                      />
+                    </div>
+                  </div>
 
-              <div
-                id="cutlineSensitivityContainer"
-                style="display: none"
-                class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
-              >
-                <label
-                  for="cutlineSensitivitySlider"
-                  class="text-xs text-gray-500 mb-1 flex items-center gap-1"
+                  <div
+                    class="flex flex-col items-center gap-2 w-full"
+                    id="cutTypeContainer"
+                    style="display: none"
+                  >
+                    <label for="cutTypeSelect" class="text-xs text-gray-500"
+                      >Cut Type</label
+                    >
+                    <select
+                      id="cutTypeSelect"
+                      class="input px-2 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm w-full max-w-[200px]"
+                    >
+                      <option value="die_cut">Die Cut (Through backer)</option>
+                      <option value="kiss_cut">Kiss Cut (Sticker only)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Detail / Smoothing Group -->
+                <div
+                  class="flex flex-col gap-4 border border-blue-200 p-3 rounded bg-white shadow-sm"
                 >
-                  Edge Sensitivity
-                  <svg
-                    tabindex="0"
-                    role="button"
-                    aria-label="Edge Sensitivity Help: Adjust background detection tolerance"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke-width="1.5"
-                    stroke="currentColor"
-                    class="w-4 h-4 text-gray-400 cursor-help focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-splotch-navy rounded-full"
-                    data-tooltip="Adjust background detection tolerance"
+                  <h4
+                    class="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-1"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                    />
-                  </svg>
-                </label>
-                <div class="flex items-center gap-1 w-full px-2">
-                  <input
-                    type="range"
-                    id="cutlineSensitivitySlider"
-                    min="0"
-                    max="100"
-                    value="42"
-                    step="1"
-                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
-                  />
-                  <span
-                    id="cutlineSensitivityValue"
-                    class="text-xs w-6 text-center text-gray-600 font-mono"
-                    >42</span
+                    Detail / Smoothing
+                  </h4>
+
+                  <div class="flex flex-col justify-center items-center w-full">
+                    <label
+                      for="cutlineOffsetSlider"
+                      class="text-xs text-gray-500 mb-1"
+                      >Edge Offset</label
+                    >
+                    <div class="flex items-center gap-1 w-full px-2">
+                      <input
+                        type="range"
+                        id="cutlineOffsetSlider"
+                        min="0"
+                        max="2"
+                        value="1"
+                        step="1"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                      />
+                      <span
+                        id="cutlineOffsetValue"
+                        class="text-xs min-w-[80px] text-center text-gray-600 font-mono whitespace-nowrap"
+                        >1.5mm</span
+                      >
+                    </div>
+                  </div>
+
+                  <div
+                    id="cutlineSensitivityContainer"
+                    style="display: none"
+                    class="flex flex-col justify-center items-center w-full"
                   >
+                    <label
+                      for="cutlineSensitivitySlider"
+                      class="text-xs text-gray-500 mb-1 flex items-center gap-1"
+                    >
+                      Edge Sensitivity
+                      <svg
+                        tabindex="0"
+                        role="button"
+                        aria-label="Edge Sensitivity Help: Adjust background detection tolerance"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                        class="w-4 h-4 text-gray-400 cursor-help focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-splotch-navy rounded-full"
+                        data-tooltip="Adjust background detection tolerance"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                        />
+                      </svg>
+                    </label>
+                    <div class="flex items-center gap-1 w-full px-2">
+                      <input
+                        type="range"
+                        id="cutlineSensitivitySlider"
+                        min="0"
+                        max="100"
+                        value="42"
+                        step="1"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                      />
+                      <span
+                        id="cutlineSensitivityValue"
+                        class="text-xs w-6 text-center text-gray-600 font-mono"
+                        >42</span
+                      >
+                    </div>
+                  </div>
+
+                  <div
+                    id="lazyLassoContainer"
+                    style="display: none"
+                    class="flex flex-col justify-center items-center w-full"
+                  >
+                    <label
+                      for="lazyLassoSlider"
+                      class="text-xs text-gray-500 mb-1 flex items-center gap-1"
+                    >
+                      Lazy Lasso
+                      <svg
+                        tabindex="0"
+                        role="button"
+                        aria-label="Lazy Lasso Help: Smooths out deep cuts and gaps"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                        class="w-4 h-4 text-gray-400 cursor-help focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-splotch-navy rounded-full"
+                        data-tooltip="Smooths out deep cuts and gaps"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                        />
+                      </svg>
+                    </label>
+                    <div class="flex items-center gap-1 w-full px-2">
+                      <input
+                        type="range"
+                        id="lazyLassoSlider"
+                        min="0"
+                        max="50"
+                        value="50"
+                        step="1"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
+                      />
+                      <span
+                        id="lazyLassoValue"
+                        class="text-xs w-6 text-center text-gray-600 font-mono"
+                        >50</span
+                      >
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div
-                id="lazyLassoContainer"
-                style="display: none"
-                class="flex flex-col justify-center items-center w-full sm:w-auto min-w-[150px]"
-              >
-                <label
-                  for="lazyLassoSlider"
-                  class="text-xs text-gray-500 mb-1 flex items-center gap-1"
+              <div class="flex justify-center mt-2">
+                <button
+                  type="button"
+                  id="generateCutlineBtn"
+                  class="bg-teal-500 text-white flex justify-center items-center gap-2 rounded px-6 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500 w-full sm:w-auto font-medium"
+                  data-tooltip="Generate Cutline from Image Alpha"
                 >
-                  Lazy Lasso
-                  <svg
-                    tabindex="0"
-                    role="button"
-                    aria-label="Lazy Lasso Help: Smooths out deep cuts and gaps"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke-width="1.5"
-                    stroke="currentColor"
-                    class="w-4 h-4 text-gray-400 cursor-help focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-splotch-navy rounded-full"
-                    data-tooltip="Smooths out deep cuts and gaps"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                    />
-                  </svg>
-                </label>
-                <div class="flex items-center gap-1 w-full px-2">
-                  <input
-                    type="range"
-                    id="lazyLassoSlider"
-                    min="0"
-                    max="50"
-                    value="50"
-                    step="1"
-                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-splotch-teal"
-                  />
-                  <span
-                    id="lazyLassoValue"
-                    class="text-xs w-6 text-center text-gray-600 font-mono"
-                    >50</span
-                  >
-                </div>
+                  Generate Smart Cutline
+                </button>
               </div>
-              <div
-                class="flex items-center gap-2"
-                id="cutTypeContainer"
-                style="display: none"
-              >
-                <label
-                  for="cutTypeSelect"
-                  class="text-sm font-medium text-gray-700"
-                  >Cut Type:</label
-                >
-                <select
-                  id="cutTypeSelect"
-                  class="input px-2 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                >
-                  <option value="die_cut">Die Cut (Through backer)</option>
-                  <option value="kiss_cut">Kiss Cut (Sticker only)</option>
-                </select>
-              </div>
-              <button
-                type="button"
-                id="generateCutlineBtn"
-                class="bg-teal-500 text-white flex justify-center items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500 w-full sm:w-auto"
-                data-tooltip="Generate Cutline from Image Alpha"
-              >
-                Generate Smart Cutline
-              </button>
             </div>
 
             <!-- Custom Layer Controls -->
@@ -805,17 +843,17 @@
               style="display: none"
             >
               <div
-                id="customLayerTypeContainer"
+                id="printInkTypeContainer"
                 class="flex items-center gap-2"
                 style="display: none"
               >
                 <label
-                  for="customLayerTypeSelect"
+                  for="printInkTypeSelect"
                   class="text-sm font-medium text-gray-700"
                   >Inlay Type:</label
                 >
                 <select
-                  id="customLayerTypeSelect"
+                  id="printInkTypeSelect"
                   class="input px-2 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 >
                   <!-- Populated by JS -->
@@ -824,13 +862,13 @@
 
               <div class="flex items-center gap-2">
                 <label
-                  for="customLayerImageUpload"
+                  for="printInkImageUpload"
                   class="text-sm font-medium text-gray-700"
                   >Upload Mask Image:</label
                 >
                 <input
                   type="file"
-                  id="customLayerImageUpload"
+                  id="printInkImageUpload"
                   class="input block text-sm text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                   accept="image/*, image/svg+xml, .png,.jpeg,.jpg,.webp,.tiff,.svg,.pdf,.ai"
                 />

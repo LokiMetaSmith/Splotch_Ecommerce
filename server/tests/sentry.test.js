@@ -43,7 +43,7 @@ jest.unstable_mockModule('../keyManager.js', () => ({
 
 jest.unstable_mockModule('lowdb/node', () => ({
   JSONFilePreset: jest.fn().mockResolvedValue({
-    data: { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} },
+    data: { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} },
     write: jest.fn(),
   }),
 }));

@@ -75,6 +75,7 @@ export class LowDbAdapter {
         // Ensure structure exists
         if (!this.db.data) this.db.data = {};
         if (!this.db.data.orders) this.db.data.orders = {};
+        if (!this.db.data.batches) this.db.data.batches = {};
 
         // MIGRATION: Convert orders array to object if necessary
         if (Array.isArray(this.db.data.orders)) {
@@ -187,6 +188,23 @@ export class LowDbAdapter {
         this._updateCaches(order);
         await this.write();
         return order;
+    }
+
+    // --- Batches ---
+    async getBatch(id) {
+        return this.db.data.batches[id];
+    }
+
+    async createBatch(batch) {
+        this.db.data.batches[batch.batchId] = batch;
+        await this.write();
+        return batch;
+    }
+
+    async updateBatch(batch) {
+        this.db.data.batches[batch.batchId] = batch;
+        await this.write();
+        return batch;
     }
 
     async updateOrder(order) {

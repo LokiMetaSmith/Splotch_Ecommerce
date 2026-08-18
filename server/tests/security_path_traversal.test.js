@@ -28,7 +28,7 @@ describe('Security: Path Traversal in Create Order', () => {
 
   beforeAll(async () => {
     // Mock DB
-    const data = { orders: {}, users: {}, credentials: {}, config: {}, products: {} };
+    const data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {} };
     db = {
       data: data,
       write: async () => { },

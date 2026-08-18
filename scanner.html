@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Splotch - Scanner</title>
+    <link href="/output.css" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Modak&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <style>
+      :root {
+        --splotch-navy: #192b4d;
+        --splotch-red: #ff3b3b;
+        --splotch-yellow: #ffc82c;
+        --splotch-teal: #00d2d3;
+        --splotch-pink: #ff9ff3;
+      }
+      body {
+        background-color: #f3f4f6;
+        color: #374151;
+      }
+      .font-modak {
+        font-family: 'Modak', cursive;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex flex-col items-center p-4">
+    <header class="w-full max-w-2xl bg-white rounded-lg shadow-md p-4 mb-6 flex justify-between items-center">
+      <h1 class="text-3xl text-splotch-navy font-modak tracking-wide">
+        Splotch Scanner
+      </h1>
+      <a href="/printshop.html" class="text-blue-500 hover:underline">Back to Print Shop</a>
+    </header>
+
+    <main class="w-full max-w-2xl bg-white rounded-lg shadow-xl p-6 flex flex-col space-y-6">
+      <div id="scan-input-area" class="w-full">
+        <label for="scanner-input" class="block text-lg font-bold mb-2">Scan QR Code</label>
+        <input
+          type="text"
+          id="scanner-input"
+          class="w-full p-4 border-2 border-gray-300 rounded-lg text-xl shadow-inner focus:outline-none focus:border-blue-500"
+          placeholder="Scan or type ID and press Enter..."
+          autofocus
+        />
+        <p class="text-sm text-gray-500 mt-2">Make sure this field is focused before scanning.</p>
+      </div>
+
+      <div id="loading-indicator" class="hidden flex justify-center py-4">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+
+      <div id="scan-result" class="hidden flex-col space-y-4 p-4 border rounded-lg bg-gray-50">
+        <div class="flex justify-between items-start">
+            <div>
+                <h2 class="text-xl font-bold" id="result-type">Order / Batch</h2>
+                <p class="text-sm text-gray-600 font-mono" id="result-id">ID: 12345</p>
+            </div>
+            <div id="result-status" class="px-3 py-1 rounded-full text-sm font-bold bg-gray-200 text-gray-800">
+                STATUS
+            </div>
+        </div>
+
+        <div id="result-details" class="text-sm space-y-1">
+            <!-- Dynamic details go here -->
+        </div>
+
+        <div class="border-t pt-4 mt-4">
+          <h3 class="text-md font-bold mb-2">Update Status To:</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button class="status-update-btn px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-bold" data-status="ACCEPTED">Accepted</button>
+            <button class="status-update-btn px-4 py-2 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 font-bold" data-status="PRINTING">Printing</button>
+            <button class="status-update-btn px-4 py-2 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 font-bold" data-status="SHIPPED">Shipped</button>
+            <button class="status-update-btn px-4 py-2 bg-green-100 text-green-700 rounded hover:bg-green-200 font-bold" data-status="DELIVERED">Delivered</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="error-message" class="hidden text-red-600 bg-red-100 p-3 rounded-lg border border-red-300 font-medium">
+      </div>
+      <div id="success-message" class="hidden text-green-600 bg-green-100 p-3 rounded-lg border border-green-300 font-medium">
+      </div>
+    </main>
+
+    <script type="module" src="./src/scanner.js"></script>
+  </body>
+</html>

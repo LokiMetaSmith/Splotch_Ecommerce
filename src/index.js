@@ -20,15 +20,15 @@ import {
 } from "./lib/image-processing.js";
 import { showNotification } from "./notifications.js";
 import {
-  designLayers,
-  activeLayerIndex,
-  addLayer,
-  removeLayer,
-  moveLayer,
-  setActiveLayer,
-  getActiveLayer,
-  clearLayers,
-} from "./lib/layers.js";
+  stickers,
+  activeStickerIndex,
+  addSticker,
+  removeSticker,
+  moveSticker,
+  setActiveSticker,
+  getActiveSticker,
+  clearStickers,
+} from "./lib/stickers.js";
 import Sortable from "sortablejs";
 
 // index.js
@@ -78,12 +78,12 @@ let payments, card, csrfToken;
 let canvas, ctx;
 
 function getActiveBase() {
-  if (activeLayerIndex >= 0 && activeLayerIndex < designLayers.length) {
-    return designLayers[activeLayerIndex];
+  if (activeStickerIndex >= 0 && activeStickerIndex < stickers.length) {
+    return stickers[activeStickerIndex];
   }
   // Fallback if none is active but we need a target to write to
-  if (designLayers.length === 0) {
-    designLayers.push({
+  if (stickers.length === 0) {
+    stickers.push({
       originalImage: null,
       cleanCanvasState: null,
       rasterCutlinePoly: null,
@@ -96,9 +96,9 @@ function getActiveBase() {
       rotation: 0,
       visible: true,
     });
-    setActiveLayer(0);
+    setActiveSticker(0);
   }
-  return designLayers[activeLayerIndex >= 0 && activeLayerIndex < designLayers.length ? activeLayerIndex : 0];
+  return stickers[activeStickerIndex >= 0 && activeStickerIndex < stickers.length ? activeStickerIndex : 0];
 }
 
 const activeBase = new Proxy(
@@ -147,14 +147,14 @@ let textInput,
   addTextBtn,
   textFontFamilySelect,
   textEditingControlsContainer,
-  layerControlsContainer,
+  printInkControlsContainer,
   cutlineOffsetSlider,
   cutlineOffsetValueDisplay,
   cutlineSensitivitySlider,
   cutlineSensitivityValueDisplay,
   lazyLassoSlider,
   lazyLassoValueDisplay,
-  customLayerImageUpload,
+  printInkImageUpload,
   alphaColorPicker,
   maskColorPicker,
   cutTypeSelect;
@@ -195,14 +195,13 @@ let canvasLegendContainer;
 let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
 let creatorProfitCents = 0; // The markup for the current product
-let cutlineOffset = 15; // Default offset
 
 // Memoization globals for pricing
 let lastCalculatedPerimeter = 0;
 let lastCalculatedPerimeterCutlineRef = null;
 
 function generateOrganicSheetBoundary() {
-  if (designLayers.length === 0) {
+  if (stickers.length === 0) {
     organicSheetCutline = null;
     return;
   }
@@ -221,8 +220,8 @@ function generateOrganicSheetBoundary() {
   const clipper = new ClipperLib.Clipper();
   let hasCutline = false;
 
-  console.log("BROWSER LOG: generateOrganicSheetBoundary start. Layers:", designLayers.length);
-  designLayers.forEach((layer) => {
+  console.log("BROWSER LOG: generateOrganicSheetBoundary start. Layers:", stickers.length);
+  stickers.forEach((layer) => {
     console.log("BROWSER LOG: Layer check:", layer.id, "currentCutline?", !!layer.currentCutline, "length:", layer.currentCutline?.length, "visible:", layer.visible);
     if (layer.currentCutline && layer.currentCutline.length > 0 && layer.visible !== false) {
       // Offset the cutline to world coordinates
@@ -425,7 +424,7 @@ async function BootStrap() {
   paymentFormGlobalRef = document.getElementById("payment-form");
   submitPaymentBtn = document.getElementById("submitPaymentBtn");
   canvasPlaceholder = document.getElementById("canvas-placeholder");
-  customLayerImageUpload = document.getElementById("customLayerImageUpload");
+  printInkImageUpload = document.getElementById("printInkImageUpload");
   alphaColorPicker = document.getElementById("alphaColorPicker");
   maskColorPicker = document.getElementById("maskColorPicker");
   cutTypeSelect = document.getElementById("cutTypeSelect");
@@ -727,15 +726,15 @@ async function BootStrap() {
       handleGenerateFromBase(),
     );
 
-  const customLayerTypeSelect = document.getElementById(
-    "customLayerTypeSelect",
+  const printInkTypeSelect = document.getElementById(
+    "printInkTypeSelect",
   );
-  if (customLayerTypeSelect) {
-    customLayerTypeSelect.addEventListener("change", (e) => {
+  if (printInkTypeSelect) {
+    printInkTypeSelect.addEventListener("change", (e) => {
       const activeTabId = getActiveLineId();
       if (!activeTabId || activeTabId === "base" || activeTabId === "cutline")
         return;
-      const layer = customPrintLayers.find((l) => l.id === activeTabId);
+      const layer = printInks.find((l) => l.id === activeTabId);
       if (layer) {
         layer.subType = e.target.value;
       }
@@ -769,6 +768,10 @@ async function BootStrap() {
         textLabel = "3mm";
       }
 
+      if (activeBase) {
+        activeBase.cutlineOffset = cutlineOffset;
+      }
+
       if (cutlineOffsetValueDisplay)
         cutlineOffsetValueDisplay.textContent = textLabel;
 
@@ -777,11 +780,15 @@ async function BootStrap() {
           ? parseInt(lazyLassoSlider.value, 10)
           : 50;
 
+      if (activeBase) {
+        activeBase.lazyLassoRadius = currentLassoRadius;
+      }
+
       if (activeBase.rasterCutlinePoly) {
         generateCutLineAsync(
           activeBase.rasterCutlinePoly,
-          cutlineOffset,
-          currentLassoRadius,
+          activeBase.cutlineOffset,
+          activeBase.lazyLassoRadius,
         ).then((cutline) => {
           activeBase.currentCutline = cutline;
           currentBounds = getPolygonsBounds(cutline);
@@ -976,13 +983,13 @@ async function BootStrap() {
     fileInputGlobalRef.addEventListener("change", handleFileChange);
   }
 
-  if (customLayerImageUpload) {
-    customLayerImageUpload.addEventListener("change", handleCustomLayerUpload);
+  if (printInkImageUpload) {
+    printInkImageUpload.addEventListener("change", handleCustomLayerUpload);
   }
 
   if (alphaColorPicker) {
     alphaColorPicker.addEventListener("input", (e) => {
-      const activeLayer = getActiveLayer();
+      const activeLayer = getActiveSticker();
       if (activeLayer) {
         activeLayer.alphaColorHex = e.target.value;
         if (activeLayer.originalImage) {
@@ -994,7 +1001,7 @@ async function BootStrap() {
 
   if (maskColorPicker) {
     maskColorPicker.addEventListener("input", (e) => {
-      const activeLayer = getActiveLayer();
+      const activeLayer = getActiveSticker();
       if (activeLayer) {
         activeLayer.maskColorHex = e.target.value;
         if (activeLayer.originalImage) {
@@ -1213,7 +1220,7 @@ async function BootStrap() {
       const starterTemplatesSection = document.getElementById(
         "starterTemplatesSection",
       );
-      layerControlsContainer = document.getElementById(
+      printInkControlsContainer = document.getElementById(
         "layer-controls-container",
       );
 
@@ -1236,8 +1243,8 @@ async function BootStrap() {
 
       const isDisabled =
         !activeBase.originalImage && activeBase.basePolygons.length === 0;
-      if (layerControlsContainer) {
-        layerControlsContainer.style.display = "block";
+      if (printInkControlsContainer) {
+        printInkControlsContainer.style.display = "block";
       }
 
       if (starterTemplatesSection) {
@@ -1339,13 +1346,13 @@ function calculateAndUpdatePrice() {
     lastCalculatedPerimeterCutlineRef = cutline;
   }
 
-  const allCustomLayers = customPrintLayers.map((l) => ({
+  const allCustomLayers = printInks.map((l) => ({
     type: l.type,
     subType: l.subType,
   }));
   const numImageLayers =
-    typeof designLayers !== "undefined" && designLayers
-      ? designLayers.length
+    typeof stickers !== "undefined" && stickers
+      ? stickers.length
       : 1;
 
   const priceResult = calculateStickerPrice(
@@ -1562,10 +1569,10 @@ async function fetchPricingInfo() {
 }
 
 function populateLayerDropdown(materialId) {
-  const layerSelect = document.getElementById("layerSelect");
-  if (!layerSelect || !pricingConfig) return;
+  const printInkSelect = document.getElementById("printInkSelect");
+  if (!printInkSelect || !pricingConfig) return;
 
-  layerSelect.innerHTML = "";
+  printInkSelect.innerHTML = "";
 
   const material = pricingConfig.materials.find((m) => m.id === materialId);
   if (material && material.supportedLayers) {
@@ -1574,7 +1581,7 @@ function populateLayerDropdown(materialId) {
       option.value = layer;
       // Capitalize first letter
       option.textContent = layer.charAt(0).toUpperCase() + layer.slice(1);
-      layerSelect.appendChild(option);
+      printInkSelect.appendChild(option);
     });
   }
 }
@@ -1673,12 +1680,12 @@ async function handlePaymentFormSubmit(event) {
 
   showPaymentStatus("Processing order...", "info");
   console.log(
-    "BROWSER LOG: Processing order check designLayers length:",
-    designLayers.length,
+    "BROWSER LOG: Processing order check stickers length:",
+    stickers.length,
   );
 
   // --- NEW VALIDATION: Ensure an image exists before proceeding ---
-  if (designLayers.length === 0 && activeBase.basePolygons.length === 0) {
+  if (stickers.length === 0 && activeBase.basePolygons.length === 0) {
     showPaymentStatus(
       "Please upload a sticker design image before submitting.",
       "error",
@@ -1775,7 +1782,7 @@ async function handlePaymentFormSubmit(event) {
       // Generate multi-layer SVG for the entire sheet
       console.log("BROWSER LOG: Generating Multi-Layer SVG");
       const svgContent = generateMultiLayerSvg(
-        designLayers,
+        stickers,
         organicSheetCutline,
         currentBounds
       );
@@ -1865,7 +1872,7 @@ async function handlePaymentFormSubmit(event) {
         ? fileInput.files[0].name
         : "Custom Sticker";
 
-    const allCustomLayers = customPrintLayers.map((l) => ({
+    const allCustomLayers = printInks.map((l) => ({
       type: l.type,
       subType: l.subType,
     }));
@@ -2226,7 +2233,7 @@ function handleCustomLayerUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const activeLayer = getActiveLayer();
+  const activeLayer = getActiveSticker();
   if (
     !activeLayer ||
     activeLayer.id === "base" ||
@@ -2339,7 +2346,7 @@ function loadFileAsImage(file, isMascot = false) {
     file.type === "image/svg+xml" ||
     file.name.toLowerCase().endsWith(".svg")
   ) {
-    const newLayer = addLayer(
+    const newLayer = addSticker(
       null, // No raster image
       file.name || "Upload",
       0,
@@ -2347,7 +2354,7 @@ function loadFileAsImage(file, isMascot = false) {
       baseCanvasWidth,
       baseCanvasHeight,
     );
-    setActiveLayer(designLayers.length - 1);
+    setActiveSticker(stickers.length - 1);
     
     reader.onload = (e) => {
       handleSvgUpload(e.target.result);
@@ -2368,7 +2375,7 @@ function loadFileAsImage(file, isMascot = false) {
 
         if (activeTab !== "base" && activeTab !== "cutline") {
           // Custom Layer Upload
-          const customLayer = customPrintLayers.find((l) => l.id === activeTab);
+          const customLayer = printInks.find((l) => l.id === activeTab);
           if (customLayer) {
             // Apply grayscale to the image
             const tempCanvas = document.createElement("canvas");
@@ -2393,7 +2400,7 @@ function loadFileAsImage(file, isMascot = false) {
         }
 
         // Base Layer Upload
-        const newLayer = addLayer(
+        const newLayer = addSticker(
           img,
           file.name || "Upload",
           0,
@@ -2401,7 +2408,7 @@ function loadFileAsImage(file, isMascot = false) {
           img.width,
           img.height,
         );
-        setActiveLayer(designLayers.length - 1);
+        setActiveSticker(stickers.length - 1);
         updateEditingButtonsState(false);
         renderLayerList();
         if (clearFileBtn) clearFileBtn.classList.remove("hidden");
@@ -2479,13 +2486,13 @@ function redrawAll() {
       : 50;
 
   // 1. Calculate Cutlines for all layers
-  designLayers.forEach((layer) => {
+  stickers.forEach((layer) => {
     if (layer.currentPolygons && layer.currentPolygons.length > 0) {
       // Vector mode
       let cutline = generateCutLine(
         layer.currentPolygons,
-        cutlineOffset,
-        currentLassoRadius
+        layer.cutlineOffset !== undefined ? layer.cutlineOffset : 15,
+        layer.lazyLassoRadius !== undefined ? layer.lazyLassoRadius : currentLassoRadius
       );
       cutline = clipPolygonToBoundingBox(
         cutline,
@@ -2498,8 +2505,8 @@ function redrawAll() {
       if (layer.rasterCutlinePoly) {
         let cutline = generateCutLine(
           layer.rasterCutlinePoly,
-          cutlineOffset,
-          currentLassoRadius
+          layer.cutlineOffset !== undefined ? layer.cutlineOffset : 15,
+          layer.lazyLassoRadius !== undefined ? layer.lazyLassoRadius : currentLassoRadius
         );
         layer.currentCutline = cutline;
       }
@@ -2515,7 +2522,7 @@ function redrawAll() {
     maxY = -Infinity;
   let hasContent = false;
 
-  designLayers.forEach((layer) => {
+  stickers.forEach((layer) => {
     if (layer.currentCutline && layer.currentCutline.length > 0 && layer.visible !== false) {
       const bounds = getPolygonsBounds(layer.currentCutline);
       const absLeft = bounds.left + (layer.x || 0);
@@ -2648,7 +2655,7 @@ function handleSvgUpload(svgText) {
     setCanvasSize(bounds.width, bounds.height);
 
     // Generate the cutline
-    let cutline = generateCutLine(polygons, cutlineOffset); // Use dynamic offset
+    let cutline = generateCutLine(polygons, activeBase.cutlineOffset !== undefined ? activeBase.cutlineOffset : 15); // Use dynamic offset
     cutline = clipPolygonToBoundingBox(
       cutline,
       baseCanvasWidth,
@@ -2965,7 +2972,7 @@ function drawPolygonsToCanvas(
 }
 
 function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDraw = null) {
-  if (!bounds || designLayers.length === 0) return;
+  if (!bounds || stickers.length === 0) return;
 
   const dpr = window.devicePixelRatio || 1;
 
@@ -2976,7 +2983,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
   const bColor1 = document.getElementById("bleedColor1")?.value || "#000000";
   const bColor2 = document.getElementById("bleedColor2")?.value || "#000000";
 
-  designLayers.forEach((layer) => {
+  stickers.forEach((layer) => {
     if (
       layer.currentCutline &&
       layer.currentCutline.length > 0 &&
@@ -3018,7 +3025,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
   ctx.restore();
 
   // Pass 2: Draw Base Images & Polygons for all layers
-  designLayers.forEach((layer) => {
+  stickers.forEach((layer) => {
     if (layer.visible !== false) {
       if (layer.currentPolygons && layer.currentPolygons.length > 0) {
         // Vector mode base drawing
@@ -3032,6 +3039,25 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
         const img = layer.image || layer.originalImage;
         if (img) {
           ctx.save();
+
+          if (layer.currentCutline && layer.currentCutline.length > 0) {
+            ctx.beginPath();
+            layer.currentCutline.forEach((poly) => {
+              if (!poly || poly.length === 0) return;
+              ctx.moveTo(
+                poly[0].x + offset.x + (layer.x || 0),
+                poly[0].y + offset.y + (layer.y || 0)
+              );
+              for (let i = 1; i < poly.length; i++)
+                ctx.lineTo(
+                  poly[i].x + offset.x + (layer.x || 0),
+                  poly[i].y + offset.y + (layer.y || 0)
+                );
+              ctx.closePath();
+            });
+            ctx.clip();
+          }
+
           const layerWidth = layer.cleanCanvasState
             ? layer.cleanCanvasState.width / dpr
             : layer.width || img.width;
@@ -3054,10 +3080,10 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
   });
 
   // Pass 3: Draw Custom Print Layers (Holographic, Spot Gloss, etc.)
-  if (typeof globalLayerOrder !== "undefined" && typeof customPrintLayers !== "undefined") {
+  if (typeof globalLayerOrder !== "undefined" && typeof printInks !== "undefined") {
       globalLayerOrder.forEach((layerId) => {
         if (layerId !== "base" && layerId !== "cutline") {
-          const customLayer = customPrintLayers.find((l) => l.id === layerId);
+          const customLayer = printInks.find((l) => l.id === layerId);
           if (customLayer && customLayer.image) {
             ctx.save();
             const activeLayer = getActiveBase();
@@ -3085,8 +3111,8 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
   }
 
   // Pass 4: Draw All Kiss Cuts (Cyan)
-  designLayers.forEach((layer, index) => {
-    const isSelected = activeLayerIndex === index;
+  stickers.forEach((layer, index) => {
+    const isSelected = activeStickerIndex === index;
     const isSvgLayer = !layer.image && !layer.originalImage;
     const shouldDraw = (typeof globalLayerOrder !== "undefined" && globalLayerOrder.includes("cutline")) || isSelected || isSvgLayer;
     
@@ -3112,7 +3138,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
       "red",
       offset,
       true,
-      activeLayerIndex === 'boundary'
+      activeStickerIndex === 'boundary'
     );
   }
 
@@ -3246,15 +3272,24 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
 }
 
 let layerTabsInitialized = false;
-let customPrintLayers = []; // Store custom layer objects { id, type, image, name, visible }
+let printInks = []; // Store custom layer objects { id, type, image, name, visible }
 let globalLayerOrder = ["base", "cutline"];
 let sortableInstance = null;
 
 function renderLayerTabs() {
-  const layerTabsContainer = document.getElementById("layer-tabs");
+  const layerTabsContainer = document.getElementById("print-ink-tabs");
   if (!layerTabsContainer) return;
 
   layerTabsContainer.style.display = "flex";
+
+  const container = document.getElementById("print-ink-tabs-container");
+  if (container) {
+    if (stickers.length > 0 && activeStickerIndex !== 'boundary') {
+       container.style.display = "flex";
+    } else {
+       container.style.display = "none";
+    }
+  }
 
   const tabs = [
     {
@@ -3271,7 +3306,7 @@ function renderLayerTabs() {
       borderColor: "#ef4444",
       bgColor: "#fee2e2",
     },
-    ...customPrintLayers.map((layer) => ({
+    ...printInks.map((layer) => ({
       id: layer.id,
       label: layer.name,
       color: "#4b5563",
@@ -3299,7 +3334,7 @@ function renderLayerTabs() {
   sortedTabs.forEach((tab) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.id = `layer-tab-${tab.id}`;
+    btn.id = `print-ink-tab-${tab.id}`;
     btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 flex items-center gap-1`;
     btn.setAttribute("data-id", tab.id);
 
@@ -3360,8 +3395,8 @@ function renderLayerTabs() {
   addBtn.type = "button";
   addBtn.className = `px-3 py-1 text-xs font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 border-b-0 rounded-t-lg transition-colors`;
   addBtn.textContent = "+";
-  addBtn.title = "Add Layer";
-  addBtn.classList.add("add-layer-btn"); // Add a class so Sortable can ignore it
+  addBtn.title = "Add Specialty Ink or Mask";
+  addBtn.classList.add("add-sticker-btn"); // Add a class so Sortable can ignore it
 
   // Create Dropdown Container
   const dropdownContainer = document.createElement("div");
@@ -3437,7 +3472,7 @@ function renderLayerTabs() {
 
   sortableInstance = new Sortable(layerTabsContainer, {
     animation: 150,
-    filter: ".add-layer-btn", // Don't allow dragging the + button
+    filter: ".add-sticker-btn", // Don't allow dragging the + button
     onEnd: function (evt) {
       // Rebuild globalLayerOrder based on the new DOM order
       const newOrder = [];
@@ -3461,16 +3496,16 @@ function renderLayerTabs() {
 }
 
 function updateLayerTabsStyles() {
-  const layerTabsContainer = document.getElementById("layer-tabs");
+  const layerTabsContainer = document.getElementById("print-ink-tabs");
   if (!layerTabsContainer) return;
   const tabs = [
     { id: "base", bgColor: "#e0e7ff" },
     { id: "cutline", bgColor: "#fee2e2" },
-    ...customPrintLayers.map((layer) => ({ id: layer.id, bgColor: "#f3f4f6" })),
+    ...printInks.map((layer) => ({ id: layer.id, bgColor: "#f3f4f6" })),
   ];
 
   tabs.forEach((tab) => {
-    const btn = document.getElementById(`layer-tab-${tab.id}`);
+    const btn = document.getElementById(`print-ink-tab-${tab.id}`);
     if (btn) {
       const isActive = getActiveLineId() === tab.id;
       if (isActive) {
@@ -3495,6 +3530,36 @@ function updateEditingControlsForActiveLayer() {
   if (cutlineControls)
     cutlineControls.style.display = activeTabId === "cutline" ? "flex" : "none";
 
+  // Update slider/input values based on the active sticker
+  if (activeBase) {
+    if (cutlineOffsetSlider) {
+      let step = 1; // Default
+      if (activeBase.cutlineOffset === 0) step = 0;
+      else if (activeBase.cutlineOffset === 15) step = 1;
+      else if (activeBase.cutlineOffset === 35) step = 2;
+      cutlineOffsetSlider.value = step;
+      if (cutlineOffsetValueDisplay) {
+        cutlineOffsetValueDisplay.textContent = step === 0 ? "0mm (None)" : step === 1 ? "1.5mm" : "3mm";
+      }
+    }
+    if (cutlineSensitivitySlider) {
+      cutlineSensitivitySlider.value = activeBase.cutlineSensitivity !== undefined ? activeBase.cutlineSensitivity : 42;
+      if (cutlineSensitivityValueDisplay) {
+        cutlineSensitivityValueDisplay.textContent = cutlineSensitivitySlider.value;
+      }
+    }
+    if (lazyLassoSlider) {
+      lazyLassoSlider.value = activeBase.lazyLassoRadius !== undefined ? activeBase.lazyLassoRadius : 50;
+      if (lazyLassoValueDisplay) {
+        lazyLassoValueDisplay.textContent = lazyLassoSlider.value;
+      }
+    }
+    const cutShapeSelect = document.getElementById("cutShapeSelect");
+    if (cutShapeSelect) {
+      cutShapeSelect.value = activeBase.cutShape || "trace";
+    }
+  }
+
   const standardSizesControls = document.getElementById(
     "standard-sizes-controls",
   );
@@ -3503,7 +3568,7 @@ function updateEditingControlsForActiveLayer() {
       activeTabId === "base" ? "flex" : "none";
 
   const textControls = document.getElementById("text-editing-controls");
-  const layer = customPrintLayers.find((l) => l.id === activeTabId);
+  const layer = printInks.find((l) => l.id === activeTabId);
   const isTextLayer = layer && layer.type === "text";
 
   // Text layer controls
@@ -3522,8 +3587,8 @@ function updateEditingControlsForActiveLayer() {
         label.textContent = `Upload image for ${layer ? layer.name : "Custom"} Layer:`;
       }
       // Update custom layer type select
-      const typeContainer = document.getElementById("customLayerTypeContainer");
-      const typeSelect = document.getElementById("customLayerTypeSelect");
+      const typeContainer = document.getElementById("printInkTypeContainer");
+      const typeSelect = document.getElementById("printInkTypeSelect");
       if (
         typeContainer &&
         typeSelect &&
@@ -3581,14 +3646,14 @@ function addCustomLayer(type) {
     image: null,
     visible: true,
   };
-  customPrintLayers.push(newLayer);
+  printInks.push(newLayer);
   selectedLegendTab = newLayer.id;
   renderLayerTabs();
   calculateAndUpdatePrice();
 }
 
 function deleteCustomLayer(id) {
-  customPrintLayers = customPrintLayers.filter((l) => l.id !== id);
+  printInks = printInks.filter((l) => l.id !== id);
   if (selectedLegendTab === id) selectedLegendTab = "base";
   renderLayerTabs();
   calculateAndUpdatePrice();
@@ -3618,7 +3683,7 @@ function handleAddText() {
     return;
   }
   const activeTabId = getActiveLineId();
-  const layer = customPrintLayers.find((l) => l.id === activeTabId);
+  const layer = printInks.find((l) => l.id === activeTabId);
   if (!layer || layer.type !== "text") {
     showNotification("Please select a Text layer first.", "error");
     return;
@@ -4059,7 +4124,7 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
           : 50;
       const cutline = generateCutLine(
         activeBase.rasterCutlinePoly,
-        cutlineOffset,
+        activeBase.cutlineOffset !== undefined ? activeBase.cutlineOffset : 15,
         currentLassoRadius,
       );
       activeBase.currentCutline = cutline;
@@ -4351,7 +4416,7 @@ function handleGenerateFromBase() {
     return;
   }
 
-  const customLayer = customPrintLayers.find((l) => l.id === activeTabId);
+  const customLayer = printInks.find((l) => l.id === activeTabId);
   if (!customLayer) return;
 
   showNotification("Generating mask from base design...", "info");
@@ -4376,14 +4441,14 @@ function handleGenerateFromBase() {
 }
 
 function handleGenerateCutline(skipPrompt = false) {
-  if (designLayers.length === 0 || activeLayerIndex === -1) {
+  if (stickers.length === 0 || activeStickerIndex === -1) {
     if (!skipPrompt) {
       showNotification("Please upload an image first.", "error");
     }
     return;
   }
 
-  const activeBaseLayer = designLayers[activeLayerIndex];
+  const activeBaseLayer = stickers[activeStickerIndex];
   if (!activeBaseLayer.image && !activeBaseLayer.basePolygons?.length) return;
   if (skipPrompt instanceof Event) skipPrompt = false;
   if (!canvas || !ctx || (!activeBaseLayer.image && !activeBaseLayer.basePolygons?.length)) {
@@ -4436,6 +4501,7 @@ function handleGenerateCutline(skipPrompt = false) {
 
   const cutShapeSelect = document.getElementById("cutShapeSelect");
   const selectedShape = cutShapeSelect ? cutShapeSelect.value : "trace";
+  activeBase.cutShape = selectedShape;
 
   try {
     const dpr = window.devicePixelRatio || 1;
@@ -4940,7 +5006,7 @@ async function handleRemoteImageLoad(imageUrl) {
 
       const cutline = generateCutLine(
         activeBase.rasterCutlinePoly,
-        cutlineOffset,
+        activeBase.cutlineOffset !== undefined ? activeBase.cutlineOffset : 15,
       );
       activeBase.currentCutline = cutline;
       currentBounds = getPolygonsBounds(cutline);
@@ -5060,21 +5126,21 @@ async function loadProductForBuyer(productId) {
 let listSortableInstance = null;
 
 function renderLayerList() {
-    const listEl = document.getElementById("layer-list");
+    const listEl = document.getElementById("sticker-list");
     if (!listEl) return;
     
     // Toggle boundary panel visibility
     const boundaryPanel = document.getElementById("boundary-settings-panel");
     if (boundaryPanel) {
-        boundaryPanel.style.display = (activeLayerIndex === 'boundary') ? "block" : "none";
+        boundaryPanel.style.display = (activeStickerIndex === 'boundary') ? "block" : "none";
     }
 
     listEl.innerHTML = "";
     
-    const reversedLayers = [...designLayers].reverse();
+    const reversedLayers = [...stickers].reverse();
     
     reversedLayers.forEach((layer, i) => {
-        const originalIndex = designLayers.length - 1 - i;
+        const originalIndex = stickers.length - 1 - i;
         const isSvgLayer = !layer.image && !layer.originalImage;
         
         const li = document.createElement("li");
@@ -5082,7 +5148,7 @@ function renderLayerList() {
         // Base styling with drag handle cursor
         let liClasses = "flex items-center justify-between p-2 border rounded transition-colors ";
         
-        if (activeLayerIndex === originalIndex) {
+        if (activeStickerIndex === originalIndex) {
             liClasses += isSvgLayer ? "bg-cyan-100 border-cyan-400 shadow-sm" : "bg-indigo-100 border-indigo-400 shadow-sm";
         } else {
             liClasses += isSvgLayer ? "bg-cyan-50 border-cyan-200 hover:bg-cyan-100" : "bg-white border-gray-200 hover:bg-gray-50";
@@ -5093,9 +5159,11 @@ function renderLayerList() {
         
         // Click to select
         li.addEventListener("click", () => {
-            setActiveLayer(originalIndex);
+            setActiveSticker(originalIndex);
             renderLayerList();
             redrawAll();
+            updateEditingControlsForActiveLayer();
+            updateFilterButtonVisuals();
         });
         
         const leftSide = document.createElement("div");
@@ -5133,7 +5201,7 @@ function renderLayerList() {
         deleteBtn.title = "Delete Sticker";
         deleteBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            removeLayer(originalIndex);
+            removeSticker(originalIndex);
             renderLayerList();
             redrawAll();
         });
@@ -5143,12 +5211,12 @@ function renderLayerList() {
     });
     
     // Always append the Sheet Boundary layer at the bottom
-    if (designLayers.length > 0) {
+    if (stickers.length > 0) {
         const boundaryLi = document.createElement("li");
         boundaryLi.className = "ignore-drag"; // Crucial for Sortable filter
         
         let bClasses = "flex items-center justify-between p-2 border rounded cursor-pointer transition-colors ";
-        if (activeLayerIndex === 'boundary') {
+        if (activeStickerIndex === 'boundary') {
             bClasses += "bg-red-50 border-red-400 shadow-sm";
         } else {
             bClasses += "bg-white border-gray-200 hover:bg-red-50";
@@ -5159,9 +5227,11 @@ function renderLayerList() {
         
         // Click to select
         innerDiv.addEventListener("click", () => {
-            setActiveLayer('boundary');
+            setActiveSticker('boundary');
             renderLayerList();
             redrawAll();
+            updateEditingControlsForActiveLayer();
+            updateFilterButtonVisuals();
         });
         
         const leftSide = document.createElement("div");
@@ -5198,35 +5268,35 @@ function renderLayerList() {
             return true;
         },
         onEnd: function (evt) {
-            // After drop, rebuild designLayers based on new DOM order
+            // After drop, rebuild stickers based on new DOM order
             const newLayers = [];
             const items = listEl.querySelectorAll("li:not(.ignore-drag)");
             
             // items are from top to bottom (highest visual Z-index to lowest)
-            // designLayers is from index 0 (bottom) to N (top)
+            // stickers is from index 0 (bottom) to N (top)
             for (let i = items.length - 1; i >= 0; i--) {
                 const oldIdx = parseInt(items[i].dataset.index, 10);
-                newLayers.push(designLayers[oldIdx]);
+                newLayers.push(stickers[oldIdx]);
             }
             
-            // Update activeLayerIndex correctly
-            if (activeLayerIndex !== 'boundary' && activeLayerIndex >= 0 && activeLayerIndex < designLayers.length) {
-                const activeLayer = designLayers[activeLayerIndex];
+            // Update activeStickerIndex correctly
+            if (activeStickerIndex !== 'boundary' && activeStickerIndex >= 0 && activeStickerIndex < stickers.length) {
+                const activeLayer = stickers[activeStickerIndex];
                 const newActiveIndex = newLayers.indexOf(activeLayer);
-                setActiveLayer(newActiveIndex);
+                setActiveSticker(newActiveIndex);
             }
             
             // Update array in place
-            designLayers.splice(0, designLayers.length, ...newLayers);
+            stickers.splice(0, stickers.length, ...newLayers);
             
             renderLayerList();
             redrawAll();
         }
     });
 
-    const panel = document.getElementById("layer-editor-panel");
+    const panel = document.getElementById("sticker-editor-panel");
     if (panel) {
-        if (designLayers.length > 0) {
+        if (stickers.length > 0) {
             panel.style.display = "flex";
         } else {
             panel.style.display = "none";
@@ -5236,17 +5306,17 @@ function renderLayerList() {
 
 // Hook into add layer button
 document.addEventListener("DOMContentLoaded", () => {
-    const addLayerBtn = document.getElementById("add-layer-btn");
+    const addStickerBtn = document.getElementById("add-sticker-btn");
     const fileInput = document.getElementById("file"); // The main file input
     
-    if (addLayerBtn && fileInput) {
-        addLayerBtn.addEventListener("click", () => {
+    if (addStickerBtn && fileInput) {
+        addStickerBtn.addEventListener("click", () => {
             fileInput.click();
         });
     }
     
     // We should also call renderLayerList when a layer is added or removed.
-    // I'll override addLayer and removeLayer locally or just hook into loadFileAsImage.
+    // I'll override addSticker and removeSticker locally or just hook into loadFileAsImage.
 });
 
 // --- Canvas Layer Dragging Interaction ---
@@ -5261,8 +5331,8 @@ let dragOffsetY = 0;
 function hitTestLayers(mouseX, mouseY) {
     const dpr = window.devicePixelRatio || 1;
     // We check from top layer (end of array) to bottom layer (start of array)
-    for (let i = designLayers.length - 1; i >= 0; i--) {
-        const layer = designLayers[i];
+    for (let i = stickers.length - 1; i >= 0; i--) {
+        const layer = stickers[i];
         if (layer.visible === false) continue;
         
         let left, top, right, bottom;
@@ -5322,7 +5392,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (canvas) {
         canvas.addEventListener("mousedown", (e) => {
-            if (designLayers.length === 0) return;
+            if (stickers.length === 0) return;
             
             // Calculate mouse position relative to logical canvas coords
             // Taking into account canvas scaling
@@ -5357,7 +5427,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (hit) {
                 isDraggingLayer = true;
                 draggedLayer = hit.layer;
-                setActiveLayer(hit.index);
+                setActiveSticker(hit.index);
                 renderLayerList();
                 
                 dragStartX = mouseX;

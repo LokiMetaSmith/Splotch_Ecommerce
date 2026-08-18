@@ -36,7 +36,7 @@ describe('Job Lifecycle', () => {
         fs.unlinkSync(mockImagePath);
     }
 
-    const defaultData = { orders: {}, users: {}, credentials: {}, config: {}, products: {} };
+    const defaultData = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {} };
     // Create a mock uploaded file
     if (!fs.existsSync(path.join(__dirname, '../uploads'))) {
         fs.mkdirSync(path.join(__dirname, '../uploads'));
