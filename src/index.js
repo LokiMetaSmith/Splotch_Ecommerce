@@ -3518,11 +3518,15 @@ function updateEditingControlsForActiveLayer() {
   const customControls = document.querySelector(".control-group-custom");
 
   if (baseControls)
-    baseControls.style.display = activeTabId === "base" ? "flex" : "none";
+    baseControls.style.display = (activeTabId === "base" && activeStickerIndex !== 'boundary') ? "flex" : "none";
   if (cutlineControls)
-    cutlineControls.style.display = activeTabId === "cutline" ? "flex" : "none";
+    cutlineControls.style.display = (activeTabId === "cutline" && activeStickerIndex !== 'boundary') ? "flex" : "none";
+  if (customControls)
+    customControls.style.display = (activeTabId !== "base" && activeTabId !== "cutline" && activeStickerIndex !== 'boundary') ? "block" : "none";
 
-  // Update slider/input values based on the active sticker
+  if (activeStickerIndex === 'boundary') {
+      return; // Skip slider updates for boundary
+  }
   if (activeBase) {
     if (cutlineOffsetSlider) {
       let step = 1; // Default
