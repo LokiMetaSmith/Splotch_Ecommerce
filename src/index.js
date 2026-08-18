@@ -3569,7 +3569,7 @@ function renderLayerTabs() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = `print-ink-tab-${tab.id}`;
-    btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 flex items-center gap-1`;
+    btn.className = `px-3 py-1 text-xs font-semibold rounded-t-lg transition-colors border-2 border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 flex items-center gap-1 cursor-grab active:cursor-grabbing select-none`;
     btn.setAttribute("data-id", tab.id);
 
     // Default style
@@ -3634,6 +3634,7 @@ function renderLayerTabs() {
 
   // Create Dropdown Container
   const dropdownContainer = document.createElement("div");
+  dropdownContainer.className = "ignore-drag add-sticker-btn";
   dropdownContainer.style.position = "relative";
   dropdownContainer.style.display = "inline-block";
 
@@ -3706,7 +3707,17 @@ function renderLayerTabs() {
 
   sortableInstance = new Sortable(layerTabsContainer, {
     animation: 150,
-    filter: ".add-sticker-btn", // Don't allow dragging the + button
+    filter: ".add-sticker-btn, .ignore-drag", // Don't allow dragging the + button
+    onMove: function (evt) {
+      if (
+        evt.related &&
+        (evt.related.classList.contains("add-sticker-btn") ||
+          evt.related.classList.contains("ignore-drag"))
+      ) {
+        return false;
+      }
+      return true;
+    },
     onEnd: function (evt) {
       // Rebuild activeBase.layerOrder based on the new DOM order
       const newOrder = [];
@@ -5654,130 +5665,126 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (canvas) {
-        canvas.addEventListener("mousedown", (e) => {
-            if (stickers.length === 0) return;
-            
-            // Calculate mouse position relative to logical canvas coords
-            // Taking into account canvas scaling
+        const getCanvasCoords = (clientX, clientY) => {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             const dpr = window.devicePixelRatio || 1;
-            
-            let mouseX = (e.clientX - rect.left) * scaleX / dpr;
-            let mouseY = (e.clientY - rect.top) * scaleY / dpr;
-            
-            // Adjust for drawing offset (padding) which is added in redrawAll
-            // currentBounds and padding
+
+            let mouseX = ((clientX - rect.left) * scaleX) / dpr;
+            let mouseY = ((clientY - rect.top) * scaleY) / dpr;
+
             let ppi = 300;
             if (pricingConfig && stickerResolutionSelect) {
-                const selectedRes = pricingConfig.resolutions.find(r => r.id === (stickerResolutionSelect.value || "dpi_300"));
+                const selectedRes = pricingConfig.resolutions.find(
+                    (r) => r.id === (stickerResolutionSelect.value || "dpi_300")
+                );
                 if (selectedRes) ppi = selectedRes.ppi;
             }
             const ppiScale = ppi / 96;
             const scale = Math.max(currentBounds.width, currentBounds.height) / 500;
             const padding = Math.max(Math.round(60 * ppiScale), Math.round(40 * scale));
-            
-            // The drawing offset is:
+
             const drawOffsetX = -currentBounds.left + padding;
             const drawOffsetY = -currentBounds.top + padding;
-            
-            mouseX -= drawOffsetX;
-            mouseY -= drawOffsetY;
-            
-            const hit = hitTestLayers(mouseX, mouseY);
-            
+
+            return {
+                x: mouseX - drawOffsetX,
+                y: mouseY - drawOffsetY
+            };
+        };
+
+        const handleDragStart = (clientX, clientY) => {
+            if (stickers.length === 0) return false;
+            const coords = getCanvasCoords(clientX, clientY);
+            const hit = hitTestLayers(coords.x, coords.y);
+
             if (hit) {
                 isDraggingLayer = true;
                 draggedLayer = hit.layer;
                 setActiveSticker(hit.index);
                 renderLayerList();
                 renderLayerTabs();
-                
-                dragStartX = mouseX;
-                dragStartY = mouseY;
+
+                dragStartX = coords.x;
+                dragStartY = coords.y;
                 dragOffsetX = hit.layer.x || 0;
                 dragOffsetY = hit.layer.y || 0;
-                
+
                 canvas.style.cursor = 'grabbing';
-                redrawAll(); // Highlights active layer
+                redrawAll();
+                return true;
             }
-        });
-        
-        window.addEventListener("mousemove", (e) => {
+            return false;
+        };
+
+        const handleDragMove = (clientX, clientY) => {
             if (!isDraggingLayer || !draggedLayer) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const dpr = window.devicePixelRatio || 1;
-            
-            let mouseX = (e.clientX - rect.left) * scaleX / dpr;
-            let mouseY = (e.clientY - rect.top) * scaleY / dpr;
-            
-            let ppi = 300;
-            if (pricingConfig && stickerResolutionSelect) {
-                const selectedRes = pricingConfig.resolutions.find(r => r.id === (stickerResolutionSelect.value || "dpi_300"));
-                if (selectedRes) ppi = selectedRes.ppi;
-            }
-            const ppiScale = ppi / 96;
-            const scale = Math.max(currentBounds.width, currentBounds.height) / 500;
-            const padding = Math.max(Math.round(60 * ppiScale), Math.round(40 * scale));
-            
-            const drawOffsetX = -currentBounds.left + padding;
-            const drawOffsetY = -currentBounds.top + padding;
-            
-            mouseX -= drawOffsetX;
-            mouseY -= drawOffsetY;
-            
-            if (!isDraggingLayer || !draggedLayer) return;
-            
-            const dx = mouseX - dragStartX;
-            const dy = mouseY - dragStartY;
-            
+            const coords = getCanvasCoords(clientX, clientY);
+            const dx = coords.x - dragStartX;
+            const dy = coords.y - dragStartY;
+
             draggedLayer.x = dragOffsetX + dx;
             draggedLayer.y = dragOffsetY + dy;
-            
+
             redrawAll();
-        });
-        
-        window.addEventListener("mouseup", () => {
+        };
+
+        const handleDragEnd = () => {
             if (isDraggingLayer) {
                 isDraggingLayer = false;
                 draggedLayer = null;
                 if (canvas) canvas.style.cursor = 'default';
                 redrawAll();
             }
+        };
+
+        // Mouse listeners
+        canvas.addEventListener("mousedown", (e) => {
+            handleDragStart(e.clientX, e.clientY);
         });
-        
+
+        window.addEventListener("mousemove", (e) => {
+            if (isDraggingLayer) {
+                handleDragMove(e.clientX, e.clientY);
+            }
+        });
+
+        window.addEventListener("mouseup", () => {
+            handleDragEnd();
+        });
+
+        // Touch listeners
+        canvas.addEventListener("touchstart", (e) => {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                if (handleDragStart(touch.clientX, touch.clientY)) {
+                    e.preventDefault();
+                }
+            }
+        }, { passive: false });
+
+        window.addEventListener("touchmove", (e) => {
+            if (isDraggingLayer && e.touches.length === 1) {
+                const touch = e.touches[0];
+                handleDragMove(touch.clientX, touch.clientY);
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        window.addEventListener("touchend", () => {
+            handleDragEnd();
+        });
+
+        window.addEventListener("touchcancel", () => {
+            handleDragEnd();
+        });
+
         // Update cursor on hover
         canvas.addEventListener("mousemove", (e) => {
             if (isDraggingLayer) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const dpr = window.devicePixelRatio || 1;
-            
-            let mouseX = (e.clientX - rect.left) * scaleX / dpr;
-            let mouseY = (e.clientY - rect.top) * scaleY / dpr;
-            
-            let ppi = 300;
-            if (pricingConfig && stickerResolutionSelect) {
-                const selectedRes = pricingConfig.resolutions.find(r => r.id === (stickerResolutionSelect.value || "dpi_300"));
-                if (selectedRes) ppi = selectedRes.ppi;
-            }
-            const ppiScale = ppi / 96;
-            const scale = Math.max(currentBounds.width, currentBounds.height) / 500;
-            const padding = Math.max(Math.round(60 * ppiScale), Math.round(40 * scale));
-            
-            const drawOffsetX = -currentBounds.left + padding;
-            const drawOffsetY = -currentBounds.top + padding;
-            
-            mouseX -= drawOffsetX;
-            mouseY -= drawOffsetY;
-            
-            if (hitTestLayers(mouseX, mouseY)) {
+            const coords = getCanvasCoords(e.clientX, e.clientY);
+            if (hitTestLayers(coords.x, coords.y)) {
                 canvas.style.cursor = 'grab';
             } else {
                 canvas.style.cursor = 'default';
