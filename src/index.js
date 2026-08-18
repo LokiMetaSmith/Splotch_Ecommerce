@@ -738,7 +738,7 @@ async function BootStrap() {
       const activeTabId = getActiveLineId();
       if (!activeTabId || activeTabId === "base" || activeTabId === "cutline")
         return;
-      const layer = printInks.find((l) => l.id === activeTabId);
+      const layer = activeBase.customLayers.find((l) => l.id === activeTabId);
       if (layer) {
         layer.subType = e.target.value;
       }
@@ -1354,10 +1354,19 @@ function calculateAndUpdatePrice() {
     lastCalculatedPerimeterCutlineRef = cutline;
   }
 
-  const allCustomLayers = printInks.map((l) => ({
-    type: l.type,
-    subType: l.subType,
-  }));
+  const allCustomLayers = [];
+  if (typeof stickers !== "undefined") {
+    stickers.forEach((s) => {
+      if (s.customLayers) {
+        s.customLayers.forEach((l) => {
+          allCustomLayers.push({
+            type: l.type,
+            subType: l.subType,
+          });
+        });
+      }
+    });
+  }
   const numImageLayers =
     typeof stickers !== "undefined" && stickers
       ? stickers.length
@@ -1880,10 +1889,19 @@ async function handlePaymentFormSubmit(event) {
         ? fileInput.files[0].name
         : "Custom Sticker";
 
-    const allCustomLayers = printInks.map((l) => ({
-      type: l.type,
-      subType: l.subType,
-    }));
+    const allCustomLayers = [];
+    if (typeof stickers !== "undefined") {
+      stickers.forEach((s) => {
+        if (s.customLayers) {
+          s.customLayers.forEach((l) => {
+            allCustomLayers.push({
+              type: l.type,
+              subType: l.subType,
+            });
+          });
+        }
+      });
+    }
 
     // 4. Create JSON payload for the order
     const orderDetails = {
@@ -2390,7 +2408,7 @@ function loadFileAsImage(file, isMascot = false) {
 
         if (activeTab !== "base" && activeTab !== "cutline") {
           // Custom Layer Upload
-          const customLayer = printInks.find((l) => l.id === activeTab);
+          const customLayer = activeBase.customLayers.find((l) => l.id === activeTab);
           if (customLayer) {
             // Apply grayscale to the image
             const tempCanvas = document.createElement("canvas");
@@ -3079,41 +3097,41 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
   });
 
   // Pass 3: Draw Custom Print Layers (Holographic, Spot Gloss, etc.)
-  if (typeof globalLayerOrder !== "undefined" && typeof printInks !== "undefined") {
-      globalLayerOrder.forEach((layerId) => {
+  stickers.forEach((sticker) => {
+    if (sticker.visible !== false && sticker.layerOrder && sticker.customLayers) {
+      sticker.layerOrder.forEach((layerId) => {
         if (layerId !== "base" && layerId !== "cutline") {
-          const customLayer = printInks.find((l) => l.id === layerId);
+          const customLayer = sticker.customLayers.find((l) => l.id === layerId);
           if (customLayer && customLayer.image) {
             ctx.save();
-            const activeLayer = getActiveBase();
-            if (activeLayer) {
-              const layerWidth = activeLayer.cleanCanvasState
-                ? activeLayer.cleanCanvasState.width / dpr
-                : activeLayer.width || (activeLayer.image && activeLayer.image.width) || 0;
-              const layerHeight = activeLayer.cleanCanvasState
-                ? activeLayer.cleanCanvasState.height / dpr
-                : activeLayer.height || (activeLayer.image && activeLayer.image.height) || 0;
-              if (layerWidth > 0 && layerHeight > 0) {
-                ctx.drawImage(
-                  customLayer.image,
-                  offset.x + (activeLayer.x || 0),
-                  offset.y + (activeLayer.y || 0),
-                  layerWidth,
-                  layerHeight
-                );
-              }
+            const layerWidth = sticker.cleanCanvasState
+              ? sticker.cleanCanvasState.width / dpr
+              : sticker.width || (sticker.image && sticker.image.width) || 0;
+            const layerHeight = sticker.cleanCanvasState
+              ? sticker.cleanCanvasState.height / dpr
+              : sticker.height || (sticker.image && sticker.image.height) || 0;
+            if (layerWidth > 0 && layerHeight > 0) {
+              ctx.drawImage(
+                customLayer.image,
+                offset.x + (sticker.x || 0),
+                offset.y + (sticker.y || 0),
+                layerWidth,
+                layerHeight
+              );
             }
             ctx.restore();
           }
         }
       });
-  }
+    }
+  });
 
   // Pass 4: Draw All Kiss Cuts (Cyan)
   stickers.forEach((layer, index) => {
     const isSelected = activeStickerIndex === index;
     const isSvgLayer = !layer.image && !layer.originalImage;
-    const shouldDraw = (typeof globalLayerOrder !== "undefined" && globalLayerOrder.includes("cutline")) || isSelected || isSvgLayer;
+    // 1) The layer is selected OR 2) It is the cutline layer and we want to draw it based on layerOrder OR 3) it's an SVG and we always draw it
+    const shouldDraw = (typeof activeBase.layerOrder !== "undefined" && activeBase.layerOrder.includes("cutline")) || isSelected || isSvgLayer;
     
     if (shouldDraw && layer.currentCutline && layer.currentCutline.length > 0 && layer.visible !== false) {
       const layerOffset = {
@@ -3245,8 +3263,8 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
 }
 
 let layerTabsInitialized = false;
-let printInks = []; // Store custom layer objects { id, type, image, name, visible }
-let globalLayerOrder = ["base", "cutline"];
+// Removed global printInks
+// globalLayerOrder replaced by activeBase.layerOrder
 let sortableInstance = null;
 
 function renderLayerTabs() {
@@ -3279,7 +3297,7 @@ function renderLayerTabs() {
       borderColor: "#ef4444",
       bgColor: "#fee2e2",
     },
-    ...printInks.map((layer) => ({
+    ...activeBase.customLayers.map((layer) => ({
       id: layer.id,
       label: layer.name,
       color: "#4b5563",
@@ -3290,17 +3308,17 @@ function renderLayerTabs() {
 
   layerTabsContainer.innerHTML = ""; // Always rebuild to handle dynamic tabs
 
-  // Ensure globalLayerOrder contains all current tabs and no stale tabs
+  // Ensure activeBase.layerOrder contains all current tabs and no stale tabs
   const tabIds = tabs.map((t) => t.id);
-  globalLayerOrder = globalLayerOrder.filter((id) => tabIds.includes(id));
+  activeBase.layerOrder = activeBase.layerOrder.filter((id) => tabIds.includes(id));
   tabIds.forEach((id) => {
-    if (!globalLayerOrder.includes(id)) {
-      globalLayerOrder.push(id);
+    if (!activeBase.layerOrder.includes(id)) {
+      activeBase.layerOrder.push(id);
     }
   });
 
-  // Sort tabs array to match globalLayerOrder for visual rendering
-  const sortedTabs = globalLayerOrder
+  // Sort tabs array to match activeBase.layerOrder for visual rendering
+  const sortedTabs = activeBase.layerOrder
     .map((id) => tabs.find((t) => t.id === id))
     .filter(Boolean);
 
@@ -3447,14 +3465,14 @@ function renderLayerTabs() {
     animation: 150,
     filter: ".add-sticker-btn", // Don't allow dragging the + button
     onEnd: function (evt) {
-      // Rebuild globalLayerOrder based on the new DOM order
+      // Rebuild activeBase.layerOrder based on the new DOM order
       const newOrder = [];
       const children = layerTabsContainer.children;
       for (let i = 0; i < children.length; i++) {
         const id = children[i].getAttribute("data-id");
         if (id) newOrder.push(id);
       }
-      globalLayerOrder = newOrder;
+      activeBase.layerOrder = newOrder;
       redrawAll();
     },
   });
@@ -3474,7 +3492,7 @@ function updateLayerTabsStyles() {
   const tabs = [
     { id: "base", bgColor: "#e0e7ff" },
     { id: "cutline", bgColor: "#fee2e2" },
-    ...printInks.map((layer) => ({ id: layer.id, bgColor: "#f3f4f6" })),
+    ...activeBase.customLayers.map((layer) => ({ id: layer.id, bgColor: "#f3f4f6" })),
   ];
 
   tabs.forEach((tab) => {
@@ -3541,7 +3559,7 @@ function updateEditingControlsForActiveLayer() {
       activeTabId === "base" ? "flex" : "none";
 
   const textControls = document.getElementById("text-editing-controls");
-  const layer = printInks.find((l) => l.id === activeTabId);
+  const layer = activeBase.customLayers.find((l) => l.id === activeTabId);
   const isTextLayer = layer && layer.type === "text";
 
   // Text layer controls
@@ -3619,14 +3637,14 @@ function addCustomLayer(type) {
     image: null,
     visible: true,
   };
-  printInks.push(newLayer);
+  activeBase.customLayers.push(newLayer);
   selectedLegendTab = newLayer.id;
   renderLayerTabs();
   calculateAndUpdatePrice();
 }
 
 function deleteCustomLayer(id) {
-  printInks = printInks.filter((l) => l.id !== id);
+  activeBase.customLayers = activeBase.customLayers.filter((l) => l.id !== id);
   if (selectedLegendTab === id) selectedLegendTab = "base";
   renderLayerTabs();
   calculateAndUpdatePrice();
@@ -3634,7 +3652,7 @@ function deleteCustomLayer(id) {
 
 function redrawAllForHighlight() {
   try {
-    // We can just reuse redrawAll because it respects the globalLayerOrder.
+    // We can just reuse redrawAll because it respects the activeBase.layerOrder.
     redrawAll();
   } catch (error) {
     console.error("[CLIENT] ERROR in redrawAllForHighlight:", error);
@@ -3656,7 +3674,7 @@ function handleAddText() {
     return;
   }
   const activeTabId = getActiveLineId();
-  const layer = printInks.find((l) => l.id === activeTabId);
+  const layer = activeBase.customLayers.find((l) => l.id === activeTabId);
   if (!layer || layer.type !== "text") {
     showNotification("Please select a Text layer first.", "error");
     return;
@@ -4389,7 +4407,7 @@ function handleGenerateFromBase() {
     return;
   }
 
-  const customLayer = printInks.find((l) => l.id === activeTabId);
+  const customLayer = activeBase.customLayers.find((l) => l.id === activeTabId);
   if (!customLayer) return;
 
   showNotification("Generating mask from base design...", "info");

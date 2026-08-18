@@ -18,6 +18,7 @@ export function addSticker(image, name, x, y, width, height) {
     offsetPoly: null,
     cleanCanvasState: null, // Used if there are filters
     customLayers: [],
+    layerOrder: ["base", "cutline"],
     basePolygons: [],
     currentPolygons: [],
     currentCutline: [],
