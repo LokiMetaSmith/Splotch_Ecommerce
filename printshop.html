@@ -698,11 +698,29 @@
             <!-- Dynamically populated pricing editor -->
             <p class="text-gray-500 text-center py-4">Loading pricing configuration...</p>
           </div>
-          <div class="flex justify-end pt-4 border-t border-gray-300 mt-6">
+          <div class="flex flex-wrap justify-between items-center gap-3 pt-4 border-t border-gray-300 mt-6">
+            <div class="flex gap-2">
+              <button
+                type="button"
+                id="reload-pricing-btn"
+                class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-md hover:bg-gray-200 border border-gray-300 transition-colors"
+                title="Discard unsaved changes and reload from server"
+              >
+                Reload from Server
+              </button>
+              <button
+                type="button"
+                id="copy-pricing-btn"
+                class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-md hover:bg-gray-200 border border-gray-300 transition-colors"
+                title="Copy current pricing configuration as JSON to clipboard"
+              >
+                Copy JSON
+              </button>
+            </div>
             <button
               type="button"
               id="save-pricing-btn"
-              class="px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700"
+              class="px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 shadow-sm transition-colors"
             >
               Save Pricing
             </button>
