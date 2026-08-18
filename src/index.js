@@ -92,6 +92,8 @@ function getActiveBase() {
       currentPolygons: [],
       basePolygons: [],
       currentCutline: [],
+      customLayers: [],
+      layerOrder: ["base", "cutline"],
       x: 0,
       y: 0,
       scale: 1,
@@ -3611,6 +3613,7 @@ function renderLayerTabs() {
     }
   }
 
+  const customLayers = (activeBase && Array.isArray(activeBase.customLayers)) ? activeBase.customLayers : [];
   const tabs = [
     {
       id: "base",
@@ -3626,7 +3629,7 @@ function renderLayerTabs() {
       borderColor: "#ef4444",
       bgColor: "#fee2e2",
     },
-    ...activeBase.customLayers.map((layer) => ({
+    ...customLayers.map((layer) => ({
       id: layer.id,
       label: layer.name,
       color: "#4b5563",
@@ -3636,6 +3639,10 @@ function renderLayerTabs() {
   ];
 
   layerTabsContainer.innerHTML = ""; // Always rebuild to handle dynamic tabs
+
+  if (!activeBase.layerOrder || !Array.isArray(activeBase.layerOrder)) {
+    activeBase.layerOrder = ["base", "cutline"];
+  }
 
   // Ensure activeBase.layerOrder contains all current tabs and no stale tabs
   const tabIds = tabs.map((t) => t.id);
