@@ -755,7 +755,8 @@ async function BootStrap() {
   const cutShapeSelect = document.getElementById("cutShapeSelect");
   if (cutShapeSelect) {
     cutShapeSelect.addEventListener("change", () => {
-      if (activeBase.originalImage) {
+      const activeSticker = getActiveSticker();
+      if (activeSticker && (activeSticker.image || activeSticker.originalImage || activeSticker.basePolygons?.length)) {
         handleGenerateCutline(true);
       }
     });
@@ -4875,66 +4876,42 @@ function handleGenerateCutline(skipPrompt = false) {
   activeBase.cutShape = selectedShape;
 
   try {
-    const dpr = window.devicePixelRatio || 1;
-    const sourceWidth = activeBase.cleanCanvasState
-      ? activeBase.cleanCanvasState.width
-      : canvas.width;
-    const sourceHeight = activeBase.cleanCanvasState
-      ? activeBase.cleanCanvasState.height
-      : canvas.height;
-    const logicalCanvasWidth = sourceWidth / dpr;
-    const logicalCanvasHeight = sourceHeight / dpr;
+    const activeSticker = getActiveSticker() || activeBase;
+    const img = activeSticker.originalImage || activeSticker.image;
+    const sourceWidth = img ? (img.naturalWidth || img.width) : (activeSticker.width || canvas.width);
+    const sourceHeight = img ? (img.naturalHeight || img.height) : (activeSticker.height || canvas.height);
+    const targetWidth = activeSticker.width || sourceWidth;
+    const targetHeight = activeSticker.height || sourceHeight;
+    const logicalCanvasWidth = targetWidth;
+    const logicalCanvasHeight = targetHeight;
 
     // --- Performance Optimization: Downscale before tracing ---
     const maxDim = 500;
     const scaleFactor = Math.min(
       1,
-      maxDim / Math.max(logicalCanvasWidth, logicalCanvasHeight),
+      maxDim / Math.max(sourceWidth, sourceHeight),
     );
     const scaledWidth = Math.max(
       1,
-      Math.round(logicalCanvasWidth * scaleFactor),
+      Math.round(sourceWidth * scaleFactor),
     );
     const scaledHeight = Math.max(
       1,
-      Math.round(logicalCanvasHeight * scaleFactor),
+      Math.round(sourceHeight * scaleFactor),
     );
 
-    let scaledImageData;
-    if (scaleFactor < 1 || dpr !== 1) {
-      const tempCanvas1 = document.createElement("canvas");
-      tempCanvas1.width = sourceWidth;
-      tempCanvas1.height = sourceHeight;
-      const tempCtx1 = tempCanvas1.getContext("2d");
-      if (activeBase.cleanCanvasState) {
-        tempCtx1.putImageData(activeBase.cleanCanvasState, 0, 0);
-      } else {
-        tempCtx1.drawImage(canvas, 0, 0);
-      }
-
-      const tempCanvas2 = document.createElement("canvas");
-      tempCanvas2.width = scaledWidth;
-      tempCanvas2.height = scaledHeight;
-      const tempCtx2 = tempCanvas2.getContext("2d");
-      tempCtx2.drawImage(
-        tempCanvas1,
-        0,
-        0,
-        tempCanvas1.width,
-        tempCanvas1.height,
-        0,
-        0,
-        scaledWidth,
-        scaledHeight,
-      );
-      scaledImageData = tempCtx2.getImageData(0, 0, scaledWidth, scaledHeight);
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = scaledWidth;
+    tempCanvas.height = scaledHeight;
+    const tempCtx = tempCanvas.getContext("2d", { willReadFrequently: true });
+    if (img) {
+      tempCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+    } else if (activeBase.cleanCanvasState) {
+      tempCtx.putImageData(activeBase.cleanCanvasState, 0, 0);
     } else {
-      if (activeBase.cleanCanvasState) {
-        scaledImageData = activeBase.cleanCanvasState;
-      } else {
-        scaledImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      }
+      tempCtx.drawImage(canvas, 0, 0, scaledWidth, scaledHeight);
     }
+    const scaledImageData = tempCtx.getImageData(0, 0, scaledWidth, scaledHeight);
 
     let traceTimeout = setTimeout(() => {
       console.warn("traceWorker timed out, using fallback cutline");
@@ -5009,9 +4986,9 @@ function handleGenerateCutline(skipPrompt = false) {
               significantContours = [
                 [
                   { x: 0, y: 0 },
-                  { x: logicalCanvasWidth, y: 0 },
-                  { x: logicalCanvasWidth, y: logicalCanvasHeight },
-                  { x: 0, y: logicalCanvasHeight },
+                  { x: sourceWidth, y: 0 },
+                  { x: sourceWidth, y: sourceHeight },
+                  { x: 0, y: sourceHeight },
                 ],
               ];
             } else {
@@ -5043,6 +5020,13 @@ function handleGenerateCutline(skipPrompt = false) {
               });
             });
 
+            if (minX === Infinity) {
+              minX = 0;
+              maxX = sourceWidth;
+              minY = 0;
+              maxY = sourceHeight;
+            }
+
             const hw = (maxX - minX) / 2;
             const hh = (maxY - minY) / 2;
             const cx = minX + hw;
@@ -5050,7 +5034,7 @@ function handleGenerateCutline(skipPrompt = false) {
             let poly = [];
 
             if (selectedShape === "circle") {
-              const r = Math.sqrt(hw * hw + hh * hh);
+              const r = Math.max(hw, hh);
               const steps = 64;
               for (let i = 0; i < steps; i++) {
                 const theta = (i / steps) * 2 * Math.PI;
@@ -5114,13 +5098,15 @@ function handleGenerateCutline(skipPrompt = false) {
             return;
           }
 
+          const renderScaleX = targetWidth / sourceWidth;
+          const renderScaleY = targetHeight / sourceHeight;
           const rasterCutlineOutput = new Array(finalContours.length);
           for (let i = 0; i < finalContours.length; i++) {
             const poly = finalContours[i];
             const newPoly = new Array(poly.length);
             for (let j = 0; j < poly.length; j++) {
               const p = poly[j];
-              newPoly[j] = { x: p.x / dpr, y: p.y / dpr };
+              newPoly[j] = { x: p.x * renderScaleX, y: p.y * renderScaleY };
             }
             rasterCutlineOutput[i] = newPoly;
           }
