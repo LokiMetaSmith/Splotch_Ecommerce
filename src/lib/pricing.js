@@ -224,6 +224,61 @@ export function generateMultiLayerSvg(stickers, sheetBoundary, bounds) {
   let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
 
+  // Squash raster images
+  if (typeof document !== "undefined") {
+    const layerCanvases = {};
+    const getCanvasForLayer = (layerType) => {
+      if (!layerCanvases[layerType]) {
+        const c = document.createElement("canvas");
+        c.width = width;
+        c.height = height;
+        layerCanvases[layerType] = c;
+      }
+      return layerCanvases[layerType];
+    };
+
+    if (stickers && stickers.length > 0) {
+      stickers.forEach((sticker) => {
+        // Base Art (CMYK)
+        if (sticker.image && sticker.visible !== false) {
+          const ctx = getCanvasForLayer("cmyk_art").getContext("2d");
+          ctx.drawImage(
+            sticker.image,
+            (sticker.x || 0) - left,
+            (sticker.y || 0) - top,
+            sticker.width || sticker.image.width,
+            sticker.height || sticker.image.height,
+          );
+        }
+
+        // Custom Layers (White, Clear, etc)
+        if (sticker.customLayers && sticker.customLayers.length > 0) {
+          sticker.customLayers.forEach((layer) => {
+            if (layer.image && layer.visible !== false) {
+              const ctx = getCanvasForLayer(layer.type.toLowerCase()).getContext("2d");
+              ctx.drawImage(
+                layer.image,
+                (sticker.x || 0) - left,
+                (sticker.y || 0) - top,
+                sticker.width || layer.image.width,
+                sticker.height || layer.image.height,
+              );
+            }
+          });
+        }
+      });
+    }
+
+    // Embed squashed images into the SVG
+    for (const type in layerCanvases) {
+      const dataUrl = layerCanvases[type].toDataURL("image/png");
+      const layerId = type.charAt(0).toUpperCase() + type.slice(1) + "_Layer";
+      svgContent += `\n  <g id="${layerId}">`;
+      svgContent += `\n    <image href="${dataUrl}" x="0" y="0" width="${width}" height="${height}" />`;
+      svgContent += `\n  </g>`;
+    }
+  }
+
   // 1. Kiss Cuts (Cyan)
   svgContent += `\n  <g id="Kiss-Cut" stroke="cyan" fill="none" stroke-width="1">`;
   if (stickers && stickers.length > 0) {
