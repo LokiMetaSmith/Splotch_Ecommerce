@@ -462,3 +462,14 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
     outline: 4px solid var(--splotch-red);
     outline-offset: -4px;
 }
+
+/* Canvas Processing & Loading Overlay */
+#canvas-loading-overlay {
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: inset 0 0 20px rgba(0, 169, 157, 0.15);
+}
+
+#canvas-loading-overlay.opacity-100 {
+    pointer-events: auto;
+}

@@ -357,6 +357,38 @@
                 >
                   Your browser does not support the HTML5 canvas tag.
                 </canvas>
+                <!-- Canvas Processing & Loading Overlay -->
+                <div
+                  id="canvas-loading-overlay"
+                  class="absolute inset-0 flex flex-col items-center justify-center select-none z-30 bg-white/85 backdrop-blur-md rounded-lg shadow-lg border border-teal-100 transition-all duration-300 opacity-0 pointer-events-none"
+                  role="status"
+                  aria-live="polite"
+                  aria-label="Loading and processing sticker design"
+                >
+                  <div class="relative flex items-center justify-center mb-3">
+                    <div class="w-16 h-16 border-4 border-teal-200 border-t-splotch-teal rounded-full animate-spin"></div>
+                    <div class="absolute w-10 h-10 border-4 border-pink-200 border-b-splotch-red rounded-full animate-spin" style="animation-direction: reverse; animation-duration: 0.75s;"></div>
+                    <div class="absolute w-4 h-4 bg-splotch-yellow rounded-full animate-ping"></div>
+                  </div>
+                  <p
+                    id="canvas-loading-text"
+                    class="text-base font-bold text-splotch-navy text-center px-4 tracking-wide"
+                    style="font-family: var(--font-baumans)"
+                  >
+                    Processing Image...
+                  </p>
+                  <p
+                    id="canvas-loading-subtext"
+                    class="text-xs text-gray-500 font-medium mt-1 text-center px-4 max-w-xs"
+                    style="font-family: var(--font-baumans)"
+                  >
+                    Analyzing transparency & generating cutlines
+                  </p>
+                  <div class="w-40 bg-gray-200 h-1.5 rounded-full mt-3 overflow-hidden">
+                    <div id="canvas-loading-bar" class="bg-gradient-to-r from-splotch-teal to-splotch-red h-full w-full rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+
                 <div
                   id="canvas-placeholder"
                   class="absolute inset-0 flex flex-col items-center justify-center select-none z-20 bg-white/60 backdrop-blur-sm rounded-lg cursor-pointer hover:bg-white/80 transition-colors focus-visible:ring-4 focus-visible:ring-splotch-teal focus-visible:outline-none focus-visible:ring-inset"

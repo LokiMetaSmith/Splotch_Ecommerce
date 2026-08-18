@@ -191,6 +191,49 @@ let submitPaymentBtn;
 let widthInputEl, heightInputEl;
 let canvasPlaceholder;
 let canvasLegendContainer;
+let canvasLoadingOverlay, canvasLoadingText, canvasLoadingSubtext;
+
+export function showCanvasLoading(
+  mainText = "Processing Image...",
+  subText = "Analyzing transparency & generating cutlines",
+) {
+  if (!canvasLoadingOverlay) {
+    canvasLoadingOverlay = document.getElementById("canvas-loading-overlay");
+    canvasLoadingText = document.getElementById("canvas-loading-text");
+    canvasLoadingSubtext = document.getElementById("canvas-loading-subtext");
+  }
+  if (!canvasLoadingOverlay) return;
+
+  if (canvasLoadingText && mainText) canvasLoadingText.textContent = mainText;
+  if (canvasLoadingSubtext && subText)
+    canvasLoadingSubtext.textContent = subText;
+
+  canvasLoadingOverlay.classList.remove("opacity-0", "pointer-events-none");
+  canvasLoadingOverlay.classList.add("opacity-100");
+}
+
+export function updateCanvasLoading(mainText, subText) {
+  if (!canvasLoadingOverlay) {
+    canvasLoadingOverlay = document.getElementById("canvas-loading-overlay");
+    canvasLoadingText = document.getElementById("canvas-loading-text");
+    canvasLoadingSubtext = document.getElementById("canvas-loading-subtext");
+  }
+  if (!canvasLoadingOverlay) return;
+
+  if (canvasLoadingText && mainText) canvasLoadingText.textContent = mainText;
+  if (canvasLoadingSubtext && subText)
+    canvasLoadingSubtext.textContent = subText;
+}
+
+export function hideCanvasLoading() {
+  if (!canvasLoadingOverlay) {
+    canvasLoadingOverlay = document.getElementById("canvas-loading-overlay");
+  }
+  if (!canvasLoadingOverlay) return;
+
+  canvasLoadingOverlay.classList.remove("opacity-100");
+  canvasLoadingOverlay.classList.add("opacity-0", "pointer-events-none");
+}
 
 let currentOrderAmountCents = 0;
 let currentProductId = null; // Track if we are in "Product Mode"
@@ -1039,6 +1082,7 @@ async function BootStrap() {
 
       // Handle Mascot Drop
       if (e.dataTransfer.getData("application/x-mascot-drag")) {
+        showCanvasLoading("Loading Mascot...", "Fetching asset & preparing canvas");
         const mascotSrc = e.dataTransfer.getData("text/uri-list");
         if (mascotSrc) {
           fetch(mascotSrc)
@@ -1049,13 +1093,17 @@ async function BootStrap() {
               });
               loadFileAsImage(file, true);
             })
-            .catch((err) => console.error("Failed to load mascot", err));
+            .catch((err) => {
+              console.error("Failed to load mascot", err);
+              hideCanvasLoading();
+            });
         }
         return;
       }
 
       const file = e.dataTransfer.files[0];
       if (file) {
+        showCanvasLoading("Loading Image...", "Reading file data");
         loadFileAsImage(file);
       }
     });
@@ -1096,6 +1144,7 @@ async function BootStrap() {
 
       // Handle Mascot Drop
       if (e.dataTransfer.getData("application/x-mascot-drag")) {
+        showCanvasLoading("Loading Mascot...", "Fetching asset & preparing canvas");
         const mascotSrc = e.dataTransfer.getData("text/uri-list");
         if (mascotSrc) {
           fetch(mascotSrc)
@@ -1106,13 +1155,17 @@ async function BootStrap() {
               });
               loadFileAsImage(file, true);
             })
-            .catch((err) => console.error("Failed to load mascot", err));
+            .catch((err) => {
+              console.error("Failed to load mascot", err);
+              hideCanvasLoading();
+            });
         }
         return;
       }
 
       const file = e.dataTransfer.files[0];
       if (file) {
+        showCanvasLoading("Loading Image...", "Reading file data");
         loadFileAsImage(file);
       }
     });
@@ -2336,6 +2389,10 @@ function loadFileAsImage(file, isMascot = false) {
   if (!file) return;
 
   const reader = new FileReader();
+  showCanvasLoading(
+    isMascot ? "Loading Mascot..." : "Loading Sticker Design...",
+    "Reading file data",
+  );
 
   // Hande API-based conversions for TIFF, PDF, and AI
   if (
@@ -2346,6 +2403,7 @@ function loadFileAsImage(file, isMascot = false) {
     file.name.toLowerCase().endsWith(".pdf") ||
     file.name.toLowerCase().endsWith(".tiff")
   ) {
+    updateCanvasLoading("Converting File...", "Transforming to preview format");
     showNotification(
       "Converting file to preview format. This may take a moment...",
       "info",
@@ -2369,6 +2427,7 @@ function loadFileAsImage(file, isMascot = false) {
       })
       .catch((err) => {
         console.error(err);
+        hideCanvasLoading();
         showNotification("Failed to convert file format.", "error");
       });
     return;
@@ -2379,6 +2438,7 @@ function loadFileAsImage(file, isMascot = false) {
     file.type === "image/svg+xml" ||
     file.name.toLowerCase().endsWith(".svg")
   ) {
+    updateCanvasLoading("Parsing SVG...", "Extracting vector paths and print layers");
     const newLayer = addSticker(
       null, // No raster image
       file.name || "Upload",
@@ -2390,10 +2450,19 @@ function loadFileAsImage(file, isMascot = false) {
     setActiveSticker(stickers.length - 1);
     
     reader.onload = (e) => {
-      handleSvgUpload(e.target.result);
-      renderLayerList();
+      try {
+        handleSvgUpload(e.target.result);
+        renderLayerList();
+      } catch (err) {
+        console.error("SVG upload error:", err);
+      } finally {
+        hideCanvasLoading();
+      }
     };
-    reader.onerror = () => showNotification("Error reading SVG file.", "error");
+    reader.onerror = () => {
+      hideCanvasLoading();
+      showNotification("Error reading SVG file.", "error");
+    };
     reader.readAsText(file);
   } else if (
     file.type.startsWith("image/") ||
@@ -2401,6 +2470,7 @@ function loadFileAsImage(file, isMascot = false) {
     file.name.toLowerCase().endsWith(".jpg") ||
     file.name.toLowerCase().endsWith(".jpeg")
   ) {
+    updateCanvasLoading("Decoding Image...", "Preparing canvas and resolution");
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
@@ -2408,6 +2478,7 @@ function loadFileAsImage(file, isMascot = false) {
 
         if (activeTab !== "base" && activeTab !== "cutline") {
           // Custom Layer Upload
+          updateCanvasLoading("Processing Layer...", "Applying layer mask and color mapping");
           const customLayer = activeBase.customLayers.find((l) => l.id === activeTab);
           if (customLayer) {
             // Apply grayscale to the image
@@ -2426,13 +2497,21 @@ function loadFileAsImage(file, isMascot = false) {
                 "success",
               );
               redrawAllForHighlight();
+              hideCanvasLoading();
+            };
+            processedImg.onerror = () => {
+              hideCanvasLoading();
+              showNotification("Failed to load processed layer image.", "error");
             };
             processedImg.src = tempCanvas.toDataURL();
+          } else {
+            hideCanvasLoading();
           }
           return; // Stop here, don't reset base design
         }
 
         // Base Layer Upload
+        updateCanvasLoading("Analyzing Image...", "Detecting contours & tracing cutlines");
         const newLayer = addSticker(
           img,
           file.name || "Upload",
@@ -2496,6 +2575,7 @@ function loadFileAsImage(file, isMascot = false) {
                 );
 
                 if (supportsWhite && !hasWhiteLayer) {
+                  updateCanvasLoading("Generating Underbase...", "Creating White underbase layer mask");
                   const whiteLayer = {
                     id: `custom_${Date.now()}_${Math.floor(
                       Math.random() * 1000,
@@ -2540,12 +2620,20 @@ function loadFileAsImage(file, isMascot = false) {
                     })
                     .catch((err) => {
                       console.error("Auto mask generation failed:", err);
+                    })
+                    .finally(() => {
+                      hideCanvasLoading();
                     });
+                } else {
+                  hideCanvasLoading();
                 }
+              } else {
+                hideCanvasLoading();
               }
             })
             .catch((err) => {
               magicWandThreshold = prevThreshold;
+              hideCanvasLoading();
               showNotification(
                 "Failed to auto-generate cutline. Image may be too complex.",
                 "warning",
@@ -2571,15 +2659,23 @@ function loadFileAsImage(file, isMascot = false) {
 
           // Show the legend tabs since an image is loaded
           renderLayerTabs();
+        } else {
+          hideCanvasLoading();
         }
       };
-      img.onerror = () =>
+      img.onerror = () => {
+        hideCanvasLoading();
         showNotification("Error loading image data.", "error");
+      };
       img.src = reader.result;
     };
-    reader.onerror = () => showNotification("Error reading file.", "error");
+    reader.onerror = () => {
+      hideCanvasLoading();
+      showNotification("Error reading file.", "error");
+    };
     reader.readAsDataURL(file);
   } else {
+    hideCanvasLoading();
     showNotification(
       "Invalid file type. Please select an image or SVG file.",
       "error",
@@ -4743,6 +4839,10 @@ function handleGenerateCutline(skipPrompt = false) {
   if (!skipPrompt) {
     showNotification("Generating smart cutline...", "info");
   }
+  showCanvasLoading(
+    "Calculating Cutline...",
+    "Tracing contours and smoothing borders",
+  );
 
   // START LOADING STATE
   const btn = document.getElementById("generateCutlineBtn");
@@ -5067,6 +5167,7 @@ function handleGenerateCutline(skipPrompt = false) {
                 "success",
               );
             }
+            hideCanvasLoading();
           })
           .catch((err) => {
             console.error("generateCutLineAsync failed:", err);
@@ -5082,6 +5183,7 @@ function handleGenerateCutline(skipPrompt = false) {
               );
               generateCutlineBtn.innerHTML = "Generate Smart Cutline";
             }
+            hideCanvasLoading();
           });
       } else {
         ctx.putImageData(originalCanvasData, 0, 0);
@@ -5099,6 +5201,7 @@ function handleGenerateCutline(skipPrompt = false) {
           );
           generateCutlineBtn.innerHTML = "Generate Smart Cutline";
         }
+        hideCanvasLoading();
       }
     };
 
@@ -5227,6 +5330,7 @@ async function handleCreateProduct() {
 }
 
 async function handleRemoteImageLoad(imageUrl) {
+  showCanvasLoading("Loading Design...", "Fetching saved design from server");
   showNotification("Loading your previous design...", "info");
   const img = new Image();
   img.crossOrigin = "Anonymous";
@@ -5290,16 +5394,21 @@ async function handleRemoteImageLoad(imageUrl) {
 
     // Show Legend
     renderLayerTabs();
+    hideCanvasLoading();
 
     showNotification("Design loaded! You can now adjust options.", "success");
   };
-  img.onerror = () => showNotification("Failed to load design image.", "error");
+  img.onerror = () => {
+    hideCanvasLoading();
+    showNotification("Failed to load design image.", "error");
+  };
   img.src = decodeURIComponent(imageUrl);
 }
 
 async function loadProductForBuyer(productId) {
   try {
     currentProductId = productId;
+    showCanvasLoading("Loading Product...", "Retrieving product design and pricing");
     showNotification("Loading product design...", "info");
 
     const response = await fetch(`${serverUrl}/api/products/${productId}`);
@@ -5383,13 +5492,19 @@ async function loadProductForBuyer(productId) {
 
       // Show Legend
       renderLayerTabs();
+      hideCanvasLoading();
 
       showNotification("Design loaded!", "success");
+    };
+    img.onerror = () => {
+      hideCanvasLoading();
+      showNotification("Failed to load product design image.", "error");
     };
     img.crossOrigin = "Anonymous"; // Important for canvas manipulation if on different port
     img.src = product.designImagePath;
   } catch (error) {
     console.error(error);
+    hideCanvasLoading();
     showNotification("Failed to load product.", "error");
   }
 }
