@@ -720,6 +720,10 @@ async function BootStrap() {
       handleGenerateCutline(false),
     );
 
+  const downloadCutlineBtn = document.getElementById("downloadCutlineBtn");
+  if (downloadCutlineBtn)
+    downloadCutlineBtn.addEventListener("click", handleDownloadCutline);
+
   const generateFromBaseBtn = document.getElementById("generateFromBaseBtn");
   if (generateFromBaseBtn)
     generateFromBaseBtn.addEventListener("click", () =>
@@ -1217,6 +1221,7 @@ async function BootStrap() {
       );
       const lazyLassoContainer = document.getElementById("lazyLassoContainer");
       const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+      const downloadCutlineBtn = document.getElementById("downloadCutlineBtn");
       const starterTemplatesSection = document.getElementById(
         "starterTemplatesSection",
       );
@@ -1239,6 +1244,9 @@ async function BootStrap() {
       }
       if (generateCutlineBtn) {
         generateCutlineBtn.style.display = "flex";
+      }
+      if (downloadCutlineBtn) {
+        downloadCutlineBtn.style.display = "flex";
       }
 
       const isDisabled =
@@ -2082,6 +2090,7 @@ function updateEditingButtonsState(disabled) {
     sepiaBtnEl,
     document.getElementById("resizeSlider"),
     document.getElementById("generateCutlineBtn"),
+    document.getElementById("downloadCutlineBtn"),
     textInput,
     textSizeInput,
     textSizeSlider,
@@ -2109,6 +2118,7 @@ function updateEditingButtonsState(disabled) {
   );
   const lazyLassoContainer = document.getElementById("lazyLassoContainer");
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
+  const downloadCutlineBtn = document.getElementById("downloadCutlineBtn");
 
   if (!easterEggUnlocked) {
     if (grayBtn) grayBtn.style.display = "none";
@@ -2119,6 +2129,7 @@ function updateEditingButtonsState(disabled) {
       lazyLassoContainer.style.display = "none";
     }
     if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
+    if (downloadCutlineBtn) downloadCutlineBtn.style.display = "none";
   } else {
     if (grayBtn) {
       grayBtn.style.display = disabled ? "none" : "block";
@@ -2134,6 +2145,10 @@ function updateEditingButtonsState(disabled) {
     }
     if (generateCutlineBtn) {
       generateCutlineBtn.style.display = disabled ? "none" : "flex";
+    }
+    if (downloadCutlineBtn) {
+      const hasCutline = activeBase.currentCutline && activeBase.currentCutline.length > 0;
+      downloadCutlineBtn.style.display = (disabled || !hasCutline) ? "none" : "flex";
     }
   }
   if (canvasPlaceholder)
@@ -2477,7 +2492,17 @@ function loadFileAsImage(file, isMascot = false) {
   }
 }
 
+let redrawPending = false;
 function redrawAll() {
+  if (redrawPending) return;
+  redrawPending = true;
+  requestAnimationFrame(() => {
+    redrawPending = false;
+    doRedrawAll();
+  });
+}
+
+function doRedrawAll() {
   // Ensure active line ID matches DOM state if applicable
   const lazyLassoSlider = document.getElementById("lazyLassoSlider");
   const currentLassoRadius =
@@ -2485,33 +2510,7 @@ function redrawAll() {
       ? parseInt(lazyLassoSlider.value, 10)
       : 50;
 
-  // 1. Calculate Cutlines for all layers
-  stickers.forEach((layer) => {
-    if (layer.currentPolygons && layer.currentPolygons.length > 0) {
-      // Vector mode
-      let cutline = generateCutLine(
-        layer.currentPolygons,
-        layer.cutlineOffset !== undefined ? layer.cutlineOffset : 15,
-        layer.lazyLassoRadius !== undefined ? layer.lazyLassoRadius : currentLassoRadius
-      );
-      cutline = clipPolygonToBoundingBox(
-        cutline,
-        baseCanvasWidth,
-        baseCanvasHeight
-      );
-      layer.currentCutline = cutline;
-    } else if (layer.originalImage || layer.image) {
-      // Raster mode
-      if (layer.rasterCutlinePoly) {
-        let cutline = generateCutLine(
-          layer.rasterCutlinePoly,
-          layer.cutlineOffset !== undefined ? layer.cutlineOffset : 15,
-          layer.lazyLassoRadius !== undefined ? layer.lazyLassoRadius : currentLassoRadius
-        );
-        layer.currentCutline = cutline;
-      }
-    }
-  });
+
 
   generateOrganicSheetBoundary();
 
@@ -3144,39 +3143,13 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
 
   drawBoundingBox(bounds, offset);
   
-  // Draw dimensions
-  const formatValue = (val) => {
-    return (isMetric ? val * 25.4 : val).toFixed(2) + (isMetric ? " mm" : '"');
-  };
-
-  let ppi = 300;
-  if (
-    typeof pricingConfig !== "undefined" &&
-    pricingConfig &&
-    typeof stickerResolutionSelect !== "undefined" &&
-    stickerResolutionSelect
-  ) {
-    const selectedRes = pricingConfig.resolutions.find(
-      (r) => r.id === (stickerResolutionSelect.value || "dpi_300")
-    );
-    if (selectedRes) ppi = selectedRes.ppi;
-  }
-
-  const widthStr = formatValue(bounds.width / ppi);
-  const heightStr = formatValue(bounds.height / ppi);
-  if (typeof drawCanvasRuler === 'function') {
-      try {
-          drawCanvasRuler(ctx, bounds, offset, widthStr, heightStr);
-      } catch (e) {
-          // If the signature is different in canvas-utils
-          try {
-             drawCanvasRuler(bounds, offset);
-          } catch(e2){}
-      }
-  } else if (typeof drawRuler === 'function') {
+  // Draw dimensions and ruler
+  if (typeof drawRuler === 'function') {
       drawRuler(bounds, offset);
   }
- // Updated based on the old implementation call signature if missing formatValue, it might be in canvasRuler directly! Wait, original had formatValue.
+  if (typeof drawSizeIndicator === 'function') {
+      drawSizeIndicator(bounds, offset);
+  }
 }
 
 function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
@@ -4438,6 +4411,29 @@ function handleGenerateFromBase() {
     redrawAllForHighlight();
   };
   processedImg.src = tempCanvas.toDataURL();
+}
+
+function handleDownloadCutline() {
+  if (!activeBase.currentCutline || activeBase.currentCutline.length === 0) {
+    showNotification("No cutline generated to download.", "error");
+    return;
+  }
+  try {
+    const svgContent = generateSvgFromCutline(activeBase.currentCutline, currentBounds);
+    const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "splotch-cutline.svg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showNotification("Cutline downloaded successfully.", "success");
+  } catch (error) {
+    console.error("Error downloading cutline:", error);
+    showNotification("Failed to download cutline.", "error");
+  }
 }
 
 function handleGenerateCutline(skipPrompt = false) {
