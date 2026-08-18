@@ -2884,6 +2884,67 @@ function doRedrawAll() {
   
   // After redrawing, the bounds may have changed, so update the price.
   calculateAndUpdatePrice();
+  updateLegend();
+}
+
+function updateLegend() {
+  const legendDiv = document.getElementById("cutline-legend");
+  const legendList = document.getElementById("cutline-legend-list");
+  if (!legendDiv || !legendList) return;
+
+  if (stickers.length === 0) {
+    legendDiv.style.opacity = "0";
+    setTimeout(() => { if(stickers.length === 0) legendDiv.style.display = "none"; }, 300);
+    return;
+  }
+
+  legendDiv.style.display = "block";
+  requestAnimationFrame(() => {
+    legendDiv.style.opacity = "1";
+  });
+
+  let html = "";
+  
+  if (stickers.length === 1) {
+    html += `
+      <li class="flex items-center gap-2">
+        <div class="w-6 h-0 border-t-2 border-cyan-400"></div>
+        <span>Kiss Cut</span>
+      </li>
+      <li class="flex items-center gap-2">
+        <div class="w-6 h-0 border-t-2 border-red-500"></div>
+        <span>Sheet Boundary (Die Cut)</span>
+      </li>
+    `;
+  } else if (activeStickerIndex === 'boundary') {
+     html += `
+      <li class="flex items-center gap-2">
+        <div class="w-6 h-0 border-t-2 border-dashed border-cyan-400 opacity-50"></div>
+        <span>Kiss Cut (All Stickers)</span>
+      </li>
+      <li class="flex items-center gap-2">
+        <div class="w-6 h-0 border-t-2 border-red-500"></div>
+        <span>Sheet Boundary (Die Cut)</span>
+      </li>
+    `;
+  } else {
+    html += `
+      <li class="flex items-center gap-2">
+        <div class="w-6 h-0 border-t-2 border-cyan-400"></div>
+        <span>Kiss Cut (Active Sticker)</span>
+      </li>
+      <li class="flex items-center gap-2">
+        <div class="w-6 h-0 border-t-2 border-dashed border-cyan-400 opacity-50"></div>
+        <span>Kiss Cut (Other Stickers)</span>
+      </li>
+      <li class="flex items-center gap-2">
+        <div class="w-6 h-0 border-t-2 border-dashed border-red-500 opacity-50"></div>
+        <span>Sheet Boundary (Die Cut)</span>
+      </li>
+    `;
+  }
+
+  legendList.innerHTML = html;
 }
 
 function handleSvgUpload(svgText) {
