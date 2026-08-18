@@ -3962,7 +3962,8 @@ function updateEditingControlsForActiveLayer() {
       activeTabId === "base" ? "flex" : "none";
 
   const textControls = document.getElementById("text-editing-controls");
-  const layer = activeBase.customLayers.find((l) => l.id === activeTabId);
+  const customLayers = activeBase.customLayers || [];
+  const layer = customLayers.find((l) => l.id === activeTabId);
   const isTextLayer = layer && layer.type === "text";
 
   // Text layer controls
@@ -3973,7 +3974,7 @@ function updateEditingControlsForActiveLayer() {
 
   // Custom Layers (but not Text layer)
   if (customControls) {
-    if (activeTabId !== "base" && activeTabId !== "cutline" && !isTextLayer) {
+    if (activeTabId !== "base" && activeTabId !== "cutline" && !isTextLayer && layer) {
       customControls.style.display = "flex";
       // Update dropzone text if we have it
       const label = document.querySelector('label[for="imageUpload"]');
@@ -4021,9 +4022,9 @@ function updateEditingControlsForActiveLayer() {
       }
 
       if (alphaColorPicker)
-        alphaColorPicker.value = layer.alphaColorHex || "#ffffff";
+        alphaColorPicker.value = (layer && layer.alphaColorHex) || "#ffffff";
       if (maskColorPicker)
-        maskColorPicker.value = layer.maskColorHex || "#000000";
+        maskColorPicker.value = (layer && layer.maskColorHex) || "#000000";
     } else {
       customControls.style.display = "none";
       const label = document.querySelector('label[for="imageUpload"]');
@@ -5140,7 +5141,7 @@ function handleGenerateCutline(skipPrompt = false) {
             lazyLassoSlider && lazyLassoSlider.value
               ? parseInt(lazyLassoSlider.value, 10)
               : 50;
-          let currentOffset = cutlineOffset;
+          let currentOffset = activeBase.cutlineOffset !== undefined ? activeBase.cutlineOffset : 15;
           if (cutlineOffsetSlider && cutlineOffsetSlider.value) {
             const step = parseInt(cutlineOffsetSlider.value, 10);
             if (step === 0) currentOffset = 0;
