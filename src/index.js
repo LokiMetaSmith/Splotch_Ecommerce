@@ -57,6 +57,7 @@ traceWorker.onerror = (error) => {
     ":",
     error.lineno,
   );
+  hideCanvasLoading();
   import("./notifications.js").then(({ showNotification }) => {
     showNotification(`Worker initialization failed: ${error.message}`, "error");
   });
@@ -71,6 +72,7 @@ offsetWorker.onerror = (error) => {
     ":",
     error.lineno,
   );
+  hideCanvasLoading();
 };
 
 // Declare globals for SDK objects and key DOM elements
@@ -3087,6 +3089,11 @@ let currentOffsetMessageId = 0;
 
 function generateCutLineAsync(polygons, rawOffset, rawLazyRadius = 0) {
   return new Promise((resolve, reject) => {
+    if (!polygons || polygons.length === 0) {
+      resolve([]);
+      return;
+    }
+
     // Determine current PPI from UI state to convert real-world values to image pixels
     let ppi = 300; // Default fallback
     if (
@@ -3104,8 +3111,6 @@ function generateCutLineAsync(polygons, rawOffset, rawLazyRadius = 0) {
     }
 
     // Convert raw values (which the slider outputs, presumably representing something like 0.1mm increments)
-    // Let's assume the slider values represent 0.1mm (so slider value 10 = 1mm).
-    // Then physical offset in mm is (sliderValue / 10).
     const offsetMm = rawOffset / 10;
     const lazyRadiusMm = rawLazyRadius / 10;
 
@@ -3115,17 +3120,32 @@ function generateCutLineAsync(polygons, rawOffset, rawLazyRadius = 0) {
 
     const messageId = ++currentOffsetMessageId;
 
+    let timeoutId;
     const handleMessage = function (e) {
       if (e.data.messageId !== messageId) return; // Ignore old messages
+      clearTimeout(timeoutId);
       offsetWorker.removeEventListener("message", handleMessage);
 
       if (e.data.success) {
         console.log("BROWSER LOG: offsetWorker SUCCESS:", e.data.workerLogs);
         resolve(e.data.cutline);
       } else {
-        reject(new Error(e.data.error));
+        console.warn("offsetWorker error, using sync fallback:", e.data.error);
+        resolve(generateCutLine(polygons, rawOffset, rawLazyRadius));
       }
     };
+
+    // Safety timeout: fall back to synchronous calculation if worker takes > 2500ms
+    timeoutId = setTimeout(() => {
+      offsetWorker.removeEventListener("message", handleMessage);
+      console.warn("offsetWorker timed out, executing synchronous cutline fallback");
+      try {
+        const fallback = generateCutLine(polygons, rawOffset, rawLazyRadius);
+        resolve(fallback);
+      } catch (err) {
+        reject(err);
+      }
+    }, 2500);
 
     offsetWorker.addEventListener("message", handleMessage);
 
@@ -4911,70 +4931,171 @@ function handleGenerateCutline(skipPrompt = false) {
       }
     }
 
-    traceWorker.onmessage = function (e) {
-      console.log("Trace worker message received:", e.data.success);
-      if (!e.data.success) {
-        console.error("Trace error: ", e.data.error);
+    let traceTimeout = setTimeout(() => {
+      console.warn("traceWorker timed out, using fallback cutline");
+      const fallbackPoly = [
+        [
+          { x: 0, y: 0 },
+          { x: logicalCanvasWidth, y: 0 },
+          { x: logicalCanvasWidth, y: logicalCanvasHeight },
+          { x: 0, y: logicalCanvasHeight },
+        ],
+      ];
+      activeBase.rasterCutlinePoly = fallbackPoly;
+      activeBase.currentCutline = fallbackPoly;
+      currentBounds = getPolygonsBounds(fallbackPoly);
+      redrawAll();
+      calculateAndUpdatePrice();
+      updateEditingButtonsState(false);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
       }
-      if (e.data.success) {
-        let contours = e.data.contours;
+      hideCanvasLoading();
+    }, 4000);
 
-        // Filter contours to remove noise (e.g. area < 400 pixels)
-        // Bolt Optimization: Use a dynamic threshold based on image size to filter noise spots (islands)
-        // INCREASED threshold to 0.02% to aggressively filter alpha noise spots before they are magnified by offset, but still allow small flames.
-        const imageArea = sourceWidth * sourceHeight;
-        const minIslandArea = Math.max(100, imageArea * 0.0002);
-        // Bolt Optimization: Simplify FIRST to reduce points for topological checks (isPointInPolygon)
-        // This changes O(N*M) check to O(N*m) where m << M.
-        // INCREASED epsilon to 1.5 to smooth out fractal/jagged edges on soft alpha gradients.
-        let significantContours = contours
-          .filter((c) => getPolygonArea(c) > minIslandArea)
-          .map((c) => simplifyPolygon(c, 1.5));
+    traceWorker.onmessage = function (e) {
+      clearTimeout(traceTimeout);
+      console.log("Trace worker message received:", e.data.success);
+      try {
+        if (!e.data.success) {
+          console.error("Trace error: ", e.data.error);
+        }
+        if (e.data.success) {
+          let contours = e.data.contours;
 
-        // Suppress "island cuts" (internal holes) that are larger than 2mm.
-        // Constraint: "we can have internal cuts, but they should be less than 2mm"
-        // Interpretation: Keep internal cuts <= 2mm. Remove internal cuts > 2mm.
-        if (significantContours.length > 0) {
-          const selectedResolutionId =
-            stickerResolutionSelect && stickerResolutionSelect.value
-              ? stickerResolutionSelect.value
-              : "dpi_300";
-          const selectedResolution =
-            pricingConfig && pricingConfig.resolutions
-              ? pricingConfig.resolutions.find(
-                  (r) => r.id === selectedResolutionId,
-                )
-              : null;
+          // Filter contours to remove noise (e.g. area < 400 pixels)
+          const imageArea = sourceWidth * sourceHeight;
+          const minIslandArea = Math.max(100, imageArea * 0.0002);
+          let significantContours = (contours || [])
+            .filter((c) => getPolygonArea(c) > minIslandArea)
+            .map((c) => simplifyPolygon(c, 1.5));
 
-          const ppi = selectedResolution ? selectedResolution.ppi : 300;
-          // Calculate 2mm in pixels for max hole size
-          let maxAllowedHoleSize = (2 / 25.4) * ppi;
-          // Calculate 0.5mm in pixels for min hole size (noise floor)
-          const minAllowedHoleSize = (0.5 / 25.4) * ppi;
+          // Suppress "island cuts" (internal holes) that are larger than 2mm.
+          if (significantContours.length > 0) {
+            const selectedResolutionId =
+              stickerResolutionSelect && stickerResolutionSelect.value
+                ? stickerResolutionSelect.value
+                : "dpi_300";
+            const selectedResolution =
+              pricingConfig && pricingConfig.resolutions
+                ? pricingConfig.resolutions.find(
+                    (r) => r.id === selectedResolutionId,
+                  )
+                : null;
 
-          if (lazyLassoRadius >= 50) {
-            maxAllowedHoleSize = -1;
+            const ppi = selectedResolution ? selectedResolution.ppi : 300;
+            let maxAllowedHoleSize = (2 / 25.4) * ppi;
+            const minAllowedHoleSize = (0.5 / 25.4) * ppi;
+
+            if (lazyLassoRadius >= 50) {
+              maxAllowedHoleSize = -1;
+            }
+
+            significantContours = filterInternalContours(
+              significantContours,
+              maxAllowedHoleSize,
+              minAllowedHoleSize,
+            );
           }
 
-          significantContours = filterInternalContours(
-            significantContours,
-            maxAllowedHoleSize,
-            minAllowedHoleSize,
-          );
-        }
+          if (significantContours.length === 0) {
+            if (selectedShape === "circle" || selectedShape === "square") {
+              significantContours = [
+                [
+                  { x: 0, y: 0 },
+                  { x: logicalCanvasWidth, y: 0 },
+                  { x: logicalCanvasWidth, y: logicalCanvasHeight },
+                  { x: 0, y: logicalCanvasHeight },
+                ],
+              ];
+            } else {
+              ctx.putImageData(originalCanvasData, 0, 0);
+              showNotification(
+                "Could not detect a usable outline. Try an image with a transparent background.",
+                "error",
+              );
+              if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+              }
+              hideCanvasLoading();
+              return;
+            }
+          }
 
-        if (significantContours.length === 0) {
           if (selectedShape === "circle" || selectedShape === "square") {
-            // Fallback to full image bounds for basic shapes if trace fails (e.g. non-transparent image)
-            significantContours = [
-              [
-                { x: 0, y: 0 },
-                { x: logicalCanvasWidth, y: 0 },
-                { x: logicalCanvasWidth, y: logicalCanvasHeight },
-                { x: 0, y: logicalCanvasHeight },
-              ],
-            ];
-          } else {
+            let minX = Infinity,
+              maxX = -Infinity,
+              minY = Infinity,
+              maxY = -Infinity;
+            significantContours.forEach((c) => {
+              c.forEach((p) => {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+              });
+            });
+
+            const hw = (maxX - minX) / 2;
+            const hh = (maxY - minY) / 2;
+            const cx = minX + hw;
+            const cy = minY + hh;
+            let poly = [];
+
+            if (selectedShape === "circle") {
+              const r = Math.sqrt(hw * hw + hh * hh);
+              const steps = 64;
+              for (let i = 0; i < steps; i++) {
+                const theta = (i / steps) * 2 * Math.PI;
+                poly.push({
+                  x: cx + r * Math.cos(theta),
+                  y: cy + r * Math.sin(theta),
+                });
+              }
+            } else {
+              poly = [
+                { x: minX, y: minY },
+                { x: maxX, y: minY },
+                { x: maxX, y: maxY },
+                { x: minX, y: maxY },
+              ];
+            }
+            significantContours = [poly];
+          }
+
+          const scale = 100;
+          const finalContours = [];
+
+          significantContours.forEach((contour) => {
+            const smoothedContour =
+              selectedShape === "square" ? contour : smoothPolygon(contour, 3);
+
+            const scaledPoly = new Array(smoothedContour.length);
+            for (let j = 0; j < smoothedContour.length; j++) {
+              const p = smoothedContour[j];
+              scaledPoly[j] = {
+                X: Math.round(p.x * scale),
+                Y: Math.round(p.y * scale),
+              };
+            }
+            const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(
+              scaledPoly,
+              0.1,
+            );
+
+            if (cleanedScaledPoly && cleanedScaledPoly.length >= 3) {
+              const newPoly = new Array(cleanedScaledPoly.length);
+              for (let j = 0; j < cleanedScaledPoly.length; j++) {
+                const p = cleanedScaledPoly[j];
+                newPoly[j] = { x: p.X / scale, y: p.Y / scale };
+              }
+              finalContours.push(newPoly);
+            }
+          });
+
+          if (finalContours.length === 0) {
             ctx.putImageData(originalCanvasData, 0, 0);
             showNotification(
               "Could not detect a usable outline. Try an image with a transparent background.",
@@ -4987,196 +5108,101 @@ function handleGenerateCutline(skipPrompt = false) {
             hideCanvasLoading();
             return;
           }
-        }
 
-        if (selectedShape === "circle" || selectedShape === "square") {
-          let minX = Infinity,
-            maxX = -Infinity,
-            minY = Infinity,
-            maxY = -Infinity;
-          significantContours.forEach((c) => {
-            c.forEach((p) => {
-              if (p.x < minX) minX = p.x;
-              if (p.x > maxX) maxX = p.x;
-              if (p.y < minY) minY = p.y;
-              if (p.y > maxY) maxY = p.y;
+          const rasterCutlineOutput = new Array(finalContours.length);
+          for (let i = 0; i < finalContours.length; i++) {
+            const poly = finalContours[i];
+            const newPoly = new Array(poly.length);
+            for (let j = 0; j < poly.length; j++) {
+              const p = poly[j];
+              newPoly[j] = { x: p.x / dpr, y: p.y / dpr };
+            }
+            rasterCutlineOutput[i] = newPoly;
+          }
+
+          rasterCutlineOutput.sort(
+            (a, b) => getPolygonArea(b) - getPolygonArea(a),
+          );
+          activeBase.rasterCutlinePoly = rasterCutlineOutput.slice(0, 50);
+
+          let curRadius =
+            lazyLassoSlider && lazyLassoSlider.value
+              ? parseInt(lazyLassoSlider.value, 10)
+              : 50;
+          let currentOffset = cutlineOffset;
+          if (cutlineOffsetSlider && cutlineOffsetSlider.value) {
+            const step = parseInt(cutlineOffsetSlider.value, 10);
+            if (step === 0) currentOffset = 0;
+            else if (step === 1) currentOffset = 15;
+            else if (step === 2) currentOffset = 35;
+          }
+
+          console.log("Sending to generateCutLineAsync");
+          generateCutLineAsync(
+            activeBase.rasterCutlinePoly,
+            currentOffset,
+            curRadius,
+          )
+            .then((cutline) => {
+              activeBase.currentCutline = cutline;
+              currentBounds = getPolygonsBounds(cutline);
+              redrawAll();
+              calculateAndUpdatePrice();
+              updateEditingButtonsState(false);
+              const generateCutlineBtn =
+                document.getElementById("generateCutlineBtn");
+              if (generateCutlineBtn) {
+                generateCutlineBtn.disabled = false;
+                generateCutlineBtn.classList.remove(
+                  "opacity-50",
+                  "cursor-not-allowed",
+                );
+                generateCutlineBtn.innerHTML = "Generate Smart Cutline";
+              }
+              if (!skipPrompt) {
+                showNotification(
+                  "Smart cutline generated successfully.",
+                  "success",
+                );
+              }
+              hideCanvasLoading();
+            })
+            .catch((err) => {
+              console.error("generateCutLineAsync failed:", err);
+              showNotification(`Error: ${err.message}`, "error");
+              updateEditingButtonsState(false);
+              const generateCutlineBtn =
+                document.getElementById("generateCutlineBtn");
+              if (generateCutlineBtn) {
+                generateCutlineBtn.disabled = false;
+                generateCutlineBtn.classList.remove(
+                  "opacity-50",
+                  "cursor-not-allowed",
+                );
+                generateCutlineBtn.innerHTML = "Generate Smart Cutline";
+              }
+              hideCanvasLoading();
             });
-          });
-
-          const hw = (maxX - minX) / 2;
-          const hh = (maxY - minY) / 2;
-          const cx = minX + hw;
-          const cy = minY + hh;
-          let poly = [];
-
-          if (selectedShape === "circle") {
-            const r = Math.sqrt(hw * hw + hh * hh);
-            const steps = 64;
-            for (let i = 0; i < steps; i++) {
-              const theta = (i / steps) * 2 * Math.PI;
-              poly.push({
-                x: cx + r * Math.cos(theta),
-                y: cy + r * Math.sin(theta),
-              });
-            }
-          } else {
-            poly = [
-              { x: minX, y: minY },
-              { x: maxX, y: minY },
-              { x: maxX, y: maxY },
-              { x: minX, y: maxY },
-            ];
-          }
-          significantContours = [poly];
-        }
-
-        const scale = 100;
-        const finalContours = [];
-
-        significantContours.forEach((contour) => {
-          // Bolt Optimization: Apply smoothing to round sharp corners ("surface energy minimization")
-          // 3 iterations of Chaikin's algorithm gives nice rounded corners without adding too many vertices
-          // Note: contour is already simplified.
-          // Don't apply heavy smoothing to square shape, let the offset algorithm handle its natural corner rounding.
-          const smoothedContour =
-            selectedShape === "square" ? contour : smoothPolygon(contour, 3);
-
-          // Clean the polygon to remove self-intersections and other issues before offsetting.
-          // This requires scaling up for Clipper's integer math.
-          // Bolt Optimization: Pre-allocate array and use for-loop instead of .map() to reduce GC pressure
-          const scaledPoly = new Array(smoothedContour.length);
-          for (let j = 0; j < smoothedContour.length; j++) {
-            const p = smoothedContour[j];
-            scaledPoly[j] = {
-              X: Math.round(p.x * scale),
-              Y: Math.round(p.y * scale),
-            };
-          }
-          const cleanedScaledPoly = ClipperLib.Clipper.CleanPolygon(
-            scaledPoly,
-            0.1,
-          );
-
-          // Add validation to ensure we have a usable polygon AFTER cleaning
-          if (cleanedScaledPoly && cleanedScaledPoly.length >= 3) {
-            // Bolt Optimization: Pre-allocate array and use for-loop instead of .map()
-            const newPoly = new Array(cleanedScaledPoly.length);
-            for (let j = 0; j < cleanedScaledPoly.length; j++) {
-              const p = cleanedScaledPoly[j];
-              newPoly[j] = { x: p.X / scale, y: p.Y / scale };
-            }
-            finalContours.push(newPoly);
-          }
-        });
-
-        if (finalContours.length === 0) {
+        } else {
           ctx.putImageData(originalCanvasData, 0, 0);
-          showNotification(
-            "Could not detect a usable outline. Try an image with a transparent background.",
-            "error",
-          );
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
+          showNotification(`Error: ${e.data.error}`, "error");
+          console.error(e.data.error);
+
+          updateEditingButtonsState(false);
+          const generateCutlineBtn =
+            document.getElementById("generateCutlineBtn");
+          if (generateCutlineBtn) {
+            generateCutlineBtn.disabled = false;
+            generateCutlineBtn.classList.remove(
+              "opacity-50",
+              "cursor-not-allowed",
+            );
+            generateCutlineBtn.innerHTML = "Generate Smart Cutline";
           }
           hideCanvasLoading();
-          return;
         }
-
-        // Set the raster cutline polygon (Overlay Mode)
-        // Bolt Optimization: Replace nested .map() with pre-allocated arrays and for-loops
-        const rasterCutlineOutput = new Array(finalContours.length);
-        for (let i = 0; i < finalContours.length; i++) {
-          const poly = finalContours[i];
-          const newPoly = new Array(poly.length);
-          for (let j = 0; j < poly.length; j++) {
-            const p = poly[j];
-            newPoly[j] = { x: p.x / dpr, y: p.y / dpr };
-          }
-          rasterCutlineOutput[i] = newPoly;
-        }
-
-        // Safeguard: Limit to top 50 largest polygons to prevent ClipperLib freezes
-        rasterCutlineOutput.sort(
-          (a, b) => getPolygonArea(b) - getPolygonArea(a),
-        );
-        activeBase.rasterCutlinePoly = rasterCutlineOutput.slice(0, 50);
-
-        // Set the offset according to the current UI value before redraw
-        let curRadius =
-          lazyLassoSlider && lazyLassoSlider.value
-            ? parseInt(lazyLassoSlider.value, 10)
-            : 50;
-        let currentOffset = cutlineOffset;
-        if (cutlineOffsetSlider && cutlineOffsetSlider.value) {
-          const step = parseInt(cutlineOffsetSlider.value, 10);
-          if (step === 0) currentOffset = 0;
-          else if (step === 1) currentOffset = 15;
-          else if (step === 2) currentOffset = 35;
-        }
-
-        console.log("Sending to generateCutLineAsync");
-        generateCutLineAsync(
-          activeBase.rasterCutlinePoly,
-          currentOffset,
-          curRadius,
-        )
-          .then((cutline) => {
-            activeBase.currentCutline = cutline;
-            currentBounds = getPolygonsBounds(cutline);
-            redrawAll();
-            calculateAndUpdatePrice();
-            updateEditingButtonsState(false);
-            const generateCutlineBtn =
-              document.getElementById("generateCutlineBtn");
-            if (generateCutlineBtn) {
-              generateCutlineBtn.disabled = false;
-              generateCutlineBtn.classList.remove(
-                "opacity-50",
-                "cursor-not-allowed",
-              );
-              generateCutlineBtn.innerHTML = "Generate Smart Cutline";
-            }
-            if (!skipPrompt) {
-              showNotification(
-                "Smart cutline generated successfully.",
-                "success",
-              );
-            }
-            hideCanvasLoading();
-          })
-          .catch((err) => {
-            console.error("generateCutLineAsync failed:", err);
-            showNotification(`Error: ${err.message}`, "error");
-            updateEditingButtonsState(false);
-            const generateCutlineBtn =
-              document.getElementById("generateCutlineBtn");
-            if (generateCutlineBtn) {
-              generateCutlineBtn.disabled = false;
-              generateCutlineBtn.classList.remove(
-                "opacity-50",
-                "cursor-not-allowed",
-              );
-              generateCutlineBtn.innerHTML = "Generate Smart Cutline";
-            }
-            hideCanvasLoading();
-          });
-      } else {
-        ctx.putImageData(originalCanvasData, 0, 0);
-        showNotification(`Error: ${e.data.error}`, "error");
-        console.error(e.data.error);
-
-        updateEditingButtonsState(false);
-        const generateCutlineBtn =
-          document.getElementById("generateCutlineBtn");
-        if (generateCutlineBtn) {
-          generateCutlineBtn.disabled = false;
-          generateCutlineBtn.classList.remove(
-            "opacity-50",
-            "cursor-not-allowed",
-          );
-          generateCutlineBtn.innerHTML = "Generate Smart Cutline";
-        }
+      } catch (innerErr) {
+        console.error("Error processing trace result:", innerErr);
         hideCanvasLoading();
       }
     };
@@ -5201,6 +5227,7 @@ function handleGenerateCutline(skipPrompt = false) {
       generateCutlineBtn.classList.remove("opacity-50", "cursor-not-allowed");
       generateCutlineBtn.innerHTML = "Generate Smart Cutline";
     }
+    hideCanvasLoading();
   }
 }
 

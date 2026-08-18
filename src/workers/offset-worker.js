@@ -50,26 +50,35 @@ self.addEventListener("message", function (e) {
     // Apply a small positive offset for lasso logic if needed
     let initialPolygons = scaledPolygons;
     if (lassoRadius && lassoRadius > 0) {
-      const tempCo = new ClipperLib.ClipperOffset();
-      const tempPaths = new ClipperLib.Paths();
-      tempCo.AddPaths(
-        scaledPolygons,
-        ClipperLib.JoinType.jtSquare,
-        ClipperLib.EndType.etClosedPolygon,
-      );
-      const r = Math.max(1, Math.round(lassoRadius * scale));
-      tempCo.Execute(tempPaths, r);
+      try {
+        const tempCo = new ClipperLib.ClipperOffset();
+        const tempPaths = new ClipperLib.Paths();
+        tempCo.AddPaths(
+          scaledPolygons,
+          ClipperLib.JoinType.jtSquare,
+          ClipperLib.EndType.etClosedPolygon,
+        );
+        const r = Math.max(1, Math.round(lassoRadius * scale));
+        tempCo.Execute(tempPaths, r);
 
-      const tempCo2 = new ClipperLib.ClipperOffset();
-      const tempPaths2 = new ClipperLib.Paths();
-      tempCo2.AddPaths(
-        tempPaths,
-        ClipperLib.JoinType.jtSquare,
-        ClipperLib.EndType.etClosedPolygon,
-      );
-      tempCo2.Execute(tempPaths2, -r);
+        if (tempPaths && tempPaths.length > 0) {
+          const tempCo2 = new ClipperLib.ClipperOffset();
+          const tempPaths2 = new ClipperLib.Paths();
+          tempCo2.AddPaths(
+            tempPaths,
+            ClipperLib.JoinType.jtSquare,
+            ClipperLib.EndType.etClosedPolygon,
+          );
+          tempCo2.Execute(tempPaths2, -r);
 
-      initialPolygons = tempPaths2;
+          if (tempPaths2 && tempPaths2.length > 0) {
+            initialPolygons = tempPaths2;
+          }
+        }
+      } catch (e) {
+        console.warn("Lasso pre-offset error:", e);
+        initialPolygons = scaledPolygons;
+      }
     }
 
     if (isNegativeOffset) {
@@ -90,13 +99,14 @@ self.addEventListener("message", function (e) {
 
     co.Execute(offsetPolygons, Math.round(offsetAmount * scale));
 
+    const pathsToConvert = (offsetPolygons && offsetPolygons.length > 0) ? offsetPolygons : initialPolygons;
     const finalCutline = [];
-    for (let i = 0; i < offsetPolygons.length; i++) {
-      const path = new Array(offsetPolygons[i].length);
-      for (let j = 0; j < offsetPolygons[i].length; j++) {
+    for (let i = 0; i < pathsToConvert.length; i++) {
+      const path = new Array(pathsToConvert[i].length);
+      for (let j = 0; j < pathsToConvert[i].length; j++) {
         path[j] = {
-          x: offsetPolygons[i][j].X / scale,
-          y: offsetPolygons[i][j].Y / scale,
+          x: pathsToConvert[i][j].X / scale,
+          y: pathsToConvert[i][j].Y / scale,
         };
       }
 
@@ -105,7 +115,7 @@ self.addEventListener("message", function (e) {
       }
     }
 
-    const workerLogs = `offset-worker input polygons length: ${polygons.length}, offsetPolygons length: ${offsetPolygons.length}, offsetAmount: ${offsetAmount}, scale: ${scale}`;
+    const workerLogs = `offset-worker input polygons length: ${polygons.length}, offsetPolygons length: ${finalCutline.length}, offsetAmount: ${offsetAmount}, scale: ${scale}`;
 
     postMessage({ success: true, messageId: messageId, cutline: finalCutline, workerLogs: workerLogs });
   } catch (error) {

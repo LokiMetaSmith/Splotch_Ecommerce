@@ -151,6 +151,8 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
       const startPos = { x: startX, y: startY };
       let lastDirection = 6; // Start checking from 6 (West)
       let foundNext = false;
+      const maxSteps = Math.max(1000, width * height * 2);
+      let stepCount = 0;
 
       do {
         contour.push({ x: cx / scaleFactor, y: cy / scaleFactor });
@@ -174,6 +176,8 @@ function traceContours(imageData, sensitivity = 50, scaleFactor = 1) {
         }
 
         if (!foundNext) break;
+        stepCount++;
+        if (stepCount > maxSteps) break;
       } while (cx !== startPos.x || cy !== startPos.y);
 
       return contour;
