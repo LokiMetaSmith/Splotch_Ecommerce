@@ -208,7 +208,7 @@ const signInstanceToken = () => {
 let db;
 let app;
 
-const defaultData = { orders: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
+const defaultData = { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
 
 // Define an async function to contain all server logic
 async function startServer(
@@ -1744,6 +1744,127 @@ async function startServer(
           res.status(200).json({ success: true, order: order });
       } catch (error) {
         await logAndEmailError(error, 'Error updating order status');
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+
+    app.post('/api/admin/batches', authenticateToken, [
+      body('orderIds').isArray().notEmpty().withMessage('orderIds array is required'),
+      body('status').optional().isString(),
+    ], async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      if (!await isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+
+      const { orderIds, status } = req.body;
+      const batchId = 'batch-' + crypto.randomUUID().substring(0, 8);
+
+      const newBatch = {
+        batchId,
+        orderIds,
+        status: status || 'NESTED',
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        await db.createBatch(newBatch);
+        res.status(201).json({ success: true, batch: newBatch });
+      } catch (error) {
+        await logAndEmailError(error, 'Error creating batch');
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+
+    app.get('/api/admin/batches/:batchId', authenticateToken, async (req, res) => {
+      if (!await isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+
+      try {
+        const batch = await db.getBatch(req.params.batchId);
+        if (!batch) {
+          return res.status(404).json({ error: 'Batch not found.' });
+        }
+        res.status(200).json({ batch });
+      } catch (error) {
+        await logAndEmailError(error, 'Error fetching batch');
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+
+    app.post('/api/admin/batches/:batchId/status', authenticateToken, [
+      body('status').notEmpty().withMessage('status is required').isIn(VALID_STATUSES).withMessage('Invalid status'),
+    ], async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      if (!await isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+
+      const { status } = req.body;
+      const { batchId } = req.params;
+
+      try {
+        const batch = await db.getBatch(batchId);
+        if (!batch) {
+          return res.status(404).json({ error: 'Batch not found.' });
+        }
+
+        batch.status = status;
+        await db.updateBatch(batch);
+
+        const updatedOrders = [];
+        await Promise.all(batch.orderIds.map(async (orderId) => {
+          const order = await db.getOrder(orderId);
+          if (order) {
+            order.status = status;
+            order.lastUpdatedAt = new Date().toISOString();
+            await db.updateOrder(order);
+            updatedOrders.push(order);
+          }
+        }));
+
+        res.status(200).json({ success: true, batch, updatedOrdersCount: updatedOrders.length });
+      } catch (error) {
+        await logAndEmailError(error, 'Error updating batch status');
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+
+    app.get('/api/admin/scan/:identifier', authenticateToken, async (req, res) => {
+      if (!await isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      }
+
+      const { identifier } = req.params;
+
+      try {
+        // Try as batch first
+        if (identifier.startsWith('batch-')) {
+            const batch = await db.getBatch(identifier);
+            if (batch) {
+                return res.status(200).json({ type: 'batch', data: batch });
+            }
+        }
+
+        // Try as order
+        const order = await db.getOrder(identifier);
+        if (order) {
+            return res.status(200).json({ type: 'order', data: order });
+        }
+
+        res.status(404).json({ error: 'Entity not found.' });
+
+      } catch (error) {
+        await logAndEmailError(error, 'Error scanning identifier');
         res.status(500).json({ error: 'Internal Server Error' });
       }
     });

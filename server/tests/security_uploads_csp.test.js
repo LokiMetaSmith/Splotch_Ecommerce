@@ -32,7 +32,7 @@ describe('Security: Uploads CSP', () => {
 
     // Mock DB (minimal)
     const mockLowDb = {
-        data: { orders: {}, users: {}, credentials: {}, config: {}, products: {}, emailIndex: {} },
+        data: { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {}, emailIndex: {} },
         write: async () => {},
         read: async () => {}
     };

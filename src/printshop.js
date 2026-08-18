@@ -1531,15 +1531,29 @@ async function handleNesting(e) {
         throw new Error("No nested SVG sheets were generated.");
     }
 
-    // Generate a 6-digit Cut File ID (like 100018)
-    const cutFileId = Math.floor(100000 + Math.random() * 900000).toString();
-    window.currentCutFileId = cutFileId; // Save for download button
+    // Create a batch on the backend to link these orders
+    const orderIdsToBatch = Array.from(new Set(checkedCheckboxes.map(cb => cb.dataset.orderId || cb.value)));
+    let batchId = Math.floor(100000 + Math.random() * 900000).toString(); // Fallback if API fails
+
+    try {
+      const res = await fetchWithAuth(`${serverUrl}/api/admin/batches`, {
+        method: "POST",
+        body: JSON.stringify({ orderIds: orderIdsToBatch, status: "PRINTING" }),
+      });
+      if (res && res.batch && res.batch.batchId) {
+        batchId = res.batch.batchId;
+      }
+    } catch (e) {
+      console.error("Failed to create batch on backend, falling back to local ID.", e);
+    }
+
+    window.currentCutFileId = batchId; // Save for download button
     window.nestedSvgs = [];
     ui.nestedSvgContainer.innerHTML = '';
 
     for (let sheetIndex = 0; sheetIndex < resultSvgs.length; sheetIndex++) {
         const resultSvg = resultSvgs[sheetIndex];
-        const trackingCode = `${cutFileId}-${sheetIndex + 1}~`;
+        const trackingCode = `${batchId}-${sheetIndex + 1}~`;
 
         // 4. Inject Printing Marks & QR Codes into SVG
         const domParser = new DOMParser();

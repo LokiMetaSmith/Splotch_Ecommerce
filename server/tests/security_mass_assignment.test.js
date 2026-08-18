@@ -38,7 +38,7 @@ describe('Security: Mass Assignment in Create Order', () => {
 
   beforeAll(async () => {
     // Mock DB
-    const data = { orders: {}, users: {}, credentials: {}, config: {}, products: {} };
+    const data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, products: {} };
     db = {
       data: data,
       write: async () => { },
@@ -65,7 +65,7 @@ describe('Security: Mass Assignment in Create Order', () => {
   });
 
   beforeEach(async () => {
-    db.data = { orders: {}, users: {}, credentials: {}, config: {}, emailIndex: {}, products: {} };
+    db.data = { orders: {}, batches: {}, users: {}, credentials: {}, config: {}, emailIndex: {}, products: {} };
     mockSendEmail.mockClear();
     mockSquareClient.payments.create.mockClear();
   });
