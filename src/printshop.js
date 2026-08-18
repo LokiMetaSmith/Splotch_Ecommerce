@@ -2125,7 +2125,9 @@ export async function init() {
     "connection-status-text",
     "login-form",
     "pricing-editor-container",
-    "save-pricing-btn"
+    "save-pricing-btn",
+    "reload-pricing-btn",
+    "copy-pricing-btn"
   ];
   ids.forEach((id) => {
     // Convert kebab-case to camelCase for keys
@@ -2158,6 +2160,16 @@ export async function init() {
   ui.exportPdfBtn?.addEventListener("click", handleExportPdf);
   ui.searchBtn?.addEventListener("click", handleSearch);
   ui.savePricingBtn?.addEventListener("click", savePricingConfig);
+  ui.reloadPricingBtn?.addEventListener("click", () => {
+    loadPricingConfigEditor();
+    showSuccessToast("Pricing reloaded from server.");
+  });
+  ui.copyPricingBtn?.addEventListener("click", () => {
+    if (currentPricingConfig) {
+      navigator.clipboard?.writeText(JSON.stringify(currentPricingConfig, null, 2));
+      showSuccessToast("Pricing JSON copied to clipboard!");
+    }
+  });
 
   ui.previewCutlinesToggle?.addEventListener("change", (e) => {
     if (e.target.checked) {
@@ -2374,153 +2386,543 @@ let currentPricingConfig = {};
 
 async function loadPricingConfigEditor() {
   if (!ui.pricingEditorContainer) return;
-  ui.pricingEditorContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Loading pricing configuration...</p>';
+  ui.pricingEditorContainer.innerHTML =
+    '<p class="text-gray-500 text-center py-4">Loading pricing configuration...</p>';
   try {
     const config = await fetchWithAuth(`${serverUrl}/api/pricing-info`);
     currentPricingConfig = config;
     renderPricingEditor(currentPricingConfig);
   } catch (err) {
-    ui.pricingEditorContainer.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+    ui.pricingEditorContainer.innerHTML = `<p class="text-red-500 text-center py-4">Error loading pricing: ${err.message}</p>`;
   }
 }
 
 function renderPricingEditor(config) {
+  if (!ui.pricingEditorContainer) return;
+
+  const resolutions = config.resolutions || [];
+  const materials = config.materials || [];
+  const layers = config.layers || [];
+  const complexity = config.complexity || { perLayerMultiplier: 0.1, tiers: [] };
+  const quantityDiscounts = config.quantityDiscounts || [];
+
   let html = `
-    <div class="space-y-4">
-      <div>
-        <label class="block font-bold mb-1">Base Price per Square Inch (Cents)</label>
-        <input type="number" id="pricing-base-price" class="w-full p-2 border rounded-md" value="${config.pricePerSquareInchCents || 0}">
+    <div class="space-y-6 text-gray-800">
+      <!-- Base Price Card -->
+      <div class="bg-slate-50 border border-slate-200 p-4 rounded-lg">
+        <label class="block font-bold text-sm text-gray-700 mb-1">Base Price per Square Inch (Cents)</label>
+        <div class="flex items-center gap-3">
+          <input type="number" step="0.1" min="0" id="pricing-base-price" class="w-48 p-2 border border-gray-300 rounded-md font-semibold text-lg" value="${config.pricePerSquareInchCents || 0}">
+          <span class="text-sm text-gray-500 font-medium">cents / sq inch (e.g. 13 = $0.13)</span>
+        </div>
       </div>
 
-      <!-- Resolutions -->
-      <div class="border p-4 rounded-md bg-gray-50">
-        <h4 class="font-bold mb-2">Resolutions</h4>
+      <!-- Resolutions Section -->
+      <div class="border border-gray-200 p-4 rounded-lg bg-white shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h4 class="font-bold text-base text-splotch-navy">Resolutions & PPI</h4>
+            <p class="text-xs text-gray-500">Output resolutions selectable by customers with respective cost multipliers.</p>
+          </div>
+          <button type="button" id="add-res-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Resolution</button>
+        </div>
         <div id="pricing-resolutions-list" class="space-y-2">
-          ${(config.resolutions || []).map((r, i) => `
-            <div class="flex gap-2 items-center resolution-row">
-              <input type="text" placeholder="ID" class="p-1 border rounded w-24 res-id" value="${escapeHtml(r.id)}">
-              <input type="text" placeholder="Name" class="p-1 border rounded flex-grow res-name" value="${escapeHtml(r.name)}">
-              <input type="number" placeholder="PPI" class="p-1 border rounded w-20 res-ppi" value="${r.ppi}">
-              <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 res-mult" value="${r.costMultiplier}">
-              <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+          ${resolutions.map((r) => `
+            <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center resolution-row bg-gray-50 p-2 rounded border border-gray-200">
+              <input type="text" placeholder="ID (e.g. dpi_300)" class="p-1.5 text-xs border rounded w-32 res-id font-mono" value="${escapeHtml(r.id)}">
+              <input type="text" placeholder="Display Name" class="p-1.5 text-xs border rounded flex-grow res-name font-medium" value="${escapeHtml(r.name)}">
+              <div class="flex items-center gap-1">
+                <span class="text-xs text-gray-400 font-mono">PPI:</span>
+                <input type="number" min="1" placeholder="PPI" class="p-1.5 text-xs border rounded w-20 res-ppi" value="${r.ppi}">
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="text-xs text-gray-400 font-mono">Mult:</span>
+                <input type="number" step="0.05" min="0" placeholder="Multiplier" class="p-1.5 text-xs border rounded w-20 res-mult" value="${r.costMultiplier}">
+              </div>
+              <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Resolution">&times;</button>
             </div>
-          `).join('')}
+          `).join("")}
         </div>
-        <button type="button" id="add-res-btn" class="mt-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">Add Resolution</button>
       </div>
 
-      <!-- Materials -->
-      <div class="border p-4 rounded-md bg-gray-50">
-        <h4 class="font-bold mb-2">Materials</h4>
-        <div id="pricing-materials-list" class="space-y-2">
-          ${(config.materials || []).map((m, i) => `
-            <div class="border p-2 bg-white rounded material-row space-y-2">
-              <div class="flex gap-2 items-center">
-                <input type="text" placeholder="ID" class="p-1 border rounded w-32 mat-id" value="${escapeHtml(m.id)}">
-                <input type="text" placeholder="Name" class="p-1 border rounded flex-grow mat-name" value="${escapeHtml(m.name)}">
-                <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 mat-mult" value="${m.costMultiplier}">
-                <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
-              </div>
-              <input type="text" placeholder="Supported Layers (comma separated)" class="w-full p-1 border rounded text-sm mat-layers" value="${escapeHtml((m.supportedLayers || []).join(', '))}">
-              <input type="text" placeholder="Description" class="w-full p-1 border rounded text-sm mat-desc" value="${escapeHtml(m.description || '')}">
-            </div>
-          `).join('')}
+      <!-- Materials Section -->
+      <div class="border border-gray-200 p-4 rounded-lg bg-white shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h4 class="font-bold text-base text-splotch-navy">Materials & Vinyl Types</h4>
+            <p class="text-xs text-gray-500">Supported substrate finishes and compatible specialty print inks.</p>
+          </div>
+          <button type="button" id="add-mat-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Material</button>
         </div>
-        <button type="button" id="add-mat-btn" class="mt-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">Add Material</button>
-      </div>
-      
-      <!-- Layers -->
-      <div class="border p-4 rounded-md bg-gray-50">
-        <h4 class="font-bold mb-2">Layers</h4>
-        <div id="pricing-layers-list" class="space-y-2">
-          ${(config.layers || []).map((l, i) => `
-            <div class="border p-2 bg-white rounded layer-row space-y-2">
-              <div class="flex gap-2 items-center">
-                <input type="text" placeholder="ID" class="p-1 border rounded w-32 layer-id" value="${escapeHtml(l.id)}">
-                <input type="text" placeholder="Name" class="p-1 border rounded flex-grow layer-name" value="${escapeHtml(l.name)}">
-                <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 layer-mult" value="${l.costMultiplier}">
-                <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+        <div id="pricing-materials-list" class="space-y-3">
+          ${materials.map((m) => `
+            <div class="border border-gray-200 p-3 bg-gray-50 rounded-lg material-row space-y-2">
+              <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+                <input type="text" placeholder="ID (e.g. pp_standard)" class="p-1.5 text-xs border rounded w-36 mat-id font-mono" value="${escapeHtml(m.id)}">
+                <input type="text" placeholder="Material Display Name" class="p-1.5 text-xs border rounded flex-grow mat-name font-medium" value="${escapeHtml(m.name)}">
+                <div class="flex items-center gap-1">
+                  <span class="text-xs text-gray-400 font-mono">Mult:</span>
+                  <input type="number" step="0.05" min="0" placeholder="Multiplier" class="p-1.5 text-xs border rounded w-20 mat-mult" value="${m.costMultiplier}">
+                </div>
+                <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Material">&times;</button>
               </div>
               <div>
-                <label class="text-xs text-gray-500">Subtypes (JSON Array)</label>
-                <textarea class="w-full p-1 border rounded text-sm layer-subtypes font-mono" rows="2">${escapeHtml(l.subTypes ? JSON.stringify(l.subTypes) : '[]')}</textarea>
+                <label class="block text-[11px] font-semibold text-gray-500 mb-0.5">Supported Layers (comma-separated layer types, e.g. white, cmyk, clear, inlay):</label>
+                <input type="text" placeholder="white, cmyk, clear" class="w-full p-1.5 border rounded text-xs mat-layers font-mono bg-white" value="${escapeHtml((m.supportedLayers || []).join(", "))}">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-gray-500 mb-0.5">Description:</label>
+                <input type="text" placeholder="Marketing description shown in tooltip" class="w-full p-1.5 border rounded text-xs mat-desc bg-white" value="${escapeHtml(m.description || "")}">
               </div>
             </div>
-          `).join('')}
+          `).join("")}
         </div>
-        <button type="button" id="add-layer-btn" class="mt-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">Add Layer</button>
       </div>
-      
-      <!-- Complexity & Discounts -->
-      <div class="border p-4 rounded-md bg-gray-50">
-        <h4 class="font-bold mb-2">Complexity & Discounts</h4>
-        <label class="block text-xs text-gray-500">Complexity Config (JSON Object)</label>
-        <textarea id="pricing-complexity" class="w-full p-1 border rounded text-sm mb-2 font-mono" rows="6">${escapeHtml(JSON.stringify(config.complexity, null, 2) || '{}')}</textarea>
-        
-        <label class="block text-xs text-gray-500">Quantity Discounts (JSON Array)</label>
-        <textarea id="pricing-discounts" class="w-full p-1 border rounded text-sm font-mono" rows="6">${escapeHtml(JSON.stringify(config.quantityDiscounts, null, 2) || '[]')}</textarea>
+
+      <!-- Layers & Specialty Inks Section -->
+      <div class="border border-gray-200 p-4 rounded-lg bg-white shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h4 class="font-bold text-base text-splotch-navy">Print Layers & Specialty Inks</h4>
+            <p class="text-xs text-gray-500">Custom ink passes (White underbase, Clear gloss, Inlays) and their optional subtypes.</p>
+          </div>
+          <button type="button" id="add-layer-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Layer</button>
+        </div>
+        <div id="pricing-layers-list" class="space-y-3">
+          ${layers.map((l) => `
+            <div class="border border-gray-200 p-3 bg-gray-50 rounded-lg layer-row space-y-2">
+              <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+                <input type="text" placeholder="ID (e.g. white)" class="p-1.5 text-xs border rounded w-32 layer-id font-mono" value="${escapeHtml(l.id)}">
+                <input type="text" placeholder="Layer Name (e.g. White)" class="p-1.5 text-xs border rounded flex-grow layer-name font-medium" value="${escapeHtml(l.name)}">
+                <div class="flex items-center gap-1">
+                  <span class="text-xs text-gray-400 font-mono">Mult:</span>
+                  <input type="number" step="0.05" min="0" placeholder="Multiplier" class="p-1.5 text-xs border rounded w-20 layer-mult" value="${l.costMultiplier}">
+                </div>
+                <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Layer">&times;</button>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-gray-500 mb-0.5">Subtypes JSON Array (Optional, e.g. [{"id":"holographic","name":"Holographic","costMultiplier":1.0}]):</label>
+                <textarea class="w-full p-1.5 border rounded text-xs layer-subtypes font-mono bg-white" rows="2">${escapeHtml(l.subTypes ? JSON.stringify(l.subTypes) : "[]")}</textarea>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- Cutline Complexity Tiers Section -->
+      <div class="border border-gray-200 p-4 rounded-lg bg-white shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h4 class="font-bold text-base text-splotch-navy">Cutline Complexity</h4>
+            <p class="text-xs text-gray-500">Perimeter-based multiplier tiers and multi-layer packaging penalties.</p>
+          </div>
+          <button type="button" id="add-complexity-tier-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Complexity Tier</button>
+        </div>
+
+        <div class="mb-3">
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Per Additional Sticker/Layer Multiplier Penalty:</label>
+          <input type="number" step="0.01" min="0" id="pricing-per-layer-mult" class="w-36 p-1.5 text-xs border rounded" value="${complexity.perLayerMultiplier || 0.1}">
+        </div>
+
+        <div id="pricing-complexity-list" class="space-y-2">
+          ${(complexity.tiers || []).map((t) => `
+            <div class="flex gap-2 items-center complexity-row bg-gray-50 p-2 rounded border border-gray-200">
+              <span class="text-xs text-gray-500 font-medium">Perimeter up to:</span>
+              <input type="text" placeholder="Inches (e.g. 12 or Infinity)" class="p-1.5 text-xs border rounded w-32 comp-threshold font-mono" value="${t.thresholdInches}">
+              <span class="text-xs text-gray-500 font-medium">inches &rarr; Multiplier:</span>
+              <input type="number" step="0.05" min="0" class="p-1.5 text-xs border rounded w-24 comp-multiplier font-mono" value="${t.multiplier}">
+              <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Tier">&times;</button>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- Quantity Discounts Section -->
+      <div class="border border-gray-200 p-4 rounded-lg bg-white shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h4 class="font-bold text-base text-splotch-navy">Bulk Quantity Discounts</h4>
+            <p class="text-xs text-gray-500">Tiered volume discounts applied automatically during checkout.</p>
+          </div>
+          <button type="button" id="add-discount-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Discount Tier</button>
+        </div>
+        <div id="pricing-discounts-list" class="space-y-2">
+          ${quantityDiscounts.map((d) => `
+            <div class="flex gap-3 items-center discount-row bg-gray-50 p-2 rounded border border-gray-200">
+              <span class="text-xs text-gray-500 font-medium">Min Quantity:</span>
+              <input type="number" min="1" placeholder="Quantity" class="p-1.5 text-xs border rounded w-28 disc-qty font-mono font-bold" value="${d.quantity}">
+              <span class="text-xs text-gray-500 font-medium">&rarr; Discount (%):</span>
+              <input type="number" min="0" max="100" step="1" placeholder="Discount %" class="p-1.5 text-xs border rounded w-24 disc-percent font-mono font-bold text-green-700" value="${Math.round((d.discount || 0) * 100)}">
+              <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200 disc-badge">${Math.round((d.discount || 0) * 100)}% OFF</span>
+              <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn ml-auto" title="Delete Discount Tier">&times;</button>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- Live Pricing Calculator / Sandbox -->
+      <div class="border-2 border-indigo-300 p-5 rounded-lg bg-indigo-50/50 shadow-md">
+        <div class="flex items-center gap-2 mb-4">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+          <h4 class="font-bold text-base text-indigo-900">Live Pricing Sandbox / Simulator</h4>
+        </div>
+        <p class="text-xs text-indigo-700 mb-4">Test your configured formulas and tier multipliers in real time against sample sticker specs:</p>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div>
+            <label class="block text-[11px] font-bold text-indigo-800">Width (Inches):</label>
+            <input type="number" step="0.5" id="sim-width" class="w-full p-1.5 text-xs border rounded bg-white" value="3">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-indigo-800">Height (Inches):</label>
+            <input type="number" step="0.5" id="sim-height" class="w-full p-1.5 text-xs border rounded bg-white" value="3">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-indigo-800">Quantity:</label>
+            <input type="number" min="1" id="sim-qty" class="w-full p-1.5 text-xs border rounded bg-white font-bold" value="100">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-indigo-800">Perimeter (Inches):</label>
+            <input type="number" step="1" id="sim-perimeter" class="w-full p-1.5 text-xs border rounded bg-white" value="12">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div>
+            <label class="block text-[11px] font-bold text-indigo-800">Material:</label>
+            <select id="sim-mat" class="w-full p-1.5 text-xs border rounded bg-white font-medium"></select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-indigo-800">Resolution:</label>
+            <select id="sim-res" class="w-full p-1.5 text-xs border rounded bg-white font-medium"></select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-indigo-800">Active Layers (Sample):</label>
+            <select id="sim-layers" class="w-full p-1.5 text-xs border rounded bg-white font-medium">
+              <option value="none">Base Only (CMYK)</option>
+              <option value="white">Base + White Underbase</option>
+              <option value="white_clear">Base + White + Clear Gloss</option>
+              <option value="inlay">Base + Inlay (Holographic)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Simulator Results Box -->
+        <div class="bg-white p-4 rounded-lg border border-indigo-200 flex flex-wrap justify-between items-center gap-4">
+          <div class="space-y-1">
+            <div class="text-xs text-gray-500">Square Inches: <span id="sim-out-sqin" class="font-bold text-gray-800">9.0</span> sq in</div>
+            <div class="text-xs text-gray-500">Combined Multipliers: <span id="sim-out-mult" class="font-bold text-indigo-600">1.30x</span></div>
+            <div class="text-xs text-gray-500">Volume Discount: <span id="sim-out-disc" class="font-bold text-green-600">0% OFF</span></div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-400 uppercase font-bold tracking-wide">Calculated Total:</div>
+            <div id="sim-out-total" class="text-2xl sm:text-3xl font-extrabold text-splotch-navy">$0.00</div>
+            <div id="sim-out-unit" class="text-xs text-gray-500">($0.00 / sticker)</div>
+          </div>
+        </div>
       </div>
     </div>
   `;
 
   ui.pricingEditorContainer.innerHTML = html;
 
-  // Add Row Handlers
+  // Add Dynamic Row Event Handlers
   document.getElementById("add-res-btn")?.addEventListener("click", () => {
-    const div = document.createElement('div');
-    div.className = "flex gap-2 items-center resolution-row";
+    const div = document.createElement("div");
+    div.className =
+      "flex flex-wrap sm:flex-nowrap gap-2 items-center resolution-row bg-gray-50 p-2 rounded border border-gray-200";
     div.innerHTML = `
-      <input type="text" placeholder="ID" class="p-1 border rounded w-24 res-id" value="">
-      <input type="text" placeholder="Name" class="p-1 border rounded flex-grow res-name" value="">
-      <input type="number" placeholder="PPI" class="p-1 border rounded w-20 res-ppi" value="300">
-      <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 res-mult" value="1.0">
-      <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+      <input type="text" placeholder="ID (e.g. dpi_custom)" class="p-1.5 text-xs border rounded w-32 res-id font-mono" value="dpi_${Date.now().toString().slice(-4)}">
+      <input type="text" placeholder="Display Name" class="p-1.5 text-xs border rounded flex-grow res-name font-medium" value="Custom DPI">
+      <div class="flex items-center gap-1">
+        <span class="text-xs text-gray-400 font-mono">PPI:</span>
+        <input type="number" min="1" placeholder="PPI" class="p-1.5 text-xs border rounded w-20 res-ppi" value="300">
+      </div>
+      <div class="flex items-center gap-1">
+        <span class="text-xs text-gray-400 font-mono">Mult:</span>
+        <input type="number" step="0.05" min="0" placeholder="Multiplier" class="p-1.5 text-xs border rounded w-20 res-mult" value="1.0">
+      </div>
+      <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Resolution">&times;</button>
     `;
     document.getElementById("pricing-resolutions-list").appendChild(div);
+    updateSimulatorDropdowns();
+    runSimulator();
   });
 
   document.getElementById("add-mat-btn")?.addEventListener("click", () => {
-    const div = document.createElement('div');
-    div.className = "border p-2 bg-white rounded material-row space-y-2";
+    const div = document.createElement("div");
+    div.className =
+      "border border-gray-200 p-3 bg-gray-50 rounded-lg material-row space-y-2";
     div.innerHTML = `
-      <div class="flex gap-2 items-center">
-        <input type="text" placeholder="ID" class="p-1 border rounded w-32 mat-id" value="">
-        <input type="text" placeholder="Name" class="p-1 border rounded flex-grow mat-name" value="">
-        <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 mat-mult" value="1.0">
-        <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+      <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+        <input type="text" placeholder="ID (e.g. mat_custom)" class="p-1.5 text-xs border rounded w-36 mat-id font-mono" value="mat_${Date.now().toString().slice(-4)}">
+        <input type="text" placeholder="Material Display Name" class="p-1.5 text-xs border rounded flex-grow mat-name font-medium" value="New Vinyl Material">
+        <div class="flex items-center gap-1">
+          <span class="text-xs text-gray-400 font-mono">Mult:</span>
+          <input type="number" step="0.05" min="0" placeholder="Multiplier" class="p-1.5 text-xs border rounded w-20 mat-mult" value="1.0">
+        </div>
+        <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Material">&times;</button>
       </div>
-      <input type="text" placeholder="Supported Layers (comma separated)" class="w-full p-1 border rounded text-sm mat-layers" value="white, cmyk, clear">
-      <input type="text" placeholder="Description" class="w-full p-1 border rounded text-sm mat-desc" value="">
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-500 mb-0.5">Supported Layers (comma-separated):</label>
+        <input type="text" placeholder="white, cmyk, clear" class="w-full p-1.5 border rounded text-xs mat-layers font-mono bg-white" value="white, cmyk, clear">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-500 mb-0.5">Description:</label>
+        <input type="text" placeholder="Description" class="w-full p-1.5 border rounded text-xs mat-desc bg-white" value="">
+      </div>
     `;
     document.getElementById("pricing-materials-list").appendChild(div);
+    updateSimulatorDropdowns();
+    runSimulator();
   });
 
   document.getElementById("add-layer-btn")?.addEventListener("click", () => {
-    const div = document.createElement('div');
-    div.className = "border p-2 bg-white rounded layer-row space-y-2";
+    const div = document.createElement("div");
+    div.className =
+      "border border-gray-200 p-3 bg-gray-50 rounded-lg layer-row space-y-2";
     div.innerHTML = `
-      <div class="flex gap-2 items-center">
-        <input type="text" placeholder="ID" class="p-1 border rounded w-32 layer-id" value="">
-        <input type="text" placeholder="Name" class="p-1 border rounded flex-grow layer-name" value="">
-        <input type="number" step="0.1" placeholder="Multiplier" class="p-1 border rounded w-24 layer-mult" value="1.0">
-        <button type="button" class="text-red-500 font-bold px-2 remove-row-btn">&times;</button>
+      <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+        <input type="text" placeholder="ID (e.g. specialty_ink)" class="p-1.5 text-xs border rounded w-32 layer-id font-mono" value="layer_${Date.now().toString().slice(-4)}">
+        <input type="text" placeholder="Layer Name" class="p-1.5 text-xs border rounded flex-grow layer-name font-medium" value="Specialty Layer">
+        <div class="flex items-center gap-1">
+          <span class="text-xs text-gray-400 font-mono">Mult:</span>
+          <input type="number" step="0.05" min="0" placeholder="Multiplier" class="p-1.5 text-xs border rounded w-20 layer-mult" value="1.1">
+        </div>
+        <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Layer">&times;</button>
       </div>
       <div>
-        <label class="text-xs text-gray-500">Subtypes (JSON Array)</label>
-        <textarea class="w-full p-1 border rounded text-sm layer-subtypes font-mono" rows="2">[]</textarea>
+        <label class="block text-[11px] font-semibold text-gray-500 mb-0.5">Subtypes JSON Array (Optional):</label>
+        <textarea class="w-full p-1.5 border rounded text-xs layer-subtypes font-mono bg-white" rows="2">[]</textarea>
       </div>
     `;
     document.getElementById("pricing-layers-list").appendChild(div);
+    runSimulator();
   });
 
-  // Delegate event for all remove buttons
+  document
+    .getElementById("add-complexity-tier-btn")
+    ?.addEventListener("click", () => {
+      const div = document.createElement("div");
+      div.className =
+        "flex gap-2 items-center complexity-row bg-gray-50 p-2 rounded border border-gray-200";
+      div.innerHTML = `
+        <span class="text-xs text-gray-500 font-medium">Perimeter up to:</span>
+        <input type="text" placeholder="Inches" class="p-1.5 text-xs border rounded w-32 comp-threshold font-mono" value="36">
+        <span class="text-xs text-gray-500 font-medium">inches &rarr; Multiplier:</span>
+        <input type="number" step="0.05" min="0" class="p-1.5 text-xs border rounded w-24 comp-multiplier font-mono" value="1.3">
+        <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Tier">&times;</button>
+      `;
+      document.getElementById("pricing-complexity-list").appendChild(div);
+      runSimulator();
+    });
+
+  document
+    .getElementById("add-discount-btn")
+    ?.addEventListener("click", () => {
+      const div = document.createElement("div");
+      div.className =
+        "flex gap-3 items-center discount-row bg-gray-50 p-2 rounded border border-gray-200";
+      div.innerHTML = `
+        <span class="text-xs text-gray-500 font-medium">Min Quantity:</span>
+        <input type="number" min="1" placeholder="Quantity" class="p-1.5 text-xs border rounded w-28 disc-qty font-mono font-bold" value="1000">
+        <span class="text-xs text-gray-500 font-medium">&rarr; Discount (%):</span>
+        <input type="number" min="0" max="100" step="1" placeholder="Discount %" class="p-1.5 text-xs border rounded w-24 disc-percent font-mono font-bold text-green-700" value="20">
+        <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200 disc-badge">20% OFF</span>
+        <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn ml-auto" title="Delete Discount Tier">&times;</button>
+      `;
+      document.getElementById("pricing-discounts-list").appendChild(div);
+      runSimulator();
+    });
+
+  // Delegate event for all remove buttons and dynamic badges
   ui.pricingEditorContainer.addEventListener("click", (e) => {
     if (e.target.classList.contains("remove-row-btn")) {
-      e.target.parentElement.parentElement.tagName === "DIV" && e.target.parentElement.classList.contains("flex") 
-        ? (e.target.closest('.layer-row') || e.target.closest('.material-row') || e.target.parentElement).remove()
-        : e.target.parentElement.remove();
+      const row =
+        e.target.closest(".layer-row") ||
+        e.target.closest(".material-row") ||
+        e.target.closest(".resolution-row") ||
+        e.target.closest(".complexity-row") ||
+        e.target.closest(".discount-row") ||
+        e.target.parentElement;
+      if (row) row.remove();
+      updateSimulatorDropdowns();
+      runSimulator();
     }
   });
+
+  ui.pricingEditorContainer.addEventListener("input", (e) => {
+    if (e.target.classList.contains("disc-percent")) {
+      const row = e.target.closest(".discount-row");
+      const badge = row?.querySelector(".disc-badge");
+      if (badge) {
+        badge.textContent = `${e.target.value || 0}% OFF`;
+      }
+    }
+    runSimulator();
+  });
+
+  // Simulator controls listener
+  document.getElementById("sim-width")?.addEventListener("input", runSimulator);
+  document.getElementById("sim-height")?.addEventListener("input", runSimulator);
+  document.getElementById("sim-qty")?.addEventListener("input", runSimulator);
+  document.getElementById("sim-perimeter")?.addEventListener("input", runSimulator);
+  document.getElementById("sim-mat")?.addEventListener("change", runSimulator);
+  document.getElementById("sim-res")?.addEventListener("change", runSimulator);
+  document.getElementById("sim-layers")?.addEventListener("change", runSimulator);
+
+  updateSimulatorDropdowns();
+  runSimulator();
+}
+
+function updateSimulatorDropdowns() {
+  const matSelect = document.getElementById("sim-mat");
+  const resSelect = document.getElementById("sim-res");
+  if (!matSelect || !resSelect) return;
+
+  const currentMat = matSelect.value;
+  const currentRes = resSelect.value;
+
+  matSelect.innerHTML = "";
+  document.querySelectorAll(".material-row").forEach((row) => {
+    const id = row.querySelector(".mat-id")?.value.trim();
+    const name = row.querySelector(".mat-name")?.value.trim();
+    if (id) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = name || id;
+      matSelect.appendChild(opt);
+    }
+  });
+  if (currentMat && matSelect.querySelector(`option[value="${currentMat}"]`)) {
+    matSelect.value = currentMat;
+  }
+
+  resSelect.innerHTML = "";
+  document.querySelectorAll(".resolution-row").forEach((row) => {
+    const id = row.querySelector(".res-id")?.value.trim();
+    const name = row.querySelector(".res-name")?.value.trim();
+    if (id) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = name || id;
+      resSelect.appendChild(opt);
+    }
+  });
+  if (currentRes && resSelect.querySelector(`option[value="${currentRes}"]`)) {
+    resSelect.value = currentRes;
+  }
+}
+
+function runSimulator() {
+  const basePriceCents =
+    parseFloat(document.getElementById("pricing-base-price")?.value) || 0;
+  const widthInches =
+    parseFloat(document.getElementById("sim-width")?.value) || 0;
+  const heightInches =
+    parseFloat(document.getElementById("sim-height")?.value) || 0;
+  const qty = parseInt(document.getElementById("sim-qty")?.value, 10) || 1;
+  const perimeterInches =
+    parseFloat(document.getElementById("sim-perimeter")?.value) || 0;
+  const matId = document.getElementById("sim-mat")?.value;
+  const resId = document.getElementById("sim-res")?.value;
+  const layersMode = document.getElementById("sim-layers")?.value;
+
+  if (widthInches <= 0 || heightInches <= 0 || qty <= 0) return;
+
+  const sqInches = widthInches * heightInches;
+
+  // 1. Material Multiplier
+  let matMult = 1.0;
+  document.querySelectorAll(".material-row").forEach((row) => {
+    if (row.querySelector(".mat-id")?.value.trim() === matId) {
+      matMult = parseFloat(row.querySelector(".mat-mult")?.value) || 1.0;
+    }
+  });
+
+  // 2. Resolution Multiplier
+  let resMult = 1.0;
+  document.querySelectorAll(".resolution-row").forEach((row) => {
+    if (row.querySelector(".res-id")?.value.trim() === resId) {
+      resMult = parseFloat(row.querySelector(".res-mult")?.value) || 1.0;
+    }
+  });
+
+  // 3. Complexity Multiplier
+  let compMult = 1.0;
+  const compRows = Array.from(
+    document.querySelectorAll(".complexity-row")
+  ).map((row) => {
+    const rawThresh = row.querySelector(".comp-threshold")?.value.trim();
+    const threshold =
+      rawThresh === "Infinity" || isNaN(parseFloat(rawThresh))
+        ? Infinity
+        : parseFloat(rawThresh);
+    const mult =
+      parseFloat(row.querySelector(".comp-multiplier")?.value) || 1.0;
+    return { threshold, mult };
+  });
+
+  compRows.sort((a, b) => a.threshold - b.threshold);
+  for (const tier of compRows) {
+    if (perimeterInches <= tier.threshold) {
+      compMult = tier.mult;
+      break;
+    }
+  }
+
+  // 4. Custom Layers Penalty
+  let layerAdd = 0;
+  if (layersMode === "white") {
+    layerAdd += 0.1; // White layer multiplier
+  } else if (layersMode === "white_clear") {
+    layerAdd += 0.3; // White + Clear
+  } else if (layersMode === "inlay") {
+    layerAdd += 0.5; // Inlay
+  }
+
+  const combinedMultiplier = matMult * resMult * (compMult + layerAdd);
+
+  // 5. Quantity Discount
+  let discountPercent = 0;
+  const discountRows = Array.from(
+    document.querySelectorAll(".discount-row")
+  ).map((row) => {
+    const q = parseInt(row.querySelector(".disc-qty")?.value, 10) || 0;
+    const p = parseFloat(row.querySelector(".disc-percent")?.value) || 0;
+    return { q, discount: p / 100 };
+  });
+  discountRows.sort((a, b) => b.q - a.q); // Descending
+  for (const tier of discountRows) {
+    if (qty >= tier.q) {
+      discountPercent = tier.discount;
+      break;
+    }
+  }
+
+  const baseCostCents = sqInches * basePriceCents;
+  const totalCentsBeforeDiscount =
+    baseCostCents * qty * combinedMultiplier;
+  const totalCents = Math.round(
+    totalCentsBeforeDiscount * (1 - discountPercent)
+  );
+
+  const totalDollars = (totalCents / 100).toFixed(2);
+  const unitDollars = ((totalCents / qty) / 100).toFixed(2);
+
+  // Update simulator UI
+  const outSqIn = document.getElementById("sim-out-sqin");
+  const outMult = document.getElementById("sim-out-mult");
+  const outDisc = document.getElementById("sim-out-disc");
+  const outTotal = document.getElementById("sim-out-total");
+  const outUnit = document.getElementById("sim-out-unit");
+
+  if (outSqIn) outSqIn.textContent = sqInches.toFixed(1);
+  if (outMult) outMult.textContent = `${combinedMultiplier.toFixed(2)}x`;
+  if (outDisc)
+    outDisc.textContent = `${Math.round(discountPercent * 100)}% OFF`;
+  if (outTotal) outTotal.textContent = `$${totalDollars}`;
+  if (outUnit) outUnit.textContent = `($${unitDollars} / sticker)`;
 }
 
 async function savePricingConfig() {
@@ -2529,66 +2931,122 @@ async function savePricingConfig() {
   setButtonLoading(btn, true, "Saving...");
 
   try {
+    const basePrice =
+      parseFloat(document.getElementById("pricing-base-price")?.value) || 0;
+    if (basePrice <= 0) {
+      throw new Error("Base price per square inch must be greater than 0.");
+    }
+
     const config = {
-      pricePerSquareInchCents: parseFloat(document.getElementById("pricing-base-price").value) || 0,
+      pricePerSquareInchCents: basePrice,
       resolutions: [],
       materials: [],
       layers: [],
-      complexity: JSON.parse(document.getElementById("pricing-complexity").value || "{}"),
-      quantityDiscounts: JSON.parse(document.getElementById("pricing-discounts").value || "[]")
+      complexity: {
+        description: "Multiplier based on the perimeter of the cut path.",
+        perLayerMultiplier:
+          parseFloat(
+            document.getElementById("pricing-per-layer-mult")?.value
+          ) || 0.1,
+        tiers: [],
+      },
+      quantityDiscounts: [],
     };
 
     // Gather Resolutions
-    document.querySelectorAll('.resolution-row').forEach(row => {
-      config.resolutions.push({
-        id: row.querySelector('.res-id').value.trim(),
-        name: row.querySelector('.res-name').value.trim(),
-        ppi: parseInt(row.querySelector('.res-ppi').value) || 300,
-        costMultiplier: parseFloat(row.querySelector('.res-mult').value) || 1.0
-      });
+    document.querySelectorAll(".resolution-row").forEach((row) => {
+      const id = row.querySelector(".res-id").value.trim();
+      const name = row.querySelector(".res-name").value.trim();
+      const ppi = parseInt(row.querySelector(".res-ppi").value, 10) || 300;
+      const costMultiplier =
+        parseFloat(row.querySelector(".res-mult").value) || 1.0;
+
+      if (!id) throw new Error("Resolution ID cannot be empty.");
+      config.resolutions.push({ id, name, ppi, costMultiplier });
     });
 
     // Gather Materials
-    document.querySelectorAll('.material-row').forEach(row => {
-      const layersStr = row.querySelector('.mat-layers').value;
+    document.querySelectorAll(".material-row").forEach((row) => {
+      const id = row.querySelector(".mat-id").value.trim();
+      const name = row.querySelector(".mat-name").value.trim();
+      const costMultiplier =
+        parseFloat(row.querySelector(".mat-mult").value) || 1.0;
+      const layersStr = row.querySelector(".mat-layers").value;
+      const description = row.querySelector(".mat-desc").value.trim();
+
+      if (!id) throw new Error("Material ID cannot be empty.");
       config.materials.push({
-        id: row.querySelector('.mat-id').value.trim(),
-        name: row.querySelector('.mat-name').value.trim(),
-        costMultiplier: parseFloat(row.querySelector('.mat-mult').value) || 1.0,
-        supportedLayers: layersStr ? layersStr.split(',').map(s => s.trim()).filter(Boolean) : [],
-        description: row.querySelector('.mat-desc').value.trim()
+        id,
+        name,
+        costMultiplier,
+        supportedLayers: layersStr
+          ? layersStr
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [],
+        description,
       });
     });
 
     // Gather Layers
-    document.querySelectorAll('.layer-row').forEach(row => {
-      const layer = {
-        id: row.querySelector('.layer-id').value.trim(),
-        name: row.querySelector('.layer-name').value.trim(),
-        costMultiplier: parseFloat(row.querySelector('.layer-mult').value) || 1.0
-      };
+    document.querySelectorAll(".layer-row").forEach((row) => {
+      const id = row.querySelector(".layer-id").value.trim();
+      const name = row.querySelector(".layer-name").value.trim();
+      const costMultiplier =
+        parseFloat(row.querySelector(".layer-mult").value) || 1.0;
+
+      if (!id) throw new Error("Layer ID cannot be empty.");
+      const layer = { id, name, costMultiplier };
+
+      const subTypesText =
+        row.querySelector(".layer-subtypes")?.value.trim() || "[]";
       try {
-        const subTypesText = row.querySelector('.layer-subtypes').value;
         const subTypes = JSON.parse(subTypesText);
         if (Array.isArray(subTypes) && subTypes.length > 0) {
           layer.subTypes = subTypes;
         }
-      } catch(e) {
-        throw new Error(`Invalid JSON in subtypes for layer ${layer.id}`);
+      } catch (e) {
+        throw new Error(`Invalid JSON in subtypes for layer "${id}".`);
       }
       config.layers.push(layer);
     });
 
-    // fetchWithAuth throws an error if !response.ok, so if we reach here it was successful.
-    // The response is already the parsed JSON body.
-    const result = await fetchWithAuth(`${serverUrl}/api/admin/pricing`, {
+    // Gather Complexity Tiers
+    document.querySelectorAll(".complexity-row").forEach((row) => {
+      const rawThresh = row.querySelector(".comp-threshold").value.trim();
+      const thresholdInches =
+        rawThresh === "Infinity" || isNaN(parseFloat(rawThresh))
+          ? "Infinity"
+          : parseFloat(rawThresh);
+      const multiplier =
+        parseFloat(row.querySelector(".comp-multiplier").value) || 1.0;
+      config.complexity.tiers.push({ thresholdInches, multiplier });
+    });
+
+    // Gather Quantity Discounts
+    document.querySelectorAll(".discount-row").forEach((row) => {
+      const quantity =
+        parseInt(row.querySelector(".disc-qty").value, 10) || 1;
+      const percent =
+        parseFloat(row.querySelector(".disc-percent").value) || 0;
+      config.quantityDiscounts.push({
+        quantity,
+        discount: +(percent / 100).toFixed(4),
+      });
+    });
+
+    // Sort discounts by quantity ascending
+    config.quantityDiscounts.sort((a, b) => a.quantity - b.quantity);
+
+    // Save via Authenticated API
+    await fetchWithAuth(`${serverUrl}/api/admin/pricing`, {
       method: "POST",
-      body: JSON.stringify(config)
+      body: JSON.stringify(config),
     });
 
     showSuccessToast("Pricing configuration saved successfully!");
-    await loadPricingConfigEditor(); // refresh
-
+    await loadPricingConfigEditor(); // refresh UI
   } catch (err) {
     showErrorToast(err.message);
   } finally {
