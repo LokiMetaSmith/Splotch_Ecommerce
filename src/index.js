@@ -2204,8 +2204,6 @@ function updateEditingButtonsState(disabled) {
     if (lazyLassoContainer) {
       lazyLassoContainer.style.display = "none";
     }
-    if (generateCutlineBtn) generateCutlineBtn.style.display = "none";
-    if (downloadCutlineBtn) downloadCutlineBtn.style.display = "none";
   } else {
     if (grayBtn) {
       grayBtn.style.display = disabled ? "none" : "block";
@@ -2219,13 +2217,14 @@ function updateEditingButtonsState(disabled) {
     if (lazyLassoContainer) {
       lazyLassoContainer.style.display = disabled ? "none" : "flex";
     }
-    if (generateCutlineBtn) {
-      generateCutlineBtn.style.display = disabled ? "none" : "flex";
-    }
-    if (downloadCutlineBtn) {
-      const hasCutline = activeBase.currentCutline && activeBase.currentCutline.length > 0;
-      downloadCutlineBtn.style.display = (disabled || !hasCutline) ? "none" : "flex";
-    }
+  }
+
+  if (generateCutlineBtn) {
+    generateCutlineBtn.style.display = disabled ? "none" : "flex";
+  }
+  if (downloadCutlineBtn) {
+    const hasCutline = activeBase.currentCutline && activeBase.currentCutline.length > 0;
+    downloadCutlineBtn.style.display = (disabled || !hasCutline) ? "none" : "flex";
   }
   if (canvasPlaceholder)
     canvasPlaceholder.style.display = disabled ? "flex" : "none";
