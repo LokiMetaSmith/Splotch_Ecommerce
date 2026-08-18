@@ -3427,30 +3427,9 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
         };
         drawPolygonsToCanvas(layer.currentPolygons, "black", layerOffset);
       } else {
-        // Raster mode image drawing
         const img = layer.image || layer.originalImage;
         if (img) {
           ctx.save();
-
-          
-          if (layer.currentCutline && layer.currentCutline.length > 0) {
-            ctx.beginPath();
-            layer.currentCutline.forEach((poly) => {
-              if (!poly || poly.length === 0) return;
-              ctx.moveTo(
-                poly[0].x + offset.x + (layer.x || 0),
-                poly[0].y + offset.y + (layer.y || 0)
-              );
-              for (let i = 1; i < poly.length; i++)
-                ctx.lineTo(
-                  poly[i].x + offset.x + (layer.x || 0),
-                  poly[i].y + offset.y + (layer.y || 0)
-                );
-              ctx.closePath();
-            });
-            ctx.clip();
-          }
-
           const layerWidth = layer.width || (img.naturalWidth || img.width);
           const layerHeight = layer.height || (img.naturalHeight || img.height);
 
@@ -4711,63 +4690,32 @@ function handleStandardResize(targetInches) {
     activeBase.currentPolygons = newPolygons;
     redrawAll();
   } else if (activeBase.originalImage) {
-    const prevWidth = activeBase.cleanCanvasState
-      ? activeBase.cleanCanvasState.width
-      : canvas.width;
-    const prevHeight = activeBase.cleanCanvasState
-      ? activeBase.cleanCanvasState.height
-      : canvas.height;
+    const oldWidth = activeBase.width || activeBase.originalImage.width;
+    const oldHeight = activeBase.height || activeBase.originalImage.height;
 
     // Raster Image Resizing - always use the original image to prevent quality loss
     const newWidth = activeBase.originalImage.width * scale;
     const newHeight = activeBase.originalImage.height * scale;
 
     if (newWidth > 0 && newHeight > 0) {
+      const scaleX = oldWidth > 0 ? (newWidth / oldWidth) : 1;
+      const scaleY = oldHeight > 0 ? (newHeight / oldHeight) : 1;
+
       activeBase.width = newWidth;
       activeBase.height = newHeight;
-      setCanvasSize(newWidth, newHeight);
-      ctx.clearRect(0, 0, newWidth, newHeight);
-      ctx.drawImage(activeBase.originalImage, 0, 0, newWidth, newHeight);
 
-      saveCleanState(); // Save state before decorations
-
-      // Handle Raster Cutline Scaling (Overlay Mode)
-      if (activeBase.rasterCutlinePoly && prevWidth > 0 && prevHeight > 0) {
-        // Bolt Fix: Calculate scale based on LOGICAL dimensions to match activeBase.rasterCutlinePoly coordinate space
-        const dpr = window.devicePixelRatio || 1;
-        const prevLogicalWidth = prevWidth / dpr;
-        const prevLogicalHeight = prevHeight / dpr;
-
-        const scaleX = newWidth / prevLogicalWidth;
-        const scaleY = newHeight / prevLogicalHeight;
-
-        // Bolt Optimization: Use pre-allocated arrays and for loops instead of nested .map()
-        const newRasterCutlinePoly = new Array(
-          activeBase.rasterCutlinePoly.length,
+      // Handle Raster Cutline Scaling
+      if (activeBase.rasterCutlinePoly && activeBase.rasterCutlinePoly.length > 0) {
+        activeBase.rasterCutlinePoly = activeBase.rasterCutlinePoly.map((poly) =>
+          poly.map((p) => ({ x: p.x * scaleX, y: p.y * scaleY }))
         );
-        for (let i = 0; i < activeBase.rasterCutlinePoly.length; i++) {
-          const poly = activeBase.rasterCutlinePoly[i];
-          const newPoly = new Array(poly.length);
-          for (let j = 0; j < poly.length; j++) {
-            const p = poly[j];
-            newPoly[j] = { x: p.x * scaleX, y: p.y * scaleY };
-          }
-          newRasterCutlinePoly[i] = newPoly;
-        }
-        activeBase.rasterCutlinePoly = newRasterCutlinePoly;
+      }
 
-        // Regenerate activeBase.currentCutline
-        redrawAll();
+      if (activeBase.currentCutline && activeBase.currentCutline.length > 0) {
+        activeBase.currentCutline = activeBase.currentCutline.map((poly) =>
+          poly.map((p) => ({ x: p.x * scaleX, y: p.y * scaleY }))
+        );
       } else {
-        // Update the bounds and cutline for the new raster size (Default Box)
-        currentBounds = {
-          left: 0,
-          top: 0,
-          right: newWidth,
-          bottom: newHeight,
-          width: newWidth,
-          height: newHeight,
-        };
         activeBase.currentCutline = [
           [
             { x: 0, y: 0 },
@@ -4778,7 +4726,7 @@ function handleStandardResize(targetInches) {
         ];
       }
 
-      // Trigger the price update and redraw the bounding box
+      // Trigger the price update and redraw all layers
       calculateAndUpdatePrice();
       redrawAll();
     }
