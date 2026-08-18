@@ -2859,6 +2859,27 @@ function doRedrawAll() {
     y: -currentBounds.top + padding,
   };
 
+  // Fill entire canvas with white for the ruler/padding area
+  ctx.save();
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
+  // Cut out the organic sheet boundary so the CSS background (Magenta/Black) shows through
+  if (organicSheetCutline && organicSheetCutline.length > 0) {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    organicSheetCutline.forEach((poly) => {
+      if (!poly || poly.length === 0) return;
+      ctx.moveTo(poly[0].x + drawOffset.x, poly[0].y + drawOffset.y);
+      for (let i = 1; i < poly.length; i++) {
+        ctx.lineTo(poly[i].x + drawOffset.x, poly[i].y + drawOffset.y);
+      }
+      ctx.closePath();
+    });
+    ctx.fill();
+  }
+  ctx.restore();
+
   drawCanvasDecorations(currentBounds, drawOffset);
   
   // After redrawing, the bounds may have changed, so update the price.
@@ -3442,8 +3463,6 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
       ctx.lineWidth = 20;
       ctx.stroke();
 
-      ctx.fillStyle = "white";
-      ctx.fill();
     }
   });
   ctx.restore();
