@@ -3408,21 +3408,13 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
             ctx.clip();
           }
 
-          const layerWidth = layer.cleanCanvasState
-            ? layer.cleanCanvasState.width / dpr
-            : layer.width || img.width;
-          const layerHeight = layer.cleanCanvasState
-            ? layer.cleanCanvasState.height / dpr
-            : layer.height || img.height;
+          const layerWidth = layer.width || (img.naturalWidth || img.width);
+          const layerHeight = layer.height || (img.naturalHeight || img.height);
 
           const imgX = offset.x + (layer.x || 0);
           const imgY = offset.y + (layer.y || 0);
 
-          if (layer.cleanCanvasState) {
-            restoreCleanStateForLayer(layer, { x: imgX, y: imgY });
-          } else {
-            ctx.drawImage(img, imgX, imgY, layerWidth, layerHeight);
-          }
+          ctx.drawImage(img, imgX, imgY, layerWidth, layerHeight);
           ctx.restore();
         }
       }
@@ -3436,14 +3428,18 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
         if (layerId !== "base" && layerId !== "cutline") {
           const customLayer = sticker.customLayers.find((l) => l.id === layerId);
           if (customLayer && customLayer.image) {
+            // White underbase sits under the ink in production.
+            // Only draw white layer mask over canvas when the user is actively viewing/inspecting that tab.
+            if (customLayer.type === "white" && selectedLegendTab !== customLayer.id) {
+              return;
+            }
             ctx.save();
-            const layerWidth = sticker.cleanCanvasState
-              ? sticker.cleanCanvasState.width / dpr
-              : sticker.width || (sticker.image && sticker.image.width) || 0;
-            const layerHeight = sticker.cleanCanvasState
-              ? sticker.cleanCanvasState.height / dpr
-              : sticker.height || (sticker.image && sticker.image.height) || 0;
+            const layerWidth = sticker.width || (sticker.image && (sticker.image.naturalWidth || sticker.image.width)) || 0;
+            const layerHeight = sticker.height || (sticker.image && (sticker.image.naturalHeight || sticker.image.height)) || 0;
             if (layerWidth > 0 && layerHeight > 0) {
+              if (selectedLegendTab === customLayer.id) {
+                ctx.globalAlpha = 0.85;
+              }
               ctx.drawImage(
                 customLayer.image,
                 offset.x + (sticker.x || 0),
@@ -4679,6 +4675,8 @@ function handleStandardResize(targetInches) {
     const newHeight = activeBase.originalImage.height * scale;
 
     if (newWidth > 0 && newHeight > 0) {
+      activeBase.width = newWidth;
+      activeBase.height = newHeight;
       setCanvasSize(newWidth, newHeight);
       ctx.clearRect(0, 0, newWidth, newHeight);
       ctx.drawImage(activeBase.originalImage, 0, 0, newWidth, newHeight);
@@ -4734,7 +4732,7 @@ function handleStandardResize(targetInches) {
 
       // Trigger the price update and redraw the bounding box
       calculateAndUpdatePrice();
-      drawCanvasDecorations(currentBounds);
+      redrawAll();
     }
   }
 }
