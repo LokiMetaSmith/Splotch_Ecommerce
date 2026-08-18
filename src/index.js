@@ -2552,93 +2552,66 @@ function loadFileAsImage(file, isMascot = false) {
               if (resizeUnitLabelEl)
                 resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
             }
-              const bounds = getBounds(img);
-          setCanvasSize(bounds.width, bounds.height);
+          }
 
-          // Force magic wand threshold down and try to get a better edge automatically
-          const prevThreshold = magicWandThreshold;
-          magicWandThreshold = 25; // More conservative
-          processImageForCutline()
-            .then((processedImg) => {
-              activeBase.image = processedImg;
-              magicWandThreshold = prevThreshold;
-              redrawAll();
+          // --- AUTO WHITE UNDERBASE GENERATION ---
+          if (pricingConfig && pricingConfig.layers) {
+            // Check if material supports white layer and we don't already have one
+            const hasWhiteLayer = activeBase.customLayers.some(
+              (l) => l.type.toLowerCase() === "white",
+            );
+            const supportsWhite = pricingConfig.layers.some(
+              (l) => l.name.toLowerCase() === "white",
+            );
 
-              // --- AUTO WHITE UNDERBASE GENERATION ---
-              if (pricingConfig && pricingConfig.layers) {
-                // Check if material supports white layer and we don't already have one
-                const hasWhiteLayer = activeBase.customLayers.some(
-                  (l) => l.type.toLowerCase() === "white",
-                );
-                const supportsWhite = pricingConfig.layers.some(
-                  (l) => l.name.toLowerCase() === "white",
-                );
+            if (supportsWhite && !hasWhiteLayer) {
+              const whiteLayer = {
+                id: `custom_${Date.now()}_${Math.floor(
+                  Math.random() * 1000,
+                )}`,
+                name: "White Layer",
+                type: "white",
+                image: null,
+                originalImage: null,
+                visible: true,
+                alphaColorHex: "#ffffff",
+                maskColorHex: "#000000",
+              };
 
-                if (supportsWhite && !hasWhiteLayer) {
-                  updateCanvasLoading("Generating Underbase...", "Creating White underbase layer mask");
-                  const whiteLayer = {
-                    id: `custom_${Date.now()}_${Math.floor(
-                      Math.random() * 1000,
-                    )}`,
-                    name: "White Layer",
-                    type: "white",
-                    image: null,
-                    originalImage: null,
-                    visible: true,
-                    alphaColorHex: "#ffffff",
-                    maskColorHex: "#000000",
-                  };
-
-                  const pricingLayer = pricingConfig.layers.find(
-                    (l) => l.name.toLowerCase() === "white",
-                  );
-                  if (
-                    pricingLayer &&
-                    pricingLayer.subTypes &&
-                    pricingLayer.subTypes.length > 0
-                  ) {
-                    whiteLayer.subType = pricingLayer.subTypes[0].id;
-                  }
-
-                  activeBase.customLayers.push(whiteLayer);
-                  renderLayerTabs();
-                  calculateAndUpdatePrice();
-
-                  processCustomLayerMask(
-                    activeBase.originalImage,
-                    "underbase",
-                    "#ffffff",
-                    true,
-                  )
-                    .then((processedImg) => {
-                      whiteLayer.image = processedImg;
-                      redrawAll();
-                      showNotification(
-                        "Auto-generated White Underbase layer.",
-                        "info",
-                      );
-                    })
-                    .catch((err) => {
-                      console.error("Auto mask generation failed:", err);
-                    })
-                    .finally(() => {
-                      hideCanvasLoading();
-                    });
-                } else {
-                  hideCanvasLoading();
-                }
-              } else {
-                hideCanvasLoading();
-              }
-            })
-            .catch((err) => {
-              magicWandThreshold = prevThreshold;
-              hideCanvasLoading();
-              showNotification(
-                "Failed to auto-generate cutline. Image may be too complex.",
-                "warning",
+              const pricingLayer = pricingConfig.layers.find(
+                (l) => l.name.toLowerCase() === "white",
               );
-            });
+              if (
+                pricingLayer &&
+                pricingLayer.subTypes &&
+                pricingLayer.subTypes.length > 0
+              ) {
+                whiteLayer.subType = pricingLayer.subTypes[0].id;
+              }
+
+              activeBase.customLayers.push(whiteLayer);
+              renderLayerTabs();
+              calculateAndUpdatePrice();
+
+              processCustomLayerMask(
+                activeBase.originalImage,
+                "underbase",
+                "#ffffff",
+                true,
+              )
+                .then((processedImg) => {
+                  whiteLayer.image = processedImg;
+                  redrawAll();
+                  showNotification(
+                    "Auto-generated White Underbase layer.",
+                    "info",
+                  );
+                })
+                .catch((err) => {
+                  console.error("Auto mask generation failed:", err);
+                });
+            }
+          }
 
           // Generate cutline based on image transparency
           const currentImageData = ctx.getImageData(
@@ -2654,7 +2627,8 @@ function loadFileAsImage(file, isMascot = false) {
           } else {
             if (cutShapeSelect) cutShapeSelect.value = "square";
             handleGenerateCutline(true);
-          }      }
+          }
+
           activeBase.currentPolygons = []; // Clear any previous SVG data
 
           // Show the legend tabs since an image is loaded
@@ -5010,6 +4984,7 @@ function handleGenerateCutline(skipPrompt = false) {
               btn.disabled = false;
               btn.innerHTML = originalText;
             }
+            hideCanvasLoading();
             return;
           }
         }
@@ -5104,6 +5079,7 @@ function handleGenerateCutline(skipPrompt = false) {
             btn.disabled = false;
             btn.innerHTML = originalText;
           }
+          hideCanvasLoading();
           return;
         }
 
