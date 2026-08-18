@@ -5175,6 +5175,7 @@ function renderLayerList() {
         li.addEventListener("click", () => {
             setActiveSticker(originalIndex);
             renderLayerList();
+            renderLayerTabs();
             redrawAll();
             updateEditingControlsForActiveLayer();
             updateFilterButtonVisuals();
@@ -5243,6 +5244,7 @@ function renderLayerList() {
         innerDiv.addEventListener("click", () => {
             setActiveSticker('boundary');
             renderLayerList();
+            renderLayerTabs();
             redrawAll();
             updateEditingControlsForActiveLayer();
             updateFilterButtonVisuals();
@@ -5443,6 +5445,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 draggedLayer = hit.layer;
                 setActiveSticker(hit.index);
                 renderLayerList();
+                renderLayerTabs();
                 
                 dragStartX = mouseX;
                 dragStartY = mouseY;
