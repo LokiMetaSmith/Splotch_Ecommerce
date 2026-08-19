@@ -24,3 +24,5 @@ This is a list of proposed UX improvements for the Print Shop interface, ordered
 - [x] **QR Code Integration:** Add QR codes for Order IDs to the UI and export files.
 - [x] **Scan-to-Update Workflow:** Create a quick way to scan a printed QR code to instantly update an order's status.
 - [x] **Printed Traveler/Margin QR:** Inject QR codes directly into the margin/waste area of the nested PDF/SVG files.
+
+- [ ] **Fix Failing Tests:** Investigate and fix failing Playwright test (Data Compliance Flow due to CSRF token / missing SQUARE_ACCESS_TOKEN) and Jest tests (pricing_admin_api.test.js due to 'require is not defined' in ESM).
