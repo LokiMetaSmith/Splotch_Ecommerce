@@ -762,6 +762,11 @@ async function BootStrap() {
     });
   }
 
+  const bleedColor1 = document.getElementById("bleedColor1");
+  const bleedColor2 = document.getElementById("bleedColor2");
+  if (bleedColor1) bleedColor1.addEventListener("input", redrawAll);
+  if (bleedColor2) bleedColor2.addEventListener("input", redrawAll);
+
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
   if (generateCutlineBtn)
     generateCutlineBtn.addEventListener("click", () =>
@@ -834,29 +839,11 @@ async function BootStrap() {
 
       if (activeBase) {
         activeBase.lazyLassoRadius = currentLassoRadius;
-      }
-
-      if (activeBase.rasterCutlinePoly) {
-        generateCutLineAsync(
-          activeBase.rasterCutlinePoly,
-          activeBase.cutlineOffset,
-          activeBase.lazyLassoRadius,
-        ).then((cutline) => {
-          activeBase.currentCutline = cutline;
-          currentBounds = getPolygonsBounds(cutline);
-          calculateAndUpdatePrice();
-          drawCanvasDecorations(currentBounds);
-        });
-      } else if (activeBase.basePolygons.length > 0) {
-        generateCutLineAsync(
-          activeBase.currentPolygons,
-          cutlineOffset,
-          currentLassoRadius,
-        ).then((cutline) => {
-          activeBase.currentCutline = cutline;
-          currentBounds = getPolygonsBounds(cutline);
-          redrawAll();
-        });
+        
+        // Auto-generate the new cutline with the updated settings
+        if (activeBase.originalImage || activeBase.basePolygons?.length) {
+          handleGenerateCutline(true);
+        }
       }
     }, 100);
 
@@ -874,8 +861,8 @@ async function BootStrap() {
         cutlineSensitivityValueDisplay.textContent = cutlineSensitivity;
       }
       if (!easterEggUnlocked) {
-        if (activeBase.originalImage && activeBase.rasterCutlinePoly) {
-          handleGenerateCutline();
+        if (activeBase && (activeBase.originalImage && activeBase.rasterCutlinePoly)) {
+          handleGenerateCutline(true);
         }
       }
     });
@@ -894,31 +881,16 @@ async function BootStrap() {
         lazyLassoValueDisplay.textContent = e.target.value;
       }
       if (!easterEggUnlocked) {
-        if (activeBase.rasterCutlinePoly) {
-          generateCutLineAsync(
-            activeBase.rasterCutlinePoly,
-            cutlineOffset,
-            parseInt(e.target.value, 10),
-          ).then((cutline) => {
-            activeBase.currentCutline = cutline;
-            currentBounds = getPolygonsBounds(cutline);
-            calculateAndUpdatePrice();
-            drawCanvasDecorations(currentBounds);
-          });
-        } else if (activeBase.basePolygons.length > 0) {
-          redrawAll();
+        if (activeBase) {
+          activeBase.lazyLassoRadius = parseInt(e.target.value, 10);
+          if (activeBase.originalImage || activeBase.basePolygons?.length) {
+            handleGenerateCutline(true);
+          }
         }
       }
     }, 100);
 
     lazyLassoSlider.addEventListener("input", handleLassoInput);
-
-    // Trigger regeneration only on change (mouse up) to avoid lag
-    lazyLassoSlider.addEventListener("change", () => {
-      if (activeBase.originalImage && activeBase.rasterCutlinePoly) {
-        handleGenerateCutline();
-      }
-    });
   }
 
   // Creator / Product UI
