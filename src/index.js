@@ -258,7 +258,7 @@ function generateOrganicSheetBoundary() {
   if (pricingConfig && pricingConfig.resolutions) {
     const selectedRes = pricingConfig.resolutions.find(r => r.id === (stickerResolutionSelect ? stickerResolutionSelect.value : "dpi_300"));
     if (selectedRes) {
-      ppi = selectedRes.dpi;
+      ppi = selectedRes.ppi;
     }
   }
 
