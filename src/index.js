@@ -2726,8 +2726,10 @@ function doRedrawAll() {
 
 
 
-  generateOrganicSheetBoundary();
-
+  // Skip regenerating organic bounds during drag to prevent lag/crashing
+  if (typeof isDraggingLayer === 'undefined' || !isDraggingLayer) {
+    generateOrganicSheetBoundary();
+  }
   // 2. Compute Global Bounding Box across all layers
   let minX = Infinity,
     minY = Infinity,
@@ -5922,11 +5924,30 @@ document.addEventListener("DOMContentLoaded", () => {
         const handleDragMove = (clientX, clientY) => {
             if (!isDraggingLayer || !draggedLayer) return;
             const coords = getCanvasCoords(clientX, clientY);
-            const dx = coords.x - dragStartX;
-            const dy = coords.y - dragStartY;
+            
+            // Slower movement factor for precision dragging
+            const movementFactor = 0.4;
+            const dx = (coords.x - dragStartX) * movementFactor;
+            const dy = (coords.y - dragStartY) * movementFactor;
 
-            draggedLayer.x = dragOffsetX + dx;
-            draggedLayer.y = dragOffsetY + dy;
+            let targetX = dragOffsetX + dx;
+            let targetY = dragOffsetY + dy;
+
+            // Very light snapping to an invisible grid (e.g. 10px grid)
+            const gridSize = 10;
+            const snapX = Math.round(targetX / gridSize) * gridSize;
+            const snapY = Math.round(targetY / gridSize) * gridSize;
+            
+            // Snap if within 3px of a grid line
+            if (Math.abs(targetX - snapX) < 3) targetX = snapX;
+            if (Math.abs(targetY - snapY) < 3) targetY = snapY;
+
+            // Snap to corner/origin (0,0) if close
+            if (Math.abs(targetX) < 5) targetX = 0;
+            if (Math.abs(targetY) < 5) targetY = 0;
+
+            draggedLayer.x = targetX;
+            draggedLayer.y = targetY;
 
             redrawAll();
         };
