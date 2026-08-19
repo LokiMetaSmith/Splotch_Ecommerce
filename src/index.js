@@ -335,7 +335,7 @@ function generateOrganicSheetBoundary() {
         const cy = (minY + maxY) / 2;
         const w = maxX - minX;
         const h = maxY - minY;
-        const r = Math.max(w, h) / 2 + marginPx;
+        const r = Math.sqrt(Math.pow(w/2, 2) + Math.pow(h/2, 2)) + marginPx;
         const circle = [];
         const numPoints = 64;
         for (let i = 0; i < numPoints; i++) {
