@@ -3711,12 +3711,11 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
   }
 
   // Scale the font size relative to the bounds so it's readable on large images
-  // Scale the font size relative to the bounds so it's readable on large images
-  const scale = Math.max(bounds.width, bounds.height) / 500;
-  const fontSize = Math.max(16, Math.round(18 * scale));
+  // Scale the font size relative to PPI so it matches the ruler visually
   const ppiScale = ppi / 96;
-  const rulerHeight = 40 * ppiScale;
-  const rulerWidth = 60 * ppiScale;
+  const fontSize = Math.max(16, Math.round(22 * ppiScale));
+  const rulerHeight = 35 * ppiScale;
+  const rulerWidth = 65 * ppiScale;
 
   // Add a slight drop shadow so it stands out against any background
   ctx.save();
@@ -3729,13 +3728,13 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
 
   // Position the text slightly above the top edge of the bounding box and outside the ruler
   const x = bounds.left + offset.x + bounds.width / 2;
-  const y = bounds.top + offset.y - Math.max(rulerHeight + 10, 40 * scale);
+  const y = bounds.top + offset.y - rulerHeight - (5 * ppiScale);
   ctx.fillText(`${width.toFixed(1)} ${unit}`, x, y);
 
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   // Position the text slightly to the left of the left edge and outside the ruler, rotated
-  const leftX = bounds.left + offset.x - Math.max(rulerWidth + 10, 45 * scale);
+  const leftX = bounds.left + offset.x - rulerWidth - (5 * ppiScale);
   const leftY = bounds.top + offset.y + bounds.height / 2;
 
   ctx.translate(leftX, leftY);
