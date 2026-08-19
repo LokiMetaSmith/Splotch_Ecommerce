@@ -41,7 +41,8 @@ function calculateStickerPrice(
     cutline,
     resolution,
     existingPerimeterPixels = null,
-    customLayers = []
+    customLayers = [],
+    numImageLayers = 1
 ) {
     if (!pricingConfig) {
         logger.error("Pricing config not loaded.");
@@ -60,14 +61,13 @@ function calculateStickerPrice(
     const materialInfo = pricingConfig.materials.find((m) => m.id === material);
     const materialMultiplier = materialInfo ? materialInfo.costMultiplier : 1.0;
 
-    const perimeterPixels = typeof existingPerimeterPixels === 'number' ? existingPerimeterPixels : calculatePerimeter(cutline);
-    const perimeterInches = perimeterPixels / ppi;
     let complexityMultiplier = 1.0;
 
-    if (pricingConfig.complexity && pricingConfig.complexity.tiers) {
-        // Bolt Optimization: Tiers are pre-sorted on load. Iterating directly.
+    if (pricingConfig.complexity && cutline) {
+        const perimeterPixels = existingPerimeterPixels !== null ? existingPerimeterPixels : calculatePerimeter(cutline);
+        const perimeterInches = perimeterPixels / ppi;
+
         for (const tier of pricingConfig.complexity.tiers) {
-            // Logic from client: perimeterInches <= tier.thresholdInches
             const threshold =
                 tier.thresholdInches === "Infinity" ? Infinity : tier.thresholdInches;
             if (perimeterInches <= threshold) {
@@ -75,6 +75,13 @@ function calculateStickerPrice(
                 break;
             }
         }
+
+        // Increment complexity for multiple image layers in a sticker pack
+        if (numImageLayers > 1) {
+            const perLayerMultiplier = pricingConfig.complexity.perLayerMultiplier || 0.1;
+            complexityMultiplier += (numImageLayers - 1) * perLayerMultiplier;
+        }
+
         // Get layer multiplier
         if (customLayers && customLayers.length > 0 && pricingConfig.layers) {
             for (const layerObj of customLayers) {

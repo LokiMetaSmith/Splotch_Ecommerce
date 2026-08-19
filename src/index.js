@@ -1936,6 +1936,7 @@ async function handlePaymentFormSubmit(event) {
 
     // 4. Create JSON payload for the order
     const orderDetails = {
+      dimensions: currentBounds,
       resolution: stickerResolutionSelect
         ? stickerResolutionSelect.value
         : "unknown",
@@ -1947,6 +1948,7 @@ async function handlePaymentFormSubmit(event) {
       stickerName: stickerName,
       promoAddon: promoAddonCheckbox ? promoAddonCheckbox.checked : false,
       customLayers: allCustomLayers.length > 0 ? allCustomLayers : null,
+      numImageLayers: typeof stickers !== "undefined" && stickers ? stickers.length : 1,
     };
     if (cutLinePath) {
       orderDetails.cutLinePath = cutLinePath;
