@@ -1977,11 +1977,6 @@ async function handlePaymentFormSubmit(event) {
     showPaymentStatus("Submitting order to server...", "info");
     console.log("[CLIENT] Submitting order to server at /api/create-order");
 
-    // [INTERCEPT] Mocking network request for UI/UX testing
-    console.log("[CLIENT] Intercepting network request for UI testing. Skipping actual server submission.");
-    const responseData = { success: true, message: "Mock order created" };
-    
-    /*
     const response = await fetch(`${serverUrl}/api/create-order`, {
       method: "POST",
       credentials: "include", // Important for cookies
@@ -2018,7 +2013,6 @@ async function handlePaymentFormSubmit(event) {
 
       throw new Error(errorMsg || "Failed to create order on server.");
     }
-    */
 
     console.log("[CLIENT] Order created successfully on server:", responseData);
     showPaymentStatus(
