@@ -814,19 +814,20 @@ async function BootStrap() {
     const handleSliderInput = debounce((e) => {
       const step = parseInt(e.target.value, 10);
       let textLabel = "1.5mm";
+      let cutlineOffsetVal = 15;
       if (step === 0) {
-        cutlineOffset = 0;
+        cutlineOffsetVal = 0;
         textLabel = "0mm (None)";
       } else if (step === 1) {
-        cutlineOffset = 15;
+        cutlineOffsetVal = 15;
         textLabel = "1.5mm";
       } else if (step === 2) {
-        cutlineOffset = 35;
+        cutlineOffsetVal = 35;
         textLabel = "3mm";
       }
 
       if (activeBase) {
-        activeBase.cutlineOffset = cutlineOffset;
+        activeBase.cutlineOffset = cutlineOffsetVal;
       }
 
       if (cutlineOffsetValueDisplay)
@@ -5459,7 +5460,9 @@ async function handleRemoteImageLoad(imageUrl) {
         ],
       ];
 
-      cutlineOffset = 15;
+      if (activeBase) {
+        activeBase.cutlineOffset = 15;
+      }
       if (cutlineOffsetSlider) {
         cutlineOffsetSlider.value = 1;
       }
