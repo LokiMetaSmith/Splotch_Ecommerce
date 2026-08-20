@@ -815,6 +815,27 @@ async function startServer(
         }
     });
 
+    // --- Printshop Config Routes ---
+    app.get('/api/admin/printshops', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        const shops = await db.getAllPrintshops();
+        res.json(shops);
+    });
+
+    app.post('/api/admin/printshops', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        const shop = req.body;
+        const saved = await db.savePrintshop(shop);
+        res.json({ success: true, shop: saved });
+    });
+
+    app.delete('/api/admin/printshops/:id', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        const { id } = req.params;
+        const success = await db.deletePrintshop(id);
+        res.json({ success });
+    });
+
     // --- Odoo Endpoints ---
     app.get('/api/admin/odoo/config', authenticateToken, async (req, res) => {
         if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
@@ -1464,7 +1485,31 @@ async function startServer(
       if (!await isAdmin(req.user)) {
         return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
       }
-      const allOrders = await db.getAllOrders();
+      let allOrders = await db.getAllOrders();
+
+      const { printshopId } = req.query;
+      if (printshopId) {
+        const shop = await db.getPrintshop(printshopId);
+        if (shop && shop.capabilities) {
+          allOrders = allOrders.filter(order => {
+             // Basic filtering: check if all stickers in the order can be handled
+             if (!order.stickers || order.stickers.length === 0) return true;
+             
+             for (const sticker of order.stickers) {
+                 const material = sticker.material || 'vinyl'; // Default
+                 if (shop.capabilities.materials && shop.capabilities.materials.length > 0) {
+                     if (!shop.capabilities.materials.includes(material)) return false;
+                 }
+                 const maxDim = Math.max(sticker.width, sticker.height);
+                 if (shop.capabilities.maxWidth && maxDim > shop.capabilities.maxWidth) {
+                     return false;
+                 }
+             }
+             return true;
+          });
+        }
+      }
+
       res.status(200).json(allOrders.slice().reverse());
     });
 

@@ -2,6 +2,7 @@ import logger from '../logger.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,9 +74,11 @@ export class LowDbAdapter {
 
     _ensureStructure() {
         // Ensure structure exists
+        // Ensure structure exists
         if (!this.db.data) this.db.data = {};
         if (!this.db.data.orders) this.db.data.orders = {};
         if (!this.db.data.batches) this.db.data.batches = {};
+        if (!this.db.data.printshops) this.db.data.printshops = {};
 
         // MIGRATION: Convert orders array to object if necessary
         if (Array.isArray(this.db.data.orders)) {
@@ -507,6 +510,34 @@ export class LowDbAdapter {
         }
 
         await this.updateUser(user);
+        return true;
+    }
+
+    // --- Printshops ---
+    async getAllPrintshops() {
+        if (!this.db.data.printshops) return [];
+        return Object.values(this.db.data.printshops);
+    }
+
+    async getPrintshop(id) {
+        if (!this.db.data.printshops) return undefined;
+        return this.db.data.printshops[id];
+    }
+
+    async savePrintshop(shop) {
+        if (!this.db.data.printshops) this.db.data.printshops = {};
+        if (!shop.id) {
+            shop.id = randomUUID();
+        }
+        this.db.data.printshops[shop.id] = shop;
+        await this._write();
+        return shop;
+    }
+
+    async deletePrintshop(id) {
+        if (!this.db.data.printshops || !this.db.data.printshops[id]) return false;
+        delete this.db.data.printshops[id];
+        await this._write();
         return true;
     }
 }

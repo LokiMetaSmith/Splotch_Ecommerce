@@ -26,6 +26,14 @@ let currentViewMode = localStorage.getItem('splotchViewMode') || 'card';
 // A single object to hold all DOM elements for cleaner management
 export const ui = {};
 
+// --- Printer & Media Configuration ---
+export const PrinterProfiles = {
+  custom: { name: "Custom (Manual Entry)", width: 12, height: 12, dpi: 96, isCustom: true, margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 } },
+  roland_bn20: { name: "Roland BN-20", width: 20, height: 20, dpi: 1440, isCustom: false, margins: { top: 1.0, bottom: 1.0, left: 0.5, right: 0.5 } },
+  hp_latex_115: { name: "HP Latex 115", width: 54, height: 54, dpi: 1200, isCustom: false, margins: { top: 0.5, bottom: 0.5, left: 0.2, right: 0.2 } },
+  epson_surecolor: { name: "Epson SureColor", width: 60, height: 60, dpi: 600, isCustom: false, margins: { top: 0.5, bottom: 0.5, left: 0.1, right: 0.1 } }
+};
+
 class ToastManager {
   constructor(element, messageElement, duration = 3000) {
     this.element = element;
@@ -324,7 +332,7 @@ function setLoggedInState(token, username) {
   ui.loginBtn.addEventListener("click", logout);
 
   hideLoginModal();
-  fetchAndDisplayOrders();
+  loadPrintshops().then(() => fetchAndDisplayOrders());
 }
 
 /**
@@ -594,9 +602,15 @@ async function fetchAndDisplayOrders(query = "") {
   ui.noOrdersMessage.style.display = "block";
 
   try {
-    const endpoint = query
+    const activePrintshop = document.getElementById("active-printshop")?.value;
+    let endpoint = query
       ? `${serverUrl}/api/orders/search?q=${encodeURIComponent(query)}`
       : `${serverUrl}/api/orders`;
+    
+    if (activePrintshop && activePrintshop !== "") {
+       const sep = endpoint.includes("?") ? "&" : "?";
+       endpoint += `${sep}printshopId=${activePrintshop}`;
+    }
     allOrders = await fetchWithAuth(endpoint);
     if (!Array.isArray(allOrders)) allOrders = [];
     // After fetching, display with the current filter (defaults to ALL)
@@ -1306,10 +1320,14 @@ async function handleNesting(e) {
   }
 
   try {
+    // Get the current measurement unit and determine the conversion factor to inches
+    const unit = document.getElementById("measurement-unit")?.value || "inches";
+    const toInches = unit === "mm" ? (1 / 25.4) : 1;
+
     // 1. Generate the complex bin polygon
     const isRollMedia = document.getElementById("rollMedia")?.checked || false;
-    const sheetWidthInches = parseFloat(document.getElementById("sheetWidth")?.value) || 12;
-    let sheetHeightInches = parseFloat(document.getElementById("sheetHeight")?.value) || 12;
+    const sheetWidthInches = (parseFloat(document.getElementById("sheetWidth")?.value) || 12) * toInches;
+    let sheetHeightInches = (parseFloat(document.getElementById("sheetHeight")?.value) || 12) * toInches;
     if (isRollMedia) {
         sheetHeightInches = 1200; // 100 feet virtual canvas for roll packing
     }
@@ -1327,15 +1345,15 @@ async function handleNesting(e) {
     cpr.AddPath(subj, ClipperLib.PolyType.ptSubject, true);
 
     const clip = [];
-    // Add edge margins
+    // Add edge margins (convert to inches, then to pixels at 96 DPI)
     const marginTop =
-      parseInt(document.getElementById("marginTop").value, 10) || 0;
+      (parseFloat(document.getElementById("marginTop").value) || 0) * toInches * 96;
     const marginBottom =
-      parseInt(document.getElementById("marginBottom").value, 10) || 0;
+      (parseFloat(document.getElementById("marginBottom").value) || 0) * toInches * 96;
     const marginLeft =
-      parseInt(document.getElementById("marginLeft").value, 10) || 0;
+      (parseFloat(document.getElementById("marginLeft").value) || 0) * toInches * 96;
     const marginRight =
-      parseInt(document.getElementById("marginRight").value, 10) || 0;
+      (parseFloat(document.getElementById("marginRight").value) || 0) * toInches * 96;
 
     // Top margin as a keep-out
     clip.push([
@@ -1947,6 +1965,143 @@ async function renderMaterialMapping(currentMappings) {
   }
 }
 
+// --- Printshop Config ---
+let printshops = [];
+
+async function loadPrintshops() {
+  try {
+    printshops = await fetchWithAuth(`${serverUrl}/api/admin/printshops`);
+    populatePrintshopSelectors();
+  } catch (err) {
+    console.error("Failed to load printshops", err);
+  }
+}
+
+function populatePrintshopSelectors() {
+  const activeSelector = document.getElementById("active-printshop");
+  const configSelector = document.getElementById("printshop-selector");
+  if (!activeSelector || !configSelector) return;
+
+  const currentActive = activeSelector.value;
+  const currentConfig = configSelector.value;
+
+  activeSelector.innerHTML = '<option value="">All Printshops</option>';
+  configSelector.innerHTML = '<option value="new">+ Create New Printshop</option>';
+
+  printshops.forEach(shop => {
+    const optActive = document.createElement("option");
+    optActive.value = shop.id;
+    optActive.textContent = shop.name;
+    activeSelector.appendChild(optActive);
+
+    const optConfig = document.createElement("option");
+    optConfig.value = shop.id;
+    optConfig.textContent = shop.name;
+    configSelector.appendChild(optConfig);
+  });
+
+  activeSelector.value = currentActive || "";
+  if (currentConfig && currentConfig !== "new" && printshops.find(s => s.id === currentConfig)) {
+      configSelector.value = currentConfig;
+      loadPrintshopForm(currentConfig);
+  } else {
+      configSelector.value = "new";
+      resetPrintshopForm();
+  }
+}
+
+function resetPrintshopForm() {
+  document.getElementById("printshop-id").value = "";
+  document.getElementById("printshop-name").value = "";
+  document.getElementById("printshop-address").value = "";
+  document.getElementById("printshop-users").value = "";
+  document.getElementById("printshop-max-width").value = "";
+  document.querySelectorAll(".printshop-material").forEach(cb => cb.checked = false);
+  document.getElementById("delete-printshop-btn").classList.add("hidden");
+}
+
+function loadPrintshopForm(id) {
+  const shop = printshops.find(s => s.id === id);
+  if (!shop) return resetPrintshopForm();
+
+  document.getElementById("printshop-id").value = shop.id;
+  document.getElementById("printshop-name").value = shop.name || "";
+  document.getElementById("printshop-address").value = shop.address || "";
+  document.getElementById("printshop-users").value = (shop.assigned_users || []).join(", ");
+  
+  document.getElementById("printshop-max-width").value = shop.capabilities?.maxWidth || "";
+  
+  const materials = shop.capabilities?.materials || [];
+  document.querySelectorAll(".printshop-material").forEach(cb => {
+      cb.checked = materials.includes(cb.value);
+  });
+  
+  document.getElementById("delete-printshop-btn").classList.remove("hidden");
+}
+
+async function savePrintshopConfig(e) {
+  e.preventDefault();
+  const btn = document.getElementById("save-printshop-btn");
+  setButtonLoading(btn, true, "Saving...");
+
+  const id = document.getElementById("printshop-id").value;
+  const name = document.getElementById("printshop-name").value;
+  const address = document.getElementById("printshop-address").value;
+  const usersStr = document.getElementById("printshop-users").value;
+  const maxWidth = document.getElementById("printshop-max-width").value;
+  
+  const materials = [];
+  document.querySelectorAll(".printshop-material:checked").forEach(cb => materials.push(cb.value));
+  
+  const assigned_users = usersStr.split(",").map(s => s.trim()).filter(s => s);
+  
+  const shop = {
+      id: id || undefined,
+      name,
+      address,
+      assigned_users,
+      capabilities: {
+          maxWidth: maxWidth ? parseFloat(maxWidth) : null,
+          materials
+      }
+  };
+
+  try {
+    await fetchWithAuth(`${serverUrl}/api/admin/printshops`, {
+      method: "POST",
+      body: JSON.stringify(shop),
+    });
+    showSuccessToast("Printshop saved.");
+    await loadPrintshops();
+    
+    if (!id && printshops.length > 0) {
+       document.getElementById("printshop-selector").value = printshops[printshops.length - 1].id;
+       loadPrintshopForm(printshops[printshops.length - 1].id);
+    }
+  } catch (error) {
+    showErrorToast(`Failed to save printshop: ${error.message}`);
+  } finally {
+    setButtonLoading(btn, false, "Save Printshop Configuration");
+  }
+}
+
+async function deletePrintshop() {
+  if (!confirm("Are you sure you want to delete this printshop?")) return;
+  const id = document.getElementById("printshop-id").value;
+  if (!id) return;
+  
+  try {
+    await fetchWithAuth(`${serverUrl}/api/admin/printshops/${id}`, {
+      method: "DELETE"
+    });
+    showSuccessToast("Printshop deleted.");
+    await loadPrintshops();
+  } catch (err) {
+    showErrorToast(`Failed to delete: ${err.message}`);
+  }
+}
+
+
 async function saveOdooConfig(e) {
   e.preventDefault();
   const btn = e.submitter || document.getElementById("save-odoo-config-btn");
@@ -2144,7 +2299,15 @@ export async function init() {
     "pricing-editor-container",
     "save-pricing-btn",
     "reload-pricing-btn",
-    "copy-pricing-btn"
+    "copy-pricing-btn",
+    "printerProfile",
+    "sheetWidth",
+    "marginTop",
+    "marginBottom",
+    "marginLeft",
+    "marginRight",
+    "measurement-unit",
+    "save-general-settings-btn"
   ];
   ids.forEach((id) => {
     // Convert kebab-case to camelCase for keys
@@ -2167,6 +2330,11 @@ export async function init() {
   // Attach event listeners immediately so UI is responsive
   ui.ordersList?.addEventListener("click", handleOrderListClick);
   ui.ordersList?.addEventListener("change", handleOrderListChange);
+    document.getElementById("active-printshop")?.addEventListener("change", () => fetchAndDisplayOrders(ui.searchInput?.value || ""));
+  document.getElementById("printshop-selector")?.addEventListener("change", (e) => loadPrintshopForm(e.target.value));
+  document.getElementById("printshop-config-form")?.addEventListener("submit", savePrintshopConfig);
+  document.getElementById("delete-printshop-btn")?.addEventListener("click", deletePrintshop);
+
   ui.refreshOrdersBtn?.addEventListener("click", () => fetchAndDisplayOrders());
   ui.registerBtn?.addEventListener("click", handleRegistration);
   ui.closeErrorToast?.addEventListener("click", hideErrorToast);
@@ -2203,6 +2371,101 @@ export async function init() {
     } else {
       ui.sheetHeight.disabled = false;
       ui.sheetHeight.classList.remove("bg-gray-200");
+    }
+  });
+
+  ui.saveGeneralSettingsBtn?.addEventListener("click", () => {
+    localStorage.setItem("splotchMeasurementUnit", ui["measurement-unit"].value);
+    showSuccessToast("General Settings saved.");
+  });
+
+  // Initialize measurement unit from localStorage if present
+  const savedUnit = localStorage.getItem("splotchMeasurementUnit");
+  if (savedUnit && ui["measurement-unit"]) {
+    ui["measurement-unit"].value = savedUnit;
+    document.querySelectorAll("h3").forEach(h3 => {
+      if (h3.textContent.includes("Sheet Dimensions")) {
+        h3.textContent = `Sheet Dimensions (${savedUnit === "mm" ? "mm" : "Inches"})`;
+      }
+      if (h3.textContent.includes("Media Margins")) {
+        h3.textContent = `Media Margins (${savedUnit === "mm" ? "mm" : "Inches"})`;
+      }
+    });
+    
+    // The HTML defaults are in inches. If we loaded "mm", we should convert the inputs.
+    if (savedUnit === "mm") {
+      const inputsToConvert = [ui.sheetWidth, ui.sheetHeight, ui.marginTop, ui.marginBottom, ui.marginLeft, ui.marginRight];
+      inputsToConvert.forEach(input => {
+        if (input && input.value) {
+          input.value = parseFloat((parseFloat(input.value) * 25.4).toFixed(2));
+        }
+      });
+    }
+  }
+
+  let lastUnit = ui["measurement-unit"]?.value || "inches";
+  ui["measurement-unit"]?.addEventListener("change", (e) => {
+    const newUnit = e.target.value;
+    if (newUnit === lastUnit) return;
+    const factor = newUnit === "mm" ? 25.4 : (1 / 25.4);
+    
+    // Convert inputs
+    const inputsToConvert = [ui.sheetWidth, ui.sheetHeight, ui.marginTop, ui.marginBottom, ui.marginLeft, ui.marginRight];
+    inputsToConvert.forEach(input => {
+      if (input && input.value) {
+        input.value = parseFloat((parseFloat(input.value) * factor).toFixed(2));
+      }
+    });
+    
+    // Update labels in HTML
+    document.querySelectorAll("h3").forEach(h3 => {
+      if (h3.textContent.includes("Sheet Dimensions")) {
+        h3.textContent = `Sheet Dimensions (${newUnit === "mm" ? "mm" : "Inches"})`;
+      }
+      if (h3.textContent.includes("Media Margins")) {
+        h3.textContent = `Media Margins (${newUnit === "mm" ? "mm" : "Inches"})`;
+      }
+    });
+
+    lastUnit = newUnit;
+  });
+
+  ui.printerProfile?.addEventListener("change", (e) => {
+    const profile = PrinterProfiles[e.target.value];
+    if (profile) {
+      if (profile.isCustom) {
+        ui.sheetWidth.disabled = false;
+        ui.sheetWidth.classList.remove("bg-gray-200");
+        ui.marginTop.disabled = false;
+        ui.marginTop.classList.remove("bg-gray-200");
+        ui.marginBottom.disabled = false;
+        ui.marginBottom.classList.remove("bg-gray-200");
+        ui.marginLeft.disabled = false;
+        ui.marginLeft.classList.remove("bg-gray-200");
+        ui.marginRight.disabled = false;
+        ui.marginRight.classList.remove("bg-gray-200");
+      } else {
+        const toCurrentUnit = ui["measurement-unit"]?.value === "mm" ? 25.4 : 1;
+        ui.sheetWidth.value = parseFloat((profile.width * toCurrentUnit).toFixed(2));
+        // Keep height user configurable unless it's roll media
+        
+        ui.marginTop.value = parseFloat((profile.margins.top * toCurrentUnit).toFixed(2));
+        ui.marginBottom.value = parseFloat((profile.margins.bottom * toCurrentUnit).toFixed(2));
+        ui.marginLeft.value = parseFloat((profile.margins.left * toCurrentUnit).toFixed(2));
+        ui.marginRight.value = parseFloat((profile.margins.right * toCurrentUnit).toFixed(2));
+
+        // Disable the inputs so they are read-only for standard profiles
+        ui.sheetWidth.disabled = true;
+        ui.sheetWidth.classList.add("bg-gray-200");
+        ui.marginTop.disabled = true;
+        ui.marginTop.classList.add("bg-gray-200");
+        ui.marginBottom.disabled = true;
+        ui.marginBottom.classList.add("bg-gray-200");
+        ui.marginLeft.disabled = true;
+        ui.marginLeft.classList.add("bg-gray-200");
+        ui.marginRight.disabled = true;
+        ui.marginRight.classList.add("bg-gray-200");
+      }
     }
   });
   ui.searchInput?.addEventListener("keyup", (e) => {
