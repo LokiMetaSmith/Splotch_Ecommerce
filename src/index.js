@@ -196,6 +196,7 @@ let widthInputEl, heightInputEl;
 let canvasPlaceholder;
 let canvasLegendContainer;
 let canvasLoadingOverlay, canvasLoadingText, canvasLoadingSubtext;
+let isExporting = false;
 
 export function showCanvasLoading(
   mainText = "Processing Image...",
@@ -1838,10 +1839,17 @@ async function handlePaymentFormSubmit(event) {
         "Could not retrieve a new security token for file upload.",
       );
     }
-    // 1. Get image data from canvas as a Blob
+    // 1. Get image data from canvas as a Blob without UI decorations
+    isExporting = true;
+    doRedrawAll(); // Force synchronous redraw without UI
+    
     const designImageBlob = await new Promise((resolve) =>
       canvas.toBlob(resolve, "image/png"),
     );
+    
+    isExporting = false;
+    redrawAll(); // Restore UI
+    
     if (!designImageBlob) {
       throw new Error("Could not get image data from canvas.");
     }
@@ -2264,7 +2272,7 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   if (!canvas || !ctx) return;
   baseCanvasWidth = logicalWidth;
   baseCanvasHeight = logicalHeight;
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = isExporting ? 1 : (window.devicePixelRatio || 1);
 
   // Set the "actual" size of the canvas in device pixels
   canvas.width = logicalWidth * dpr;
@@ -2836,12 +2844,12 @@ function doRedrawAll() {
   }
   const ppiScale = ppi / 96;
   const scale = Math.max(currentBounds.width, currentBounds.height) / 500;
-  const padding = Math.max(Math.round(60 * ppiScale), Math.round(40 * scale));
+  const padding = isExporting ? 0 : Math.max(Math.round(60 * ppiScale), Math.round(40 * scale));
 
   const logicalWidth = currentBounds.width + padding * 2;
   const logicalHeight = currentBounds.height + padding * 2;
 
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = isExporting ? 1 : (window.devicePixelRatio || 1);
   const targetPhysicalWidth = Math.round(logicalWidth * dpr);
   const targetPhysicalHeight = Math.round(logicalHeight * dpr);
 
@@ -2860,25 +2868,27 @@ function doRedrawAll() {
   };
 
   // Fill entire canvas with white for the ruler/padding area
-  ctx.save();
-  ctx.fillStyle = "white";
-  ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+  if (!isExporting) {
+    ctx.save();
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
-  // Cut out the organic sheet boundary so the CSS background (Magenta/Black) shows through
-  if (organicSheetCutline && organicSheetCutline.length > 0) {
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath();
-    organicSheetCutline.forEach((poly) => {
-      if (!poly || poly.length === 0) return;
-      ctx.moveTo(poly[0].x + drawOffset.x, poly[0].y + drawOffset.y);
-      for (let i = 1; i < poly.length; i++) {
-        ctx.lineTo(poly[i].x + drawOffset.x, poly[i].y + drawOffset.y);
-      }
-      ctx.closePath();
-    });
-    ctx.fill();
+    // Cut out the organic sheet boundary so the CSS background (Magenta/Black) shows through
+    if (organicSheetCutline && organicSheetCutline.length > 0) {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath();
+      organicSheetCutline.forEach((poly) => {
+        if (!poly || poly.length === 0) return;
+        ctx.moveTo(poly[0].x + drawOffset.x, poly[0].y + drawOffset.y);
+        for (let i = 1; i < poly.length; i++) {
+          ctx.lineTo(poly[i].x + drawOffset.x, poly[i].y + drawOffset.y);
+        }
+        ctx.closePath();
+      });
+      ctx.fill();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   drawCanvasDecorations(currentBounds, drawOffset);
   
@@ -3489,7 +3499,7 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
   stickers.forEach((layer) => {
     if (layer.visible !== false) {
       // 1. Draw White Vinyl Background (Bleed)
-      if (layer.currentCutline && layer.currentCutline.length > 0) {
+      if (!isExporting && layer.currentCutline && layer.currentCutline.length > 0) {
         ctx.save();
         ctx.lineJoin = "round";
         ctx.beginPath();
@@ -3607,46 +3617,48 @@ function drawCanvasDecorations(bounds, offset = { x: 0, y: 0 }, customImageToDra
   });
 
   // Pass 4: Draw All Kiss Cuts (Cyan)
-  stickers.forEach((layer, index) => {
-    const isSelected = activeStickerIndex === index;
-    const isSvgLayer = !layer.image && !layer.originalImage;
-    // 1) The layer is selected OR 2) It is the cutline layer and we want to draw it based on layerOrder OR 3) it's an SVG and we always draw it
-    const shouldDraw = (typeof activeBase.layerOrder !== "undefined" && activeBase.layerOrder.includes("cutline")) || isSelected || isSvgLayer;
-    
-    if (shouldDraw && layer.currentCutline && layer.currentCutline.length > 0 && layer.visible !== false) {
-      const layerOffset = {
-        x: offset.x + (layer.x || 0),
-        y: offset.y + (layer.y || 0),
-      };
+  if (!isExporting) {
+    stickers.forEach((layer, index) => {
+      const isSelected = activeStickerIndex === index;
+      const isSvgLayer = !layer.image && !layer.originalImage;
+      // 1) The layer is selected OR 2) It is the cutline layer and we want to draw it based on layerOrder OR 3) it's an SVG and we always draw it
+      const shouldDraw = (typeof activeBase.layerOrder !== "undefined" && activeBase.layerOrder.includes("cutline")) || isSelected || isSvgLayer;
+      
+      if (shouldDraw && layer.currentCutline && layer.currentCutline.length > 0 && layer.visible !== false) {
+        const layerOffset = {
+          x: offset.x + (layer.x || 0),
+          y: offset.y + (layer.y || 0),
+        };
+        drawPolygonsToCanvas(
+          layer.currentCutline,
+          "cyan",
+          layerOffset,
+          true,
+          isSelected
+        );
+      }
+    });
+
+    // Pass 5: Draw Sheet Boundary (Die Cut - Red)
+    if (organicSheetCutline) {
       drawPolygonsToCanvas(
-        layer.currentCutline,
-        "cyan",
-        layerOffset,
+        organicSheetCutline,
+        "red",
+        offset,
         true,
-        isSelected
+        activeStickerIndex === 'boundary'
       );
     }
-  });
 
-  // Pass 5: Draw Sheet Boundary (Die Cut - Red)
-  if (organicSheetCutline) {
-    drawPolygonsToCanvas(
-      organicSheetCutline,
-      "red",
-      offset,
-      true,
-      activeStickerIndex === 'boundary'
-    );
-  }
-
-  drawBoundingBox(bounds, offset);
-  
-  // Draw dimensions and ruler
-  if (typeof drawRuler === 'function') {
-      drawRuler(bounds, offset);
-  }
-  if (typeof drawSizeIndicator === 'function') {
-      drawSizeIndicator(bounds, offset);
+    drawBoundingBox(bounds, offset);
+    
+    // Draw dimensions and ruler
+    if (typeof drawRuler === 'function') {
+        drawRuler(bounds, offset);
+    }
+    if (typeof drawSizeIndicator === 'function') {
+        drawSizeIndicator(bounds, offset);
+    }
   }
 }
 
@@ -5387,10 +5399,17 @@ async function handleCreateProduct() {
   }
 
   try {
-    // 2. Upload Design
+    // 2. Upload Design without UI decorations
+    isExporting = true;
+    doRedrawAll();
+    
     const designImageBlob = await new Promise((resolve) =>
       canvas.toBlob(resolve, "image/png"),
     );
+    
+    isExporting = false;
+    redrawAll();
+
     const uploadFormData = new FormData();
     uploadFormData.append("designImage", designImageBlob, "design.png");
 
