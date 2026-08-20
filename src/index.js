@@ -4589,6 +4589,11 @@ function rotateCanvasContentFixedBounds(angleDegrees) {
     ctx.restore(); // Restore the transform for subsequent drawing operations (decorations)
 
     saveCleanState(); // Save state before decorations
+    
+    // Bolt Fix: Update the layer's image reference so redrawAll() correctly renders the rotated image
+    activeBase.image = tempCanvas;
+    activeBase.width = newW;
+    activeBase.height = newH;
 
     // Handle Raster Cutline Rotation (Overlay Mode)
     if (activeBase.rasterCutlinePoly) {

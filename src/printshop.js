@@ -767,7 +767,7 @@ function filterAndDisplayOrders(status) {
 function displayOrderRow(order) {
   const orderId = order.orderId;
   const receivedAt = new Date(order.receivedAt).toLocaleString();
-  const quantity = order.quantity || 0;
+  const quantity = order.orderDetails?.quantity || order.quantity || 0;
   const price = (order.amount / 100).toFixed(2);
 
   const billingName = escapeHtml(
@@ -1446,6 +1446,20 @@ async function handleNesting(e) {
           viewBox = `0 0 ${parseFloat(width)} ${parseFloat(height)}`;
         }
 
+        const availW = binWidth - marginLeft - marginRight;
+        const availH = binHeight - marginTop - marginBottom;
+        const svgW = parseFloat(width);
+        const svgH = parseFloat(height);
+        
+        if (!isNaN(svgW) && !isNaN(svgH)) {
+          const fitsNormal = svgW <= availW && svgH <= availH;
+          const fitsRotated = svgW <= availH && svgH <= availW;
+          if (!fitsNormal && !fitsRotated) {
+            const orderId = img.closest('.order-row, .order-card')?.dataset?.orderId || "unknown";
+            throw new Error(`Sticker for order ${orderId.substring(0, 8)} (${Math.round(svgW)}x${Math.round(svgH)}px) is too large for the printable area (${Math.round(availW)}x${Math.round(availH)}px). Please reduce margins or use a larger sheet.`);
+          }
+        }
+
         const unifiedSvg = document.createElementNS(
           "http://www.w3.org/2000/svg",
           "svg",
@@ -1687,6 +1701,9 @@ async function handleNesting(e) {
         // 5. Display result
         const sanitizedSvg = DOMPurify.sanitize(finalSvg, {
           USE_PROFILES: { svg: true },
+          ADD_TAGS: ['image'],
+          ADD_ATTR: ['href', 'xlink:href'],
+          ADD_DATA_URI_TAGS: ['image']
         });
         
         window.nestedSvgs.push(sanitizedSvg);
