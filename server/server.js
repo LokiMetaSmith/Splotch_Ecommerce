@@ -381,7 +381,7 @@ async function startServer(
     const upload = multer({
       storage: storage,
       limits: {
-        fileSize: 10 * 1024 * 1024, // 10 MB limit
+        fileSize: 150 * 1024 * 1024, // 150 MB limit
         files: 5,                   // Max 5 file fields
         fields: 50,                 // Max 50 non-file fields
         parts: 100                  // Max 100 parts total

@@ -1391,7 +1391,7 @@ function calculateAndUpdatePrice() {
   }
 
   const bounds = currentBounds;
-  const cutline = activeBase.currentCutline;
+  const cutline = (organicSheetCutline && organicSheetCutline.length > 0) ? organicSheetCutline : activeBase.currentCutline;
 
   if (isNaN(quantity) || quantity < 0) {
     currentOrderAmountCents = 0;
