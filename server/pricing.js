@@ -92,7 +92,7 @@ function calculateStickerPrice(
                     continue;
                 }
       
-                const layerConfig = pricingConfig.layers.find((l) => l.name === layerObj.type);
+                const layerConfig = pricingConfig.layers.find((l) => l.id === layerObj.type || l.name === layerObj.type || l.name.toLowerCase() === layerObj.type.toLowerCase());
                 if (layerConfig) {
                     let currentLayerCost = (layerConfig.costMultiplier || 1.0);
         

@@ -1296,6 +1296,35 @@ async function BootStrap() {
     }
   });
 
+  const cutLineFileInput = document.getElementById("cutLineFile");
+  if (cutLineFileInput) {
+    cutLineFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file && (file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg"))) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const parser = new SVGParser();
+          try {
+            parser.load(ev.target.result);
+            parser.cleanInput();
+            const polygons = parser.getPolygons();
+            if (polygons && polygons.length > 0) {
+              activeBase.currentCutline = polygons;
+              currentBounds = getPolygonsBounds(polygons);
+              setCanvasSize(currentBounds.width, currentBounds.height);
+              calculateAndUpdatePrice();
+              redrawAll();
+              showNotification("Custom cutline updated.", "success");
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
   // Initial UI state
   if (!productIdParam) {
     updateEditingButtonsState(!activeBase.originalImage);

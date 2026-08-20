@@ -1214,7 +1214,8 @@ async function startServer(
             resolution: orderDetails.resolution,
             cutLinePath: orderDetails.cutLinePath,
             promoAddon: orderDetails.promoAddon || false,
-            customLayers: orderDetails.customLayers || []
+            customLayers: orderDetails.customLayers || [],
+            numImageLayers: orderDetails.numImageLayers || 1
         };
 
         // --- Product / Creator Payout Logic ---
