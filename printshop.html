@@ -630,21 +630,13 @@
               <input type="text" id="printshop-users" class="w-full p-2 border rounded-md" placeholder="e.g. alice@printshop.com, bob@printshop.com" />
             </div>
 
-            <h3 class="text-xl font-bold mt-4">Capabilities</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border p-4 rounded-md bg-gray-50">
-               <div>
-                  <label for="printshop-max-width" class="block font-bold mb-1">Max Roll Width (inches)</label>
-                  <input type="number" step="0.1" id="printshop-max-width" class="w-full p-2 border rounded-md" placeholder="e.g. 54" />
-               </div>
-               <div>
-                  <label class="block font-bold mb-1">Supported Materials</label>
-                  <div class="flex flex-wrap items-center gap-4">
-                     <label><input type="checkbox" name="materials" value="vinyl" class="mr-1 printshop-material"> Vinyl</label>
-                     <label><input type="checkbox" name="materials" value="holographic" class="mr-1 printshop-material"> Holographic</label>
-                     <label><input type="checkbox" name="materials" value="clear" class="mr-1 printshop-material"> Clear</label>
-                  </div>
-               </div>
+                        <h3 class="text-xl font-bold mt-4">Machines &amp; Capabilities</h3>
+            <div id="printshop-machines-list" class="space-y-4">
+              <!-- Machines injected here -->
             </div>
+            <button type="button" id="add-machine-btn" class="text-blue-600 font-bold hover:underline">
+              + Add Machine
+            </button>
 
             <div class="flex justify-between items-center pt-4 border-t">
               <button type="button" id="delete-printshop-btn" class="text-red-600 hover:text-red-800 hidden">
@@ -956,5 +948,89 @@
       </button>
     </div>
     <script type="module" src="./src/version.js"></script>
+
+<template id="machine-template">
+  <div class="machine-card border p-4 rounded-md bg-gray-50 relative">
+    <button type="button" class="remove-machine-btn absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold" title="Remove Machine">X</button>
+    
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div>
+        <label class="block font-bold mb-1 text-sm">Machine Type</label>
+        <select class="machine-type w-full p-2 border rounded-md text-sm">
+          <option value="printer">Printer / Printer-Cutter</option>
+          <option value="vinyl_cutter">Vinyl Cutter</option>
+          <option value="table_cutter">Table Cutter</option>
+          <option value="heat_press">Heat Press</option>
+          <option value="film_shaker">Film Shaker</option>
+          <option value="cnc_cutter">CNC Cutter</option>
+          <option value="laser_cutter">Laser Cutter</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="block font-bold mb-1 text-sm">Model Number</label>
+        <input type="text" class="machine-model w-full p-2 border rounded-md text-sm" placeholder="e.g. Roland BN-20" required />
+      </div>
+      <div>
+        <label class="block font-bold mb-1 text-sm">Serial Number</label>
+        <input type="text" class="machine-serial w-full p-2 border rounded-md text-sm" placeholder="e.g. SN-12345" />
+      </div>
+      <div>
+        <label class="block font-bold mb-1 text-sm">Status</label>
+        <select class="machine-status w-full p-2 border rounded-md text-sm">
+          <option value="working">Working</option>
+          <option value="down">Down</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="mb-4">
+      <label class="block font-bold mb-1 text-sm">Supported Media Types</label>
+      <div class="flex space-x-4 text-sm">
+        <label><input type="checkbox" class="machine-media-type mr-1" value="roll" checked> Roll</label>
+        <label><input type="checkbox" class="machine-media-type mr-1" value="flat"> Flat</label>
+        <label><input type="checkbox" class="machine-media-type mr-1" value="sheets"> Sheets</label>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block font-bold mb-1 text-sm">Supported Materials</label>
+        <div class="machine-materials-container text-sm space-y-1 max-h-32 overflow-y-auto border p-2 bg-white rounded">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+      <div>
+        <label class="block font-bold mb-1 text-sm">Supported Print Layers</label>
+        <div class="machine-layers-container text-sm space-y-1 max-h-32 overflow-y-auto border p-2 bg-white rounded">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block font-bold mb-1 text-sm">Supported Resolutions</label>
+        <div class="machine-resolutions-container text-sm space-y-1 max-h-32 overflow-y-auto border p-2 bg-white rounded">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+      <div>
+        <label class="block font-bold mb-1 text-sm">Max Cutline Complexity</label>
+        <select class="machine-complexity-select w-full p-2 border rounded-md text-sm">
+          <option value="">Any (No Limit)</option>
+          <!-- Injected dynamically -->
+        </select>
+      </div>
+    </div>
+    
+    <div class="mb-2">
+      <label class="block font-bold mb-1 text-sm">Bulk Quantity Discounts (Machine Specific)</label>
+      <div class="machine-discounts-list space-y-2 mb-2"></div>
+      <button type="button" class="add-discount-btn text-blue-600 text-sm hover:underline">+ Add Discount Tier</button>
+    </div>
+  </div>
+</template>
+
 </body>
 </html>

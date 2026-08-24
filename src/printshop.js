@@ -1720,7 +1720,7 @@ async function handleNesting(e) {
         const sanitizedSvg = DOMPurify.sanitize(finalSvg, {
           USE_PROFILES: { svg: true },
           ADD_TAGS: ['image'],
-          ADD_ATTR: ['href', 'xlink:href'],
+          ADD_ATTR: ['href', 'xlink:href', 'class'],
           ADD_DATA_URI_TAGS: ['image']
         });
         
@@ -1970,6 +1970,9 @@ let printshops = [];
 
 async function loadPrintshops() {
   try {
+    if (!currentPricingConfig || !currentPricingConfig.materials) {
+        currentPricingConfig = await fetchWithAuth(`${serverUrl}/api/pricing-info`);
+    }
     printshops = await fetchWithAuth(`${serverUrl}/api/admin/printshops`);
     populatePrintshopSelectors();
   } catch (err) {
@@ -2015,8 +2018,7 @@ function resetPrintshopForm() {
   document.getElementById("printshop-name").value = "";
   document.getElementById("printshop-address").value = "";
   document.getElementById("printshop-users").value = "";
-  document.getElementById("printshop-max-width").value = "";
-  document.querySelectorAll(".printshop-material").forEach(cb => cb.checked = false);
+  document.getElementById("printshop-machines-list").innerHTML = "";
   document.getElementById("delete-printshop-btn").classList.add("hidden");
 }
 
@@ -2029,15 +2031,110 @@ function loadPrintshopForm(id) {
   document.getElementById("printshop-address").value = shop.address || "";
   document.getElementById("printshop-users").value = (shop.assigned_users || []).join(", ");
   
-  document.getElementById("printshop-max-width").value = shop.capabilities?.maxWidth || "";
-  
-  const materials = shop.capabilities?.materials || [];
-  document.querySelectorAll(".printshop-material").forEach(cb => {
-      cb.checked = materials.includes(cb.value);
-  });
+  const machinesList = document.getElementById("printshop-machines-list");
+  machinesList.innerHTML = "";
+  if (shop.machines && Array.isArray(shop.machines)) {
+      shop.machines.forEach(m => addMachineCard(m));
+  }
   
   document.getElementById("delete-printshop-btn").classList.remove("hidden");
 }
+
+function addMachineCard(machineData = null) {
+    const template = document.getElementById("machine-template");
+    const container = document.getElementById("printshop-machines-list");
+    const clone = template.content.cloneNode(true);
+    
+    const card = clone.querySelector(".machine-card");
+    // Generate unique ID for this card
+    const cardId = 'machine-' + Math.random().toString(36).substr(2, 9);
+    card.dataset.id = cardId;
+    
+    // Inject pricing checkboxes dynamically
+    if (currentPricingConfig) {
+        const matContainer = card.querySelector(".machine-materials-container");
+        (currentPricingConfig.materials || []).forEach(mat => {
+            matContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-mat-cb mr-1" value="${mat.id}"> ${mat.name}</label>`;
+        });
+        
+        const layContainer = card.querySelector(".machine-layers-container");
+        (currentPricingConfig.layers || []).forEach(lay => {
+            layContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-lay-cb mr-1" value="${lay.id}"> ${lay.name}</label>`;
+        });
+        
+        const resContainer = card.querySelector(".machine-resolutions-container");
+        (currentPricingConfig.resolutions || []).forEach(res => {
+            resContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-res-cb mr-1" value="${res.id}"> ${res.name}</label>`;
+        });
+        
+        const cxSelect = card.querySelector(".machine-complexity-select");
+        if (currentPricingConfig.complexity && currentPricingConfig.complexity.tiers) {
+            currentPricingConfig.complexity.tiers.forEach(tier => {
+                cxSelect.innerHTML += `<option value="${tier.thresholdInches}">Up to ${tier.thresholdInches} inches</option>`;
+            });
+        }
+    }
+    
+    // Bind remove button
+    card.querySelector(".remove-machine-btn").addEventListener("click", () => card.remove());
+    
+    // Bind add discount button
+    card.querySelector(".add-discount-btn").addEventListener("click", () => {
+        const list = card.querySelector(".machine-discounts-list");
+        const div = document.createElement("div");
+        div.className = "flex items-center space-x-2 discount-tier";
+        div.innerHTML = `
+            <span>Qty:</span>
+            <input type="number" class="discount-qty p-1 border rounded w-20" min="1" placeholder="e.g. 1000">
+            <span>Discount:</span>
+            <input type="number" step="0.01" class="discount-val p-1 border rounded w-20" placeholder="e.g. 0.2">
+            <button type="button" class="text-red-500 font-bold ml-2" onclick="this.parentElement.remove()">X</button>
+        `;
+        list.appendChild(div);
+    });
+    
+    // Populate data if editing
+    if (machineData) {
+        if(machineData.id) card.dataset.machineId = machineData.id;
+        card.querySelector(".machine-type").value = machineData.type || "printer";
+        card.querySelector(".machine-model").value = machineData.modelNumber || "";
+        card.querySelector(".machine-serial").value = machineData.serialNumber || "";
+        card.querySelector(".machine-status").value = machineData.status || "working";
+        card.querySelector(".machine-complexity-select").value = machineData.maxCutlineTier || "";
+        
+        const media = machineData.supportedMedia || [];
+        card.querySelectorAll(".machine-media-type").forEach(cb => cb.checked = media.includes(cb.value));
+        
+        const mats = machineData.supportedMaterials || [];
+        card.querySelectorAll(".machine-mat-cb").forEach(cb => cb.checked = mats.includes(cb.value));
+        
+        const lays = machineData.supportedLayers || [];
+        card.querySelectorAll(".machine-lay-cb").forEach(cb => cb.checked = lays.includes(cb.value));
+        
+        const res = machineData.supportedResolutions || [];
+        card.querySelectorAll(".machine-res-cb").forEach(cb => cb.checked = res.includes(cb.value));
+        
+        if (machineData.bulkDiscounts) {
+            const list = card.querySelector(".machine-discounts-list");
+            machineData.bulkDiscounts.forEach(d => {
+                const div = document.createElement("div");
+                div.className = "flex items-center space-x-2 discount-tier";
+                div.innerHTML = `
+                    <span>Qty:</span>
+                    <input type="number" class="discount-qty p-1 border rounded w-20" value="${d.quantity}">
+                    <span>Discount:</span>
+                    <input type="number" step="0.01" class="discount-val p-1 border rounded w-20" value="${d.discount}">
+                    <button type="button" class="text-red-500 font-bold ml-2" onclick="this.parentElement.remove()">X</button>
+                `;
+                list.appendChild(div);
+            });
+        }
+    }
+    
+    container.appendChild(card);
+}
+
+document.getElementById("add-machine-btn")?.addEventListener("click", () => addMachineCard());
 
 async function savePrintshopConfig(e) {
   e.preventDefault();
@@ -2048,22 +2145,50 @@ async function savePrintshopConfig(e) {
   const name = document.getElementById("printshop-name").value;
   const address = document.getElementById("printshop-address").value;
   const usersStr = document.getElementById("printshop-users").value;
-  const maxWidth = document.getElementById("printshop-max-width").value;
-  
-  const materials = [];
-  document.querySelectorAll(".printshop-material:checked").forEach(cb => materials.push(cb.value));
   
   const assigned_users = usersStr.split(",").map(s => s.trim()).filter(s => s);
+  
+  const machines = [];
+  document.querySelectorAll(".machine-card").forEach(card => {
+      const type = card.querySelector(".machine-type").value;
+      const modelNumber = card.querySelector(".machine-model").value;
+      const serialNumber = card.querySelector(".machine-serial").value;
+      const status = card.querySelector(".machine-status").value;
+      const maxCutlineTier = card.querySelector(".machine-complexity-select").value;
+      
+      const supportedMedia = Array.from(card.querySelectorAll(".machine-media-type:checked")).map(cb => cb.value);
+      const supportedMaterials = Array.from(card.querySelectorAll(".machine-mat-cb:checked")).map(cb => cb.value);
+      const supportedLayers = Array.from(card.querySelectorAll(".machine-lay-cb:checked")).map(cb => cb.value);
+      const supportedResolutions = Array.from(card.querySelectorAll(".machine-res-cb:checked")).map(cb => cb.value);
+      
+      const bulkDiscounts = [];
+      card.querySelectorAll(".discount-tier").forEach(div => {
+          const q = parseInt(div.querySelector(".discount-qty").value);
+          const v = parseFloat(div.querySelector(".discount-val").value);
+          if (!isNaN(q) && !isNaN(v)) bulkDiscounts.push({ quantity: q, discount: v });
+      });
+      
+      machines.push({
+          id: card.dataset.machineId || undefined,
+          type,
+          modelNumber,
+          serialNumber,
+          status,
+          supportedMedia,
+          supportedMaterials,
+          supportedLayers,
+          supportedResolutions,
+          maxCutlineTier: maxCutlineTier || undefined,
+          bulkDiscounts
+      });
+  });
   
   const shop = {
       id: id || undefined,
       name,
       address,
       assigned_users,
-      capabilities: {
-          maxWidth: maxWidth ? parseFloat(maxWidth) : null,
-          materials
-      }
+      machines
   };
 
   try {
@@ -2084,6 +2209,7 @@ async function savePrintshopConfig(e) {
     setButtonLoading(btn, false, "Save Printshop Configuration");
   }
 }
+
 
 async function deletePrintshop() {
   if (!confirm("Are you sure you want to delete this printshop?")) return;

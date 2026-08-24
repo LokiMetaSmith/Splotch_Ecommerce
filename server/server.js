@@ -1488,11 +1488,47 @@ async function startServer(
       let allOrders = await db.getAllOrders();
 
       const { printshopId } = req.query;
-      if (printshopId) {
+            if (printshopId) {
         const shop = await db.getPrintshop(printshopId);
-        if (shop && shop.capabilities) {
+        if (shop && shop.machines && shop.machines.length > 0) {
+          const workingMachines = shop.machines.filter(m => m.status === 'working');
+          
           allOrders = allOrders.filter(order => {
-             // Basic filtering: check if all stickers in the order can be handled
+             if (!order.stickers || order.stickers.length === 0) return true;
+             
+             return order.stickers.every(sticker => {
+                 const material = sticker.material || 'pp_standard'; // Default
+                 const resId = sticker.resolution ? sticker.resolution.id : null;
+                 const layers = sticker.customLayers && sticker.customLayers.length > 0 ? sticker.customLayers : ['cmyk'];
+                 
+                 return workingMachines.some(m => {
+                     // Check material
+                     if (m.supportedMaterials && m.supportedMaterials.length > 0) {
+                         if (!m.supportedMaterials.includes(material)) return false;
+                     }
+                     
+                     // Check resolution
+                     if (resId && m.supportedResolutions && m.supportedResolutions.length > 0) {
+                         if (!m.supportedResolutions.includes(resId)) return false;
+                     }
+                     
+                     // Check layers
+                     if (m.supportedLayers && m.supportedLayers.length > 0) {
+                         const hasAllLayers = layers.every(l => {
+                             const type = typeof l === 'string' ? l : l.type;
+                             // Fallback to true if layer type is not tracked, but generally all should be checked
+                             return m.supportedLayers.includes(type);
+                         });
+                         if (!hasAllLayers) return false;
+                     }
+                     
+                     return true;
+                 });
+             });
+          });
+        } else if (shop && shop.capabilities) {
+          // Fallback for legacy printshops
+          allOrders = allOrders.filter(order => {
              if (!order.stickers || order.stickers.length === 0) return true;
              
              for (const sticker of order.stickers) {
