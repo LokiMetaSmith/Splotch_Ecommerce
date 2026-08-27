@@ -16,3 +16,7 @@ This application follows a standard client-server architecture. It consists of t
 
 3.  **Print Shop Dashboard (`printshop.html`, `printshop.js`)**: This is an internal-facing dashboard for the print shop to view and manage incoming orders. This page **fetches all its data from the Node.js server** via API calls.
 
+## Core Principles
+*   **No Customer Accounts**: We do not implement or support user accounts for customers.
+*   **No Shopping Carts**: We do not use shopping carts. Items are bundled together and shipped as they complete. Do not build cart functionality.
+

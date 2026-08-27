@@ -357,6 +357,9 @@ function logout() {
   const noOrdersText = document.getElementById("no-orders-text");
   if (noOrdersText) noOrdersText.textContent = "Please log in to view orders.";
   ui.noOrdersMessage.style.display = "block";
+
+  // Automatically show the login modal if we are logged out
+  showLoginModal();
 }
 
 /**

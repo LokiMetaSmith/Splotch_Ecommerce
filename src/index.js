@@ -33,8 +33,8 @@ import Sortable from "sortablejs";
 
 // index.js
 
-const appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
-const locationId = "LTS82DEX24XR0";
+let appId = "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA";
+let locationId = "LTS82DEX24XR0";
 const serverUrl = ""; // Define server URL once
 
 // Web Workers for heavy processing
@@ -578,9 +578,29 @@ async function BootStrap() {
       setTemplate("thank_you"),
     );
 
-  // Fetch CSRF token and pricing info
-  // Fetch CSRF token first to establish the session cookie, avoiding race conditions with other requests
+  // Fetch CSRF token, config, pricing, and inventory
   await fetchCsrfToken();
+  const configRes = await fetch(`${serverUrl}/api/config`);
+  if (configRes.ok) {
+      const config = await configRes.json();
+      appId = config.squareAppId || appId;
+      locationId = config.squareLocationId || locationId;
+      
+      const scriptUrl = config.squareEnvironment === 'production' 
+          ? "https://web.squarecdn.com/v1/square.js" 
+          : "https://sandbox.web.squarecdn.com/v1/square.js";
+          
+      // Dynamically load the Square script
+      await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = scriptUrl;
+          script.type = 'text/javascript';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+      });
+  }
+
   await Promise.all([fetchPricingInfo(), fetchInventory()]);
 
   // Initialize Square Payments SDK
