@@ -49,6 +49,7 @@ import { startTelegramWorker } from './workers/telegramWorker.js';
 import { startOdooWorker } from './workers/odooWorker.js';
 import { emailQueue, telegramQueue, odooQueue, redisAvailable } from './queueManager.js';
 import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
+import { processIncomingOrderToDropBox } from './utils/usbDropBox.js'; // SBC Drop Box Integration
 import { wafMiddleware } from './waf.js';
 import OdooClient from './odoo.js';
 import { exec, execFile } from 'child_process';
@@ -1432,6 +1433,11 @@ async function startServer(
 
         await db.createOrder(newOrder);
         logger.info(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
+
+        // Async trigger physical USB drop box processing & RGB indicator
+        processIncomingOrderToDropBox(newOrder, storageProvider).catch(err => {
+            logger.error(`[DropBox] Background task failed: ${err.message}`);
+        });
 
         // Send Telegram notification
         if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
