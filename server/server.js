@@ -1730,6 +1730,71 @@ async function startServer(
         }
     });
 
+
+    // Get messages for an order
+    app.get('/api/orders/:orderId/messages', authenticateToken, validateId('orderId'), async (req, res) => {
+        try {
+            const orderId = req.params.orderId;
+            const order = await db.get('orders').find({ id: orderId }).value();
+            if (!order) return res.status(404).json({ error: 'Order not found' });
+            
+            res.json(order.messages || []);
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+            res.status(500).json({ error: 'Failed to fetch messages' });
+        }
+    });
+
+    // Send a message (email) to the customer
+    app.post('/api/orders/:orderId/messages', authenticateToken, validateId('orderId'), [
+        body('message').isString().trim().notEmpty().withMessage('Message is required')
+    ], async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+        try {
+            const orderId = req.params.orderId;
+            const { message } = req.body;
+            
+            const order = await db.get('orders').find({ id: orderId }).value();
+            if (!order) return res.status(404).json({ error: 'Order not found' });
+
+            const customerEmail = order.customerEmail || order.email || order.userEmail;
+            if (!customerEmail) return res.status(400).json({ error: 'Customer email not found for this order' });
+
+            const newMessage = {
+                id: crypto.randomUUID(),
+                sender: 'printshop',
+                content: message,
+                timestamp: new Date().toISOString()
+            };
+
+            // Initialize messages if needed
+            if (!order.messages) {
+                order.messages = [];
+            }
+            order.messages.push(newMessage);
+
+            // Send email (dynamic import for the email utility so we don't break if not at top)
+            try {
+                const { sendEmail } = await import('./utils/email.js');
+                await sendEmail({
+                    to: customerEmail,
+                    subject: `Update on your Splotch order #${orderId.substring(0, 8)}`,
+                    text: `Hello,\n\nRegarding your order #${orderId.substring(0, 8)}:\n\n${message}\n\nThanks,\nSplotch Print Shop`
+                });
+            } catch(emailErr) {
+                console.error("Failed to send email, but logged message to DB", emailErr);
+            }
+
+            await db.write();
+            res.status(201).json(newMessage);
+        } catch (error) {
+            console.error('Error sending message:', error);
+            res.status(500).json({ error: 'Failed to send message' });
+        }
+    });
+
     app.post('/api/orders/:orderId/status', authenticateToken, [
       ...validateId('orderId'),
       body('status').notEmpty().withMessage('status is required').isIn(VALID_STATUSES).withMessage('Invalid status'),

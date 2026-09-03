@@ -22,6 +22,10 @@ let JWKS; // To hold the remote key set verifier
 const svgCache = new Map(); // Cache for SVG strings to avoid redundant fetches
 let currentViewMode = localStorage.getItem('splotchViewMode') || 'card';
 
+// Pagination state
+let currentPage = 1;
+const itemsPerPage = 20;
+
 // --- DOM Elements ---
 // A single object to hold all DOM elements for cleaner management
 export const ui = {};
@@ -719,8 +723,18 @@ function filterAndDisplayOrders(status) {
     if (noOrdersText)
       noOrdersText.textContent = `No orders found with status: ${status}.`;
     ui.noOrdersMessage.style.display = "block";
+    renderPagination(0);
   } else {
     ui.noOrdersMessage.style.display = "none";
+
+    // Sort newest first
+    const sortedOrders = ordersToDisplay.slice().reverse();
+    
+    // Pagination
+    const totalPages = Math.ceil(sortedOrders.length / itemsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedOrders = sortedOrders.slice(startIndex, startIndex + itemsPerPage);
 
     let html = "";
     if (currentViewMode === "list") {
@@ -739,9 +753,7 @@ function filterAndDisplayOrders(status) {
             </thead>
             <tbody>
       `;
-      html += ordersToDisplay
-        .slice()
-        .reverse()
+      html += paginatedOrders
         .map((order) => displayOrderRow(order))
         .join("");
       html += `
@@ -750,9 +762,7 @@ function filterAndDisplayOrders(status) {
         </div>
       `;
     } else {
-      html = ordersToDisplay
-        .slice()
-        .reverse()
+      html = paginatedOrders
         .map((order) => displayOrder(order))
         .join("");
     }
@@ -760,6 +770,8 @@ function filterAndDisplayOrders(status) {
     // Update innerHTML and restore the message element (hidden)
     ui.ordersList.innerHTML = html;
     ui.ordersList.appendChild(ui.noOrdersMessage);
+    
+    renderPagination(sortedOrders.length);
 
     // Render QR codes for all displayed orders
     if (window.QRCode) {
@@ -819,6 +831,9 @@ function displayOrderRow(order) {
     COMPLETED: "bg-gray-100 text-gray-800",
     CANCELED: "bg-red-100 text-red-800",
   };
+  const alert = getOrderAlert(order);
+  const alertHtml = alert ? `<div class="inline-flex items-center gap-1 mt-1 text-[10px] px-1.5 py-0.5 rounded border ${alert.classes}">${alert.icon} ${alert.text}</div>` : "";
+  
   const statusClass =
     statusColors[order.status?.toUpperCase()] || "bg-gray-500 text-white";
 
@@ -841,6 +856,7 @@ function displayOrderRow(order) {
       <td class="px-4 py-3">
         <div class="font-bold text-gray-900">${orderId.substring(0, 8)}...</div>
         <div class="text-xs text-gray-500">${receivedAt}</div>
+        ${alertHtml}
         <div class="mt-1 font-semibold text-green-600">$${price}</div>
       </td>
       <td class="px-4 py-3">
@@ -918,6 +934,9 @@ export function displayOrder(order) {
     COMPLETED: "bg-gray-100 text-gray-800",
     CANCELED: "bg-red-100 text-red-800",
   };
+  const alert = getOrderAlert(order);
+  const alertHtml = alert ? `<span class="inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded border ${alert.classes}">${alert.icon} ${alert.text}</span>` : "";
+
   const statusClass =
     statusColors[status.toUpperCase()] || "bg-gray-500 text-white";
 
@@ -960,6 +979,7 @@ export function displayOrder(order) {
                 <div>
                     <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${orderIdShort}...</span></h3>
                     <p class="text-sm text-gray-600">Received: ${escapeHtml(receivedDate)}</p>
+                    ${alertHtml}
                 </div>
             </div>
             <div class="${statusClass} font-bold py-1 px-3 rounded-full text-sm" id="status-badge-${orderId}">${status}</div>
@@ -1892,11 +1912,64 @@ async function handleExportPdf() {
         const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         const sheetSuffix = window.nestedSvgs.length > 1 ? `-sheet${i + 1}` : '';
         zip.file(`${baseName}${sheetSuffix}-300dpi.png`, pngBlob);
+
+        // --- NEW: Generate Vector Print & Cut PDF using svg2pdf ---
+        // Clone the original nested SVG (which still has cutlines)
+        const vectorSvgElement = new DOMParser().parseFromString(
+          window.nestedSvgs[i],
+          "image/svg+xml"
+        ).documentElement;
+        
+        // Ensure proper dimensions
+        vectorSvgElement.setAttribute("width", width);
+        vectorSvgElement.setAttribute("height", height);
+
+        // Fetch the selected printer's layer config
+        let layerName = 'CutContour';
+        let cutColor = '#FF00FF';
+        
+        // Grab from UI if available
+        const layerNameInput = document.getElementById('cutLayerName');
+        const cutColorInput = document.getElementById('cutColor');
+        if (layerNameInput) layerName = layerNameInput.value || layerName;
+        if (cutColorInput) cutColor = cutColorInput.value || cutColor;
+
+        // Group cutlines for the specific layer name (useful for RIPs that use layer names)
+        const cutGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        cutGroup.setAttribute("id", layerName);
+        cutGroup.setAttribute("data-name", layerName);
+        
+        // Standardize the cutlines for the RIP software
+        vectorSvgElement.querySelectorAll('path, polygon, polyline').forEach(el => {
+            el.setAttribute('stroke', cutColor);
+            el.setAttribute('stroke-width', '1'); // 1px stroke
+            el.setAttribute('fill', 'none');
+            // Remove any classes that might interfere
+            el.removeAttribute('class');
+            
+            // Move into our specific layer group
+            cutGroup.appendChild(el);
+        });
+        
+        vectorSvgElement.appendChild(cutGroup);
+
+        // Initialize a new PDF document for this sheet
+        const vectorDoc = new jsPDF({
+            unit: "px",
+            format: [width, height],
+        });
+
+        // Render the SVG into the PDF document natively (preserves vectors!)
+        await vectorDoc.svg(vectorSvgElement, { x: 0, y: 0, width: width, height: height });
+
+        // Add the Vector PDF to the ZIP
+        const vectorPdfBlob = vectorDoc.output('blob');
+        zip.file(`${baseName}${sheetSuffix}-VinylMaster-PrintCut.pdf`, vectorPdfBlob);
     }
 
-    // Add PDF to zip
+    // Add Flattened Print-Only PDF to zip
     const pdfBlob = doc.output('blob');
-    zip.file(`${baseName}-300dpi.pdf`, pdfBlob);
+    zip.file(`${baseName}-PrintOnly.pdf`, pdfBlob);
 
     // Generate zip and trigger download
     const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -2671,6 +2744,7 @@ export async function init() {
       e.target.setAttribute("aria-pressed", "true");
       // Actually filter the orders
       const status = e.target.dataset.status;
+      currentPage = 1;
       filterAndDisplayOrders(status);
     }
   });
@@ -3462,3 +3536,152 @@ async function savePricingConfig() {
     setButtonLoading(btn, false);
   }
 }
+
+/**
+ * Renders the pagination controls based on the total number of items
+ */
+function renderPagination(totalItems) {
+  const container = document.getElementById("pagination-container");
+  if (!container) return;
+
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  
+  if (totalPages <= 1) {
+    container.innerHTML = "";
+    return;
+  }
+
+  let html = "";
+  
+  // Previous button
+  html += `<button class="px-3 py-1 border rounded-md bg-white text-gray-600 hover:bg-gray-50 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}" 
+           ${currentPage === 1 ? 'disabled' : ''} data-page="${currentPage - 1}">Prev</button>`;
+
+  // Page numbers
+  let startPage = Math.max(1, currentPage - 2);
+  let endPage = Math.min(totalPages, startPage + 4);
+  if (endPage - startPage < 4) {
+      startPage = Math.max(1, endPage - 4);
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="px-3 py-1 border rounded-md ${currentPage === i ? 'bg-splotch-navy text-white font-bold' : 'bg-white text-gray-600 hover:bg-gray-50'}" 
+             data-page="${i}">${i}</button>`;
+  }
+
+  // Next button
+  html += `<button class="px-3 py-1 border rounded-md bg-white text-gray-600 hover:bg-gray-50 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}" 
+           ${currentPage === totalPages ? 'disabled' : ''} data-page="${currentPage + 1}">Next</button>`;
+           
+  container.innerHTML = html;
+
+  // Add event listeners
+  container.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+          const newPage = parseInt(e.target.dataset.page, 10);
+          if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
+              currentPage = newPage;
+              const activeFilter = document.querySelector("#filter-container .filter-btn.active")?.dataset.status || "ALL";
+              filterAndDisplayOrders(activeFilter);
+              // Scroll to top of list
+              document.getElementById("orders-list").scrollIntoView({ behavior: "smooth" });
+          }
+      });
+  });
+}
+
+/**
+ * Returns an alert object if the order is critically late or untouched.
+ */
+function getOrderAlert(order) {
+    if (!order.receivedAt) return null;
+    
+    const status = order.status;
+    const receivedAt = new Date(order.receivedAt).getTime();
+    const now = Date.now();
+    const hoursSince = (now - receivedAt) / (1000 * 60 * 60);
+
+    // Untouched: NEW or PENDING for > 24h
+    if ((status === 'NEW' || status === 'PENDING') && hoursSince > 24) {
+        return { type: 'untouched', text: 'Untouched (24h+)', classes: 'bg-orange-500 text-white border-orange-600', icon: '⚠️' };
+    }
+
+    // Critically Late: Not shipped/completed/delivered/canceled for > 5 days (120h)
+    if (!['SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELED'].includes(status) && hoursSince > 120) {
+        return { type: 'late', text: 'Critically Late (5d+)', classes: 'bg-red-600 text-white border-red-700 animate-pulse', icon: '🚨' };
+    }
+    
+    return null;
+}
+
+
+// --- Customer Chat / Messaging ---
+window.toggleChat = function(orderId) {
+    const container = document.getElementById(`chat-container-${orderId}`);
+    if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        window.fetchMessages(orderId);
+    } else {
+        container.classList.add('hidden');
+    }
+};
+
+window.fetchMessages = async function(orderId) {
+    const historyContainer = document.getElementById(`chat-history-${orderId}`);
+    try {
+        const token = localStorage.getItem('splotchToken');
+        const res = await fetch(`/api/orders/${orderId}/messages`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!res.ok) throw new Error('Failed to fetch messages');
+        const messages = await res.json();
+        
+        if (messages.length === 0) {
+            historyContainer.innerHTML = '<em class="text-xs text-gray-400">No messages yet. Send an email to the customer to start a conversation.</em>';
+            return;
+        }
+
+        historyContainer.innerHTML = messages.map(msg => `
+            <div class="${msg.sender === 'printshop' ? 'bg-blue-100 self-end' : 'bg-gray-200 self-start'} rounded p-2 max-w-[80%]">
+                <div class="text-[10px] text-gray-500 mb-1">${new Date(msg.timestamp).toLocaleString()} (${msg.sender})</div>
+                <div>${escapeHtml(msg.content)}</div>
+            </div>
+        `).join('');
+        
+        // Scroll to bottom
+        historyContainer.scrollTop = historyContainer.scrollHeight;
+    } catch (e) {
+        console.error(e);
+        historyContainer.innerHTML = '<em class="text-xs text-red-400">Error loading messages.</em>';
+    }
+};
+
+window.sendMessage = async function(orderId) {
+    const input = document.getElementById(`chat-input-${orderId}`);
+    const message = input.value.trim();
+    if (!message) return;
+
+    try {
+        const token = localStorage.getItem('splotchToken');
+        const res = await fetch(`/api/orders/${orderId}/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ message })
+        });
+        
+        if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || 'Failed to send message');
+        }
+
+        input.value = '';
+        window.fetchMessages(orderId);
+    } catch (e) {
+        console.error(e);
+        alert('Failed to send email: ' + e.message);
+    }
+};
