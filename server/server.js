@@ -697,6 +697,10 @@ async function startServer(
         maxAge: '1d'
     }));
 
+    app.use(express.static(path.join(__dirname, '../dist'), {
+        maxAge: '1h'
+    }));
+
     // Cache-Control: Prevent caching of sensitive data (PII, etc.)
     // Placed after static files so it doesn't prevent caching of public assets
     app.use((req, res, next) => {
