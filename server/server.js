@@ -714,8 +714,8 @@ async function startServer(
 
     // SECURITY: Add additional security headers not covered by lusca
     app.use((req, res, next) => {
-        // Permissions-Policy: Disables powerful features that the app doesn't need
-        res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+        // Permissions-Policy: Disables powerful features that the app doesn't need, allows camera for printshop QR scanning
+        res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(self)');
         // Referrer-Policy: Controls how much referrer information is sent to other sites
         res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
         next();

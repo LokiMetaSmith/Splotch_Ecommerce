@@ -12,6 +12,7 @@ import * as jose from "jose";
 import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import "svg2pdf.js";
+import { Html5Qrcode } from "html5-qrcode";
 
 // --- Global Variables ---
 const serverUrl = ""; // Use relative paths for API calls
@@ -1225,61 +1226,221 @@ async function handleBulkStatusUpdate(newStatus) {
   }
 }
 
-// --- Restored SVG Nesting and File Handling Functionality ---
+// --- Camera QR Code & Barcode Scanning Functions ---
+
+let html5QrCodeScanner = null;
+let isCameraScanning = false;
+let lastScannedCode = null;
+let lastScannedTime = 0;
+
+function playScanSuccessSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  } catch {}
+}
+
+function extractOrderIdFromScan(text) {
+  if (!text) return "";
+  let clean = text.trim();
+  try {
+    if (clean.startsWith("http://") || clean.startsWith("https://")) {
+      const url = new URL(clean);
+      const queryId =
+        url.searchParams.get("orderId") ||
+        url.searchParams.get("id") ||
+        url.searchParams.get("order");
+      if (queryId) return queryId.trim();
+      const segments = url.pathname.split("/").filter(Boolean);
+      if (segments.length > 0) {
+        return segments[segments.length - 1].trim();
+      }
+    }
+  } catch {}
+  if (clean.toUpperCase().startsWith("ORDER:")) {
+    return clean.substring(6).trim();
+  }
+  return clean;
+}
+
+async function processScannedCode(rawText) {
+  const query = extractOrderIdFromScan(rawText);
+  if (!query) return;
+
+  const now = Date.now();
+  if (query === lastScannedCode && now - lastScannedTime < 3000) {
+    // Debounce duplicate scans within 3 seconds
+    return;
+  }
+  lastScannedCode = query;
+  lastScannedTime = now;
+
+  // Visual feedback overlay flash
+  const overlay = document.getElementById("scan-feedback-overlay");
+  if (overlay) {
+    overlay.classList.remove("hidden");
+    setTimeout(() => overlay.classList.add("hidden"), 800);
+  }
+
+  playScanSuccessSound();
+
+  // Find order in memory
+  let matchingOrders = allOrders.filter(
+    (o) => o.orderId === query || o.orderId.includes(query),
+  );
+
+  // If not found in current list, search backend
+  if (matchingOrders.length === 0) {
+    await fetchAndDisplayOrders(query);
+    matchingOrders = allOrders.filter(
+      (o) => o.orderId === query || o.orderId.includes(query),
+    );
+  }
+
+  if (matchingOrders.length === 1) {
+    const targetStatus =
+      document.getElementById("scanTargetStatus")?.value || "PRINTING";
+    const orderId = matchingOrders[0].orderId;
+    try {
+      await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/status`, {
+        method: "POST",
+        body: JSON.stringify({ status: targetStatus }),
+      });
+
+      const orderIndex = allOrders.findIndex((o) => o.orderId === orderId);
+      if (orderIndex !== -1) {
+        allOrders[orderIndex].status = targetStatus;
+      }
+      showSuccessToast(
+        `Scan Mode: Updated ${orderId.substring(0, 8)} to ${targetStatus}`,
+      );
+
+      // Refresh display
+      const activeFilter =
+        document.querySelector("#filter-container .filter-btn.active")
+          ?.dataset.status || "ALL";
+      filterAndDisplayOrders(activeFilter);
+
+      if (ui.searchInput) {
+        ui.searchInput.value = "";
+      }
+    } catch (error) {
+      showErrorToast(`Scan Mode Update Failed: ${error.message}`);
+    }
+  } else if (matchingOrders.length > 1) {
+    showErrorToast("Scan Mode: Multiple orders match. Please refine search.");
+  } else {
+    showErrorToast(`Scan Mode: No order found for "${query}".`);
+  }
+}
+
+async function startCameraScanner() {
+  const qrReaderElem = document.getElementById("qr-reader");
+  if (!qrReaderElem) return;
+
+  const statusText = document.getElementById("scan-status-text");
+  const statusIndicator = document.getElementById("scan-status-indicator");
+  const toggleBtnText = document.getElementById("toggleCameraBtnText");
+
+  try {
+    if (!html5QrCodeScanner) {
+      html5QrCodeScanner = new Html5Qrcode("qr-reader");
+    }
+
+    if (isCameraScanning) return;
+
+    if (statusText) statusText.textContent = "Starting camera...";
+    if (statusIndicator) {
+      statusIndicator.className =
+        "inline-block w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse";
+    }
+
+    await html5QrCodeScanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 10,
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const edge = Math.max(180, Math.floor(minEdge * 0.75));
+          return { width: edge, height: edge };
+        },
+      },
+      (decodedText) => {
+        processScannedCode(decodedText);
+      },
+      () => {
+        // Continuous frame misses are expected and ignored
+      },
+    );
+
+    isCameraScanning = true;
+    if (toggleBtnText) toggleBtnText.textContent = "Stop Camera";
+    if (statusText)
+      statusText.textContent = "Camera active — point at order QR code";
+    if (statusIndicator) {
+      statusIndicator.className =
+        "inline-block w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse";
+    }
+  } catch (error) {
+    console.error("Camera scanner start error:", error);
+    isCameraScanning = false;
+    if (toggleBtnText) toggleBtnText.textContent = "Start Camera";
+    if (statusText)
+      statusText.textContent = `Camera error: ${error.message || "Permission denied"}`;
+    if (statusIndicator) {
+      statusIndicator.className =
+        "inline-block w-2.5 h-2.5 rounded-full bg-red-500";
+    }
+    showErrorToast(
+      `Camera Scanner Error: ${error.message || "Could not open camera"}`,
+    );
+  }
+}
+
+async function stopCameraScanner() {
+  if (html5QrCodeScanner && isCameraScanning) {
+    try {
+      await html5QrCodeScanner.stop();
+    } catch (e) {
+      console.warn("Error stopping camera scanner:", e);
+    }
+    isCameraScanning = false;
+  }
+  const toggleBtnText = document.getElementById("toggleCameraBtnText");
+  const statusText = document.getElementById("scan-status-text");
+  const statusIndicator = document.getElementById("scan-status-indicator");
+  if (toggleBtnText) toggleBtnText.textContent = "Start Camera";
+  if (statusText) statusText.textContent = "Camera stopped";
+  if (statusIndicator) {
+    statusIndicator.className =
+      "inline-block w-2.5 h-2.5 rounded-full bg-gray-400";
+  }
+}
 
 async function handleSearch() {
   const query = ui.searchInput.value.trim();
   if (!query) {
-    fetchAndDisplayOrders(); // Fetch all orders if search is cleared
+    fetchAndDisplayOrders();
     return;
   }
-  await fetchAndDisplayOrders(query);
 
-  // If Scan Mode is active and we found an order, automatically update it
-  if (
-    document.getElementById("scan-mode-banner") &&
-    !document.getElementById("scan-mode-banner").classList.contains("hidden")
-  ) {
-    const matchingOrders = allOrders.filter(
-      (o) => o.orderId.includes(query) || o.orderId === query,
-    );
-    if (matchingOrders.length === 1) {
-      const targetStatus = document.getElementById("scanTargetStatus").value;
-      const orderId = matchingOrders[0].orderId;
-      try {
-        const response = await fetchWithAuth(
-          `${serverUrl}/api/orders/${orderId}/status`,
-          {
-            method: "POST",
-            body: JSON.stringify({ status: targetStatus }),
-          },
-        );
-
-        const orderIndex = allOrders.findIndex((o) => o.orderId === orderId);
-        if (orderIndex !== -1) {
-          allOrders[orderIndex].status = targetStatus;
-        }
-        showSuccessToast(
-          `Scan Mode: Updated ${orderId.substring(0, 8)} to ${targetStatus}`,
-        );
-
-        // Refresh display
-        const activeFilter =
-          document.querySelector("#filter-container .filter-btn.active")
-            ?.dataset.status || "ALL";
-        filterAndDisplayOrders(activeFilter);
-
-        // Clear input for next scan
-        ui.searchInput.value = "";
-        ui.searchInput.focus();
-      } catch (error) {
-        showErrorToast(`Scan Mode Update Failed: ${error.message}`);
-      }
-    } else if (matchingOrders.length > 1) {
-      showErrorToast("Scan Mode: Multiple orders match. Please refine search.");
-    } else {
-      showErrorToast("Scan Mode: No order found.");
-    }
+  // If Scan Mode is active, route through scan update processor
+  const scanModeBanner = document.getElementById("scan-mode-banner");
+  if (scanModeBanner && !scanModeBanner.classList.contains("hidden")) {
+    await processScannedCode(query);
+  } else {
+    await fetchAndDisplayOrders(query);
   }
 }
 
@@ -1287,23 +1448,18 @@ let scanBuffer = "";
 let scanTimeout;
 
 function handleBarcodeScan(e) {
-  if (
-    document.getElementById("scan-mode-banner") &&
-    !document.getElementById("scan-mode-banner").classList.contains("hidden")
-  ) {
+  const scanModeBanner = document.getElementById("scan-mode-banner");
+  if (scanModeBanner && !scanModeBanner.classList.contains("hidden")) {
     // Only intercept if we are NOT already typing in an input box
     if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
       if (e.key === "Enter") {
         if (scanBuffer.length > 0) {
-          ui.searchInput.value = scanBuffer;
-          handleSearch();
+          processScannedCode(scanBuffer);
           scanBuffer = "";
         }
       } else if (e.key.length === 1) {
-        // Normal character
         scanBuffer += e.key;
         clearTimeout(scanTimeout);
-        // Clear buffer if pause is more than 500ms (not a scanner)
         scanTimeout = setTimeout(() => {
           scanBuffer = "";
         }, 500);
@@ -2672,19 +2828,36 @@ export async function init() {
   const scanModeBtn = document.getElementById("scanModeBtn");
   const scanModeBanner = document.getElementById("scan-mode-banner");
   const closeScanModeBtn = document.getElementById("closeScanModeBtn");
+  const toggleCameraScanBtn = document.getElementById("toggleCameraScanBtn");
 
   if (scanModeBtn) {
     scanModeBtn.addEventListener("click", () => {
-      scanModeBanner.classList.remove("hidden");
-      ui.searchInput.focus();
+      scanModeBanner?.classList.remove("hidden");
+      startCameraScanner();
+      ui.searchInput?.focus();
     });
   }
 
   if (closeScanModeBtn) {
     closeScanModeBtn.addEventListener("click", () => {
-      scanModeBanner.classList.add("hidden");
+      stopCameraScanner();
+      scanModeBanner?.classList.add("hidden");
     });
   }
+
+  if (toggleCameraScanBtn) {
+    toggleCameraScanBtn.addEventListener("click", () => {
+      if (isCameraScanning) {
+        stopCameraScanner();
+      } else {
+        startCameraScanner();
+      }
+    });
+  }
+
+  window.addEventListener("beforeunload", () => {
+    stopCameraScanner();
+  });
 
   // Global listener for barcode scanner
   document.addEventListener("keydown", handleBarcodeScan);

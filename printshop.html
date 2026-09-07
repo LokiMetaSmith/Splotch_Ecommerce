@@ -243,23 +243,46 @@
     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
       <!-- Scan to Update Banner -->
-      <div id="scan-mode-banner" class="hidden bg-purple-100 border-l-4 border-purple-500 text-purple-700 p-4 mb-6 rounded shadow-md flex items-center justify-between">
-        <div>
-            <h3 class="font-bold text-lg">Scan Mode Active</h3>
-            <p>Scan a QR code or barcode. It will automatically search and update the status.</p>
-        </div>
-        <div class="flex items-center space-x-4">
-            <div>
-                <label for="scanTargetStatus" class="font-bold text-sm">Target Status:</label>
-                <select id="scanTargetStatus" class="ml-2 p-2 border rounded">
-                    <option value="ACCEPTED">Accepted</option>
-                    <option value="PRINTING" selected>Printing</option>
-                    <option value="SHIPPED">Shipped</option>
-                    <option value="DELIVERED">Delivered</option>
-                    <option value="COMPLETED">Completed</option>
-                </select>
+      <div id="scan-mode-banner" class="hidden bg-purple-50 border-l-4 border-purple-600 text-purple-900 p-4 mb-6 rounded-lg shadow-md transition-all duration-200">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 class="font-bold text-lg flex items-center gap-2 text-purple-900">
+              <svg class="w-5 h-5 text-purple-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+              Scan Mode Active
+            </h3>
+            <p class="text-sm text-purple-700">Point your camera at an order QR code, or scan with a barcode reader.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center">
+              <label for="scanTargetStatus" class="font-bold text-sm mr-2 text-purple-900">Target Status:</label>
+              <select id="scanTargetStatus" class="p-2 border border-purple-300 rounded-md bg-white text-gray-800 text-sm font-medium shadow-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                <option value="ACCEPTED">Accepted</option>
+                <option value="PRINTING" selected>Printing</option>
+                <option value="SHIPPED">Shipped</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
             </div>
-            <button id="closeScanModeBtn" class="text-purple-700 hover:text-purple-900 font-bold">&times; Close</button>
+            <button id="toggleCameraScanBtn" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium flex items-center gap-1.5 shadow-sm transition-colors" aria-label="Toggle Camera Scanner">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+              <span id="toggleCameraBtnText">Stop Camera</span>
+            </button>
+            <button id="closeScanModeBtn" class="text-purple-700 hover:text-purple-900 font-bold px-2 py-1 text-sm rounded hover:bg-purple-100 transition-colors">&times; Close</button>
+          </div>
+        </div>
+
+        <!-- Camera Scanner Viewport -->
+        <div id="scan-camera-container" class="mt-4 flex flex-col items-center justify-center">
+          <div class="relative w-full max-w-sm bg-black rounded-lg overflow-hidden border-2 border-purple-400 shadow-inner" style="min-height: 250px;">
+            <div id="qr-reader" class="w-full"></div>
+            <div id="scan-feedback-overlay" class="pointer-events-none absolute inset-0 hidden border-4 border-green-500 bg-green-500 bg-opacity-20 flex items-center justify-center transition-all duration-300 z-10">
+              <span class="bg-green-600 text-white font-bold px-4 py-1.5 rounded-full text-sm shadow-lg">Scanned!</span>
+            </div>
+          </div>
+          <div class="mt-2 flex items-center gap-2">
+            <span id="scan-status-indicator" class="inline-block w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+            <span id="scan-status-text" class="text-xs font-medium text-purple-700">Camera active &mdash; position QR code inside the box</span>
+          </div>
         </div>
       </div>
 
