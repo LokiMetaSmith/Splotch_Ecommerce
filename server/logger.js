@@ -38,7 +38,14 @@ if (process.env.NODE_ENV !== 'production') {
       winston.format.colorize(),
       winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
       winston.format.printf(({ level, message, timestamp, ...meta }) => {
-        const metaStr = Object.keys(meta).length ? JSON.stringify(meta) : '';
+        let metaStr = '';
+        if (Object.keys(meta).length) {
+          try {
+            metaStr = JSON.stringify(meta);
+          } catch {
+            metaStr = String(meta?.message || meta?.error || '[Circular]');
+          }
+        }
         return `${timestamp} ${level}: ${message} ${metaStr}`;
       })
     ),
