@@ -17,6 +17,10 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# Change to the project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
 # --- Argument Parsing ---
 METHOD=""
 DESTINATION=""
