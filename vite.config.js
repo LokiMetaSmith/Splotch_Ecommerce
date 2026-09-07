@@ -26,6 +26,7 @@ export default defineConfig({
         magiclogin: resolve(__dirname, 'magic-login.html'),
         orders: resolve(__dirname, 'orders.html'),
         status: resolve(__dirname, 'status.html'),
+        terms: resolve(__dirname, 'terms.html'),
       },
     },
   },

@@ -713,8 +713,18 @@ async function startServer(
     }));
 
     app.use(express.static(path.join(__dirname, '../dist'), {
-        maxAge: '1h'
+        maxAge: '1h',
+        extensions: ['html']
     }));
+
+    // Clean URL aliases for HTML pages (e.g., /printshop -> /printshop.html)
+    const htmlPages = ['printshop', 'orders', 'status', 'magic-login', 'terms'];
+    for (const page of htmlPages) {
+        app.get([`/${page}`, `/${page}/`], (req, res) => {
+            res.sendFile(path.join(__dirname, `../dist/${page}.html`));
+        });
+    }
+
 
     // Cache-Control: Prevent caching of sensitive data (PII, etc.)
     // Placed after static files so it doesn't prevent caching of public assets
