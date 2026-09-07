@@ -1,4 +1,5 @@
 import { SVGParser } from "./lib/svgparser.js";
+import { uploadDesignAssets, uploadFileInChunks } from "./lib/chunkedUpload.js";
 import {
   calculateStickerPrice,
   calculatePerimeter,
@@ -1886,13 +1887,11 @@ async function handlePaymentFormSubmit(event) {
 
     // 2. Upload the design image and optional cut line file
     showPaymentStatus("Uploading design...", "info");
-    const uploadFormData = new FormData();
-    uploadFormData.append("designImage", designImageBlob, "design.png");
-
+    let cutLineBlob = null;
     const cutLineFileInput = document.getElementById("cutLineFile");
     console.log("BROWSER LOG: Payment Submit - organicSheetCutline:", !!organicSheetCutline, "currentBounds:", !!currentBounds, "activeBase.currentCutline:", !!activeBase.currentCutline);
     if (cutLineFileInput && cutLineFileInput.files[0]) {
-      uploadFormData.append("cutLineFile", cutLineFileInput.files[0]);
+      cutLineBlob = cutLineFileInput.files[0];
     } else if (organicSheetCutline && organicSheetCutline.length > 0 && currentBounds) {
       // Generate multi-layer SVG for the entire sheet
       console.log("BROWSER LOG: Generating Multi-Layer SVG");
@@ -1903,8 +1902,7 @@ async function handlePaymentFormSubmit(event) {
       );
       console.log("BROWSER LOG: Multi-layer SVG includes Kiss-Cut?", svgContent.includes("Kiss-Cut"));
       if (svgContent) {
-        const blob = new Blob([svgContent], { type: "image/svg+xml" });
-        uploadFormData.append("cutLineFile", blob, "generated-cutline.svg");
+        cutLineBlob = new Blob([svgContent], { type: "image/svg+xml" });
       }
     } else if (
       activeBase.currentCutline &&
@@ -1918,27 +1916,21 @@ async function handlePaymentFormSubmit(event) {
         currentBounds,
       );
       if (svgContent) {
-        const blob = new Blob([svgContent], { type: "image/svg+xml" });
-        uploadFormData.append("cutLineFile", blob, "generated-cutline.svg");
+        cutLineBlob = new Blob([svgContent], { type: "image/svg+xml" });
       }
     }
 
-    const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        Authorization: `Bearer ${tempAuthToken}`,
-        "X-CSRF-Token": csrfToken,
-      },
-      body: uploadFormData,
+    const { designImagePath, cutLinePath } = await uploadDesignAssets({
+      designBlob: designImageBlob,
+      cutLineBlob,
+      serverUrl,
+      token: tempAuthToken,
+      csrfToken,
+      onProgress: (p) => {
+        showPaymentStatus(p.detail || `Uploading artwork (${p.percent}%)...`, "info");
+      }
     });
 
-    const uploadData = await uploadResponse.json();
-    if (!uploadResponse.ok) {
-      throw new Error(uploadData.error || "Failed to upload design.");
-    }
-    const designImagePath = uploadData.designImagePath;
-    const cutLinePath = uploadData.cutLinePath;
     console.log("[CLIENT] Design uploaded. Path:", designImagePath);
     if (cutLinePath) {
       console.log("[CLIENT] Cut line uploaded. Path:", cutLinePath);
@@ -5470,28 +5462,19 @@ async function handleCreateProduct() {
     isExporting = false;
     redrawAll();
 
-    const uploadFormData = new FormData();
-    uploadFormData.append("designImage", designImageBlob, "design.png");
-
-    // Use existing upload endpoint
-    const uploadResponse = await fetch(`${serverUrl}/api/upload-design`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "X-CSRF-Token": csrfToken,
-      },
-      body: uploadFormData,
+    const { designImagePath, cutLinePath } = await uploadDesignAssets({
+      designBlob: designImageBlob,
+      serverUrl,
+      token,
+      csrfToken,
     });
-    const uploadData = await uploadResponse.json();
-    if (!uploadResponse.ok)
-      throw new Error(uploadData.error || "Upload failed");
 
     // 3. Create Product
     const productPayload = {
       name,
       creatorProfitCents: profitCents,
-      designImagePath: uploadData.designImagePath,
-      cutLinePath: uploadData.cutLinePath,
+      designImagePath,
+      cutLinePath,
       _csrf: csrfToken,
     };
 

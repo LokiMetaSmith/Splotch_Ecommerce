@@ -48,6 +48,8 @@ import { startEmailWorker } from './workers/emailWorker.js';
 import { startTelegramWorker } from './workers/telegramWorker.js';
 import { startOdooWorker } from './workers/odooWorker.js';
 import { emailQueue, telegramQueue, odooQueue, redisAvailable } from './queueManager.js';
+import { ChunkedUploadManager } from './utils/chunkedUploader.js';
+import sizeOf from 'image-size';
 import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
 import { processIncomingOrderToDropBox } from './utils/usbDropBox.js'; // SBC Drop Box Integration
 import { wafMiddleware } from './waf.js';
@@ -90,7 +92,11 @@ if (storageProviderType === 's3' || shouldDefaultToS3) {
 
 // JSDOM window is needed for server-side SVG sanitization
 const { window } = new JSDOM('');
-const purify = DOMPurify(window);
+const createDOMPurify = DOMPurify?.default || DOMPurify;
+const purify = typeof createDOMPurify === 'function' ? createDOMPurify(window) : createDOMPurify;
+
+
+
 
 async function enforceCorrectExtension(fileObj, detectedType) {
     if (!detectedType || !detectedType.ext) return;
@@ -389,6 +395,40 @@ async function startServer(
       }
     });
     logger.info('[SERVER] Multer configured for file uploads.');
+
+    // --- Chunked Upload Configuration ---
+    const chunksBaseDir = path.join(path.dirname(dbPath || __dirname), 'uploads', '.chunks');
+    const chunkedUploadManager = new ChunkedUploadManager(chunksBaseDir, logger);
+
+    const chunkStorage = multer.diskStorage({
+      destination: (req, file, cb) => {
+        const incomingDir = path.join(chunksBaseDir, '_incoming');
+        if (!fs.existsSync(incomingDir)) {
+          fs.mkdirSync(incomingDir, { recursive: true });
+        }
+        cb(null, incomingDir);
+      },
+      filename: (req, file, cb) => {
+        cb(null, `part-${randomUUID()}`);
+      }
+    });
+
+    const chunkUpload = multer({
+      storage: chunkStorage,
+      limits: {
+        fileSize: 20 * 1024 * 1024, // 20 MB max per chunk
+        files: 1,
+        fields: 10,
+        parts: 20
+      }
+    });
+
+    const chunkCleanupTimer = setInterval(() => {
+      chunkedUploadManager.cleanupStaleSessions().catch(err => {
+        logger.error('[CHUNKED] Stale session cleanup error:', err);
+      });
+    }, 60 * 60 * 1000);
+    chunkCleanupTimer.unref();
     
     // --- Square Client Initialization ---
     logger.info('[SERVER] Initializing Square client...');
@@ -1090,6 +1130,201 @@ async function startServer(
             designImagePath: designImagePath,
             cutLinePath: cutLinePath
         });
+    });
+
+    // --- Chunked Upload Endpoints ---
+
+    // 1. Initialize Chunked Upload Session
+    app.post('/api/upload-chunk/init', authenticateToken, wafMiddleware, async (req, res) => {
+        try {
+            const { filename, totalSize, totalChunks, mimeType, isCutLine } = req.body;
+            const uploadId = req.body.uploadId || randomUUID();
+
+            // Basic extension check for filename
+            const ext = path.extname(filename || '').toLowerCase().replace('.', '');
+            const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'tiff', 'tif', 'pdf', 'ai', 'eps'];
+            if (!allowedExtensions.includes(ext)) {
+                return res.status(400).json({ error: `Unsupported file extension .${ext}. Allowed extensions: ${allowedExtensions.join(', ')}` });
+            }
+
+            const session = chunkedUploadManager.initSession({
+                uploadId,
+                filename,
+                totalSize,
+                totalChunks,
+                mimeType,
+                isCutLine
+            });
+
+            res.json({
+                success: true,
+                uploadId: session.uploadId,
+                filename: session.filename,
+                chunkSize: 5 * 1024 * 1024
+            });
+        } catch (err) {
+            logger.warn(`[CHUNKED] Init failed: ${err.message}`);
+            res.status(400).json({ error: err.message });
+        }
+    });
+
+    // 2. Upload Single Chunk
+    app.post('/api/upload-chunk', authenticateToken, chunkUpload.single('chunk'), wafMiddleware, async (req, res) => {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No chunk file uploaded' });
+        }
+
+        const { uploadId, chunkIndex } = req.body;
+        if (!uploadId || chunkIndex === undefined) {
+            try { await fs.promises.unlink(req.file.path); } catch (e) {}
+            return res.status(400).json({ error: 'uploadId and chunkIndex are required' });
+        }
+
+        try {
+            const result = await chunkedUploadManager.saveChunk(uploadId, chunkIndex, req.file.path);
+            res.json({
+                success: true,
+                uploadId,
+                chunkIndex: Number(chunkIndex),
+                receivedChunks: result.receivedChunks,
+                totalChunks: result.totalChunks,
+                isComplete: result.isComplete
+            });
+        } catch (err) {
+            try { await fs.promises.unlink(req.file.path); } catch (e) {}
+            logger.warn(`[CHUNKED] Save chunk failed for session ${uploadId}: ${err.message}`);
+            res.status(400).json({ error: err.message });
+        }
+    });
+
+    // 3. Complete and Reassemble Chunked Upload
+    app.post('/api/upload-chunk/complete', authenticateToken, wafMiddleware, async (req, res) => {
+        const { uploadId } = req.body;
+        if (!uploadId) {
+            return res.status(400).json({ error: 'uploadId is required' });
+        }
+
+        const session = chunkedUploadManager.getSession(uploadId);
+        if (!session) {
+            return res.status(404).json({ error: 'Upload session not found or expired' });
+        }
+
+        if (!chunkedUploadManager.isComplete(uploadId)) {
+            return res.status(400).json({
+                error: `Upload incomplete: received ${session.receivedChunks.size} of ${session.totalChunks} chunks`
+            });
+        }
+
+        // Determine directory to stage the assembled file
+        const stageDir = storageProvider.uploadDir || storageProvider.tempDir || path.join(__dirname, 'uploads');
+        if (!fs.existsSync(stageDir)) {
+            fs.mkdirSync(stageDir, { recursive: true });
+        }
+
+        const fieldPrefix = session.isCutLine ? 'cutLineFile' : 'designImage';
+        const tempAssembledFilename = `${fieldPrefix}-${randomUUID()}${path.extname(session.filename)}`;
+        const tempAssembledPath = path.join(stageDir, tempAssembledFilename);
+
+        try {
+            await chunkedUploadManager.assembleChunks(uploadId, tempAssembledPath);
+
+            // Run file type verification on assembled file
+            let detectedType = await fileTypeFromFile(tempAssembledPath);
+
+            // Fallback for valid SVGs lacking the XML prolog
+            if (!detectedType && session.filename.toLowerCase().endsWith('.svg')) {
+                try {
+                    const buffer = Buffer.alloc(100);
+                    const fd = await fs.promises.open(tempAssembledPath, 'r');
+                    const { bytesRead } = await fd.read(buffer, 0, 100, 0);
+                    await fd.close();
+                    const str = buffer.toString('utf-8', 0, bytesRead).toLowerCase();
+                    if (str.includes('<svg')) {
+                        detectedType = { ext: 'svg', mime: 'image/svg+xml' };
+                    }
+                } catch (e) {
+                    logger.error('[CHUNKED] Error in SVG fallback detection:', e);
+                }
+            }
+
+            if (!detectedType || !allowedMimeTypes.includes(detectedType.mime)) {
+                try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
+                return res.status(400).json({ error: `Invalid file type. Only ${allowedMimeTypes.join(', ')} are allowed.` });
+            }
+
+            // SVG Sanitization
+            if (detectedType.mime === 'image/svg+xml' || detectedType.mime === 'application/xml') {
+                const isSafe = await sanitizeSVGFile(tempAssembledPath);
+                if (!isSafe) {
+                    try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
+                    return res.status(400).json({ error: 'The uploaded SVG file contains potentially malicious content and was rejected.' });
+                }
+            }
+
+            // If cutLineFile, must be SVG
+            if (session.isCutLine) {
+                const isValidCutLine = detectedType && (detectedType.ext === 'svg' || (detectedType.ext === 'xml' && detectedType.mime === 'application/xml'));
+                if (!isValidCutLine) {
+                    try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
+                    return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for cutline.' });
+                }
+            } else {
+                // Pixel bomb / dimension check for raster images
+                try {
+                    const dimensions = sizeOf(tempAssembledPath);
+                    if (dimensions && dimensions.width && dimensions.height) {
+                        const totalPixels = dimensions.width * dimensions.height;
+                        if (totalPixels > 50_000_000) {
+                            try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
+                            return res.status(400).json({ error: 'Image dimensions too large (exceeds 50MP limit).' });
+                        }
+                    }
+                } catch (e) {
+                    if (e.message && e.message.includes('50MP')) {
+                        try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
+                        return res.status(400).json({ error: e.message });
+                    }
+                    // Non-raster formats like PDF might not parse with image-size, which is normal
+                }
+            }
+
+            // Enforce extension
+            const fileObj = {
+                path: tempAssembledPath,
+                filename: tempAssembledFilename,
+                originalname: session.filename,
+                mimetype: detectedType.mime
+            };
+            await enforceCorrectExtension(fileObj, detectedType);
+
+            // Finalize upload with storage provider
+            const finalPath = await storageProvider.finalizeUpload(fileObj);
+
+            res.json({
+                success: true,
+                filePath: finalPath,
+                isCutLine: session.isCutLine
+            });
+        } catch (err) {
+            try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
+            logger.error(`[CHUNKED] Assembly/finalization error for session ${uploadId}:`, err);
+            res.status(500).json({ error: err.message || 'Failed to assemble and finalize upload' });
+        }
+    });
+
+    // 4. Abort Chunked Upload Session
+    app.post('/api/upload-chunk/abort', authenticateToken, wafMiddleware, async (req, res) => {
+        const { uploadId } = req.body;
+        if (!uploadId) {
+            return res.status(400).json({ error: 'uploadId is required' });
+        }
+
+        try {
+            await chunkedUploadManager.abortSession(uploadId);
+            res.json({ success: true, message: 'Upload session aborted' });
+        } catch (err) {
+            res.status(400).json({ error: err.message });
+        }
     });
 
     // --- Product Endpoints ---
@@ -2918,6 +3153,7 @@ async function startServer(
       clearInterval(sessionTokenTimer);
       clearInterval(keyRotationTimer);
       clearInterval(metricsTimer);
+      clearInterval(chunkCleanupTimer);
       if (db && db._watcher) {
           db._watcher.unref();
           if (db._watcher.close) db._watcher.close();
@@ -2926,7 +3162,7 @@ async function startServer(
       await closeQueues();
     };
 
-    return { app, timers: [sessionTokenTimer, keyRotationTimer, metricsTimer], bot, close };
+    return { app, timers: [sessionTokenTimer, keyRotationTimer, metricsTimer, chunkCleanupTimer], bot, close };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');
