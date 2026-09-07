@@ -531,14 +531,14 @@ export class LowDbAdapter {
             shop.id = randomUUID();
         }
         this.db.data.printshops[shop.id] = shop;
-        await this._write();
+        await this.write();
         return shop;
     }
 
     async deletePrintshop(id) {
         if (!this.db.data.printshops || !this.db.data.printshops[id]) return false;
         delete this.db.data.printshops[id];
-        await this._write();
+        await this.write();
         return true;
     }
 }
