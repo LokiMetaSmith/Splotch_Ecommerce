@@ -8,7 +8,7 @@ Maintain a log of active physical SBC units deployed:
 
 | Hostname       | Associated Location | Active | Version | SBC Hardware                                | Date Last Updated |
 |----------------|------------------|--------|---------|---------------------------------------------|-------------------|
-| `splotch-sbc-1` |           | Yes    | 0.5     | GMKtec N150, 12GB DDR5, 512GB SSD, Dual LAN | April 1st, 2025   |
+| `splotch-sbc-1` |           | Yes    | 1.0     | GMKtec N150, 12GB DDR5, 512GB SSD, Dual LAN | September 7th, 2026 |
 
 
 ---
@@ -218,3 +218,33 @@ openrgb --mode direct --color 00FF00
 openrgb --mode breathing --color FFFF00
 ```
 *(Alternatively, you can change the LED Colour Settings in the GMKtec BIOS by repeatedly pressing Delete/F7 on boot -> Boot tab -> LED Colour Settings if a static color is preferred without software).*
+ 
+---
+
+## 6. Systemd Service & Cloudflare Tunnel Setup
+
+### A. Production Systemd Service
+The server runs automatically on boot as a native `systemd` service:
+1. Copy `scripts/splotch.service` to `/etc/systemd/system/splotch.service`:
+   ```bash
+   sudo cp scripts/splotch.service /etc/systemd/system/splotch.service
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now splotch
+   ```
+2. Check logs and status:
+   ```bash
+   sudo systemctl status splotch
+   journalctl -u splotch -f
+   ```
+
+### B. Cloudflare Zero Trust Tunnel
+The SBC connects out to Cloudflare via `cloudflared` without opening any incoming firewall ports on the router:
+1. Install `cloudflared` binary into `/usr/local/bin/cloudflared`.
+2. Configure Zero Trust Tunnel Public Hostnames in the Cloudflare dashboard:
+   - `splotch.page` -> HTTP `localhost:3000`
+   - `www.splotch.page` -> HTTP `localhost:3000`
+3. Install systemd unit:
+   ```bash
+   sudo cloudflared service install <TUNNEL_TOKEN>
+   ```
+4. Set `TRUST_PROXY="true"` in `server/.env` so Express correctly trusts proxy headers (`X-Forwarded-For`) from Cloudflare.

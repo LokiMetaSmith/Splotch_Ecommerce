@@ -1,0 +1,17 @@
+﻿[Unit]
+Description=Splotch Print Shop Server
+After=network.target autofs.service
+
+[Service]
+Type=simple
+User=loki
+WorkingDirectory=/home/loki/Splotch_Ecommerce/server
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=5s
+Environment=NODE_ENV=production
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
