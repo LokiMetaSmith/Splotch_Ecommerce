@@ -524,11 +524,11 @@ async function startServer(
     });
 
     const authLimiter = rateLimit({
-      windowMs: 60 * 60 * 1000, // 1 hour
+      windowMs: 15 * 60 * 1000, // 15 minutes
       max: (process.env.ENABLE_RATE_LIMIT_TEST === 'true') ? 10 :
-           (process.env.NODE_ENV === 'test') ? 1000 :
-           (process.env.NODE_ENV === 'production' ? 10 : 100),
-      message: 'Too many login attempts from this IP, please try again after 15 minutes',
+           (process.env.NODE_ENV === 'test') ? 1000 : 50,
+      skipSuccessfulRequests: process.env.ENABLE_RATE_LIMIT_TEST !== 'true',
+      message: { error: 'Too many login attempts from this IP, please try again after 15 minutes.' },
       standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
       legacyHeaders: false, // Disable the `X-RateLimit-*` headers
       store: redisClient ? new RateLimitRedisStore({
@@ -729,11 +729,11 @@ async function startServer(
         csp: {
             policy: {
                 'default-src': "'self'",
-                'script-src': "'self' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com",
+                'script-src': "'self' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com https://static.cloudflareinsights.com",
                 'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com https://*.squarecdn.com https://sandbox.web.squarecdn.com",
                 'font-src': "'self' https://fonts.gstatic.com https://*.squarecdn.com https://cash-f.squarecdn.com https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
                 'img-src': "'self' data: blob: https://*.squarecdn.com https://sandbox.web.squarecdn.com",
-                'connect-src': "'self' https://*.squarecdn.com https://*.squareup.com https://*.squareupsandbox.com https://*.sentry.io",
+                'connect-src': "'self' https://*.squarecdn.com https://*.squareup.com https://*.squareupsandbox.com https://*.sentry.io https://cloudflareinsights.com",
                 'frame-src': "'self' https://*.squarecdn.com https://sandbox.web.squarecdn.com",
                 'worker-src': "'self' blob: https://cdn.jsdelivr.net",
                 'child-src': "'self' blob: https://cdn.jsdelivr.net"
@@ -2817,19 +2817,32 @@ async function startServer(
         return res.status(400).json({ error: 'Invalid username.' });
       }
       const user = await db.getUser(username);
+      const allowedOrigins = Array.from(new Set([expectedOrigin, 'https://splotch.page', 'https://www.splotch.page', 'http://localhost:3000'].filter(Boolean)));
       try {
         const verification = await injectedWebAuthn.verifyRegistrationResponse({
           response: body,
           expectedChallenge: user.challenge,
-          expectedOrigin: expectedOrigin,
+          expectedOrigin: allowedOrigins,
           expectedRPID: rpID,
+          requireUserVerification: false,
         });
         const { verified, registrationInfo } = verification;
-        if (verified) {
+        if (verified && registrationInfo) {
+          const credId = registrationInfo.credential?.id || registrationInfo.credentialID || registrationInfo.id;
+          const pubKey = registrationInfo.credential?.publicKey || registrationInfo.credentialPublicKey || registrationInfo.publicKey;
+          const credRecord = {
+            id: credId,
+            credentialID: credId,
+            publicKey: pubKey,
+            credentialPublicKey: pubKey,
+            counter: registrationInfo.credential?.counter ?? registrationInfo.counter ?? 0,
+            transports: registrationInfo.credential?.transports || registrationInfo.transports || [],
+          };
           if (!user.credentials) user.credentials = [];
-          user.credentials.push(registrationInfo);
+          user.credentials = user.credentials.filter(c => (c.credentialID || c.id) !== credId);
+          user.credentials.push(credRecord);
           await db.updateUser(user);
-          await db.saveCredential(registrationInfo);
+          await db.saveCredential(credRecord);
         }
         res.json({ verified });
       } catch (error) {
@@ -2856,8 +2869,9 @@ async function startServer(
       }
       const options = await injectedWebAuthn.generateAuthenticationOptions({
         allowCredentials: (user.credentials || []).map(cred => ({
-          id: cred.credentialID,
+          id: cred.credentialID || cred.id,
           type: 'public-key',
+          transports: cred.transports,
         })),
         userVerification: 'preferred',
       });
@@ -2882,16 +2896,27 @@ async function startServer(
       if (!credential) {
         return res.status(400).json({ error: 'Credential not found.' });
       }
+      const allowedOrigins = Array.from(new Set([expectedOrigin, 'https://splotch.page', 'https://www.splotch.page', 'http://localhost:3000'].filter(Boolean)));
       try {
         const verification = await injectedWebAuthn.verifyAuthenticationResponse({
           response: body,
           expectedChallenge: user.challenge,
-          expectedOrigin: expectedOrigin,
+          expectedOrigin: allowedOrigins,
           expectedRPID: rpID,
-          authenticator: credential,
+          credential: {
+            id: credential.id || credential.credentialID,
+            publicKey: credential.publicKey || credential.credentialPublicKey,
+            counter: credential.counter || 0,
+            transports: credential.transports,
+          },
+          requireUserVerification: false,
         });
-        const { verified } = verification;
+        const { verified, authenticationInfo } = verification;
         if (verified) {
+          if (authenticationInfo && typeof authenticationInfo.newCounter === 'number') {
+            credential.counter = authenticationInfo.newCounter;
+            await db.saveCredential(credential);
+          }
           const { privateKey, kid } = getCurrentSigningKey();
           const payload = { username: user.username };
           if (user.email) {

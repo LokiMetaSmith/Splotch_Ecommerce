@@ -167,7 +167,9 @@ export class MongoDbAdapter {
 
     // --- Credentials ---
     async getCredential(credentialId) {
-        const cred = await this.db.collection('credentials').findOne({ credentialID: credentialId });
+        const cred = await this.db.collection('credentials').findOne({
+            $or: [{ credentialID: credentialId }, { id: credentialId }]
+        });
         if (cred) delete cred._id;
         return cred;
     }
@@ -175,8 +177,11 @@ export class MongoDbAdapter {
     async saveCredential(credential) {
         // eslint-disable-next-line no-unused-vars
         const { _id, ...doc } = credential;
+        const id = credential.credentialID || credential.id;
+        doc.credentialID = id;
+        doc.id = id;
         await this.db.collection('credentials').updateOne(
-            { credentialID: credential.credentialID },
+            { $or: [{ credentialID: id }, { id }] },
             { $set: doc },
             { upsert: true }
         );
@@ -204,7 +209,7 @@ export class MongoDbAdapter {
 
     async listUsernames() {
         const users = await this.db.collection('users').find({}, { projection: { username: 1 } }).toArray();
-        return users.map(u => u.username);
+        return users.map(u => u.username).filter(Boolean);
     }
 
     async removeCredential(username, credentialID) {
@@ -212,7 +217,7 @@ export class MongoDbAdapter {
         if (!user) return false;
 
         if (user.credentials) {
-             const newCreds = user.credentials.filter(c => c.credentialID !== credentialID);
+             const newCreds = user.credentials.filter(c => (c.credentialID || c.id) !== credentialID);
              if (newCreds.length !== user.credentials.length) {
                  user.credentials = newCreds;
                  await this.updateUser(user);

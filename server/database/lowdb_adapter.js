@@ -448,7 +448,8 @@ export class LowDbAdapter {
     }
 
     async saveCredential(credential) {
-        this.db.data.credentials[credential.credentialID] = credential;
+        const id = credential.id || credential.credentialID;
+        this.db.data.credentials[id] = credential;
         await this.write();
         return credential;
     }
@@ -492,7 +493,7 @@ export class LowDbAdapter {
     }
 
     async listUsernames() {
-        return Object.values(this.db.data.users).map(u => u.username);
+        return Object.values(this.db.data.users).map(u => u.username).filter(Boolean);
     }
 
     async removeCredential(username, credentialID) {
@@ -500,7 +501,7 @@ export class LowDbAdapter {
         if (!user) return false;
 
         if (user.credentials) {
-             const idx = user.credentials.findIndex(c => c.credentialID === credentialID);
+             const idx = user.credentials.findIndex(c => (c.credentialID || c.id) === credentialID);
              if (idx !== -1) {
                  user.credentials.splice(idx, 1);
              }

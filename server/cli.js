@@ -41,7 +41,7 @@ program
     .description('Add a new user')
     .argument('<username>', 'username')
     .argument('<password>', 'password')
-    .option('--admin', 'Grant admin privileges to the user')
+    .option('--no-admin', 'Do not grant admin privileges to the user')
     .action(async (username, password, options) => {
         const existing = await db.getUser(username);
         if (existing) {
@@ -50,18 +50,35 @@ program
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        const isAdmin = options.admin !== false;
 
         const user = {
             id: randomUUID(),
             username,
             password: hashedPassword,
             credentials: [],
-            ...(options.admin ? { role: 'admin' } : {})
+            role: isAdmin ? 'admin' : 'user'
         };
 
         await db.createUser(user);
 
-        console.log(`User ${username} added successfully${options.admin ? ' with admin privileges' : ''}`);
+        console.log(`User ${username} added successfully${isAdmin ? ' with admin privileges' : ''}`);
+    });
+
+program
+    .command('set-admin')
+    .description('Grant or revoke admin privileges for a user')
+    .argument('<username>', 'username')
+    .option('--revoke', 'Revoke admin privileges')
+    .action(async (username, options) => {
+        const user = await db.getUser(username);
+        if (!user) {
+            console.log(`User ${username} not found`);
+            return;
+        }
+        user.role = options.revoke ? 'user' : 'admin';
+        await db.updateUser(user);
+        console.log(`User ${username} role updated to: ${user.role}`);
     });
 
 program

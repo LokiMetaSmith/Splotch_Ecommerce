@@ -294,18 +294,21 @@ async function fetchWithAuth(url, options = {}) {
   }
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => {
-      // Provide a more descriptive error if we can't parse JSON (e.g. proxy returned 500 without a body)
-      console.error(
-        `[fetchWithAuth] Received non-JSON error response. HTTP Status: ${response.status}`,
-      );
-      return {
-        error: `Server error: Could not process response (Status ${response.status})`,
-      };
-    });
-    throw new Error(
-      errorData.error || `HTTP error! Status: ${response.status}`,
-    );
+    let errorMessage = `HTTP error! Status: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      if (errorData && (errorData.error || errorData.message)) {
+        errorMessage = errorData.error || errorData.message;
+      }
+    } catch {
+      try {
+        const text = await response.text();
+        if (text && text.trim()) {
+          errorMessage = text.trim();
+        }
+      } catch {}
+    }
+    throw new Error(errorMessage);
   }
 
   // Handle responses with no content
