@@ -513,7 +513,22 @@ async function startServer(
 
     const allowedOrigins = [
       'https://lokimetasmith.github.io',
+      'https://www.splotch.page',
+      'https://splotch.page',
     ];
+
+    if (process.env.BASE_URL) {
+      try {
+        const parsed = new URL(process.env.BASE_URL).origin;
+        if (!allowedOrigins.includes(parsed)) allowedOrigins.push(parsed);
+      } catch (e) {}
+    }
+    if (process.env.EXPECTED_ORIGIN) {
+      try {
+        const parsed = new URL(process.env.EXPECTED_ORIGIN).origin;
+        if (!allowedOrigins.includes(parsed)) allowedOrigins.push(parsed);
+      } catch (e) {}
+    }
     
     if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV !== 'production') {
       allowedOrigins.push(/https?:\/\/(localhost|127\.0\.0\.1):\d+/);
