@@ -258,6 +258,9 @@ Before deploying, ensure your server (e.g., a Linux VM) has the necessary softwa
         listen 80;
         server_name your_domain.com;
 
+        # Accommodate large assets & canvas prints up to Cloudflare's 100MB limit
+        client_max_body_size 100M;
+
         root /path/to/your/project/dist;
         index index.html;
 

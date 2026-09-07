@@ -35,6 +35,9 @@ server {
     listen 80;
     server_name example.com www.example.com;
 
+    # Accommodate large assets & canvas prints up to Cloudflare's 100MB limit
+    client_max_body_size 100M;
+
     location / {
         proxy_pass http://app-prod:3000;
         proxy_set_header Host $host;
@@ -48,6 +51,9 @@ server {
 server {
     listen 80;
     server_name dev.example.com;
+
+    # Accommodate large assets & canvas prints up to Cloudflare's 100MB limit
+    client_max_body_size 100M;
 
     location / {
         proxy_pass http://app-dev:3001;

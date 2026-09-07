@@ -66,6 +66,9 @@ server {
     # ssl_certificate /path/to/your/fullchain.pem;
     # ssl_certificate_key /path/to/your/privkey.pem;
 
+    # Accommodate large assets & canvas prints up to Cloudflare's 100MB limit
+    client_max_body_size 100M;
+
     location / {
         proxy_pass http://localhost:3000;
         proxy_set_header Host $host;

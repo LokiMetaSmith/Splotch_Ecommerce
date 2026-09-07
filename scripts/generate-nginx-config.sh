@@ -36,6 +36,9 @@ server {
     add_header X-XSS-Protection "1; mode=block";
     add_header X-Content-Type-Options "nosniff";
 
+    # Accommodate large assets & canvas prints up to Cloudflare's 100MB limit
+    client_max_body_size 100M;
+
     location / {
         proxy_pass http://$BACKEND_ADDR;
         proxy_http_version 1.1;
