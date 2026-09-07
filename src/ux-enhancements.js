@@ -340,37 +340,43 @@ export function setupContrastToggle() {
   const bgLightBtn = document.getElementById("bgLightBtn");
   const bgDarkBtn = document.getElementById("bgDarkBtn");
   const bgTransBtn = document.getElementById("bgTransBtn");
-
   const bgMagentaBtn = document.getElementById("bgMagentaBtn");
 
-  const originalBgImage = canvas.style.backgroundImage;
+  const originalBgImage =
+    canvas.style.backgroundImage ||
+    `linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(135deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(135deg, transparent 75%, #ccc 75%)`;
 
-  if (bgLightBtn) {
-    bgLightBtn.addEventListener("click", () => {
-      canvas.style.backgroundImage = "none";
-      canvas.style.backgroundColor = "white";
+  const buttons = [
+    { btn: bgLightBtn, color: "white", image: "none" },
+    { btn: bgDarkBtn, color: "#1f2937", image: "none" },
+    { btn: bgMagentaBtn, color: "#ff00ff", image: "none" },
+    { btn: bgTransBtn, color: "white", image: originalBgImage },
+  ];
+
+  const setCanvasBg = (color, image, activeBtn) => {
+    canvas.style.setProperty("background-color", color, "important");
+    canvas.style.setProperty("background-image", image, "important");
+    buttons.forEach(({ btn }) => {
+      if (!btn) return;
+      if (btn === activeBtn) {
+        btn.classList.add("ring-2", "ring-splotch-teal", "ring-offset-1");
+      } else {
+        btn.classList.remove("ring-2", "ring-splotch-teal", "ring-offset-1");
+      }
     });
-  }
+  };
 
-  if (bgDarkBtn) {
-    bgDarkBtn.addEventListener("click", () => {
-      canvas.style.backgroundImage = "none";
-      canvas.style.backgroundColor = "#1f2937"; // gray-800
-    });
-  }
+  buttons.forEach(({ btn, color, image }) => {
+    if (btn) {
+      btn.addEventListener("click", () => {
+        setCanvasBg(color, image, btn);
+      });
+    }
+  });
 
-  if (bgMagentaBtn) {
-    bgMagentaBtn.addEventListener("click", () => {
-      canvas.style.backgroundImage = "none";
-      canvas.style.backgroundColor = "#ff00ff"; // magenta
-    });
-  }
-
+  // Default active indicator: checkerboard
   if (bgTransBtn) {
-    bgTransBtn.addEventListener("click", () => {
-      canvas.style.backgroundImage = originalBgImage;
-      canvas.style.backgroundColor = "transparent";
-    });
+    bgTransBtn.classList.add("ring-2", "ring-splotch-teal", "ring-offset-1");
   }
 }
 
