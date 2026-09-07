@@ -805,6 +805,14 @@ async function startServer(
       res.json({ csrfToken: res.locals._csrf });
     });
 
+    app.get('/api/config', (req, res) => {
+      res.json({
+        squareAppId: getSecret('SQUARE_APPLICATION_ID') || getSecret('SQUARE_APP_ID') || 'sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA',
+        squareLocationId: getSecret('SQUARE_LOCATION_ID') || 'LTS82DEX24XR0',
+        squareEnvironment: getSecret('SQUARE_ENVIRONMENT') || 'sandbox',
+      });
+    });
+
     app.get('/api/pricing-info', (req, res) => {
         // PERFORMANCE: Temporarily disabled cache during development to allow pricing updates
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

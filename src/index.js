@@ -580,23 +580,33 @@ async function BootStrap() {
 
   // Fetch CSRF token, config, pricing, and inventory
   await fetchCsrfToken();
-  const configRes = await fetch(`${serverUrl}/api/config`);
-  if (configRes.ok) {
-      const config = await configRes.json();
-      appId = config.squareAppId || appId;
-      locationId = config.squareLocationId || locationId;
-      
-      const scriptUrl = config.squareEnvironment === 'production' 
-          ? "https://web.squarecdn.com/v1/square.js" 
-          : "https://sandbox.web.squarecdn.com/v1/square.js";
+  let scriptUrl = "https://sandbox.web.squarecdn.com/v1/square.js";
+  try {
+      const configRes = await fetch(`${serverUrl}/api/config`);
+      if (configRes.ok) {
+          const config = await configRes.json();
+          appId = config.squareAppId || appId;
+          locationId = config.squareLocationId || locationId;
           
-      // Dynamically load the Square script
-      await new Promise((resolve, reject) => {
+          if (config.squareEnvironment === 'production') {
+              scriptUrl = "https://web.squarecdn.com/v1/square.js";
+          }
+      }
+  } catch (e) {
+      console.warn("[CLIENT] Failed to fetch /api/config, falling back to default Square config:", e);
+  }
+
+  // Dynamically load the Square script if not already present
+  if (!window.Square && !document.querySelector(`script[src*="square.js"]`)) {
+      await new Promise((resolve) => {
           const script = document.createElement('script');
           script.src = scriptUrl;
           script.type = 'text/javascript';
           script.onload = resolve;
-          script.onerror = reject;
+          script.onerror = (e) => {
+              console.error("[CLIENT] Failed to load Square script from:", scriptUrl, e);
+              resolve();
+          };
           document.head.appendChild(script);
       });
   }
