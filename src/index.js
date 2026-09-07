@@ -4525,171 +4525,198 @@ function handleResetImage() {
 }
 
 function rotateCanvasContentFixedBounds(angleDegrees) {
-  if (activeBase.basePolygons.length > 0) {
-    // SVG Vector Rotation
-    const bounds = getPolygonsBounds(activeBase.currentPolygons);
-    const centerX = bounds.left + (bounds.right - bounds.left) / 2;
-    const centerY = bounds.top + (bounds.bottom - bounds.top) / 2;
-    const angleRad = (angleDegrees * Math.PI) / 180;
-    const cos = Math.cos(angleRad);
-    const sin = Math.sin(angleRad);
+  const sticker = getActiveBase();
+  if (!sticker) return;
 
-    // Bolt Optimization: Replace nested .map() with pre-allocated arrays and standard for-loops.
-    // This eliminates closure allocation overhead and reduces GC pressure in hot requestAnimationFrame paths.
-    const newPolygons = new Array(activeBase.currentPolygons.length);
-    for (let i = 0; i < activeBase.currentPolygons.length; i++) {
-      const poly = activeBase.currentPolygons[i];
-      const newPoly = new Array(poly.length);
-      for (let j = 0; j < poly.length; j++) {
-        const point = poly[j];
-        const translatedX = point.x - centerX;
-        const translatedY = point.y - centerY;
-        const rotatedX = translatedX * cos - translatedY * sin;
-        const rotatedY = translatedX * sin + translatedY * cos;
-        newPoly[j] = { x: rotatedX + centerX, y: rotatedY + centerY };
-      }
-      newPolygons[i] = newPoly;
-    }
-    activeBase.currentPolygons = newPolygons;
-    redrawAll();
-  } else if (activeBase.originalImage) {
-    // Use the current canvas dimensions, which represent the scaled image size
-    const dpr = window.devicePixelRatio || 1;
-    let w = canvas.width;
-    let h = canvas.height;
-    let sourceCanvas = canvas;
+  const angleRad = (angleDegrees * Math.PI) / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  const isSwap =
+    angleDegrees === 90 ||
+    angleDegrees === -90 ||
+    angleDegrees === 270 ||
+    angleDegrees === -270;
 
-    if (activeBase.cleanCanvasState) {
-      if (
-        !cachedTempCanvas ||
-        cachedTempCanvas.width !== activeBase.cleanCanvasState.width ||
-        cachedTempCanvas.height !== activeBase.cleanCanvasState.height
-      ) {
-        cachedTempCanvas = document.createElement("canvas");
-        cachedTempCanvas.width = activeBase.cleanCanvasState.width;
-        cachedTempCanvas.height = activeBase.cleanCanvasState.height;
-        cachedTempCanvas
-          .getContext("2d")
-          .putImageData(activeBase.cleanCanvasState, 0, 0);
-      }
-      sourceCanvas = cachedTempCanvas;
-      w = activeBase.cleanCanvasState.width;
-      h = activeBase.cleanCanvasState.height;
-    }
+  // Helper to rotate points of a polygon around an origin
+  const rotatePoint = (pt, cx, cy, ncx, ncy) => {
+    const tx = pt.x - cx;
+    const ty = pt.y - cy;
+    const rx = tx * cos - ty * sin;
+    const ry = tx * sin + ty * cos;
+    return { x: rx + ncx, y: ry + ncy };
+  };
 
-    // Swap dimensions for 90/270 degree rotations
-    const newW = angleDegrees === 90 || angleDegrees === -90 ? h : w;
-    const newH = angleDegrees === 90 || angleDegrees === -90 ? w : h;
+  const rotatePolyList = (polys, cx, cy, ncx, ncy) => {
+    if (!polys || !Array.isArray(polys)) return polys;
+    return polys.map((poly) => {
+      if (!Array.isArray(poly)) return poly;
+      return poly.map((pt) => rotatePoint(pt, cx, cy, ncx, ncy));
+    });
+  };
 
-    // Calculate logical dimensions for setCanvasSize (which multiplies by DPR)
-    const newLogicalW = newW / dpr;
-    const newLogicalH = newH / dpr;
+  // Helper to rotate an image element (HTMLImageElement or HTMLCanvasElement)
+  const rotateImageEl = (img) => {
+    if (!img) return img;
+    const sw = img.naturalWidth || img.width;
+    const sh = img.naturalHeight || img.height;
+    if (!sw || !sh) return img;
+    const dw = isSwap ? sh : sw;
+    const dh = isSwap ? sw : sh;
 
-    // Create a new in-memory canvas to draw the rotated image on
-    // Use physical dimensions to preserve quality
-    const tempCanvas = document.createElement("canvas");
-    const tempCtx = tempCanvas.getContext("2d");
+    const rotCanvas = document.createElement("canvas");
+    rotCanvas.width = dw;
+    rotCanvas.height = dh;
+    const rotCtx = rotCanvas.getContext("2d");
+    rotCtx.translate(dw / 2, dh / 2);
+    rotCtx.rotate(angleRad);
+    rotCtx.drawImage(img, -sw / 2, -sh / 2);
+    return rotCanvas;
+  };
 
-    // Set the dimensions of the temp canvas to the new width and height
-    tempCanvas.width = newW;
-    tempCanvas.height = newH;
+  if (sticker.basePolygons && sticker.basePolygons.length > 0) {
+    // --- SVG Vector Rotation ---
+    const bounds = getPolygonsBounds(
+      sticker.currentPolygons || sticker.basePolygons,
+    );
+    const oldW = bounds.width;
+    const oldH = bounds.height;
+    const oldCenterX = bounds.left + oldW / 2;
+    const oldCenterY = bounds.top + oldH / 2;
+    const newCenterX = bounds.left + oldH / 2;
+    const newCenterY = bounds.top + oldW / 2;
 
-    // Translate to the center of the temp canvas, rotate, and draw the current canvas content
-    tempCtx.translate(newW / 2, newH / 2);
-    tempCtx.rotate((angleDegrees * Math.PI) / 180);
-
-    // Draw the image from the main canvas onto the temp canvas
-    // This preserves all current transformations (scale, filters)
-    // We draw the physical canvas directly
-    tempCtx.drawImage(sourceCanvas, -w / 2, -h / 2);
-
-    // Now, update the main canvas with the rotated image
-    // Pass LOGICAL dimensions
-    setCanvasSize(newLogicalW, newLogicalH);
-
-    // Draw the temp canvas onto the main canvas
-    // Since setCanvasSize sets a transform (scale(dpr)), we must reset it temporarily
-    // to draw our physical-pixel tempCanvas 1:1 onto the physical-pixel main canvas.
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, newW, newH);
-    ctx.drawImage(tempCanvas, 0, 0);
-    ctx.restore(); // Restore the transform for subsequent drawing operations (decorations)
-
-    saveCleanState(); // Save state before decorations
-    
-    // Bolt Fix: Update the layer's image reference so redrawAll() correctly renders the rotated image
-    activeBase.image = tempCanvas;
-    activeBase.width = newW;
-    activeBase.height = newH;
-
-    // Handle Raster Cutline Rotation (Overlay Mode)
-    if (activeBase.rasterCutlinePoly) {
-      const angleRad = (angleDegrees * Math.PI) / 180;
-      const cos = Math.cos(angleRad);
-      const sin = Math.sin(angleRad);
-      const dpr = window.devicePixelRatio || 1;
-      const oldCenterX = w / dpr / 2;
-      const oldCenterY = h / dpr / 2;
-      const newCenterX = newW / dpr / 2;
-      const newCenterY = newH / dpr / 2;
-
-      // Bolt Optimization: Replace nested .map() with pre-allocated arrays and standard for-loops.
-      // This eliminates closure allocation overhead and reduces GC pressure in hot requestAnimationFrame paths.
-      const newRasterCutlinePoly = new Array(
-        activeBase.rasterCutlinePoly.length,
+    sticker.currentPolygons = rotatePolyList(
+      sticker.currentPolygons,
+      oldCenterX,
+      oldCenterY,
+      newCenterX,
+      newCenterY,
+    );
+    if (sticker.basePolygons) {
+      const bBounds = getPolygonsBounds(sticker.basePolygons);
+      const bOldCenterX = bBounds.left + bBounds.width / 2;
+      const bOldCenterY = bBounds.top + bBounds.height / 2;
+      const bNewCenterX = bBounds.left + bBounds.height / 2;
+      const bNewCenterY = bBounds.top + bBounds.width / 2;
+      sticker.basePolygons = rotatePolyList(
+        sticker.basePolygons,
+        bOldCenterX,
+        bOldCenterY,
+        bNewCenterX,
+        bNewCenterY,
       );
-      for (let i = 0; i < activeBase.rasterCutlinePoly.length; i++) {
-        const poly = activeBase.rasterCutlinePoly[i];
-        const newPoly = new Array(poly.length);
-        for (let j = 0; j < poly.length; j++) {
-          const p = poly[j];
-          const tx = p.x - oldCenterX;
-          const ty = p.y - oldCenterY;
-          const rx = tx * cos - ty * sin;
-          const ry = tx * sin + ty * cos;
-          newPoly[j] = { x: rx + newCenterX, y: ry + newCenterY };
-        }
-        newRasterCutlinePoly[i] = newPoly;
-      }
-      activeBase.rasterCutlinePoly = newRasterCutlinePoly;
-
-      // Regenerate activeBase.currentCutline from rotated poly
-      const lazyLassoSlider = document.getElementById("lazyLassoSlider");
-      const currentLassoRadius =
-        lazyLassoSlider && lazyLassoSlider.value
-          ? parseInt(lazyLassoSlider.value, 10)
-          : 50;
-      const cutline = generateCutLine(
-        activeBase.rasterCutlinePoly,
-        activeBase.cutlineOffset !== undefined ? activeBase.cutlineOffset : 15,
-        currentLassoRadius,
+    }
+    if (sticker.currentCutline) {
+      sticker.currentCutline = rotatePolyList(
+        sticker.currentCutline,
+        oldCenterX,
+        oldCenterY,
+        newCenterX,
+        newCenterY,
       );
-      activeBase.currentCutline = cutline;
-      currentBounds = getPolygonsBounds(cutline);
+    }
+
+    // Keep world center unchanged
+    const worldCenterX = (sticker.x || 0) + oldW / 2;
+    const worldCenterY = (sticker.y || 0) + oldH / 2;
+    sticker.width = isSwap ? oldH : oldW;
+    sticker.height = isSwap ? oldW : oldH;
+    sticker.x = worldCenterX - sticker.width / 2;
+    sticker.y = worldCenterY - sticker.height / 2;
+  } else if (sticker.image || sticker.originalImage) {
+    // --- Raster Image & Layers Rotation ---
+    const img = sticker.image || sticker.originalImage;
+    const imgW = img.naturalWidth || img.width;
+    const imgH = img.naturalHeight || img.height;
+
+    // Logical dimensions for sticker
+    const oldW = sticker.width || imgW;
+    const oldH = sticker.height || imgH;
+    const newW = isSwap ? oldH : oldW;
+    const newH = isSwap ? oldW : oldH;
+
+    // Rotate base image
+    sticker.image = rotateImageEl(img);
+    if (sticker.originalImage && sticker.originalImage !== img) {
+      sticker.originalImage = rotateImageEl(sticker.originalImage);
     } else {
-      // Default bounds if no cutline
-      currentBounds = {
-        left: 0,
-        top: 0,
-        right: newW,
-        bottom: newH,
-        width: newW,
-        height: newH,
-      };
-      activeBase.currentCutline = [
-        [
-          { x: 0, y: 0 },
-          { x: newW, y: 0 },
-          { x: newW, y: newH },
-          { x: 0, y: newH },
-        ],
-      ];
+      sticker.originalImage = sticker.image;
     }
 
-    calculateAndUpdatePrice();
-    drawCanvasDecorations(currentBounds);
+    // Rotate all custom print layers (e.g. White Layer, Spot Gloss, Foil)
+    if (sticker.customLayers && Array.isArray(sticker.customLayers)) {
+      sticker.customLayers.forEach((layer) => {
+        if (layer.image) {
+          layer.image = rotateImageEl(layer.image);
+        }
+        if (layer.originalImage && layer.originalImage !== layer.image) {
+          layer.originalImage = rotateImageEl(layer.originalImage);
+        }
+      });
+    }
+
+    // Center in sticker-local coordinates
+    const oldCenterX = oldW / 2;
+    const oldCenterY = oldH / 2;
+    const newCenterX = newW / 2;
+    const newCenterY = newH / 2;
+
+    // Rotate all cutline polygons around the sticker's local center
+    if (sticker.currentCutline && sticker.currentCutline.length > 0) {
+      sticker.currentCutline = rotatePolyList(
+        sticker.currentCutline,
+        oldCenterX,
+        oldCenterY,
+        newCenterX,
+        newCenterY,
+      );
+    }
+    if (sticker.rasterCutlinePoly && sticker.rasterCutlinePoly.length > 0) {
+      sticker.rasterCutlinePoly = rotatePolyList(
+        sticker.rasterCutlinePoly,
+        oldCenterX,
+        oldCenterY,
+        newCenterX,
+        newCenterY,
+      );
+    }
+    if (sticker.cutlinePoly && sticker.cutlinePoly.length > 0) {
+      sticker.cutlinePoly = rotatePolyList(
+        sticker.cutlinePoly,
+        oldCenterX,
+        oldCenterY,
+        newCenterX,
+        newCenterY,
+      );
+    }
+    if (sticker.offsetPoly && sticker.offsetPoly.length > 0) {
+      sticker.offsetPoly = rotatePolyList(
+        sticker.offsetPoly,
+        oldCenterX,
+        oldCenterY,
+        newCenterX,
+        newCenterY,
+      );
+    }
+
+    // Keep world center unchanged
+    const worldCenterX = (sticker.x || 0) + oldW / 2;
+    const worldCenterY = (sticker.y || 0) + oldH / 2;
+    sticker.width = newW;
+    sticker.height = newH;
+    sticker.x = worldCenterX - newW / 2;
+    sticker.y = worldCenterY - newH / 2;
+
+    // Invalidate cached cleanCanvasState since the image has been transformed
+    sticker.cleanCanvasState = null;
+    cachedTempCanvas = null;
   }
+
+  sticker.rotation = ((sticker.rotation || 0) + angleDegrees) % 360;
+
+  // Update sheet boundary & re-render everything
+  redrawAll();
+  calculateAndUpdatePrice();
 }
 
 function redrawOriginalImageWithFilters() {
