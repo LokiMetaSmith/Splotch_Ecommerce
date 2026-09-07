@@ -398,18 +398,9 @@ async function handleWebAuthnLogin(e) {
 
     const authResp = await startAuthentication({ optionsJSON: opts });
 
-    // Encode binary data to Base64URL before sending to server
     const verificationPayload = {
+      ...authResp,
       username,
-      id: authResp.id,
-      rawId: authResp.rawId,
-      type: authResp.type,
-      response: {
-        clientDataJSON: authResp.response.clientDataJSON,
-        authenticatorData: authResp.response.authenticatorData,
-        signature: authResp.response.signature,
-        userHandle: authResp.response.userHandle,
-      },
     };
 
     const verification = await fetchWithAuth(
@@ -427,7 +418,11 @@ async function handleWebAuthnLogin(e) {
       throw new Error(verification.error || "WebAuthn verification failed.");
     }
   } catch (error) {
-    showErrorToast(`WebAuthn Login Failed: ${error.message}`);
+    if (error.name === "NotAllowedError") {
+      showErrorToast("Authentication cancelled or timed out. Please try again.");
+    } else {
+      showErrorToast(`WebAuthn Login Failed: ${error.message}`);
+    }
     console.error(error);
   } finally {
     setButtonLoading(btn, false);
@@ -517,16 +512,9 @@ async function handleRegistration(e) {
     });
     const regResp = await startRegistration({ optionsJSON: opts });
 
-    // Encode binary data before sending for verification
     const verificationPayload = {
+      ...regResp,
       username,
-      id: regResp.id,
-      rawId: regResp.rawId,
-      type: regResp.type,
-      response: {
-        clientDataJSON: regResp.response.clientDataJSON,
-        attestationObject: regResp.response.attestationObject,
-      },
     };
 
     const verification = await fetchWithAuth(
@@ -543,7 +531,11 @@ async function handleRegistration(e) {
       throw new Error(verification.error || "Registration failed.");
     }
   } catch (error) {
-    showErrorToast(`Registration Failed: ${error.message}`);
+    if (error.name === "NotAllowedError") {
+      showErrorToast("Registration cancelled or timed out. Please try again.");
+    } else {
+      showErrorToast(`Registration Failed: ${error.message}`);
+    }
     console.error(error);
   } finally {
     setButtonLoading(btn, false);

@@ -2766,6 +2766,13 @@ async function startServer(
 
 
     // --- WebAuthn (Passkey) Endpoints ---
+    function getEffectiveRpID(req) {
+      if (req.hostname === 'localhost' || req.hostname === '127.0.0.1') {
+        return 'localhost';
+      }
+      return rpID || 'splotch.page';
+    }
+
     app.post('/api/auth/pre-register', authLimiter, validateUsername, async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -2790,8 +2797,9 @@ async function startServer(
         logger.info(`New user created for WebAuthn pre-registration: ${username}`);
       }
 
+      const effectiveRpID = getEffectiveRpID(req);
       const options = await injectedWebAuthn.generateRegistrationOptions({
-        rpID: rpID,
+        rpID: effectiveRpID,
         rpName: 'Splotch',
         userName: username,
         authenticatorSelection: {
@@ -2817,13 +2825,15 @@ async function startServer(
         return res.status(400).json({ error: 'Invalid username.' });
       }
       const user = await db.getUser(username);
+      const effectiveRpID = getEffectiveRpID(req);
+      const allowedRPIDs = Array.from(new Set([effectiveRpID, rpID, 'splotch.page', 'www.splotch.page', 'localhost'].filter(Boolean)));
       const allowedOrigins = Array.from(new Set([expectedOrigin, 'https://splotch.page', 'https://www.splotch.page', 'http://localhost:3000'].filter(Boolean)));
       try {
         const verification = await injectedWebAuthn.verifyRegistrationResponse({
           response: body,
           expectedChallenge: user.challenge,
           expectedOrigin: allowedOrigins,
-          expectedRPID: rpID,
+          expectedRPID: allowedRPIDs,
           requireUserVerification: false,
         });
         const { verified, registrationInfo } = verification;
@@ -2867,12 +2877,19 @@ async function startServer(
       if (!user) {
         return res.status(400).json({ error: 'User not found' });
       }
+      const effectiveRpID = getEffectiveRpID(req);
       const options = await injectedWebAuthn.generateAuthenticationOptions({
-        allowCredentials: (user.credentials || []).map(cred => ({
-          id: cred.credentialID || cred.id,
-          type: 'public-key',
-          transports: cred.transports,
-        })),
+        rpID: effectiveRpID,
+        allowCredentials: (user.credentials || []).map(cred => {
+          const credObj = {
+            id: cred.credentialID || cred.id,
+            type: 'public-key',
+          };
+          if (Array.isArray(cred.transports) && cred.transports.length > 0) {
+            credObj.transports = cred.transports;
+          }
+          return credObj;
+        }),
         userVerification: 'preferred',
       });
       user.challenge = options.challenge;
@@ -2896,18 +2913,26 @@ async function startServer(
       if (!credential) {
         return res.status(400).json({ error: 'Credential not found.' });
       }
+      const effectiveRpID = getEffectiveRpID(req);
+      const allowedRPIDs = Array.from(new Set([effectiveRpID, rpID, 'splotch.page', 'www.splotch.page', 'localhost'].filter(Boolean)));
       const allowedOrigins = Array.from(new Set([expectedOrigin, 'https://splotch.page', 'https://www.splotch.page', 'http://localhost:3000'].filter(Boolean)));
       try {
+        const rawPubKey = credential.publicKey || credential.credentialPublicKey;
+        const pubKeyBytes = rawPubKey instanceof Uint8Array ? rawPubKey :
+          Buffer.isBuffer(rawPubKey) ? new Uint8Array(rawPubKey) :
+          (typeof rawPubKey === 'object' && rawPubKey !== null) ? new Uint8Array(Object.values(rawPubKey)) :
+          (typeof rawPubKey === 'string') ? Buffer.from(rawPubKey, 'base64url') : new Uint8Array();
+
         const verification = await injectedWebAuthn.verifyAuthenticationResponse({
           response: body,
           expectedChallenge: user.challenge,
           expectedOrigin: allowedOrigins,
-          expectedRPID: rpID,
+          expectedRPID: allowedRPIDs,
           credential: {
             id: credential.id || credential.credentialID,
-            publicKey: credential.publicKey || credential.credentialPublicKey,
+            publicKey: pubKeyBytes,
             counter: credential.counter || 0,
-            transports: credential.transports,
+            transports: (Array.isArray(credential.transports) && credential.transports.length > 0) ? credential.transports : undefined,
           },
           requireUserVerification: false,
         });
