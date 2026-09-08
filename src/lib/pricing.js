@@ -176,7 +176,7 @@ export function generateSvgFromCutline(cutline, bounds) {
   chunks.length = chunkIdx;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" data-ppi="${bounds.ppi || 300}" xmlns="http://www.w3.org/2000/svg">
     <path d="${chunks.join(" ")}" fill="none" stroke="black" stroke-width="1" />
 </svg>
     `.trim();
@@ -221,8 +221,9 @@ export function generateMultiLayerSvg(stickers, sheetBoundary, bounds) {
     return chunks.join(" ");
   };
 
+  const ppi = bounds.ppi || 300;
   let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" data-ppi="${ppi}" xmlns="http://www.w3.org/2000/svg">`;
 
   // Squash raster images
   if (typeof document !== "undefined") {
@@ -270,7 +271,16 @@ export function generateMultiLayerSvg(stickers, sheetBoundary, bounds) {
     }
 
     // Embed squashed images into the SVG
-    for (const type in layerCanvases) {
+    // White underbase must be rendered FIRST (underneath) so CMYK artwork renders on top!
+    const orderedTypes = Object.keys(layerCanvases).sort((a, b) => {
+      if (a === "white") return -1;
+      if (b === "white") return 1;
+      if (a === "cmyk_art") return 1;
+      if (b === "cmyk_art") return -1;
+      return a.localeCompare(b);
+    });
+
+    for (const type of orderedTypes) {
       const dataUrl = layerCanvases[type].toDataURL("image/png");
       const layerId = type.charAt(0).toUpperCase() + type.slice(1) + "_Layer";
       svgContent += `\n  <g id="${layerId}">`;

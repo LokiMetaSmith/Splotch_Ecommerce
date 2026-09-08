@@ -267,7 +267,9 @@ export class SvgNest {
                 const originalElement = this.tree.find(part => part.id === p.id)?.element;
                 if (originalElement) {
                     const clone = originalElement.cloneNode(true);
-                    clone.setAttribute('transform', `translate(${p.x} ${p.y}) rotate(${p.rotation})`);
+                    const scaleAttr = originalElement.getAttribute('data-scale');
+                    const scaleTransform = (scaleAttr && parseFloat(scaleAttr) !== 1) ? ` scale(${scaleAttr})` : '';
+                    clone.setAttribute('transform', `translate(${p.x} ${p.y}) rotate(${p.rotation})${scaleTransform}`);
                     newSvg.appendChild(clone);
                 }
             });
@@ -351,9 +353,16 @@ export class SvgNest {
             }
 
             // Attempt to polygonify shape elements
-            const poly = this.svgParser.polygonify(el);
+            let poly = this.svgParser.polygonify(el);
 
             if (poly && poly.length > 0) {
+                if (nestGroup && nestGroup.hasAttribute('data-scale')) {
+                    const s = parseFloat(nestGroup.getAttribute('data-scale')) || 1;
+                    if (s !== 1) {
+                        poly = poly.map(pt => ({ x: pt.x * s, y: pt.y * s }));
+                    }
+                }
+
                 const cleanedPoly = this._cleanPolygon(poly);
 
                 if (cleanedPoly && cleanedPoly.length > 2 && Math.abs(GeometryUtil.polygonArea(cleanedPoly)) > this.config.curveTolerance * this.config.curveTolerance) {

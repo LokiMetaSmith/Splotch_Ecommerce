@@ -22,6 +22,7 @@ let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
 const svgCache = new Map(); // Cache for SVG strings to avoid redundant fetches
 let currentViewMode = localStorage.getItem('splotchViewMode') || 'card';
+let currentPricingConfig = {};
 
 // Pagination state
 let currentPage = 1;
@@ -788,11 +789,30 @@ function filterAndDisplayOrders(status) {
   }
 }
 
+// Helper to resolve PPI for an order
+export function getResolutionPpi(resolutionId) {
+  if (typeof resolutionId === "number" && !isNaN(resolutionId) && resolutionId > 0) {
+    return resolutionId;
+  }
+  if (currentPricingConfig && currentPricingConfig.resolutions) {
+    const found = currentPricingConfig.resolutions.find(
+      (r) => r.id === resolutionId || r.ppi === resolutionId
+    );
+    if (found && found.ppi) return Number(found.ppi);
+  }
+  if (typeof resolutionId === "string") {
+    const match = resolutionId.match(/(\d+)/);
+    if (match) return parseInt(match[1], 10);
+  }
+  return 300;
+}
+
 // --- Start Table Row View ---
 function displayOrderRow(order) {
   const orderId = order.orderId;
   const receivedAt = new Date(order.receivedAt).toLocaleString();
   const quantity = order.orderDetails?.quantity || order.quantity || 0;
+  const ppi = getResolutionPpi(order.orderDetails?.resolution || order.resolution);
   const price = (order.amount / 100).toFixed(2);
 
   const billingName = escapeHtml(
@@ -862,7 +882,7 @@ function displayOrderRow(order) {
       <td class="px-4 py-3">
         <div class="flex items-center gap-2">
             ${designImagePath && order.designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
-                <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" loading="lazy" decoding="async">
+                <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
             </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">N/A</div>`}
             <div>
                 <div class="text-xs font-semibold">Qty: ${quantity}</div>
@@ -914,6 +934,7 @@ export function displayOrder(order) {
   const shippingEmail = escapeHtml(order.shippingContact?.email || "N/A");
 
   const quantity = escapeHtml(order.orderDetails?.quantity || "N/A");
+  const ppi = getResolutionPpi(order.orderDetails?.resolution || order.resolution);
   const status = escapeHtml(order.status);
   const orderId = escapeHtml(order.orderId);
   // Truncate BEFORE escaping would be safer for logic, but since orderId is UUID (safe chars),
@@ -1003,7 +1024,7 @@ export function displayOrder(order) {
         <div class="mt-4">
             <dt>Sticker Design:</dt>
             <a class="sticker-peel-container" href="${designImagePath}" target="_blank">
-                <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" loading="lazy" decoding="async">
+                <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
             </a>
             ${cutFilePath ? `<div class="mt-2"><dt>Cut File:</dt><dd><a href="${serverUrl}${cutFilePath}" class="text-blue-500 underline text-sm" target="_blank" download>Download SVG / XML</a></dd></div>` : ""}
         </div>
@@ -1558,9 +1579,16 @@ async function handleNesting(e) {
       { X: (binWidth - marginRight) * scale, Y: (binHeight + 10) * scale },
     ]);
 
+    const addPrintingMarks = document.getElementById("addPrintingMarks")?.checked || false;
+
     // Add internal keep-outs
-    const keepoutAreasText = document.getElementById("keepoutAreas").value;
-    const keepoutAreas = JSON.parse(keepoutAreasText);
+    const keepoutAreasText = document.getElementById("keepoutAreas")?.value || "[]";
+    let keepoutAreas = [];
+    try {
+      keepoutAreas = JSON.parse(keepoutAreasText);
+    } catch (_) {
+      keepoutAreas = [];
+    }
     keepoutAreas.forEach((area) => {
       clip.push([
         { X: area.x * scale, Y: area.y * scale },
@@ -1569,6 +1597,38 @@ async function handleNesting(e) {
         { X: area.x * scale, Y: (area.y + area.height) * scale },
       ]);
     });
+
+    if (addPrintingMarks) {
+      // Protect corner fiducial marks, QR codes, and tracking code text from sticker placement
+      // Top-Left: fiducial cx=60, cy=60, QR x=90..170, text x=185..280
+      clip.push([
+        { X: -10, Y: -10 },
+        { X: 300 * scale, Y: -10 },
+        { X: 300 * scale, Y: 110 * scale },
+        { X: -10, Y: 110 * scale },
+      ]);
+      // Top-Right: fiducial cx=binWidth-60, cy=60
+      clip.push([
+        { X: (binWidth - 100) * scale, Y: -10 },
+        { X: (binWidth + 10) * scale, Y: -10 },
+        { X: (binWidth + 10) * scale, Y: 100 * scale },
+        { X: (binWidth - 100) * scale, Y: 100 * scale },
+      ]);
+      // Bottom-Left: fiducial cx=60, cy=binHeight-60
+      clip.push([
+        { X: -10, Y: (binHeight - 100) * scale },
+        { X: 100 * scale, Y: (binHeight - 100) * scale },
+        { X: 100 * scale, Y: (binHeight + 10) * scale },
+        { X: -10, Y: (binHeight + 10) * scale },
+      ]);
+      // Bottom-Right: fiducial cx=binWidth-60, cy=binHeight-60, QR x=binWidth-170..binWidth-90, text x=binWidth-185
+      clip.push([
+        { X: (binWidth - 300) * scale, Y: (binHeight - 110) * scale },
+        { X: (binWidth + 10) * scale, Y: (binHeight - 110) * scale },
+        { X: (binWidth + 10) * scale, Y: (binHeight + 10) * scale },
+        { X: (binWidth - 300) * scale, Y: (binHeight + 10) * scale },
+      ]);
+    }
 
     cpr.AddPaths(clip, ClipperLib.PolyType.ptClip, true);
 
@@ -1630,25 +1690,27 @@ async function handleNesting(e) {
           "image/svg+xml",
         );
         const cutlineRoot = cutlineDoc.documentElement;
-        const width = cutlineRoot.getAttribute("width") || "100%";
-        const height = cutlineRoot.getAttribute("height") || "100%";
+        const rawWidth = parseFloat(cutlineRoot.getAttribute("width")) || 100;
+        const rawHeight = parseFloat(cutlineRoot.getAttribute("height")) || 100;
         let viewBox = cutlineRoot.getAttribute("viewBox");
-        if (!viewBox && width !== "100%" && height !== "100%") {
-          // fallback if no viewBox
-          viewBox = `0 0 ${parseFloat(width)} ${parseFloat(height)}`;
+        if (!viewBox) {
+          viewBox = `0 0 ${rawWidth} ${rawHeight}`;
         }
+
+        const ppi = parseFloat(img.dataset.ppi) || parseFloat(cutlineRoot.getAttribute("data-ppi")) || 300;
+        const scaleFactor = 96 / ppi;
+        const scaledW = rawWidth * scaleFactor;
+        const scaledH = rawHeight * scaleFactor;
 
         const availW = binWidth - marginLeft - marginRight;
         const availH = binHeight - marginTop - marginBottom;
-        const svgW = parseFloat(width);
-        const svgH = parseFloat(height);
         
-        if (!isNaN(svgW) && !isNaN(svgH)) {
-          const fitsNormal = svgW <= availW && svgH <= availH;
-          const fitsRotated = svgW <= availH && svgH <= availW;
+        if (!isNaN(scaledW) && !isNaN(scaledH)) {
+          const fitsNormal = scaledW <= availW && scaledH <= availH;
+          const fitsRotated = scaledW <= availH && scaledH <= availW;
           if (!fitsNormal && !fitsRotated) {
             const orderId = img.closest('.order-row, .order-card')?.dataset?.orderId || "unknown";
-            throw new Error(`Sticker for order ${orderId.substring(0, 8)} (${Math.round(svgW)}x${Math.round(svgH)}px) is too large for the printable area (${Math.round(availW)}x${Math.round(availH)}px). Please reduce margins or use a larger sheet.`);
+            throw new Error(`Sticker for order ${orderId.substring(0, 8)} (${(scaledW/96).toFixed(2)}x${(scaledH/96).toFixed(2)}in) is too large for the printable area (${(availW/96).toFixed(2)}x${(availH/96).toFixed(2)}in). Please reduce margins or use a larger sheet.`);
           }
         }
 
@@ -1656,43 +1718,78 @@ async function handleNesting(e) {
           "http://www.w3.org/2000/svg",
           "svg",
         );
-        if (width) unifiedSvg.setAttribute("width", width);
-        if (height) unifiedSvg.setAttribute("height", height);
-        if (viewBox) unifiedSvg.setAttribute("viewBox", viewBox);
+        unifiedSvg.setAttribute("width", String(scaledW));
+        unifiedSvg.setAttribute("height", String(scaledH));
+        unifiedSvg.setAttribute("viewBox", viewBox);
 
         const group = document.createElementNS(
           "http://www.w3.org/2000/svg",
           "g",
         );
         group.setAttribute("class", "nest-group");
+        group.setAttribute("data-scale", String(scaleFactor));
 
-        const imageEl = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "image",
-        );
-        imageEl.setAttribute("href", pngBase64);
-        imageEl.setAttribute("width", width);
-        imageEl.setAttribute("height", height);
+        const childNodes = Array.from(cutlineRoot.children || cutlineRoot.childNodes)
+          .filter((node) => node.nodeType === 1); // ELEMENT_NODE
 
-        if (viewBox) {
-          const parts = viewBox.split(/[\s,]+/);
-          if (parts.length === 4) {
-            imageEl.setAttribute("x", parts[0]);
-            imageEl.setAttribute("y", parts[1]);
-            imageEl.setAttribute("width", parts[2]);
-            imageEl.setAttribute("height", parts[3]);
+        let hasCmykOrImage = false;
+        childNodes.forEach((child) => {
+          const id = child.getAttribute("id") || "";
+          if (id === "Cmyk_art_Layer" || child.tagName.toLowerCase() === "image" || child.querySelector("image")) {
+            hasCmykOrImage = true;
           }
+        });
+
+        const getLayerPriority = (el) => {
+          const id = (el.getAttribute("id") || "").toLowerCase();
+          const tag = el.tagName.toLowerCase();
+          if (id.includes("white")) return 1;
+          if (id.includes("inlay")) return 2;
+          if (id.includes("cmyk") || tag === "image" || el.querySelector("image")) return 3;
+          if (id.includes("clear")) return 4;
+          if (id.includes("kiss")) return 10;
+          if (id.includes("die")) return 11;
+          return 12;
+        };
+
+        const elementsToAppend = [];
+
+        if (!hasCmykOrImage) {
+          const imageEl = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "image",
+          );
+          imageEl.setAttribute("href", pngBase64);
+          imageEl.setAttribute("width", String(rawWidth));
+          imageEl.setAttribute("height", String(rawHeight));
+
+          if (viewBox) {
+            const parts = viewBox.split(/[\s,]+/);
+            if (parts.length === 4) {
+              imageEl.setAttribute("x", parts[0]);
+              imageEl.setAttribute("y", parts[1]);
+              imageEl.setAttribute("width", parts[2]);
+              imageEl.setAttribute("height", parts[3]);
+            }
+          }
+          elementsToAppend.push({ el: imageEl, priority: 3 });
         }
 
-        group.appendChild(imageEl);
-
-        // Add cut lines on top
-        Array.from(cutlineRoot.childNodes).forEach((child) => {
+        childNodes.forEach((child) => {
           const clone = child.cloneNode(true);
-          if (clone.nodeType === 1) { // ELEMENT_NODE
+          const priority = getLayerPriority(clone);
+          const isCutline = priority >= 10 || (!clone.getAttribute("id") && clone.tagName.toLowerCase() === "path");
+          if (isCutline) {
             clone.setAttribute("class", (clone.getAttribute("class") || "") + " cut-line-element");
           }
-          group.appendChild(clone);
+          elementsToAppend.push({ el: clone, priority });
+        });
+
+        // Ensure proper layer order: White_Layer (1) -> Inlay (2) -> CMYK/Art (3) -> Clear (4) -> Kiss-Cut (10) -> Die-Cut (11)
+        elementsToAppend.sort((a, b) => a.priority - b.priority);
+
+        elementsToAppend.forEach((item) => {
+          group.appendChild(item.el);
         });
 
         unifiedSvg.appendChild(group);
@@ -1718,11 +1815,10 @@ async function handleNesting(e) {
     }
 
     const spacing = parseInt(ui.spacingInput.value, 10) || 0;
-    const addPrintingMarks = ui.addPrintingMarks.checked;
     const options = { 
       spacing, 
       rotations: 4, 
-      addPrintingMarks,
+      addPrintingMarks: false, // printshop.js adds sheet-level printing marks itself
       onProgress: (msg) => {
         ui.nestedSvgContainer.innerHTML = `<p>${msg}</p>`;
       }
@@ -1826,19 +1922,19 @@ async function handleNesting(e) {
 
             // Add 4 corner marks
             // Top-Left
-            rootSvg.appendChild(createMark(135, 60));
+            rootSvg.appendChild(createMark(60, 60));
             // Top-Right
-            rootSvg.appendChild(createMark(binWidth - 135, 60));
+            rootSvg.appendChild(createMark(binWidth - 60, 60));
             // Bottom-Left
-            rootSvg.appendChild(createMark(135, binHeight - 60));
+            rootSvg.appendChild(createMark(60, binHeight - 60));
             // Bottom-Right
-            rootSvg.appendChild(createMark(binWidth - 135, binHeight - 60));
+            rootSvg.appendChild(createMark(binWidth - 60, binHeight - 60));
 
             if (window.QRCode) {
             try {
                 const qrCanvas = document.createElement("canvas");
                 await QRCode.toCanvas(qrCanvas, trackingCode, {
-                width: 100,
+                width: 80,
                 margin: 1,
                 });
                 const qrDataUri = qrCanvas.toDataURL("image/png");
@@ -1852,8 +1948,8 @@ async function handleNesting(e) {
                 qrImg.setAttribute("href", qrDataUri);
                 qrImg.setAttribute("x", String(qrX));
                 qrImg.setAttribute("y", String(qrY));
-                qrImg.setAttribute("width", "100");
-                qrImg.setAttribute("height", "100");
+                qrImg.setAttribute("width", "80");
+                qrImg.setAttribute("height", "80");
 
                 const textNode = svgDoc.createElementNS(
                     "http://www.w3.org/2000/svg",
@@ -1872,15 +1968,11 @@ async function handleNesting(e) {
                 rootSvg.appendChild(textNode);
                 };
 
-                // Top-Left QR Code (placed outside fiducial at cx=135, cy=60)
-                // QR is placed to the left of the fiducial (X=20). 
-                // Text is placed inline to the right of the QR code (X=130).
-                addQR(20, 10, 130, 65, "start");
+                // Top-Left: Fiducial cx=60, cy=60. QR x=90, y=20. Text x=185, y=65 ("start").
+                addQR(90, 20, 185, 65, "start");
                 
-                // Bottom-Right QR Code (placed outside fiducial at cx=binWidth-135, cy=binHeight-60)
-                // QR is placed to the right of the fiducial (X=binWidth - 120).
-                // Text is placed inline to the left of the QR code (X=binWidth - 130).
-                addQR(binWidth - 120, binHeight - 110, binWidth - 130, binHeight - 55, "end");
+                // Bottom-Right: Fiducial cx=binWidth-60, cy=binHeight-60. QR x=binWidth-170, y=binHeight-100. Text x=binWidth-185, y=binHeight-55 ("end").
+                addQR(binWidth - 170, binHeight - 100, binWidth - 185, binHeight - 55, "end");
             } catch (qrErr) {
                 console.error("Failed to inject QR code into SVG", qrErr);
             }
@@ -3117,7 +3209,7 @@ export async function init() {
 document.addEventListener("DOMContentLoaded", init);
 
 // --- Pricing Editor UI ---
-let currentPricingConfig = {};
+currentPricingConfig = {};
 
 async function loadPricingConfigEditor() {
   if (!ui.pricingEditorContainer) return;
