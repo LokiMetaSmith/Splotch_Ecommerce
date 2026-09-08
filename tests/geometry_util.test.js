@@ -72,6 +72,22 @@ describe('GeometryUtil.getRotatedPolygonBounds', () => {
         const bounds = GeometryUtil.getRotatedPolygonBounds(poly, 0);
         expect(bounds).toEqual({x:0, y:0, width:100, height:50});
     });
+
+    it('should cache rotated bounds and handle frozen objects gracefully', () => {
+        const poly = [{x:0, y:0}, {x:10, y:0}, {x:10, y:10}, {x:0, y:10}];
+        const bounds1 = GeometryUtil.getRotatedPolygonBounds(poly, 45);
+        const bounds2 = GeometryUtil.getRotatedPolygonBounds(poly, 45);
+
+        // Check cached reference equality
+        expect(bounds1).toBe(bounds2);
+
+        // Test frozen object fallback
+        const frozenPoly = Object.freeze([{x:0, y:0}, {x:10, y:0}, {x:10, y:10}, {x:0, y:10}]);
+        expect(() => {
+            const frozenBounds = GeometryUtil.getRotatedPolygonBounds(frozenPoly, 45);
+            expect(frozenBounds).toBeDefined();
+        }).not.toThrow();
+    });
 });
 
 describe('GeometryUtil.pointInPolygon', () => {
