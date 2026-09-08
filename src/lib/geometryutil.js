@@ -392,6 +392,23 @@ export const GeometryUtil = {
         if (!polygon || polygon.length === 0) return null;
         if (Math.abs(angle) < TOL) return this.getPolygonBounds(polygon);
 
+        // Bolt Optimization: Cache rotated bounds per angle to avoid repeated O(N) trigonometric calculations in hot nesting loops.
+        if (!polygon._rotatedBoundsCache) {
+            try {
+                Object.defineProperty(polygon, '_rotatedBoundsCache', {
+                    value: new Map(),
+                    writable: true,
+                    configurable: true,
+                    enumerable: false
+                });
+            } catch (e) {
+                // If object is non-extensible/frozen, fallback without caching
+            }
+        }
+
+        const cached = polygon._rotatedBoundsCache?.get(angle);
+        if (cached) return cached;
+
         const angleRad = _degreesToRadians(angle);
         const cos = Math.cos(angleRad);
         const sin = Math.sin(angleRad);
@@ -409,7 +426,11 @@ export const GeometryUtil = {
             if (ry > maxY) maxY = ry;
         }
 
-        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        const bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        if (polygon._rotatedBoundsCache) {
+            polygon._rotatedBoundsCache.set(angle, bounds);
+        }
+        return bounds;
     },
     
     // ... other methods from original file can be added here ...
