@@ -2527,6 +2527,86 @@ async function testOdooConnection(e) {
   }
 }
 
+// --- Pirate Ship Integration Logic ---
+async function loadPirateShipConfig() {
+  try {
+    const data = await fetchWithAuth(`${serverUrl}/api/admin/integrations/pirateship`);
+    if (data && data.success) {
+      const storeUrlInput = document.getElementById("pirateship-store-url");
+      const keyInput = document.getElementById("pirateship-consumer-key");
+      const secretInput = document.getElementById("pirateship-consumer-secret");
+
+      if (storeUrlInput) storeUrlInput.value = data.storeUrl || window.location.origin;
+      if (keyInput) keyInput.value = data.consumerKey || "";
+      if (secretInput) secretInput.value = data.consumerSecret || "";
+    }
+  } catch (error) {
+    console.warn("Failed to load Pirate Ship configuration:", error);
+  }
+}
+
+function initPirateShipListeners() {
+  document.getElementById("copy-pirateship-url-btn")?.addEventListener("click", () => {
+    const url = document.getElementById("pirateship-store-url")?.value;
+    if (url) {
+      navigator.clipboard.writeText(url);
+      showSuccessToast("Store URL copied to clipboard!");
+    }
+  });
+
+  document.getElementById("copy-pirateship-key-btn")?.addEventListener("click", () => {
+    const key = document.getElementById("pirateship-consumer-key")?.value;
+    if (key) {
+      navigator.clipboard.writeText(key);
+      showSuccessToast("Consumer Key copied to clipboard!");
+    }
+  });
+
+  document.getElementById("toggle-pirateship-secret-btn")?.addEventListener("click", () => {
+    const secretInput = document.getElementById("pirateship-consumer-secret");
+    const toggleBtn = document.getElementById("toggle-pirateship-secret-btn");
+    if (secretInput) {
+      if (secretInput.type === "password") {
+        secretInput.type = "text";
+        if (toggleBtn) toggleBtn.textContent = "Hide";
+      } else {
+        secretInput.type = "password";
+        if (toggleBtn) toggleBtn.textContent = "Show";
+      }
+    }
+  });
+
+  document.getElementById("copy-pirateship-secret-btn")?.addEventListener("click", () => {
+    const secret = document.getElementById("pirateship-consumer-secret")?.value;
+    if (secret) {
+      navigator.clipboard.writeText(secret);
+      showSuccessToast("Consumer Secret copied to clipboard!");
+    }
+  });
+
+  document.getElementById("regenerate-pirateship-keys-btn")?.addEventListener("click", async () => {
+    if (!confirm("Are you sure you want to regenerate Pirate Ship keys? You will need to update the keys in your Pirate Ship account.")) {
+      return;
+    }
+    try {
+      const result = await fetchWithAuth(`${serverUrl}/api/admin/integrations/pirateship/regenerate`, {
+        method: "POST"
+      });
+      if (result && result.success) {
+        const keyInput = document.getElementById("pirateship-consumer-key");
+        const secretInput = document.getElementById("pirateship-consumer-secret");
+        if (keyInput) keyInput.value = result.consumerKey;
+        if (secretInput) secretInput.value = result.consumerSecret;
+        showSuccessToast("New Pirate Ship keys generated successfully!");
+      } else {
+        showErrorToast("Failed to regenerate keys.");
+      }
+    } catch (err) {
+      showErrorToast(`Error regenerating keys: ${err.message}`);
+    }
+  });
+}
+
 // --- Initialization ---
 async function getServerSessionToken() {
   try {
@@ -2991,6 +3071,7 @@ export async function init() {
 
       loadOdooConfig();
       loadPricingConfigEditor();
+      loadPirateShipConfig();
     });
   }
 
@@ -3001,6 +3082,9 @@ export async function init() {
   document
     .getElementById("test-odoo-btn")
     ?.addEventListener("click", testOdooConnection);
+
+  // Pirate Ship listeners
+  initPirateShipListeners();
 
   // Check for a token in the URL from OAuth redirect
   const urlParams = new URLSearchParams(window.location.search);

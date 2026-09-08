@@ -1,7 +1,8 @@
 // server.js
 import express from 'express';
 import { SquareClient, SquareEnvironment, SquareError } from "square";
-import { randomUUID } from 'crypto';
+import crypto, { randomUUID } from 'crypto';
+import { createWooCommerceRouter } from './woocommerce.js';
 import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
@@ -722,7 +723,9 @@ async function startServer(
     });
 
     app.use(lusca({
-        csrf: true,
+        csrf: {
+            blocklist: ['/wp-json', '/wc-auth']
+        },
         xframe: 'SAMEORIGIN',
         hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},
         nosniff: true,
@@ -843,6 +846,17 @@ async function startServer(
     app.get('/api/server-info', (req, res) => {
         res.json({ serverSessionToken });
     });
+
+    // --- WooCommerce REST API Emulation (Pirate Ship Integration) ---
+    const wooCommerceModule = createWooCommerceRouter({
+        db,
+        scheduleEmail,
+        scheduleTelegram,
+        getSecret,
+        logger,
+        bot
+    });
+    app.use(wooCommerceModule.router);
 
     app.get('/api/ping', (req, res) => {
       res.status(200).json({
@@ -966,6 +980,45 @@ async function startServer(
         } else {
             res.status(400).json({ success: false, error: result.error });
         }
+    });
+
+    // --- Pirate Ship / WooCommerce Integration Settings ---
+    app.get('/api/admin/integrations/pirateship', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        const creds = wooCommerceModule.getCredentials();
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        res.json({
+            success: true,
+            storeUrl: baseUrl,
+            consumerKey: creds.consumerKey,
+            consumerSecret: creds.consumerSecret,
+            endpoints: {
+                discovery: `${baseUrl}/wp-json/wc/v3`,
+                orders: `${baseUrl}/wp-json/wc/v3/orders`
+            }
+        });
+    });
+
+    app.post('/api/admin/integrations/pirateship/regenerate', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        const newKey = `ck_splotch_${crypto.randomBytes(8).toString('hex')}`;
+        const newSecret = `cs_splotch_${crypto.randomBytes(8).toString('hex')}`;
+
+        if (!db.data.config) db.data.config = {};
+        db.data.config.woocommerce = {
+            consumerKey: newKey,
+            consumerSecret: newSecret
+        };
+        await db.write();
+
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        logger.info('[WOOCOMMERCE] Regenerated Pirate Ship credentials');
+        res.json({
+            success: true,
+            storeUrl: baseUrl,
+            consumerKey: newKey,
+            consumerSecret: newSecret
+        });
     });
 
     app.get('/api/inventory', async (req, res) => {
