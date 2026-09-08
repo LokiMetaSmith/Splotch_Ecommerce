@@ -125,6 +125,22 @@ pnpm run dev
 ```
 The frontend application will be available at `http://localhost:5173`.
 
+### Convenient Startup & Restart Scripts
+
+- **`./start.sh`**: One-command script for local development. Installs dependencies and starts both the backend server and the frontend Vite dev server concurrently.
+- **`./restart.sh`**: Automated rebuild and restart script designed for live/production deployments (e.g. on the SBC).
+  ```bash
+  # Rebuild frontend assets and restart splotch service
+  ./restart.sh
+
+  # Pull latest git commits, rebuild, and restart in one step
+  ./restart.sh --pull
+
+  # Restart backend only (skip frontend build)
+  ./restart.sh --skip-build
+  ```
+  *(Tip: `./start.sh --prod` also automatically delegates to `./restart.sh`)*
+
 ### Lite Mode / Local Development
 
 For local development or single-instance "Lite" deployments where Redis is not available or not desired, the server automatically detects the unavailability of Redis and falls back to in-memory queues and session storage.

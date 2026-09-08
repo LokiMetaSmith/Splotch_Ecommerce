@@ -102,8 +102,15 @@ Automates updating DigitalOcean DNS records (useful if your home ISP changes you
 ### `generate-nginx-config.sh`
 Dynamically generates an Nginx server block configuration for reverse-proxying the frontend/backend on standard Linux hosts.
 
-### `run-live-test.mjs`
-A Playwright script used to run an end-to-end (e2e) test against a live deployment to verify functionality (e.g. testing the UI and Square integrations).
+### `restart.sh` (Located in project root)
+Automated production deployment and restart script for host servers and SBCs.
+* **What it does:** Optionally pulls latest git commits (`--pull`), compiles client assets into `dist/` (`npm run build`), restarts `splotch.service` (or signals node to respawn via systemd's `Restart=always`), and polls `/api/config` to verify server health.
+* **Usage:** `./restart.sh [--pull] [--skip-build]`
+
+### `start.sh` (Located in project root)
+One-step convenience script for local development.
+* **What it does:** Installs root and server dependencies, then runs the backend server and Vite dev server concurrently with clean SIGINT/SIGTERM trapping.
+* **Usage:** `./start.sh` (or `./start.sh --prod` to delegate to `./restart.sh`).
 
 ---
 

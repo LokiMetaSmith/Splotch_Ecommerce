@@ -5,6 +5,7 @@ Welcome to the documentation for the Print Shop application. Here you will find 
 ## Core Documentation
 
 *   **[Deployment Guide](deployment/README.md)**: Comprehensive instructions for deploying the application to various environments (Cloud VPS, Proxmox, Local Docker).
+*   **[SBC Provisioning & Hardware Deployment](sbc-provisioning.md)**: Standard operating procedures for provisioning, running, updating, and maintaining the application on Single Board Computers (e.g. GMKtec N150) with systemd and Cloudflare Tunnels.
 *   **[Server CLI Guide](server-cli.md)**: Documentation for the backend command-line interface tool (`server/cli.js`).
 *   **[Security Best Practices](security.md)**: Essential security guidelines for the server, domain, and application.
 *   **[Backup & Restore](backups.md)**: Instructions for backing up your data and restoring from backups.

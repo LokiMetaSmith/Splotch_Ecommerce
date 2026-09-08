@@ -2,7 +2,7 @@
 
 Welcome to the central deployment documentation for the Print Shop application. This guide will help you choose and execute the deployment strategy that best fits your needs.
 
-There are four primary ways to deploy this application, each with its own guide:
+There are several primary ways to deploy this application, each with its own guide:
 
 ### 1. Local Development
 
@@ -25,17 +25,22 @@ There are four primary ways to deploy this application, each with its own guide:
 - **Use Case:** For deploying the application to a production environment on a cloud provider like DigitalOcean, AWS, or Vultr.
 - **📚 [Guide: Remote Cloud VPS Deployment](./remote-vps.md)**
 
-### 5. Deployment Planning
+### 5. Single Board Computer (SBC) / On-Premises Production Deployment
+
+- **Use Case:** For running the production stack on dedicated hardware (e.g., GMKtec N150) utilizing systemd services, Cloudflare Tunnels, and automated restart scripts (`restart.sh`).
+- **📚 [Guide: SBC Provisioning & Hardware Deployment](../sbc-provisioning.md)**
+
+### 6. Deployment Planning
 
 - **Use Case:** To understand resource requirements and recommended deployment tiers (Lite vs Standard).
 - **📚 [Guide: Plan Recommendations](./plan-recommendations.md)**
 
-### 6. Reverse Proxy Guide
+### 7. Reverse Proxy Guide
 
 - **Use Case:** General information about using a reverse proxy (Caddy, Nginx) for security and SSL.
 - **📚 [Guide: Using a Reverse Proxy](./reverse-proxy.md)**
 
-### 7. DNS & Environments
+### 8. DNS & Environments
 
 - **Use Case:** Setting up multiple environments (Production, Development) and configuring DNS.
 - **📚 [Guide: DNS & Environments](./dns-and-environments.md)**

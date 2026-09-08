@@ -20,3 +20,7 @@ This application follows a standard client-server architecture. It consists of t
 *   **No Customer Accounts**: We do not implement or support user accounts for customers.
 *   **No Shopping Carts**: We do not use shopping carts. Items are bundled together and shipped as they complete. Do not build cart functionality.
 
+## Deployment & Service Operations
+*   **Production Rebuild & Restart**: Run `./restart.sh` (or `./restart.sh --pull`) from the repository root. This compiles client assets into `dist/` with Vite (`npm run build`), safely restarts `splotch.service` (or triggers systemd's automatic respawn), and verifies health at `/api/config`.
+*   **Local Development**: Run `./start.sh` to start the backend and frontend development servers concurrently.
+

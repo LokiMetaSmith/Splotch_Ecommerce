@@ -248,3 +248,26 @@ The SBC connects out to Cloudflare via `cloudflared` without opening any incomin
    sudo cloudflared service install <TUNNEL_TOKEN>
    ```
 4. Set `TRUST_PROXY="true"` in `server/.env` so Express correctly trusts proxy headers (`X-Forwarded-For`) from Cloudflare.
+
+### C. Updating the Application & Restarting (`restart.sh`)
+
+When deploying updates to the SBC, both the frontend bundle (`dist/`) and the backend service need to be updated. The root `restart.sh` script automates this end-to-end:
+
+```bash
+# In /home/loki/Splotch_Ecommerce:
+
+# 1. Pull latest git commits, rebuild frontend assets, and restart the backend service
+./restart.sh --pull
+
+# 2. Rebuild frontend and restart (if git changes were already pulled manually)
+./restart.sh
+
+# 3. Restart backend service only (skipping frontend build, e.g. for backend/env changes)
+./restart.sh --skip-build
+```
+
+#### How the Restart Mechanism Works
+1. **Frontend Build:** Runs `npm run build` with Vite, compiling updated client files into `dist/`.
+2. **Graceful Restart:** If executed interactively with `sudo`, it invokes `sudo systemctl restart splotch.service`. If run non-interactively or as a non-root user (`loki`), it signals the `node index.js` process to terminate; systemd's configured policy (`Restart=always`, `RestartSec=5s`) then immediately respawns the updated service in a clean state.
+3. **Automated Health Check:** Polls `http://127.0.0.1:3000/api/config` for up to 15 seconds to verify the service returns `HTTP 200 OK` before declaring success.
+
