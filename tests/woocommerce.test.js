@@ -322,10 +322,10 @@ describe('WooCommerce REST API v3 Emulation (Pirate Ship Integration)', () => {
   });
 
   describe('WordPress Discovery & Version Parity (v1 / v2 / v3 / RSD)', () => {
-    it('should return authentic schema on GET /wp-json/wc/v1 with Link header', async () => {
+    it('should return authentic schema on GET /wp-json/wc/v1 without Link header', async () => {
       const res = await request(app).get('/wp-json/wc/v1');
       expect(res.status).toBe(200);
-      expect(res.headers['link']).toContain('rel="https://api.w.org/"');
+      expect(res.headers['link']).toBeUndefined();
       expect(res.body.namespace).toBe('wc/v1');
       expect(res.body.routes).toBeDefined();
       expect(res.body.routes['/wc/v1/orders']).toBeDefined();
@@ -344,12 +344,9 @@ describe('WooCommerce REST API v3 Emulation (Pirate Ship Integration)', () => {
       expect(res.headers['x-wp-total']).toBeDefined();
     });
 
-    it('should return RSD XML on GET /xmlrpc.php', async () => {
+    it('should return 404 on GET /xmlrpc.php as it is permanently disabled', async () => {
       const res = await request(app).get('/xmlrpc.php');
-      expect(res.status).toBe(200);
-      expect(res.headers['content-type']).toContain('text/xml');
-      expect(res.text).toContain('<rsd version="1.0"');
-      expect(res.text).toContain('api name="WP-API"');
+      expect(res.status).toBe(404);
     });
   });
 });
