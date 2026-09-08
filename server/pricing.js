@@ -191,8 +191,54 @@ async function getDesignDimensions(filePath) {
 
         let perimeter = 0;
 
+        // In multi-layer SVGs (e.g. from generateMultiLayerSvg), separate groups exist:
+        // - "Die-Cut" (the outer boundary / sheet cutline priced by the client)
+        // - "Kiss-Cut" (the inner sticker peel lines)
+        // If a "Die-Cut" group exists and has renderable paths, we measure Die-Cut (matching client pricing).
+        // If only "Kiss-Cut" exists, we measure Kiss-Cut.
+        // Otherwise, we measure all paths/shapes across the entire SVG.
+        const findGroupById = (node, id) => {
+            if (node.tagName === "g" && node.properties && node.properties.id) {
+                if (String(node.properties.id).toLowerCase() === id.toLowerCase()) {
+                    return node;
+                }
+            }
+            if (node.children) {
+                for (const child of node.children) {
+                    const found = findGroupById(child, id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        const hasRenderableElements = (groupNode) => {
+            if (!groupNode) return false;
+            const subStack = [groupNode];
+            while (subStack.length > 0) {
+                const n = subStack.pop();
+                if (n.tagName === "path" || n.tagName === "rect" || n.tagName === "circle" || n.tagName === "ellipse" || n.tagName === "polygon" || n.tagName === "polyline") {
+                    return true;
+                }
+                if (n.children) {
+                    for (const c of n.children) subStack.push(c);
+                }
+            }
+            return false;
+        };
+
+        const dieCutGroup = findGroupById(svgNode, "Die-Cut");
+        const kissCutGroup = findGroupById(svgNode, "Kiss-Cut");
+        let rootForMeasurement = svgNode;
+
+        if (dieCutGroup && hasRenderableElements(dieCutGroup)) {
+            rootForMeasurement = dieCutGroup;
+        } else if (kissCutGroup && hasRenderableElements(kissCutGroup)) {
+            rootForMeasurement = kissCutGroup;
+        }
+
         // Iterative traversal to avoid stack overflow
-        const stack = [svgNode];
+        const stack = [rootForMeasurement];
         let processedNodes = 0;
         const MAX_NODES = 500000; // Limit to prevent DoS via CPU exhaustion
 

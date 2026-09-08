@@ -66,4 +66,30 @@ describe('getDesignDimensions', () => {
         // Value from previous test run was ~373.58
         expect(perimeter).toBeCloseTo(373.58, 1);
     });
+
+    it('should prioritize Die-Cut group over Kiss-Cut in multi-layer SVGs', async () => {
+        const multiLayerSvgPath = path.join(process.cwd(), 'tests', 'multilayer_test.svg');
+        const multiLayerSvgContent = `
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <g id="Kiss-Cut" stroke="cyan">
+    <path d="M 20 20 L 80 20 L 80 80 L 20 80 Z" />
+  </g>
+  <g id="Die-Cut" stroke="red">
+    <path d="M 10 10 L 90 10 L 90 90 L 10 90 Z" />
+  </g>
+</svg>`;
+        fs.writeFileSync(multiLayerSvgPath, multiLayerSvgContent);
+        try {
+            const result = await getDesignDimensions(multiLayerSvgPath);
+            const perimeter = calculatePerimeter(result.cutline);
+            // Die-Cut path is 80x80 square => perimeter = 320
+            // Kiss-Cut path would be 60x60 square => perimeter = 240
+            // Sum would be 560
+            expect(perimeter).toBeCloseTo(320, 1);
+        } finally {
+            if (fs.existsSync(multiLayerSvgPath)) {
+                fs.unlinkSync(multiLayerSvgPath);
+            }
+        }
+    });
 });
