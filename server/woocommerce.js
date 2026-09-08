@@ -1041,7 +1041,7 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
           <div class="logo">S</div>
           <h1>Connect to ${escapeHtml(app_name || 'Pirate Ship')}</h1>
           <p><strong>${escapeHtml(app_name || 'Pirate Ship')}</strong> would like to connect to your Splotch store to view processing orders and synchronize shipping labels.</p>
-          <form method="POST" action="/wc-auth/v1/authorize">
+          <form method="POST" action="/wc-auth/v1/authorize?return_url=${encodeURIComponent(return_url || '')}&callback_url=${encodeURIComponent(callback_url || '')}&user_id=${encodeURIComponent(user_id || '')}&app_name=${encodeURIComponent(app_name || '')}">
             <input type="hidden" name="app_name" value="${escapeHtml(app_name || '')}">
             <input type="hidden" name="return_url" value="${escapeHtml(return_url || '')}">
             <input type="hidden" name="callback_url" value="${escapeHtml(callback_url || '')}">
@@ -1056,8 +1056,12 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
   });
 
   // POST /wc-auth/v1/authorize
-  router.post('/wc-auth/v1/authorize', async (req, res) => {
-    const { return_url, callback_url, user_id } = req.body;
+  router.post('/wc-auth/v1/authorize', express.urlencoded({ extended: true }), express.json(), async (req, res) => {
+    const body = req.body || {};
+    const query = req.query || {};
+    const return_url = body.return_url || query.return_url;
+    const callback_url = body.callback_url || query.callback_url;
+    const user_id = body.user_id || query.user_id;
     const { consumerKey, consumerSecret } = getCredentials();
 
     logger.info(`[WOOCOMMERCE] Authorizing OAuth connection for user_id=${user_id}`);
@@ -1065,7 +1069,7 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     // If callback_url is provided, post the credentials directly to the integration client
     if (callback_url) {
       try {
-        await fetch(callback_url, {
+        const callbackRes = await fetch(callback_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1076,7 +1080,7 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
             key_permissions: 'read_write'
           })
         });
-        logger.info('[WOOCOMMERCE] Successfully posted credentials to callback_url');
+        logger.info(`[WOOCOMMERCE] Posted credentials to callback_url (${callback_url}): status ${callbackRes.status}`);
       } catch (err) {
         logger.error('[WOOCOMMERCE] Error posting credentials to callback_url:', err);
       }

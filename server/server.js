@@ -660,6 +660,7 @@ async function startServer(
     }));
 
     app.use(express.json({ limit: '100kb' }));
+    app.use(express.urlencoded({ extended: true, limit: '100kb' }));
     app.use(wafMiddleware);
     app.disable('x-powered-by');
 
