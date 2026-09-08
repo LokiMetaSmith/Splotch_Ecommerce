@@ -20,3 +20,8 @@
 **Vulnerability:** A dynamic value (`odooId` from server config mappings) was interpolated directly into an HTML input attribute string via `.innerHTML`: `<input ... value="${odooId}">`. An attacker who modifies `currentMappings` via the admin API could inject quotes and script tags (e.g. `1"> <script>alert(1)</script>`) to perform a Stored XSS attack against admins.
 **Learning:** Even if data isn't meant to be rendered as text, placing it directly into HTML attribute strings without encoding allows attribute breakout attacks.
 **Prevention:** Always use `escapeHtml()` when interpolating any dynamic or server-provided data into `.innerHTML` template literals, including attribute values.
+
+## 2025-03-10 - Command Injection in Hardware Shell Execution
+**Vulnerability:** In `server/utils/hardware.js`, dynamic parameters like `mountPoint` and OpenRGB modes/colors were interpolated into shell strings via `child_process.exec`.
+**Learning:** `exec` spawns a system shell (`/bin/sh`) which parses shell metacharacters like `;`, `&`, `|`, and backticks, allowing command execution if inputs contain unescaped dynamic parameters.
+**Prevention:** Always use `execFile` or `spawn` with explicitly separated argument arrays rather than string interpolation with `exec`.
