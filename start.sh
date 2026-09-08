@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# Check if user wants to restart production service
+if [[ "$1" == "--prod" ]] || [[ "$1" == "--restart" ]] || [[ "$1" == "restart" ]]; then
+    shift
+    exec "$(dirname "$0")/restart.sh" "$@"
+fi
+
+# If production systemd service is active, inform user
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet splotch.service 2>/dev/null; then
+    echo "ℹ️  Notice: Production 'splotch.service' is running."
+    echo "   To rebuild & restart the live website, use: ./restart.sh (or ./start.sh --prod)"
+    echo "   Continuing with local development server in 3 seconds..."
+    sleep 3
+fi
+
 # Check if pnpm is installed
 if ! command -v pnpm &> /dev/null
 then
