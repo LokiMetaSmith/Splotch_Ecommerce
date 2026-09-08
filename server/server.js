@@ -885,10 +885,13 @@ async function startServer(
     });
 
     app.get('/api/config', (req, res) => {
+      const nodeEnv = process.env.NODE_ENV || 'development';
       res.json({
         squareAppId: getSecret('SQUARE_APPLICATION_ID') || getSecret('SQUARE_APP_ID') || 'sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA',
         squareLocationId: getSecret('SQUARE_LOCATION_ID') || 'LTS82DEX24XR0',
         squareEnvironment: getSecret('SQUARE_ENVIRONMENT') || 'sandbox',
+        nodeEnv,
+        isDevelopment: nodeEnv === 'development',
       });
     });
 

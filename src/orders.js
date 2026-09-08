@@ -1,3 +1,5 @@
+import { checkAndRenderDevBanner } from "./dev-banner.js";
+
 let csrfToken;
 let authToken = null;
 
@@ -178,6 +180,7 @@ export function setButtonLoading(
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  checkAndRenderDevBanner();
   await fetchCsrfToken();
 
   const loginSection = document.getElementById("login-section");

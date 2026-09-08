@@ -31,6 +31,7 @@ import {
   clearStickers,
 } from "./lib/stickers.js";
 import Sortable from "sortablejs";
+import { renderDevBanner } from "./dev-banner.js";
 
 // index.js
 
@@ -592,9 +593,16 @@ async function BootStrap() {
           if (config.squareEnvironment === 'production') {
               scriptUrl = "https://web.squarecdn.com/v1/square.js";
           }
+
+          if (config.isDevelopment || config.nodeEnv === 'development') {
+              renderDevBanner(true);
+          }
       }
   } catch (e) {
       console.warn("[CLIENT] Failed to fetch /api/config, falling back to default Square config:", e);
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          renderDevBanner(true);
+      }
   }
 
   // Dynamically load the Square script if not already present
