@@ -411,9 +411,8 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
     const baseUrl = `${protocol}://${host}`;
 
-    res.setHeader('Link', `<${baseUrl}/wp-json/>; rel="https://api.w.org/"`);
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, X-WP-Nonce, Content-Disposition, Content-MD5, Content-Type');
-    res.setHeader('Access-Control-Expose-Headers', 'X-WP-Total, X-WP-TotalPages, Link');
+    res.setHeader('Access-Control-Expose-Headers', 'X-WP-Total, X-WP-TotalPages');
     res.setHeader('Allow', 'GET, POST, PUT, DELETE, OPTIONS');
     next();
   });
@@ -432,25 +431,9 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     next();
   });
 
-  // --- XML-RPC RSD DISCOVERY ---
-  router.get('/xmlrpc.php', (req, res) => {
-    const host = req.get('host') || 'www.splotch.page';
-    const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
-    const baseUrl = `${protocol}://${host}`;
-
-    res.set('Content-Type', 'text/xml; charset=utf-8');
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">
-  <service>
-    <engineName>WordPress</engineName>
-    <engineLink>https://wordpress.org/</engineLink>
-    <homePageLink>${baseUrl}/</homePageLink>
-    <apis>
-      <api name="WordPress" blogID="1" preferred="true" apiLink="${baseUrl}/xmlrpc.php" />
-      <api name="WP-API" blogID="1" preferred="false" apiLink="${baseUrl}/wp-json/" />
-    </apis>
-  </service>
-</rsd>`);
+  // --- XML-RPC ENDPOINT (DISABLED) ---
+  router.all('/xmlrpc.php', (req, res) => {
+    res.status(404).json({ error: 'Not Found' });
   });
 
   // Helper to build dynamic schema for a given version

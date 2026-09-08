@@ -721,11 +721,6 @@ async function startServer(
         // Referrer-Policy: Controls how much referrer information is sent to other sites
         res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // WordPress / WooCommerce REST API Discovery Link header
-        const host = req.get('host') || 'www.splotch.page';
-        const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
-        res.setHeader('Link', `<${protocol}://${host}/wp-json/>; rel="https://api.w.org/"`);
-
         next();
     });
 
@@ -739,6 +734,8 @@ async function startServer(
         csp: {
             policy: {
                 'default-src': "'self'",
+                'base-uri': "'self'",
+                'object-src': "'none'",
                 'script-src': "'self' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com https://static.cloudflareinsights.com",
                 'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com https://*.squarecdn.com https://sandbox.web.squarecdn.com",
                 'font-src': "'self' https://fonts.gstatic.com https://*.squarecdn.com https://cash-f.squarecdn.com https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
@@ -773,6 +770,11 @@ async function startServer(
     app.use(express.static(path.join(__dirname, '../dist'), {
         maxAge: '1h',
         extensions: ['html']
+    }));
+
+    app.use(express.static(path.join(__dirname, '../public'), {
+        maxAge: '1h',
+        dotfiles: 'allow'
     }));
 
     // Clean URL aliases for HTML pages (e.g., /printshop -> /printshop.html)
