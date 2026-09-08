@@ -18,7 +18,7 @@ const SQL_INJECTION_PATTERNS = [
 const XSS_PATTERNS = [
     /(<script.*?>.*?<\/script>)/is, // Script tags (multiline)
     /(javascript:)/i, // Javascript protocol
-    /(on\w+\s*=\s*(?:['"].*?['"]|[^>\s]+))/i, // Event handlers like onload=
+    /\b(on\w+\s*=\s*(?:['"].*?['"]|[^>\s]+))/i, // Event handlers like onload=
     /(<iframe.*?>.*?<\/iframe>)/is, // Iframes
     /(<object.*?>.*?<\/object>)/is, // Objects
     /(<embed.*?>.*?<\/embed>)/is, // Embeds
@@ -130,6 +130,11 @@ function checkPayload(payload, depth = 0) {
 }
 
 export function wafMiddleware(req, res, next) {
+    // Exempt WooCommerce REST API and OAuth endpoints to prevent false-positive blocks
+    if (req.path && (req.path.startsWith('/wp-json') || req.path.startsWith('/wc-auth') || req.path.startsWith('/xmlrpc.php'))) {
+        return next();
+    }
+
     // Combine all inputs to check
     // We check query, body, and params
     let threat;
