@@ -750,6 +750,14 @@ async function startServer(
             }
         }
     }));
+
+    // Allow OAuth iframe / popup embedding for WooCommerce OAuth flow
+    app.use('/wc-auth', (req, res, next) => {
+        res.removeHeader('X-Frame-Options');
+        res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' https:; frame-ancestors *");
+        next();
+    });
+
     // SECURITY: Enforce strict CSP for uploaded files to prevent Stored XSS
     // This sandbox directive prevents script execution even if an attacker uploads a malicious SVG/HTML file
     // that bypasses other checks.

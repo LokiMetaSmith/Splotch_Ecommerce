@@ -1011,76 +1011,118 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
 
   // --- WOOCOMMERCE OAUTH AUTHORIZATION FLOW ---
 
+  // --- WOOCOMMERCE OAUTH AUTHORIZATION FLOW ---
+
   // GET /wc-auth/v1/authorize
   router.get('/wc-auth/v1/authorize', async (req, res) => {
-    const { app_name, return_url, callback_url, user_id } = req.query;
+    const { app_name, return_url, callback_url, user_id, scope } = req.query;
 
-    // Render an approval view
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Connect ${escapeHtml(app_name || 'Application')} to Splotch</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-          .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); max-width: 440px; width: 100%; padding: 32px; text-align: center; }
-          .logo { width: 64px; height: 64px; margin-bottom: 16px; border-radius: 50%; background: #9333ea; display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 28px; font-weight: bold; }
-          h1 { font-size: 22px; color: #1e293b; margin: 0 0 12px; }
-          p { font-size: 14px; color: #64748b; line-height: 1.5; margin: 0 0 24px; }
-          .btn { display: block; width: 100%; padding: 12px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; border: none; transition: background 0.2s; box-sizing: border-box; }
-          .btn-primary { background: #9333ea; color: white; margin-bottom: 12px; }
-          .btn-primary:hover { background: #7e22ce; }
-          .btn-secondary { background: #f1f5f9; color: #475569; }
-          .btn-secondary:hover { background: #e2e8f0; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="logo">S</div>
-          <h1>Connect to ${escapeHtml(app_name || 'Pirate Ship')}</h1>
-          <p><strong>${escapeHtml(app_name || 'Pirate Ship')}</strong> would like to connect to your Splotch store to view processing orders and synchronize shipping labels.</p>
-          <form method="POST" action="/wc-auth/v1/authorize?return_url=${encodeURIComponent(return_url || '')}&callback_url=${encodeURIComponent(callback_url || '')}&user_id=${encodeURIComponent(user_id || '')}&app_name=${encodeURIComponent(app_name || '')}">
-            <input type="hidden" name="app_name" value="${escapeHtml(app_name || '')}">
-            <input type="hidden" name="return_url" value="${escapeHtml(return_url || '')}">
-            <input type="hidden" name="callback_url" value="${escapeHtml(callback_url || '')}">
-            <input type="hidden" name="user_id" value="${escapeHtml(user_id || '')}">
-            <button type="submit" class="btn btn-primary">Approve Connection</button>
-            <button type="button" class="btn btn-secondary" onclick="window.history.back()">Deny</button>
-          </form>
-        </div>
-      </body>
-      </html>
-    `);
+    const safeAppName = escapeHtml(app_name || 'Pirate Ship');
+    const safeScope = escapeHtml(scope || 'read_write');
+    const callbackHost = callback_url ? escapeHtml(new URL(callback_url).host) : 'pirateship.com';
+
+    const grantParams = new URLSearchParams({
+      return_url: return_url || '',
+      callback_url: callback_url || '',
+      user_id: user_id || '',
+      app_name: app_name || '',
+      scope: scope || 'read_write'
+    }).toString();
+
+    const grantUrl = `/wc-auth/v1/grant?${grantParams}`;
+
+    let denyUrl = return_url || '';
+    if (denyUrl) {
+      const sep = denyUrl.includes('?') ? '&' : '?';
+      denyUrl = `${denyUrl}${sep}success=0&user_id=${encodeURIComponent(user_id || '')}`;
+    } else {
+      denyUrl = '#';
+    }
+
+    // Set permissive frame and CSP headers for OAuth popup / iframe
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' https:; frame-ancestors *");
+
+    // Render authentic WooCommerce authorization view without any inline event scripts
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect ${safeAppName} to Splotch</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+    .card { background: white; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05); max-width: 460px; width: 100%; padding: 36px; text-align: center; border: 1px solid #e2e8f0; }
+    .logo-container { margin-bottom: 20px; }
+    .logo { width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(135deg, #9333ea, #7e22ce); display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 800; box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3); }
+    h1 { font-size: 22px; color: #0f172a; margin: 0 0 14px; font-weight: 700; line-height: 1.3; }
+    p { font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px; text-align: left; }
+    .permissions-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px 14px 34px; margin: 0 0 24px; text-align: left; font-size: 13px; color: #334155; }
+    .permissions-list li { margin-bottom: 6px; }
+    .permissions-list li:last-child { margin-bottom: 0; }
+    .actions { display: flex; flex-direction: column; gap: 10px; }
+    .btn { display: block; width: 100%; padding: 13px; border-radius: 8px; font-size: 15px; font-weight: 600; text-decoration: none; text-align: center; box-sizing: border-box; transition: all 0.15s ease-in-out; }
+    .btn-primary { background: #9333ea; color: white; border: 1px solid #7e22ce; }
+    .btn-primary:hover { background: #7e22ce; }
+    .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .btn-secondary:hover { background: #e2e8f0; color: #1e293b; }
+    .footer-note { font-size: 12px; color: #94a3b8; margin-top: 18px; line-height: 1.4; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-container">
+      <div class="logo">S</div>
+    </div>
+    <h1>${safeAppName} would like to connect to your store</h1>
+    <p>This will grant <strong>${safeAppName}</strong> <strong>${safeScope}</strong> access to Splotch to:</p>
+    <ul class="permissions-list">
+      <li>View orders ready for shipment (processing status)</li>
+      <li>Create order shipping notes and synchronize tracking numbers</li>
+    </ul>
+    <p>Approving will securely share API keys with <strong>${callbackHost}</strong>.</p>
+    <div class="actions">
+      <a href="${grantUrl}" class="btn btn-primary" id="approve-btn">Approve Connection</a>
+      <a href="${denyUrl}" class="btn btn-secondary" id="deny-btn">Deny</a>
+    </div>
+    <div class="footer-note">Splotch Store API • WooCommerce Parity v3</div>
+  </div>
+</body>
+</html>`);
   });
 
-  // POST /wc-auth/v1/authorize
-  router.post('/wc-auth/v1/authorize', express.urlencoded({ extended: true }), express.json(), async (req, res) => {
-    const body = req.body || {};
-    const query = req.query || {};
-    const return_url = body.return_url || query.return_url;
-    const callback_url = body.callback_url || query.callback_url;
-    const user_id = body.user_id || query.user_id;
+  // Helper function to dispatch callback credentials and redirect
+  async function completeOAuthHandshake(req, res, params) {
+    const return_url = params.return_url;
+    const callback_url = params.callback_url;
+    const user_id = params.user_id;
+    const scope = params.scope || 'read_write';
     const { consumerKey, consumerSecret } = getCredentials();
 
-    logger.info(`[WOOCOMMERCE] Authorizing OAuth connection for user_id=${user_id}`);
+    logger.info(`[WOOCOMMERCE] Completing OAuth connection for user_id=${user_id}`);
 
     // If callback_url is provided, post the credentials directly to the integration client
     if (callback_url) {
       try {
+        const payload = {
+          key_id: 1,
+          user_id: user_id || 1,
+          consumer_key: consumerKey,
+          consumer_secret: consumerSecret,
+          key_permissions: scope
+        };
+
         const callbackRes = await fetch(callback_url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            key_id: 1,
-            user_id: user_id || 1,
-            consumer_key: consumerKey,
-            consumer_secret: consumerSecret,
-            key_permissions: 'read_write'
-          })
+          headers: {
+            'Content-Type': 'application/json;charset=UTF-8',
+            'User-Agent': 'WordPress/6.5.2; https://www.splotch.page'
+          },
+          body: JSON.stringify(payload)
         });
-        logger.info(`[WOOCOMMERCE] Posted credentials to callback_url (${callback_url}): status ${callbackRes.status}`);
+
+        const callbackBody = await callbackRes.text();
+        logger.info(`[WOOCOMMERCE] Posted credentials to callback_url (${callback_url}): status ${callbackRes.status}, body: ${callbackBody}`);
       } catch (err) {
         logger.error('[WOOCOMMERCE] Error posting credentials to callback_url:', err);
       }
@@ -1088,10 +1130,21 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
 
     if (return_url) {
       const separator = return_url.includes('?') ? '&' : '?';
-      return res.redirect(`${return_url}${separator}success=1&user_id=${encodeURIComponent(user_id || '')}`);
+      return res.redirect(302, `${return_url}${separator}success=1&user_id=${encodeURIComponent(user_id || '')}`);
     }
 
     res.send('<h3>Connection Approved</h3><p>You can now return to Pirate Ship.</p>');
+  }
+
+  // GET /wc-auth/v1/grant - standard WooCommerce GET link redirect
+  router.get('/wc-auth/v1/grant', async (req, res) => {
+    await completeOAuthHandshake(req, res, req.query || {});
+  });
+
+  // POST /wc-auth/v1/authorize - form submission fallback
+  router.post('/wc-auth/v1/authorize', express.urlencoded({ extended: true }), express.json(), async (req, res) => {
+    const params = { ...(req.query || {}), ...(req.body || {}) };
+    await completeOAuthHandshake(req, res, params);
   });
 
   return {

@@ -289,8 +289,18 @@ describe('WooCommerce REST API v3 Emulation (Pirate Ship Integration)', () => {
         .get('/wc-auth/v1/authorize?app_name=Pirate+Ship&return_url=https://ship.pirateship.com/callback&user_id=42');
 
       expect(res.status).toBe(200);
-      expect(res.text).toContain('Connect to Pirate Ship');
-      expect(res.text).toContain('/wc-auth/v1/authorize');
+      expect(res.text).toContain('Connect Pirate Ship to Splotch');
+      expect(res.text).toContain('/wc-auth/v1/grant');
+    });
+
+    it('should approve authorization on GET /wc-auth/v1/grant and redirect', async () => {
+      const res = await request(app)
+        .get('/wc-auth/v1/grant?return_url=https://ship.pirateship.com/woocommerce/install/redirect&user_id=test-user-123');
+
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toContain('https://ship.pirateship.com/woocommerce/install/redirect');
+      expect(res.headers.location).toContain('success=1');
+      expect(res.headers.location).toContain('user_id=test-user-123');
     });
 
     it('should approve authorization on POST /wc-auth/v1/authorize with urlencoded form', async () => {
