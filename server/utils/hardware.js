@@ -1,13 +1,13 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 
 let isOpenRgbAvailable = null;
 
 /**
- * Helper function to execute a shell command wrapped in a Promise.
+ * Helper function to execute a command with array arguments safely without shell interpolation.
  */
-const executeCommand = (command) => {
+const executeCommand = (file, args = []) => {
     return new Promise((resolve, reject) => {
-        exec(command, (error, stdout, stderr) => {
+        execFile(file, args, (error, stdout, stderr) => {
             if (error) {
                 return reject(error);
             }
@@ -25,7 +25,7 @@ const checkOpenRgb = async () => {
     if (isOpenRgbAvailable !== null) return isOpenRgbAvailable;
     
     try {
-        await executeCommand('which openrgb');
+        await executeCommand('which', ['openrgb']);
         isOpenRgbAvailable = true;
         console.log('[Hardware] OpenRGB detected. Chassis lighting integration enabled.');
     } catch (err) {
@@ -72,7 +72,7 @@ const setRgbState = async (state) => {
     try {
         // NOTE: On some systems, setting mode and color requires passing the specific device (-d 0)
         // openrgb --cli --mode <mode> --color <color>
-        await executeCommand(`openrgb --cli --mode ${mode} --color ${color}`);
+        await executeCommand('openrgb', ['--cli', '--mode', mode, '--color', color]);
     } catch (err) {
         console.warn(`[Hardware] OpenRGB command failed: ${err.message}`);
         // We do not disable isOpenRgbAvailable here because the daemon might just be restarting
@@ -87,7 +87,7 @@ const flushUsbDrive = async (mountPoint = '/media/auto_mount_usb') => {
     try {
         console.log('[Hardware] Flushing data buffers to physical USB storage...');
         // 'sync -f' forces a sync of the filesystem containing the file/directory
-        await executeCommand(`sync -f ${mountPoint}`);
+        await executeCommand('sync', ['-f', mountPoint]);
         console.log('[Hardware] USB flush complete. Safe to remove.');
     } catch (err) {
         // If it fails (e.g. standard macOS/Windows dev environment without sync -f support)
