@@ -1,6 +1,33 @@
 import express from 'express';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { escapeHtml } from './utils.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+let wcV1Schema = null;
+let wcV3Schema = null;
+
+try {
+  const v1Path = path.join(__dirname, 'data', 'wc_v1_schema.json');
+  if (fs.existsSync(v1Path)) {
+    wcV1Schema = JSON.parse(fs.readFileSync(v1Path, 'utf8'));
+  }
+} catch (e) {
+  // Ignored if missing
+}
+
+try {
+  const v3Path = path.join(__dirname, 'data', 'wc_v3_schema.json');
+  if (fs.existsSync(v3Path)) {
+    wcV3Schema = JSON.parse(fs.readFileSync(v3Path, 'utf8'));
+  }
+} catch (e) {
+  // Ignored if missing
+}
 
 /**
  * Creates and configures the WooCommerce REST API emulation router.
@@ -378,15 +405,97 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     };
   }
 
+  // Set standard WordPress REST API discovery headers on all /wp-json routes
+  router.use('/wp-json', (req, res, next) => {
+    const host = req.get('host') || 'www.splotch.page';
+    const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
+    const baseUrl = `${protocol}://${host}`;
+
+    res.setHeader('Link', `<${baseUrl}/wp-json/>; rel="https://api.w.org/"`);
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, X-WP-Nonce, Content-Disposition, Content-MD5, Content-Type');
+    res.setHeader('Access-Control-Expose-Headers', 'X-WP-Total, X-WP-TotalPages, Link');
+    res.setHeader('Allow', 'GET, POST, PUT, DELETE, OPTIONS');
+    next();
+  });
+
+  // Detailed incoming logger for debugging external integrations
+  router.use((req, res, next) => {
+    const url = req.originalUrl || req.url;
+    if (url && (url.includes('/wp-json') || url.includes('/wc-auth') || url.includes('xmlrpc'))) {
+      logger.info(`[WOOCOMMERCE] Incoming ${req.method} ${url}`, {
+        userAgent: req.headers['user-agent'] || 'none',
+        auth: req.headers.authorization ? 'present' : 'none',
+        query: req.query,
+        ip: req.ip
+      });
+    }
+    next();
+  });
+
+  // --- XML-RPC RSD DISCOVERY ---
+  router.get('/xmlrpc.php', (req, res) => {
+    const host = req.get('host') || 'www.splotch.page';
+    const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
+    const baseUrl = `${protocol}://${host}`;
+
+    res.set('Content-Type', 'text/xml; charset=utf-8');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">
+  <service>
+    <engineName>WordPress</engineName>
+    <engineLink>https://wordpress.org/</engineLink>
+    <homePageLink>${baseUrl}/</homePageLink>
+    <apis>
+      <api name="WordPress" blogID="1" preferred="true" apiLink="${baseUrl}/xmlrpc.php" />
+      <api name="WP-API" blogID="1" preferred="false" apiLink="${baseUrl}/wp-json/" />
+    </apis>
+  </service>
+</rsd>`);
+  });
+
+  // Helper to build dynamic schema for a given version
+  function buildDynamicSchema(version, baseUrl) {
+    const sourceSchema = (version === 'v3' && wcV3Schema) ? wcV3Schema : (wcV1Schema || null);
+    if (!sourceSchema) {
+      return {
+        namespace: `wc/${version}`,
+        routes: {
+          [`/wc/${version}`]: { namespace: `wc/${version}`, methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }] },
+          [`/wc/${version}/orders`]: { namespace: `wc/${version}`, methods: ['GET', 'POST'], endpoints: [{ methods: ['GET'], args: {} }, { methods: ['POST'], args: {} }] },
+          [`/wc/${version}/orders/(?P<id>[\\d]+)`]: { namespace: `wc/${version}`, methods: ['GET', 'PUT', 'DELETE'], endpoints: [{ methods: ['GET'], args: {} }] },
+          [`/wc/${version}/orders/(?P<order_id>[\\d]+)/notes`]: { namespace: `wc/${version}`, methods: ['GET', 'POST'], endpoints: [{ methods: ['GET'], args: {} }] },
+          [`/wc/${version}/system_status`]: { namespace: `wc/${version}`, methods: ['GET'] }
+        },
+        _links: {
+          up: [{ href: `${baseUrl}/wp-json/` }]
+        }
+      };
+    }
+
+    const schemaStr = JSON.stringify(sourceSchema);
+    const customizedStr = schemaStr.replace(/https:\/\/woocommerce\.com/g, baseUrl);
+    const parsed = JSON.parse(customizedStr);
+    parsed.namespace = `wc/${version}`;
+    if (!parsed._links) parsed._links = {};
+    parsed._links.up = [{ href: `${baseUrl}/wp-json/` }];
+    return parsed;
+  }
+
   // --- DISCOVERY ENDPOINTS ---
 
-  // GET /wp-json
-  router.get('/wp-json', (req, res) => {
+  // GET /wp-json and /wp-json/
+  router.get(['/wp-json', '/wp-json/'], (req, res) => {
+    const host = req.get('host') || 'www.splotch.page';
+    const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
+    const baseUrl = `${protocol}://${host}`;
+
     res.json({
       name: 'Splotch',
       description: 'Splotch Custom Stickers Store',
-      url: `${req.protocol}://${req.get('host')}`,
-      home: `${req.protocol}://${req.get('host')}`,
+      url: baseUrl,
+      home: baseUrl,
+      gmt_offset: 0,
+      timezone_string: 'UTC',
       namespaces: [
         'wp/v2',
         'wc/v1',
@@ -396,38 +505,71 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
       ],
       authentication: [],
       routes: {
-        '/wp-json': { namespace: '', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }] },
-        '/wp-json/wc/v3': { namespace: 'wc/v3', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }] },
-        '/wp-json/wc/v3/orders': { namespace: 'wc/v3', methods: ['GET', 'POST'] },
-        '/wp-json/wc/v3/orders/(?P<id>[\\d]+)': { namespace: 'wc/v3', methods: ['GET', 'PUT', 'DELETE'] }
+        '/': { namespace: '', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }], _links: { self: [{ href: `${baseUrl}/wp-json/` }] } },
+        '/wp/v2': { namespace: 'wp/v2', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v1': { namespace: 'wc/v1', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }], _links: { self: [{ href: `${baseUrl}/wp-json/wc/v1` }] } },
+        '/wc/v2': { namespace: 'wc/v2', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }], _links: { self: [{ href: `${baseUrl}/wp-json/wc/v2` }] } },
+        '/wc/v3': { namespace: 'wc/v3', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }], _links: { self: [{ href: `${baseUrl}/wp-json/wc/v3` }] } },
+        '/wc/v1/orders': { namespace: 'wc/v1', methods: ['GET', 'POST'], endpoints: [{ methods: ['GET'], args: {} }, { methods: ['POST'], args: {} }] },
+        '/wc/v2/orders': { namespace: 'wc/v2', methods: ['GET', 'POST'], endpoints: [{ methods: ['GET'], args: {} }, { methods: ['POST'], args: {} }] },
+        '/wc/v3/orders': { namespace: 'wc/v3', methods: ['GET', 'POST'], endpoints: [{ methods: ['GET'], args: {} }, { methods: ['POST'], args: {} }] },
+        '/wc/v1/orders/(?P<id>[\\d]+)': { namespace: 'wc/v1', methods: ['GET', 'PUT', 'DELETE'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v2/orders/(?P<id>[\\d]+)': { namespace: 'wc/v2', methods: ['GET', 'PUT', 'DELETE'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v3/orders/(?P<id>[\\d]+)': { namespace: 'wc/v3', methods: ['GET', 'PUT', 'DELETE'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v1/orders/(?P<order_id>[\\d]+)/notes': { namespace: 'wc/v1', methods: ['GET', 'POST'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v2/orders/(?P<order_id>[\\d]+)/notes': { namespace: 'wc/v2', methods: ['GET', 'POST'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v3/orders/(?P<order_id>[\\d]+)/notes': { namespace: 'wc/v3', methods: ['GET', 'POST'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v1/system_status': { namespace: 'wc/v1', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v2/system_status': { namespace: 'wc/v2', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }] },
+        '/wc/v3/system_status': { namespace: 'wc/v3', methods: ['GET'], endpoints: [{ methods: ['GET'], args: {} }] }
+      },
+      _links: {
+        help: [{ href: 'https://developer.wordpress.org/rest-api/' }]
       }
     });
   });
 
-  // GET /wp-json/wc/v3 (and fallback v2/v1)
+  // GET /wp-json/wc/v1, /wp-json/wc/v2, /wp-json/wc/v3 (with optional trailing slashes)
   const handleWcIndex = (version) => (req, res) => {
-    res.json({
-      namespace: `wc/${version}`,
-      routes: {
-        [`/wc/${version}`]: { namespace: `wc/${version}`, methods: ['GET'] },
-        [`/wc/${version}/orders`]: { namespace: `wc/${version}`, methods: ['GET', 'POST'] },
-        [`/wc/${version}/orders/(?P<id>[\\d]+)`]: { namespace: `wc/${version}`, methods: ['GET', 'PUT', 'DELETE'] },
-        [`/wc/${version}/orders/(?P<id>[\\d]+)/notes`]: { namespace: `wc/${version}`, methods: ['GET', 'POST'] },
-        [`/wc/${version}/system_status`]: { namespace: `wc/${version}`, methods: ['GET'] }
-      }
-    });
+    const host = req.get('host') || 'www.splotch.page';
+    const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
+    const baseUrl = `${protocol}://${host}`;
+
+    res.json(buildDynamicSchema(version, baseUrl));
   };
 
-  router.get('/wp-json/wc/v3', handleWcIndex('v3'));
-  router.get('/wp-json/wc/v2', handleWcIndex('v2'));
-  router.get('/wp-json/wc/v1', handleWcIndex('v1'));
+  router.get(['/wp-json/wc/v3', '/wp-json/wc/v3/'], handleWcIndex('v3'));
+  router.get(['/wp-json/wc/v2', '/wp-json/wc/v2/'], handleWcIndex('v2'));
+  router.get(['/wp-json/wc/v1', '/wp-json/wc/v1/'], handleWcIndex('v1'));
 
-  // GET /wp-json/wc/v3/system_status
-  router.get('/wp-json/wc/v3/system_status', authenticateWooCommerce, (req, res) => {
+  // GET /wp-json/wc/v3/settings, v2, v1
+  router.get([
+    '/wp-json/wc/v3/settings',
+    '/wp-json/wc/v2/settings',
+    '/wp-json/wc/v1/settings'
+  ], authenticateWooCommerce, (req, res) => {
+    res.json([
+      { id: 'general', label: 'General', description: 'General settings' },
+      { id: 'products', label: 'Products', description: 'Product settings' },
+      { id: 'shipping', label: 'Shipping', description: 'Shipping settings' },
+      { id: 'checkout', label: 'Checkout', description: 'Checkout settings' }
+    ]);
+  });
+
+  // GET /wp-json/wc/v3/system_status, v2, v1
+  router.get([
+    '/wp-json/wc/v3/system_status',
+    '/wp-json/wc/v2/system_status',
+    '/wp-json/wc/v1/system_status'
+  ], authenticateWooCommerce, (req, res) => {
+    const host = req.get('host') || 'www.splotch.page';
+    const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
+    const baseUrl = `${protocol}://${host}`;
+
     res.json({
       environment: {
-        home_url: `${req.protocol}://${req.get('host')}`,
-        site_url: `${req.protocol}://${req.get('host')}`,
+        home_url: baseUrl,
+        site_url: baseUrl,
         version: '8.5.0',
         log_directory: '/tmp',
         log_directory_writable: true,
@@ -473,8 +615,12 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
 
   // --- ORDERS ENDPOINTS ---
 
-  // GET /wp-json/wc/v3/orders
-  router.get('/wp-json/wc/v3/orders', authenticateWooCommerce, async (req, res) => {
+  // GET /wp-json/wc/v3/orders (and v2, v1)
+  router.get([
+    '/wp-json/wc/v3/orders',
+    '/wp-json/wc/v2/orders',
+    '/wp-json/wc/v1/orders'
+  ], authenticateWooCommerce, async (req, res) => {
     try {
       const allOrders = await db.getAllOrders();
 
@@ -551,8 +697,12 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     }
   });
 
-  // GET /wp-json/wc/v3/orders/:id
-  router.get('/wp-json/wc/v3/orders/:id', authenticateWooCommerce, async (req, res) => {
+  // GET /wp-json/wc/v3/orders/:id (and v2, v1)
+  router.get([
+    '/wp-json/wc/v3/orders/:id',
+    '/wp-json/wc/v2/orders/:id',
+    '/wp-json/wc/v1/orders/:id'
+  ], authenticateWooCommerce, async (req, res) => {
     try {
       const order = await findOrderByIdOrUuid(req.params.id);
       if (!order) {
@@ -653,16 +803,33 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     }
   }
 
-  router.put('/wp-json/wc/v3/orders/:id', authenticateWooCommerce, handleOrderUpdate);
-  router.post('/wp-json/wc/v3/orders/:id', authenticateWooCommerce, handleOrderUpdate);
+  router.put([
+    '/wp-json/wc/v3/orders/:id',
+    '/wp-json/wc/v2/orders/:id',
+    '/wp-json/wc/v1/orders/:id'
+  ], authenticateWooCommerce, handleOrderUpdate);
+
+  router.post([
+    '/wp-json/wc/v3/orders/:id',
+    '/wp-json/wc/v2/orders/:id',
+    '/wp-json/wc/v1/orders/:id'
+  ], authenticateWooCommerce, handleOrderUpdate);
 
   // --- ORDER NOTES ENDPOINTS ---
 
-  // POST /wp-json/wc/v3/orders/:id/notes
+  // POST /wp-json/wc/v3/orders/:id/notes (and v2, v1, :order_id)
   // Pirate Ship commonly posts tracking info as an order note when a shipping label is created!
-  router.post('/wp-json/wc/v3/orders/:id/notes', authenticateWooCommerce, async (req, res) => {
+  router.post([
+    '/wp-json/wc/v3/orders/:id/notes',
+    '/wp-json/wc/v2/orders/:id/notes',
+    '/wp-json/wc/v1/orders/:id/notes',
+    '/wp-json/wc/v3/orders/:order_id/notes',
+    '/wp-json/wc/v2/orders/:order_id/notes',
+    '/wp-json/wc/v1/orders/:order_id/notes'
+  ], authenticateWooCommerce, async (req, res) => {
+    const orderIdParam = req.params.order_id || req.params.id;
     try {
-      const order = await findOrderByIdOrUuid(req.params.id);
+      const order = await findOrderByIdOrUuid(orderIdParam);
       if (!order) {
         return res.status(404).json({
           code: 'woocommerce_rest_shop_order_invalid_id',
@@ -721,15 +888,23 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
         added_by_user: false
       });
     } catch (error) {
-      logger.error(`[WOOCOMMERCE] Error creating order note on order ${req.params.id}:`, error);
+      logger.error(`[WOOCOMMERCE] Error creating order note on order ${orderIdParam}:`, error);
       res.status(500).json({ code: 'woocommerce_rest_error', message: error.message });
     }
   });
 
-  // GET /wp-json/wc/v3/orders/:id/notes
-  router.get('/wp-json/wc/v3/orders/:id/notes', authenticateWooCommerce, async (req, res) => {
+  // GET /wp-json/wc/v3/orders/:id/notes (and v2, v1, :order_id)
+  router.get([
+    '/wp-json/wc/v3/orders/:id/notes',
+    '/wp-json/wc/v2/orders/:id/notes',
+    '/wp-json/wc/v1/orders/:id/notes',
+    '/wp-json/wc/v3/orders/:order_id/notes',
+    '/wp-json/wc/v2/orders/:order_id/notes',
+    '/wp-json/wc/v1/orders/:order_id/notes'
+  ], authenticateWooCommerce, async (req, res) => {
+    const orderIdParam = req.params.order_id || req.params.id;
     try {
-      const order = await findOrderByIdOrUuid(req.params.id);
+      const order = await findOrderByIdOrUuid(orderIdParam);
       if (!order) {
         return res.status(404).json({
           code: 'woocommerce_rest_shop_order_invalid_id',
@@ -750,7 +925,7 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
 
       res.json(notes);
     } catch (error) {
-      logger.error(`[WOOCOMMERCE] Error fetching notes for order ${req.params.id}:`, error);
+      logger.error(`[WOOCOMMERCE] Error fetching notes for order ${orderIdParam}:`, error);
       res.status(500).json({ code: 'woocommerce_rest_error', message: error.message });
     }
   });

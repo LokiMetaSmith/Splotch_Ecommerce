@@ -719,12 +719,18 @@ async function startServer(
         res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(self)');
         // Referrer-Policy: Controls how much referrer information is sent to other sites
         res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+        // WordPress / WooCommerce REST API Discovery Link header
+        const host = req.get('host') || 'www.splotch.page';
+        const protocol = req.protocol === 'http' && req.secure ? 'https' : req.protocol;
+        res.setHeader('Link', `<${protocol}://${host}/wp-json/>; rel="https://api.w.org/"`);
+
         next();
     });
 
     app.use(lusca({
         csrf: {
-            blocklist: ['/wp-json', '/wc-auth']
+            blocklist: ['/wp-json', '/wc-auth', '/xmlrpc.php']
         },
         xframe: 'SAMEORIGIN',
         hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},
