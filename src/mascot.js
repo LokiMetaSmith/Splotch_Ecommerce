@@ -1,29 +1,17 @@
-// src/mascot.js
+// Clean up any registered service workers or legacy caches to prevent caching and storage errors
 if ("serviceWorker" in navigator) {
-  if (import.meta.env.DEV) {
-    // In development, unregister any existing service workers to avoid caching issues with Vite
-    navigator.serviceWorker.getRegistrations().then(function (registrations) {
-      for (let registration of registrations) {
-        registration.unregister();
-        console.log("ServiceWorker unregistered in dev mode:", registration);
-      }
+  navigator.serviceWorker.getRegistrations().then(function (registrations) {
+    for (let registration of registrations) {
+      registration.unregister().catch(() => {});
+    }
+  }).catch(() => {});
+}
+if ("caches" in window) {
+  caches.keys().then(function (keys) {
+    keys.forEach(function (key) {
+      caches.delete(key).catch(() => {});
     });
-  } else {
-    // In production, register the service worker
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").then(
-        (registration) => {
-          console.log(
-            "ServiceWorker registration successful with scope: ",
-            registration.scope,
-          );
-        },
-        (err) => {
-          console.log("ServiceWorker registration failed: ", err);
-        },
-      );
-    });
-  }
+  }).catch(() => {});
 }
 
 // Mascot Interaction
@@ -32,6 +20,20 @@ const mascotImg = document.getElementById("mascot-img");
 const mascotText = document.getElementById("mascot-text");
 
 if (mascotContainer && mascotImg && mascotText) {
+  const defaultMascot = "/mascot.png";
+
+  // Resilient fallback if any mascot image fails to load
+  const handleImageError = () => {
+    if (!mascotImg.src.endsWith(defaultMascot)) {
+      console.warn("Mascot image failed to load, falling back to default:", defaultMascot);
+      mascotImg.src = defaultMascot;
+    }
+  };
+  mascotImg.addEventListener("error", handleImageError);
+  if (mascotImg.complete && mascotImg.naturalWidth === 0) {
+    handleImageError();
+  }
+
   // Random Mascot Selection
   const mascotImages = [
     "/mascot.png",
@@ -76,11 +78,11 @@ if (mascotContainer && mascotImg && mascotText) {
     }
 
     mascotContainer.classList.remove("wiggle");
-    // Visual feedback for click/keyboard activation
-    mascotContainer.style.transform = "scale(1.2) rotate(0deg)";
+    // Visual feedback for click/keyboard activation: snappy peel pop
+    mascotContainer.style.transform = "scale(1.28) rotate(-16deg) translateY(-16px)";
     setTimeout(() => {
       mascotContainer.style.transform = "";
-    }, 200);
+    }, 180);
   }
 
   mascotContainer.addEventListener("click", triggerMascotAction);

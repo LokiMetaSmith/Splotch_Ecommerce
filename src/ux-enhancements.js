@@ -1,18 +1,45 @@
 /**
- * Formats a raw phone number string into (XXX) XXX-XXXX format.
+ * Formats a raw phone number string into standard format.
+ * Supports standard 10-digit (XXX) XXX-XXXX as well as 11-digit US format 1 (XXX) XXX-XXXX (or +1 (XXX) XXX-XXXX).
  * @param {string} value - The raw input value.
  * @returns {string} - The formatted phone number.
  */
 export function formatPhoneNumber(value) {
   if (!value) return value;
-  const phoneNumber = value.replace(/[^\d]/g, "");
-  const phoneNumberLength = phoneNumber.length;
 
-  if (phoneNumberLength < 4) return phoneNumber;
-  if (phoneNumberLength < 7) {
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`;
+  const str = String(value);
+  const hasPlus = str.trim().startsWith("+");
+  const digits = str.replace(/[^\d]/g, "");
+
+  if (!digits) return hasPlus ? "+" : "";
+
+  // Check if this is an 11-digit number starting with US country code '1',
+  // or if it explicitly begins with '+1' or '1 ' / '1-'
+  const isExplicitCountryCode = hasPlus || /^1[\s.-]/.test(str.trim());
+  const is11DigitUS = digits.length >= 11 && digits.startsWith("1");
+
+  if (isExplicitCountryCode || is11DigitUS) {
+    const prefix = hasPlus ? "+1 " : "1 ";
+    const rest = digits.startsWith("1") ? digits.slice(1) : digits;
+
+    if (rest.length === 0) {
+      return hasPlus ? "+1" : "1";
+    }
+    if (rest.length < 4) {
+      return `${prefix}(${rest}`;
+    }
+    if (rest.length < 7) {
+      return `${prefix}(${rest.slice(0, 3)}) ${rest.slice(3)}`;
+    }
+    return `${prefix}(${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6, 10)}`;
   }
-  return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
+
+  // Standard 10-digit (or in-progress 10-digit) formatting
+  if (digits.length < 4) return digits;
+  if (digits.length < 7) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  }
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
 }
 
 /**

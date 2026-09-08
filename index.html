@@ -1741,7 +1741,7 @@
       <div class="speech-bubble" id="mascot-text">
         Create something awesome today!
       </div>
-      <img id="mascot-img" src="/mascot.png" alt="Splotch Mascot" />
+      <img id="mascot-img" src="/mascot.png" alt="Splotch Mascot" onerror="if(this.src && !this.src.endsWith('/mascot.png'))this.src='/mascot.png';" />
     </div>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script type="module" src="./src/version.js"></script>

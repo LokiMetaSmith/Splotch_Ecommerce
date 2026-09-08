@@ -333,7 +333,7 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
 /* --- Mascot Styling --- */
 @keyframes peel {
   0%, 100% { transform: rotate(-10deg) translateY(0) scale(1); }
-  50% { transform: rotate(-14deg) translateY(-10px) scale(1.02); }
+  50% { transform: rotate(-16deg) translateY(-12px) scale(1.05); }
 }
 
 @keyframes wiggle {
@@ -351,21 +351,26 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
     z-index: 9999;
     width: 130px;
     height: auto;
-    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     cursor: pointer;
-    animation: peel 4s infinite ease-in-out;
+    animation: peel 1.6s infinite ease-in-out;
     transform: rotate(-10deg); /* Initial peeled angle */
     transform-origin: bottom right;
 }
 
 #mascot-container.wiggle {
-    animation: wiggle 0.5s infinite ease-in-out;
+    animation: wiggle 0.4s infinite ease-in-out;
 }
 
 #mascot-container:hover,
 #mascot-container:focus-visible {
     animation: none;
-    transform: scale(1.15) rotate(0deg); /* Straighten up on hover/focus */
+    transform: scale(1.2) rotate(-15deg) translateY(-12px); /* Peels up fast on hover/focus */
+}
+
+#mascot-container:active {
+    transform: scale(1.28) rotate(-18deg) translateY(-18px); /* Peels up further on click/tap */
+    transition: transform 0.08s ease-out;
 }
 
 #mascot-img {
