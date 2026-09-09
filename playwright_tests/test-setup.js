@@ -74,6 +74,20 @@ export const test = base.extend({
                 });
             }
 
+            if (pathname.endsWith('/api/config')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        squareAppId: 'sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA',
+                        squareLocationId: 'LTS82DEX24XR0',
+                        squareEnvironment: 'sandbox',
+                        nodeEnv: 'development',
+                        isDevelopment: true,
+                    }),
+                });
+            }
+
             if (pathname.endsWith('/api/pricing-info')) {
                 return route.fulfill({
                 status: 200,

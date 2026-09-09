@@ -76,3 +76,83 @@ export async function checkAndRenderDevBanner(serverUrl = '') {
     }
   }
 }
+
+/**
+ * Square Sandbox Payment Banner & Highlight
+ * When SQUARE_ENVIRONMENT is 'sandbox', activates a prominent construction/caution
+ * banner around the payment section, highlights the payment section, reminds users
+ * that physical stickers will not be fulfilled, and suggests the official test card (4111 1111 1111 1111).
+ */
+export function initSquareSandboxBanner(isSandbox = true) {
+  const banner = document.getElementById("square-sandbox-banner");
+  const section = document.getElementById("payment-details-section");
+  const cardHint = document.getElementById("card-sandbox-hint");
+  const copyBtn = document.getElementById("copyTestCardBtn");
+  const copyText = document.getElementById("copyTestCardText");
+
+  if (!isSandbox) {
+    if (banner) {
+      banner.classList.add("hidden");
+      banner.style.display = "none";
+    }
+    if (cardHint) {
+      cardHint.classList.add("hidden");
+      cardHint.style.display = "none";
+    }
+    if (section) {
+      section.classList.remove("ring-4", "ring-amber-400", "border-2", "border-amber-500", "bg-amber-50/20");
+    }
+    return;
+  }
+
+  if (banner) {
+    banner.classList.remove("hidden");
+    banner.style.display = "block";
+  }
+  if (cardHint) {
+    cardHint.classList.remove("hidden");
+    cardHint.style.display = "flex";
+  }
+  if (section) {
+    section.classList.add("ring-4", "ring-amber-400", "border-2", "border-amber-500", "bg-amber-50/20");
+  }
+
+  if (copyBtn && !copyBtn.dataset.bound) {
+    copyBtn.dataset.bound = "true";
+    copyBtn.addEventListener("click", async () => {
+      const cardNum = "4111 1111 1111 1111";
+      let copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(cardNum);
+          copied = true;
+        }
+      } catch (e) {
+        // Fallback below
+      }
+
+      if (!copied) {
+        try {
+          const tempInput = document.createElement("input");
+          tempInput.value = cardNum;
+          document.body.appendChild(tempInput);
+          tempInput.select();
+          document.execCommand("copy");
+          document.body.removeChild(tempInput);
+          copied = true;
+        } catch (err) {
+          console.warn("[CLIENT] Could not copy test card:", err);
+        }
+      }
+
+      if (copied && copyText) {
+        const original = copyText.textContent;
+        copyText.textContent = "Copied!";
+        setTimeout(() => {
+          copyText.textContent = original;
+        }, 2000);
+      }
+    });
+  }
+}
+

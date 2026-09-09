@@ -4,7 +4,7 @@
 import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
-import { renderDevBanner } from '../src/dev-banner.js';
+import { renderDevBanner, initSquareSandboxBanner } from '../src/dev-banner.js';
 
 describe('Development Banner & Environment Detection', () => {
   describe('Server API (/api/config) Logic', () => {
@@ -79,6 +79,69 @@ describe('Development Banner & Environment Detection', () => {
       renderDevBanner(true);
       const banners = document.querySelectorAll('#dev-mode-banner');
       expect(banners.length).toBe(1);
+    });
+  });
+
+  describe('Square Sandbox Payment Banner & Highlight (DOM)', () => {
+    beforeEach(() => {
+      document.body.innerHTML = `
+        <div id="payment-details-section">
+          <div id="square-sandbox-banner" class="hidden" style="display: none;">
+            <span id="testCardNumberDisplay">4111 1111 1111 1111</span>
+            <button id="copyTestCardBtn"><span id="copyTestCardText">Copy Card Number</span></button>
+            <p>no real cards will be charged, and physical stickers will NOT be printed or shipped</p>
+          </div>
+          <div id="card-sandbox-hint" class="hidden" style="display: none;"></div>
+          <div id="card-container"></div>
+        </div>
+      `;
+    });
+
+    it('should reveal sandbox banner and hint, and highlight payment section when isSandbox is true', () => {
+      initSquareSandboxBanner(true);
+      const banner = document.getElementById('square-sandbox-banner');
+      const hint = document.getElementById('card-sandbox-hint');
+      const section = document.getElementById('payment-details-section');
+
+      expect(banner.classList.contains('hidden')).toBe(false);
+      expect(banner.style.display).toBe('block');
+      expect(hint.classList.contains('hidden')).toBe(false);
+      expect(section.classList.contains('ring-amber-400')).toBe(true);
+      expect(banner.textContent).toContain('4111 1111 1111 1111');
+      expect(banner.textContent).toContain('physical stickers will NOT be printed or shipped');
+    });
+
+    it('should hide sandbox banner and remove highlights when isSandbox is false', () => {
+      initSquareSandboxBanner(true);
+      initSquareSandboxBanner(false);
+
+      const banner = document.getElementById('square-sandbox-banner');
+      const hint = document.getElementById('card-sandbox-hint');
+      const section = document.getElementById('payment-details-section');
+
+      expect(banner.classList.contains('hidden')).toBe(true);
+      expect(banner.style.display).toBe('none');
+      expect(hint.classList.contains('hidden')).toBe(true);
+      expect(section.classList.contains('ring-amber-400')).toBe(false);
+    });
+
+    it('should copy test card number and update button text when copy button is clicked', async () => {
+      const writeTextMock = jest.fn().mockResolvedValue();
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock,
+        },
+      });
+
+      initSquareSandboxBanner(true);
+      const copyBtn = document.getElementById('copyTestCardBtn');
+      const copyText = document.getElementById('copyTestCardText');
+
+      copyBtn.click();
+      await Promise.resolve();
+
+      expect(writeTextMock).toHaveBeenCalledWith('4111 1111 1111 1111');
+      expect(copyText.textContent).toBe('Copied!');
     });
   });
 });

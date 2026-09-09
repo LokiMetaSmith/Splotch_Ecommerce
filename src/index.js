@@ -31,7 +31,7 @@ import {
   clearStickers,
 } from "./lib/stickers.js";
 import Sortable from "sortablejs";
-import { renderDevBanner } from "./dev-banner.js";
+import { renderDevBanner, initSquareSandboxBanner } from "./dev-banner.js";
 
 // index.js
 
@@ -597,11 +597,21 @@ async function BootStrap() {
           if (config.isDevelopment || config.nodeEnv === 'development') {
               renderDevBanner(true);
           }
+
+          const isSandbox = (config.squareEnvironment === 'sandbox' || !config.squareEnvironment || config.squareEnvironment === '');
+          initSquareSandboxBanner(isSandbox);
+      } else {
+          console.warn("[CLIENT] /api/config returned non-ok status:", configRes.status);
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+              renderDevBanner(true);
+              initSquareSandboxBanner(true);
+          }
       }
   } catch (e) {
       console.warn("[CLIENT] Failed to fetch /api/config, falling back to default Square config:", e);
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           renderDevBanner(true);
+          initSquareSandboxBanner(true);
       }
   }
 
