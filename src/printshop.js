@@ -1818,7 +1818,7 @@ async function handleNesting(e) {
     const options = { 
       spacing, 
       rotations: 4, 
-      addPrintingMarks: false, // printshop.js adds sheet-level printing marks itself
+      addPrintingMarks, // Generates corner crop marks around placed stickers
       onProgress: (msg) => {
         ui.nestedSvgContainer.innerHTML = `<p>${msg}</p>`;
       }
