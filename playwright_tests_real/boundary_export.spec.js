@@ -21,13 +21,16 @@ test.describe('Boundary Layer UI and Multi-Layer SVG Export', () => {
         await page.waitForTimeout(3000);
 
         // Wait for Sheet Boundary to be appended
-        const boundaryLi = page.locator('#layer-list li').filter({ hasText: 'Sheet Boundary' });
+        const boundaryLi = page.locator('#sticker-list li').filter({ hasText: 'Sheet Boundary' });
         await expect(boundaryLi).toBeVisible({ timeout: 10000 });
 
         await boundaryLi.click();
 
         const boundaryPanel = page.locator('#boundary-settings-panel');
         await expect(boundaryPanel).toBeVisible();
+
+        // Verify initial bleed margin defaults to 0
+        await expect(page.locator('#boundaryMarginInput')).toHaveValue('0');
 
         await page.selectOption('#boundaryShapeSelect', 'square');
         await page.fill('#boundaryMarginInput', '0.25');

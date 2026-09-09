@@ -128,7 +128,7 @@ let currentBounds = null;
 let organicSheetCutline = null; // Automatically generated boolean union of all layer cutlines
 let sheetBoundaryConfig = {
   shape: 'contour', // 'contour', 'square', 'circle'
-  margin: 0.125 // inches
+  margin: 0 // inches
 };
 let pricingConfig = null;
 let inventoryCache = {}; // Cache for Odoo inventory
@@ -5944,6 +5944,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const marginInput = document.getElementById("boundaryMarginInput");
 
     if (shapeSelect) {
+        if (shapeSelect.value) {
+            sheetBoundaryConfig.shape = shapeSelect.value;
+        }
         shapeSelect.addEventListener("change", (e) => {
             sheetBoundaryConfig.shape = e.target.value;
             redrawAll();
@@ -5957,6 +5960,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (marginInput) marginInput.value = val;
         redrawAll();
     };
+
+    if (marginInput && marginInput.value !== undefined && marginInput.value !== "") {
+        const initialVal = parseFloat(marginInput.value) || 0;
+        sheetBoundaryConfig.margin = isMetric ? (initialVal / 25.4) : initialVal;
+    }
 
     if (marginSlider) {
         marginSlider.addEventListener("input", (e) => updateMargin(e.target.value));
