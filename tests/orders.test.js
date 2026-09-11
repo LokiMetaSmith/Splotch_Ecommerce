@@ -9,6 +9,7 @@ import { JSONFilePreset } from 'lowdb/node';
 // Import modules
 import { startServer } from '../server/server.js';
 import { getCurrentSigningKey } from '../server/keyManager.js';
+import { calcOrderBreakdown, DEFAULT_SHIPPING_CONFIG } from '../server/lib/costCalc.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +51,16 @@ describe('Order API Endpoints', () => {
         // Mock Square Client
         mockSquareClient = {
             locations: { list: jest.fn() },
+            orders: {
+                create: jest.fn().mockImplementation(async (payload) => {
+                    return {
+                        order: {
+                            id: 'square_order_123',
+                            totalMoney: payload?.order?.lineItems?.[0]?.basePriceMoney || { amount: 820n, currency: 'USD' }
+                        }
+                    };
+                })
+            },
             payments: {
                 create: jest.fn().mockImplementation(async (payload) => {
                      if (payload.sourceId === 'cnon:card-nonce-declined') {
@@ -61,7 +72,7 @@ describe('Order API Endpoints', () => {
                      return {
                         payment: {
                             id: 'payment_123',
-                            orderId: 'square_order_123',
+                            orderId: payload.orderId || 'square_order_123',
                             status: 'COMPLETED'
                         }
                      };
@@ -139,9 +150,19 @@ describe('Order API Endpoints', () => {
             const csrfToken = csrfRes.body.csrfToken;
             const token = getAuthToken();
 
+            // Calculate expected grand total for 10x favicon items (approx 2 cents subtotal)
+            const expectedSubtotal = 2;
+            const breakdown = calcOrderBreakdown({
+                areaInSqIn: 1,
+                subtotalCents: expectedSubtotal,
+                config: DEFAULT_SHIPPING_CONFIG
+            });
+
             const orderData = {
                 sourceId: 'cnon:card-nonce-ok',
-                amountCents: 2, // Correct price for 10x favicon.png (approx 0.15 cents each -> 1.5 -> 2)
+                amountCents: breakdown.totalCents,
+                orderReadyConfirmed: true,
+                packageAreaSqIn: 1,
                 designImagePath: '/uploads/design.png',
                 shippingContact: {
                     givenName: 'John',
@@ -172,12 +193,55 @@ describe('Order API Endpoints', () => {
             expect(res.statusCode).toEqual(201);
             expect(res.body.success).toBe(true);
             expect(res.body.order.status).toBe('NEW');
+            expect(res.body.order.amount).toBe(breakdown.totalCents);
+            expect(res.body.order.subtotalCents).toBe(expectedSubtotal);
+            expect(res.body.order.shippingCents).toBe(breakdown.shippingCents);
+            expect(mockSquareClient.orders.create).toHaveBeenCalled();
             expect(mockSquareClient.payments.create).toHaveBeenCalled();
             expect(Object.keys(db.data.orders)).toHaveLength(1);
             expect(bot.telegram.sendMessage).toHaveBeenCalled();
 
             // Verify that telegramMessageId was updated (regression test for O(N) lookup fix)
             expect(db.data.orders[res.body.order.orderId].telegramMessageId).toBe(123);
+        });
+
+        it('should fail if orderReadyConfirmed is missing or false', async () => {
+            const agent = request.agent(app);
+            const csrfRes = await agent.get('/api/csrf-token');
+            const csrfToken = csrfRes.body.csrfToken;
+            const token = getAuthToken();
+
+            const orderData = {
+                sourceId: 'cnon:card-nonce-ok',
+                amountCents: 500,
+                orderReadyConfirmed: false, // Not confirmed
+                designImagePath: '/uploads/design.png',
+                shippingContact: {
+                    givenName: 'John',
+                    familyName: 'Doe',
+                    email: 'john@example.com',
+                    addressLines: ['123 Main St'],
+                    locality: 'Anytown',
+                    administrativeDistrictLevel1: 'NY',
+                    postalCode: '10001',
+                    country: 'US'
+                },
+                billingContact: {
+                    givenName: 'John',
+                    familyName: 'Doe',
+                    email: 'john@example.com'
+                },
+                orderDetails: { quantity: 1 }
+            };
+
+            const res = await agent
+                .post('/api/create-order')
+                .set('Authorization', `Bearer ${token}`)
+                .set('X-CSRF-Token', csrfToken)
+                .send(orderData);
+
+            expect(res.statusCode).toEqual(400);
+            expect(res.body.error).toMatch(/Order confirmation required/i);
         });
 
         it('should fail with invalid data', async () => {
@@ -204,6 +268,7 @@ describe('Order API Endpoints', () => {
              const orderData = {
                 sourceId: 'cnon:card-nonce-ok',
                 amountCents: 1, // Intentionally low amount (1 cent)
+                orderReadyConfirmed: true,
                 designImagePath: '/uploads/design.png',
                 shippingContact: {
                     givenName: 'John',
@@ -242,10 +307,18 @@ describe('Order API Endpoints', () => {
              const csrfToken = csrfRes.body.csrfToken;
              const token = getAuthToken();
 
+             // Price for quantity 1 of favicon.png is 0 cents subtotal
+             const breakdown = calcOrderBreakdown({
+                 areaInSqIn: 1,
+                 subtotalCents: 0,
+                 config: DEFAULT_SHIPPING_CONFIG
+             });
+
              const orderData = {
                 sourceId: 'cnon:card-nonce-declined',
-                amountCents: 1, // Correct price for quantity 1 (0.17 cents -> 0 or 1?) Rounds to 0. Let's try 1.
-                // Wait, if it rounds to 0, and we send 1, diff is 1. Tolerance 5. So 1 is accepted.
+                amountCents: breakdown.totalCents,
+                orderReadyConfirmed: true,
+                packageAreaSqIn: 1,
                 designImagePath: '/uploads/design.png',
                  shippingContact: {
                      givenName: 'John',
@@ -271,9 +344,6 @@ describe('Order API Endpoints', () => {
                 .set('X-CSRF-Token', csrfToken)
                 .send(orderData);
 
-             // In the test environment, the mocked error falls through to the generic handler (500)
-             // We verify that the error message is preserved if possible, but prioritize status code check
-             // as the test environment mock error structure is inconsistent.
              expect(res.statusCode).toEqual(400);
              if (res.body.message) {
                  expect(res.body.message).toContain('Card declined');

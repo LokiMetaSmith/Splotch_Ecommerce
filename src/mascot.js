@@ -93,23 +93,38 @@ if (mascotContainer && mascotImg && mascotText) {
     }
   });
 
-  // Wiggle on Proximity
-  document.addEventListener("mousemove", (e) => {
+  // Wiggle ONLY when directly over mascot container
+  const checkDirectHover = (e) => {
     const rect = mascotContainer.getBoundingClientRect();
-    const mascotCenterX = rect.left + rect.width / 2;
-    const mascotCenterY = rect.top + rect.height / 2;
-
-    const distance = Math.sqrt(
-      Math.pow(e.clientX - mascotCenterX, 2) +
-        Math.pow(e.clientY - mascotCenterY, 2),
+    const isDirectlyOver = (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
     );
 
-    // Threshold for "near" (e.g., 300 pixels)
-    if (distance < 300) {
+    if (isDirectlyOver) {
       mascotContainer.classList.add("wiggle");
     } else {
       mascotContainer.classList.remove("wiggle");
     }
+  };
+
+  document.addEventListener("mousemove", checkDirectHover);
+  document.addEventListener("pointermove", checkDirectHover);
+
+  mascotContainer.addEventListener("mouseenter", () => {
+    mascotContainer.classList.add("wiggle");
+  });
+  mascotContainer.addEventListener("pointerenter", () => {
+    mascotContainer.classList.add("wiggle");
+  });
+
+  mascotContainer.addEventListener("mouseleave", () => {
+    mascotContainer.classList.remove("wiggle");
+  });
+  mascotContainer.addEventListener("pointerleave", () => {
+    mascotContainer.classList.remove("wiggle");
   });
 
   document.addEventListener("mouseleave", () => {

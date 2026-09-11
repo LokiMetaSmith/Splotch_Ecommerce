@@ -243,6 +243,8 @@ export function hideCanvasLoading() {
 }
 
 let currentOrderAmountCents = 0;
+let currentOrderTotalCents = 0;
+let currentOrderBreakdown = null;
 let currentProductId = null; // Track if we are in "Product Mode"
 let creatorProfitCents = 0; // The markup for the current product
 
@@ -336,11 +338,25 @@ function generateOrganicSheetBoundary() {
       } else if (sheetBoundaryConfig.shape === 'circle') {
         const cx = (minX + maxX) / 2;
         const cy = (minY + maxY) / 2;
-        const w = maxX - minX;
-        const h = maxY - minY;
-        const r = Math.sqrt(Math.pow(w/2, 2) + Math.pow(h/2, 2)) + marginPx;
+        // Compute the actual maximum distance from the center to any point on the sticker cutline.
+        // This ensures circular/round stickers are hugged tightly without diagonal bounding box inflation.
+        let maxR = 0;
+        for (let j = 0; j < solution.length; j++) {
+          const poly = solution[j];
+          for (let i = 0; i < poly.length; i++) {
+            const d = Math.hypot(poly[i].X - cx, poly[i].Y - cy);
+            if (d > maxR) maxR = d;
+          }
+        }
+        if (maxR === 0) {
+          const w = maxX - minX;
+          const h = maxY - minY;
+          maxR = Math.max(w, h) / 2;
+        }
+        const r = maxR + marginPx;
+        console.log("BROWSER LOG: circle bounds:", { minX, maxX, minY, maxY, cx, cy, maxR, r, ppi, marginPx });
         const circle = [];
-        const numPoints = 64;
+        const numPoints = 96;
         for (let i = 0; i < numPoints; i++) {
           const theta = (i / numPoints) * 2 * Math.PI;
           circle.push({
@@ -473,6 +489,13 @@ async function BootStrap() {
   fileInputGlobalRef = document.getElementById("file");
   paymentFormGlobalRef = document.getElementById("payment-form");
   submitPaymentBtn = document.getElementById("submitPaymentBtn");
+  // Gate Pay button behind the confirmation checkbox
+  if (submitPaymentBtn) submitPaymentBtn.disabled = true;
+  const orderConfirmCheckbox = document.getElementById("order-ready-confirm");
+  if (orderConfirmCheckbox) {
+    orderConfirmCheckbox.addEventListener("change", updateSubmitBtnState);
+  }
+
   canvasPlaceholder = document.getElementById("canvas-placeholder");
   printInkImageUpload = document.getElementById("printInkImageUpload");
   alphaColorPicker = document.getElementById("alphaColorPicker");
@@ -1603,6 +1626,64 @@ function calculateAndUpdatePrice() {
             Complexity Modifier: x${priceResult.complexityMultiplier}
         </span>
     `;
+
+  // Refresh the order cost breakdown summary
+  updateOrderSummary();
+}
+
+// --- Order Summary & Confirmation Gate ---
+function updateSubmitBtnState() {
+  const checkbox = document.getElementById("order-ready-confirm");
+  if (submitPaymentBtn) {
+    submitPaymentBtn.disabled = !(checkbox && checkbox.checked);
+  }
+}
+
+async function updateOrderSummary() {
+  if (!currentOrderAmountCents || currentOrderAmountCents <= 0) return;
+
+  // Compute area in sq inches from current sticker bounds
+  let areaInSqIn = null;
+  if (typeof bounds !== "undefined" && bounds && selectedResolution?.ppi) {
+    const ppi = selectedResolution.ppi;
+    const w = bounds.width / ppi;
+    const h = bounds.height / ppi;
+    const qty = stickerQuantityInput ? parseInt(stickerQuantityInput.value, 10) || 1 : 1;
+    areaInSqIn = w * h * qty;
+  }
+
+  if (!areaInSqIn) return;
+
+  try {
+    const resp = await fetch(`${serverUrl}/api/order/estimate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subtotalCents: currentOrderAmountCents,
+        areaInSqIn,
+      }),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data && typeof data.totalCents === "number") {
+      currentOrderTotalCents = data.totalCents;
+      currentOrderBreakdown = data;
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = (v) => `$${Number(v).toFixed(2)}`;
+
+    if ($("summary-subtotal"))     $("summary-subtotal").textContent     = fmt(data.subtotalDollars);
+    if ($("summary-shipping"))     $("summary-shipping").textContent     = fmt(data.shippingDollars);
+    if ($("summary-shipping-label") && data.shippingLabel)
+      $("summary-shipping-label").textContent = data.shippingLabel;
+    if ($("summary-tax"))          $("summary-tax").textContent          = fmt(data.taxDollars);
+    if ($("summary-handling"))     $("summary-handling").textContent     = fmt(data.handlingDollars);
+    if ($("summary-square-fee"))   $("summary-square-fee").textContent   = fmt(data.squareFeeDollars);
+    if ($("summary-total"))        $("summary-total").textContent        = fmt(data.totalDollars);
+  } catch (err) {
+    console.warn("[CLIENT] Could not load order estimate:", err);
+  }
 }
 
 function formatPrice(amountInCents) {
@@ -1612,6 +1693,7 @@ function formatPrice(amountInCents) {
     currency: "USD",
   });
 }
+
 
 // --- Square SDK Functions ---
 async function initializeCard(paymentsSDK) {
@@ -1967,8 +2049,15 @@ async function handlePaymentFormSubmit(event) {
       countryCode: "US",
     };
 
+    // Ensure we charge the full grand total (subtotal + shipping + tax + handling + fees)
+    let effectiveChargeAmountCents = currentOrderTotalCents;
+    if (!effectiveChargeAmountCents || effectiveChargeAmountCents <= 0) {
+      await updateOrderSummary();
+      effectiveChargeAmountCents = currentOrderTotalCents > 0 ? currentOrderTotalCents : currentOrderAmountCents;
+    }
+
     const verificationDetails = {
-      amount: (currentOrderAmountCents / 100).toFixed(2), // Must be a string
+      amount: (effectiveChargeAmountCents / 100).toFixed(2), // Must be a string representing full grand total
       currencyCode: "USD",
       intent: "CHARGE",
       billingContact: billingContact,
@@ -2040,9 +2129,22 @@ async function handlePaymentFormSubmit(event) {
       country: billingContact.countryCode,
     };
 
+    const packageAreaSqIn = (() => {
+      // Sum width * height (in inches) for all stickers using current bounds and resolution
+      if (typeof bounds !== "undefined" && bounds && selectedResolution?.ppi) {
+        const ppi = selectedResolution.ppi;
+        const w = bounds.width / ppi;
+        const h = bounds.height / ppi;
+        const qty = orderDetails.quantity || 1;
+        return w * h * qty;
+      }
+      return null;
+    })();
+
     const orderPayload = {
       sourceId,
-      amountCents: currentOrderAmountCents,
+      amountCents: effectiveChargeAmountCents, // Full grand total
+      subtotalCents: currentOrderAmountCents,  // Sticker print subtotal
       currency: "USD",
       designImagePath,
       orderDetails,
@@ -2050,7 +2152,10 @@ async function handlePaymentFormSubmit(event) {
       shippingContact: serverContact, // Use same contact for shipping for now
       _csrf: csrfToken, // Add CSRF token to payload
       productId: currentProductId, // Include if it exists
+      orderReadyConfirmed: !!(document.getElementById("order-ready-confirm")?.checked),
+      packageAreaSqIn: packageAreaSqIn,
     };
+
 
     // 5. Submit the order to the server
     showPaymentStatus("Submitting order to server...", "info");
@@ -5806,6 +5911,7 @@ function renderLayerList() {
         }
         
         const innerDiv = document.createElement("div");
+        innerDiv.id = "sheet-boundary-item";
         innerDiv.className = bClasses + " w-full";
         
         // Click to select

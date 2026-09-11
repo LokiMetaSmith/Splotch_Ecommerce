@@ -1,7 +1,7 @@
 .DS_Store
 node_modules
 dist/
-.env
+.env*
 db.json
 *.pem
 /server/uploads/designImage-*
@@ -25,3 +25,7 @@ e2e_out.txt
 e2e_pid.txt
 benchmark_index.js
 test_run.txt
+backups/
+scratch/
+*.py
+

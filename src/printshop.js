@@ -2699,6 +2699,82 @@ function initPirateShipListeners() {
   });
 }
 
+// --- Shipping & Fee Configuration ---
+async function loadShippingConfig() {
+  try {
+    const data = await fetchWithAuth(`${serverUrl}/api/admin/shipping/config`);
+    if (!data || !data.config) return;
+    const c = data.config;
+
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    };
+
+    // Tax rate stored as decimal (0.085), display as percentage (8.5)
+    setVal("shipping-tax-rate",      ((c.taxRate || 0) * 100).toFixed(2));
+    // Handling fee stored in cents, display as dollars
+    setVal("shipping-handling-fee",  ((c.handlingFeeCents || 0) / 100).toFixed(2));
+    // Square % stored as decimal (0.029), display as percentage (2.9)
+    setVal("shipping-square-pct",    ((c.squareFeePercent || 0) * 100).toFixed(3));
+    // Square fixed stored in cents, display as dollars
+    setVal("shipping-square-fixed",  ((c.squareFeeFixedCents || 0) / 100).toFixed(2));
+    setVal("shipping-grams-per-sqin", (c.gramsPerSqIn || 0).toFixed(3));
+    setVal("shipping-tare-grams",     (c.packageTareGrams || 0).toFixed(0));
+  } catch (err) {
+    console.warn("[PRINTSHOP] Failed to load shipping config:", err);
+  }
+}
+
+function initShippingConfigListeners() {
+  const form = document.getElementById("shipping-config-form");
+  if (!form) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const statusEl = document.getElementById("shipping-config-status");
+
+    const getNum = (id) => parseFloat(document.getElementById(id)?.value || "0");
+
+    const payload = {
+      // Input is %, convert back to decimal for storage
+      taxRate:            getNum("shipping-tax-rate") / 100,
+      // Input is $, convert to cents
+      handlingFeeCents:   Math.round(getNum("shipping-handling-fee") * 100),
+      // Input is %, convert back to decimal
+      squareFeePercent:   getNum("shipping-square-pct") / 100,
+      // Input is $, convert to cents
+      squareFeeFixedCents: Math.round(getNum("shipping-square-fixed") * 100),
+      gramsPerSqIn:       getNum("shipping-grams-per-sqin"),
+      packageTareGrams:   getNum("shipping-tare-grams"),
+    };
+
+    try {
+      const result = await fetchWithAuth(`${serverUrl}/api/admin/shipping/config`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      if (result && result.success) {
+        showSuccessToast("Shipping settings saved!");
+        if (statusEl) {
+          statusEl.textContent = "Saved ✓";
+          statusEl.className = "text-sm text-green-600";
+          setTimeout(() => { statusEl.textContent = ""; }, 3000);
+        }
+      } else {
+        throw new Error("Server returned failure");
+      }
+    } catch (err) {
+      showErrorToast(`Failed to save shipping settings: ${err.message}`);
+      if (statusEl) {
+        statusEl.textContent = "Save failed";
+        statusEl.className = "text-sm text-red-600";
+      }
+    }
+  });
+}
+
+
 // --- Initialization ---
 async function getServerSessionToken() {
   try {
@@ -3164,6 +3240,7 @@ export async function init() {
       loadOdooConfig();
       loadPricingConfigEditor();
       loadPirateShipConfig();
+      loadShippingConfig();
     });
   }
 
@@ -3177,6 +3254,8 @@ export async function init() {
 
   // Pirate Ship listeners
   initPirateShipListeners();
+  // Shipping & Fee listeners
+  initShippingConfigListeners();
 
   // Check for a token in the URL from OAuth redirect
   const urlParams = new URLSearchParams(window.location.search);

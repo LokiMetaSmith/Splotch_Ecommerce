@@ -297,6 +297,12 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     if (order.courier) {
       metaData.push({ id: 4, key: '_tracking_company', value: order.courier });
     }
+    if (order.packageWeightOz != null) {
+      metaData.push({ id: 5, key: '_package_weight_oz', value: String(order.packageWeightOz.toFixed(2)) });
+    }
+    if (order.packageAreaSqIn != null) {
+      metaData.push({ id: 6, key: '_package_area_sq_in', value: String(order.packageAreaSqIn.toFixed(2)) });
+    }
 
     return {
       id: numericId,

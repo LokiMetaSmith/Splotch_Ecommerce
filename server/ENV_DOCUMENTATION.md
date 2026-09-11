@@ -86,3 +86,12 @@ For production environments, Redis is recommended for session storage and rate l
 -   `JWT_PUBLIC_KEY`: The public key for verifying JSON Web Tokens (JWTs). If not provided, a new key will be generated on server startup. The key should be in PEM format.
 -   `JWT_SECRET`: A secret key for encrypting the `db.json` file. Must be 32 bytes.
 -   `ENCRYPT_CLIENT_JSON`: A boolean (`true` or `false`) that controls whether the `db.json` file is encrypted on disk.
+
+## Automated Backups
+
+-   `BACKUP_ENABLED`: A boolean (`true` or `false`) indicating whether scheduled automatic database and upload backups are enabled. Defaults to `true`.
+-   `BACKUP_METHOD`: The backup strategy to execute (`local`, `rclone`, `rsync`, or `s3`). Defaults to `local`.
+-   `BACKUP_DESTINATION`: The target directory or remote endpoint for backups (e.g. `./backups`).
+-   `BACKUP_RETENTION_DAYS`: Number of days to retain backup archives before pruning expired archives. Defaults to `30`.
+-   `BACKUP_INTERVAL_HOURS`: Interval in hours between scheduled automatic backup runs. Defaults to `24`.
+

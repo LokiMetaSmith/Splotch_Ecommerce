@@ -1714,6 +1714,53 @@
             </div>
           </div>
           <!-- Square Card Payment Element -->
+          <!-- Order Cost Summary -->
+          <div
+            id="order-cost-summary"
+            class="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm space-y-1.5"
+          >
+            <h3 class="font-bold text-gray-800 mb-2">Order Summary</h3>
+            <div class="flex justify-between text-gray-700">
+              <span>Print subtotal</span>
+              <span id="summary-subtotal" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between text-gray-700">
+              <span id="summary-shipping-label">Est. shipping (USPS)</span>
+              <span id="summary-shipping" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between text-gray-700">
+              <span>Oklahoma tax (8.5%)</span>
+              <span id="summary-tax" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between text-gray-700">
+              <span>Handling</span>
+              <span id="summary-handling" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between text-gray-700">
+              <span>Processing fee (Square)</span>
+              <span id="summary-square-fee" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between font-bold border-t border-gray-300 pt-2 mt-1 text-gray-900">
+              <span>Total</span>
+              <span id="summary-total">—</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              Shipping estimate based on package weight. Actual shipping charged at label creation by Pirate Ship.
+            </p>
+          </div>
+
+          <!-- Confirmation Checkbox -->
+          <label class="flex items-start gap-3 mb-4 cursor-pointer select-none" id="order-confirm-label">
+            <input
+              type="checkbox"
+              id="order-ready-confirm"
+              class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span class="text-sm text-gray-700 font-medium">
+              I understand this will submit my order for printing and authorize the total charge shown above.
+            </span>
+          </label>
+
           <div
             id="card-sandbox-hint"
             class="hidden items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-100/90 border border-amber-300 rounded-md px-3 py-2 shadow-sm"

@@ -30,6 +30,8 @@ import { initializeTracker } from './tracker.js';
 import { validateUsername, validateUsernameQuery, validateId } from './validators.js';
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
+import { calcOrderBreakdown, DEFAULT_SHIPPING_CONFIG } from './lib/costCalc.js';
+
 import { Markup } from 'telegraf';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import DOMPurify from 'dompurify';
@@ -41,6 +43,7 @@ import { escapeHtml } from './utils.js';
 import { LocalStorageProvider, S3StorageProvider } from './storage.js';
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import { startBackupScheduler } from './backupService.js';
 import { createClient } from 'redis';
 import { RedisStore as ConnectRedisStore } from 'connect-redis';
 import { RedisStore as RateLimitRedisStore } from 'rate-limit-redis';
@@ -1041,7 +1044,65 @@ async function startServer(
         });
     });
 
+    // --- Shipping Cost Estimate (public — called from checkout before payment) ---
+    app.post('/api/order/estimate', [
+      body('subtotalCents').isInt({ gt: 0 }).withMessage('subtotalCents must be a positive integer'),
+      body('areaInSqIn').isFloat({ gt: 0 }).withMessage('areaInSqIn must be a positive number'),
+    ], async (req, res) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+      try {
+        const { subtotalCents, areaInSqIn } = req.body;
+        const shippingCfg = { ...DEFAULT_SHIPPING_CONFIG, ...(db.data?.config?.shipping || {}) };
+        const breakdown = calcOrderBreakdown({
+          areaInSqIn: Number(areaInSqIn),
+          subtotalCents: Number(subtotalCents),
+          config: shippingCfg,
+        });
+        return res.json({ success: true, ...breakdown });
+      } catch (err) {
+        logger.error('[ESTIMATE] Error calculating order estimate:', err);
+        return res.status(500).json({ error: 'Failed to calculate estimate.' });
+      }
+    });
+
+    // --- Shipping Config (admin) ---
+    app.get('/api/admin/shipping/config', authenticateToken, async (req, res) => {
+      if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+      const saved = db.data?.config?.shipping || {};
+      res.json({ success: true, config: { ...DEFAULT_SHIPPING_CONFIG, ...saved } });
+    });
+
+    app.post('/api/admin/shipping/config', authenticateToken, [
+      body('taxRate').isFloat({ min: 0, max: 1 }).withMessage('taxRate must be between 0 and 1'),
+      body('handlingFeeCents').isInt({ min: 0 }).withMessage('handlingFeeCents must be a non-negative integer'),
+      body('squareFeePercent').isFloat({ min: 0, max: 1 }).withMessage('squareFeePercent must be between 0 and 1'),
+      body('squareFeeFixedCents').isInt({ min: 0 }).withMessage('squareFeeFixedCents must be a non-negative integer'),
+      body('gramsPerSqIn').isFloat({ min: 0 }).withMessage('gramsPerSqIn must be a non-negative number'),
+      body('packageTareGrams').isFloat({ min: 0 }).withMessage('packageTareGrams must be a non-negative number'),
+    ], async (req, res) => {
+      if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const newConfig = {
+        taxRate: Number(req.body.taxRate),
+        handlingFeeCents: Number(req.body.handlingFeeCents),
+        squareFeePercent: Number(req.body.squareFeePercent),
+        squareFeeFixedCents: Number(req.body.squareFeeFixedCents),
+        gramsPerSqIn: Number(req.body.gramsPerSqIn),
+        packageTareGrams: Number(req.body.packageTareGrams),
+      };
+
+      await db.setConfig('shipping', newConfig);
+      logger.info('[SHIPPING] Config updated:', newConfig);
+      return res.json({ success: true, config: newConfig });
+    });
+
     app.get('/api/inventory', async (req, res) => {
+
         // Public endpoint to get cached inventory status
         // PERFORMANCE: Allow short caching (1 min) to reduce DB/Odoo load during bursts
         res.setHeader('Cache-Control', 'public, max-age=60');
@@ -1552,7 +1613,13 @@ async function startServer(
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { sourceId, amountCents, currency, designImagePath, productId, orderDetails, billingContact, shippingContact } = req.body;
+        // --- Guard: Confirmation Checkbox ---
+        if (!req.body.orderReadyConfirmed) {
+          return res.status(400).json({ error: 'Order confirmation required. Please check the confirmation box before submitting.' });
+        }
+
+        const { sourceId, amountCents, currency, designImagePath, productId, orderDetails, billingContact, shippingContact, packageAreaSqIn } = req.body;
+
 
         // Manually construct safe objects to prevent Mass Assignment
         // Variable names updated to avoid conflict with response variable names
@@ -1624,6 +1691,12 @@ async function startServer(
         }
 
         // --- SECURITY: Validate Order Price ---
+        let orderBreakdown = null;
+        let effectiveAreaSqIn = null;
+        let expectedSubtotal = 0;
+        let designBounds = null;
+        let selectedResolution = null;
+
         try {
             // Determine which file determines the pricing geometry (Cutline takes precedence if custom)
             // But if it's a product, the product definition might dictate paths.
@@ -1643,6 +1716,7 @@ async function startServer(
             // Note: If the file is missing (deleted?), this will throw, which is good (fail secure).
             if (fs.existsSync(localPath)) {
                 const dimensions = await getDesignDimensions(localPath);
+                designBounds = dimensions.bounds;
 
                 const quantity = orderDetails.quantity || 1;
                 // Use default material if not specified
@@ -1651,6 +1725,7 @@ async function startServer(
                 // Note: Client currently defaults to 'dpi_300' if not explicit.
                 const resolutionId = orderDetails.resolution || (product && product.defaults && product.defaults.resolution) || 'dpi_300';
                 const resolution = pricingConfig.resolutions.find(r => r.id === resolutionId) || pricingConfig.resolutions[0];
+                selectedResolution = resolution;
 
                 const priceResult = calculateStickerPrice(
                     pricingConfig,
@@ -1664,31 +1739,44 @@ async function startServer(
                     orderDetails.numImageLayers || 1
                 );
 
-                let expectedTotal = priceResult.total;
+                expectedSubtotal = priceResult.total;
 
                 // Add Creator Profit if applicable
                 if (product) {
-                    expectedTotal += (product.creatorProfitCents * quantity);
+                    expectedSubtotal += (product.creatorProfitCents * quantity);
                 }
                 
                 // Promo Addon Logic
                 if (orderDetails.promoAddon) {
                     if (quantity < 50) {
-                        expectedTotal += 200;
+                        expectedSubtotal += 200;
                     }
                 }
 
+                // Compute package area in square inches
+                effectiveAreaSqIn = (typeof packageAreaSqIn === 'number' && packageAreaSqIn > 0)
+                    ? packageAreaSqIn
+                    : (dimensions.bounds ? ((dimensions.bounds.width / (resolution.ppi || 300)) * (dimensions.bounds.height / (resolution.ppi || 300)) * quantity) : 1);
+
+                // Fetch shipping config and calculate full breakdown (subtotal + shipping + tax + handling + square fee)
+                const shippingCfg = { ...DEFAULT_SHIPPING_CONFIG, ...(db.data?.config?.shipping || {}) };
+                orderBreakdown = calcOrderBreakdown({
+                    areaInSqIn: effectiveAreaSqIn,
+                    subtotalCents: expectedSubtotal,
+                    config: shippingCfg,
+                });
+
+                const expectedGrandTotal = orderBreakdown.totalCents;
                 const submittedTotal = Number(amountCents);
 
                 // Allow a small tolerance (e.g., 5 cents) for rounding differences
-                if (Math.abs(expectedTotal - submittedTotal) > 5) {
-                    logger.warn(`[SECURITY] Price mismatch for Order. Expected: ${expectedTotal}, Received: ${submittedTotal}. Diff: ${expectedTotal - submittedTotal}`);
-                    logger.warn(`[SECURITY] Breakdown - Base Price: ${priceResult.total}, Promo: ${orderDetails.promoAddon ? 200 : 0}, Creator: ${product ? (product.creatorProfitCents * quantity) : 0}`);
-                    logger.warn(`[SECURITY] PriceResult Detail: ${JSON.stringify(priceResult)}`);
+                if (Math.abs(expectedGrandTotal - submittedTotal) > 5) {
+                    logger.warn(`[SECURITY] Price mismatch for Order. Expected Grand Total: ${expectedGrandTotal}, Received: ${submittedTotal}. Diff: ${expectedGrandTotal - submittedTotal}`);
+                    logger.warn(`[SECURITY] Breakdown - Subtotal: ${expectedSubtotal}, Shipping: ${orderBreakdown.shippingCents}, Tax: ${orderBreakdown.taxCents}, Handling: ${orderBreakdown.handlingCents}, SquareFee: ${orderBreakdown.squareFeeCents}`);
                     logger.warn(`[SECURITY] Inputs: q=${quantity}, mat=${material}, res=${resolution.id}, layers=${JSON.stringify(orderDetails.customLayers)}, bounds=${JSON.stringify(dimensions.bounds)}`);
                     return res.status(400).json({ error: 'Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.' });
                 } else {
-                    logger.info(`[SECURITY] Price validated. Expected: ${expectedTotal}, Received: ${submittedTotal}`);
+                    logger.info(`[SECURITY] Price validated. Expected Grand Total: ${expectedGrandTotal}, Received: ${submittedTotal}`);
                 }
             } else {
                 logger.warn(`[SECURITY] Could not validate price because file not found: ${localPath}`);
@@ -1703,28 +1791,7 @@ async function startServer(
         }
         // --------------------------------------
 
-        const paymentPayload = {
-          sourceId: sourceId,
-          idempotencyKey: randomUUID(),
-          locationId: getSecret('SQUARE_LOCATION_ID'),
-          amountMoney: {
-            amount: BigInt(amountCents),
-            currency: currency || 'USD',
-          },
-          autocomplete: true,
-          referenceId: randomUUID(),
-          note: "STICKERS!!!",
-        };
-        logger.info('[CLIENT INSPECTION] Keys on squareClient:', Object.keys(squareClient));
-        const paymentResult = await squareClient.payments.create(paymentPayload);
-        if ( paymentResult.errors ) {
-          logger.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
-          return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
-        }
-        logger.info('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
-
         // Explicitly construct safe billingContact to prevent Mass Assignment
-        // Use input variable names (renamed above) to construct output variables
         const finalBillingContact = {
             givenName: escapeHtml(billingContact.givenName),
             familyName: escapeHtml(billingContact.familyName),
@@ -1747,11 +1814,201 @@ async function startServer(
             country: escapeHtml(shippingContact.country)
         };
 
+        // --- Rich Square Order & Payment ---
+        let squareOrderId = null;
+        let amountToChargeMoney = {
+          amount: BigInt(amountCents),
+          currency: currency || 'USD',
+        };
+
+        const quantity = orderDetails.quantity || 1;
+        const materialObj = pricingConfig.materials?.find(m => m.id === orderDetails.material);
+        const materialName = materialObj ? materialObj.name : (orderDetails.material || 'Standard');
+        const resolutionObj = pricingConfig.resolutions?.find(r => r.id === orderDetails.resolution);
+        const resolutionName = resolutionObj ? resolutionObj.name : (orderDetails.resolution || 'Standard');
+
+        const promoAmountCents = (orderDetails.promoAddon && quantity < 50) ? 200 : 0;
+        const stickerSubtotal = Math.max(0, expectedSubtotal - promoAmountCents);
+        const isDivisible = quantity > 0 && (stickerSubtotal % quantity === 0);
+
+        let sizeNote = '';
+        if (designBounds && selectedResolution && selectedResolution.ppi) {
+            const wIn = (designBounds.width / selectedResolution.ppi).toFixed(1);
+            const hIn = (designBounds.height / selectedResolution.ppi).toFixed(1);
+            sizeNote = ` (${wIn}" x ${hIn}")`;
+        }
+
+        const squareLineItems = [
+          {
+            name: product ? (product.title || 'Custom Stickers') : `Custom Die-Cut Stickers${sizeNote}`,
+            quantity: isDivisible ? String(quantity) : '1',
+            note: `Material: ${materialName} | Resolution: ${resolutionName}${orderDetails.customLayers?.length ? ` | Layers: ${orderDetails.customLayers.length}` : ''}`,
+            basePriceMoney: {
+              amount: BigInt(isDivisible ? Math.round(stickerSubtotal / quantity) : stickerSubtotal),
+              currency: currency || 'USD'
+            }
+          }
+        ];
+
+        if (orderDetails.promoAddon) {
+          squareLineItems.push({
+            name: 'Holographic Promo Sticker',
+            quantity: '1',
+            note: quantity >= 50 ? 'Free promo sticker on orders of 50+' : 'Addon holographic promo sticker',
+            basePriceMoney: {
+              amount: BigInt(quantity >= 50 ? 0 : 200),
+              currency: currency || 'USD'
+            }
+          });
+        }
+
+        const squareServiceCharges = [];
+        if (orderBreakdown && orderBreakdown.shippingCents > 0) {
+          squareServiceCharges.push({
+            name: `Estimated Shipping (${orderBreakdown.shippingLabel || 'USPS'})`,
+            amountMoney: {
+              amount: BigInt(orderBreakdown.shippingCents),
+              currency: currency || 'USD'
+            },
+            calculationPhase: 'SUBTOTAL_PHASE',
+            taxable: true
+          });
+        }
+
+        if (orderBreakdown && orderBreakdown.handlingCents > 0) {
+          squareServiceCharges.push({
+            name: 'Handling Fee',
+            amountMoney: {
+              amount: BigInt(orderBreakdown.handlingCents),
+              currency: currency || 'USD'
+            },
+            calculationPhase: 'SUBTOTAL_PHASE',
+            taxable: false
+          });
+        }
+
+        if (orderBreakdown && orderBreakdown.squareFeeCents > 0) {
+          squareServiceCharges.push({
+            name: 'Payment Processing Fee',
+            amountMoney: {
+              amount: BigInt(orderBreakdown.squareFeeCents),
+              currency: currency || 'USD'
+            },
+            calculationPhase: 'SUBTOTAL_PHASE',
+            taxable: false
+          });
+        }
+
+        const shippingCfg = { ...DEFAULT_SHIPPING_CONFIG, ...(db.data?.config?.shipping || {}) };
+        const squareTaxes = [
+          {
+            name: `Oklahoma Sales Tax (${(shippingCfg.taxRate * 100).toFixed(1)}%)`,
+            percentage: String(shippingCfg.taxRate * 100),
+            type: 'ADDITIVE'
+          }
+        ];
+
+        const squareFulfillments = [
+          {
+            type: 'SHIPMENT',
+            state: 'PROPOSED',
+            shipmentDetails: {
+              recipient: {
+                displayName: `${shippingContact.givenName} ${shippingContact.familyName || ''}`.trim(),
+                emailAddress: shippingContact.email || billingContact.email,
+                phoneNumber: shippingContact.phoneNumber || billingContact.phoneNumber || undefined,
+                address: {
+                  addressLine1: shippingContact.addressLines?.[0] || '',
+                  addressLine2: shippingContact.addressLines?.[1] || undefined,
+                  locality: shippingContact.locality,
+                  administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1,
+                  postalCode: shippingContact.postalCode,
+                  country: shippingContact.country || 'US'
+                }
+              }
+            }
+          }
+        ];
+
+        if (squareClient && squareClient.orders && typeof squareClient.orders.create === 'function') {
+          try {
+            const squareOrderRes = await squareClient.orders.create({
+              idempotencyKey: randomUUID(),
+              order: {
+                locationId: getSecret('SQUARE_LOCATION_ID'),
+                referenceId: randomUUID(),
+                lineItems: squareLineItems,
+                serviceCharges: squareServiceCharges.length ? squareServiceCharges : undefined,
+                taxes: squareTaxes,
+                fulfillments: squareFulfillments
+              }
+            });
+
+            if (squareOrderRes && squareOrderRes.order) {
+              squareOrderId = squareOrderRes.order.id;
+              if (squareOrderRes.order.totalMoney) {
+                amountToChargeMoney = squareOrderRes.order.totalMoney;
+              }
+              logger.info(`[SERVER] Created detailed Square Order ${squareOrderId} with total ${amountToChargeMoney.amount}`);
+            }
+          } catch (orderErr) {
+            logger.warn('[SERVER] Could not create detailed Square Order, falling back to direct payment:', orderErr?.message || orderErr);
+            if (orderErr?.errors) {
+              logger.warn('[SERVER] Square Order errors:', JSON.stringify(orderErr.errors));
+            }
+          }
+        }
+
+        const paymentPayload = {
+          sourceId: sourceId,
+          idempotencyKey: randomUUID(),
+          locationId: getSecret('SQUARE_LOCATION_ID'),
+          orderId: squareOrderId || undefined,
+          amountMoney: amountToChargeMoney,
+          autocomplete: true,
+          buyerEmailAddress: billingContact.email,
+          billingAddress: {
+            firstName: billingContact.givenName,
+            lastName: billingContact.familyName || undefined,
+            addressLine1: shippingContact.addressLines?.[0] || '',
+            addressLine2: shippingContact.addressLines?.[1] || undefined,
+            locality: shippingContact.locality,
+            administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1,
+            postalCode: shippingContact.postalCode,
+            country: shippingContact.country || 'US',
+          },
+          shippingAddress: {
+            firstName: shippingContact.givenName,
+            lastName: shippingContact.familyName || undefined,
+            addressLine1: shippingContact.addressLines?.[0] || '',
+            addressLine2: shippingContact.addressLines?.[1] || undefined,
+            locality: shippingContact.locality,
+            administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1,
+            postalCode: shippingContact.postalCode,
+            country: shippingContact.country || 'US',
+          },
+          referenceId: randomUUID(),
+          note: `Custom Stickers (${quantity}x) - ${shippingContact.givenName} ${shippingContact.familyName || ''}`.trim(),
+        };
+
+        const paymentResult = await squareClient.payments.create(paymentPayload);
+        if ( paymentResult.errors ) {
+          logger.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
+          return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
+        }
+        logger.info('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
+
         const newOrder = {
           orderId: randomUUID(),
           paymentId: paymentResult.payment.id,
           squareOrderId: paymentResult.payment.orderId,
-          amount: Number(amountCents),
+          amount: Number(amountCents), // Grand total charged
+          subtotalCents: expectedSubtotal || (orderBreakdown?.subtotalCents ?? Number(amountCents)),
+          shippingCents: orderBreakdown?.shippingCents ?? 0,
+          shippingLabel: orderBreakdown?.shippingLabel ?? 'USPS First Class',
+          taxCents: orderBreakdown?.taxCents ?? 0,
+          handlingCents: orderBreakdown?.handlingCents ?? 0,
+          squareFeeCents: orderBreakdown?.squareFeeCents ?? 0,
           currency: currency || 'USD',
           status: 'NEW',
           orderDetails: inputSafeOrderDetails,
@@ -1760,7 +2017,9 @@ async function startServer(
           designImagePath: designImagePath,
           receivedAt: new Date().toISOString(),
           productId: productId || null,
-          creatorId: creator ? (creator.id || creator.username) : null
+          creatorId: creator ? (creator.id || creator.username) : null,
+          packageAreaSqIn: effectiveAreaSqIn ? Number(Number(effectiveAreaSqIn).toFixed(2)) : null,
+          packageWeightOz: orderBreakdown?.weightOz ?? null,
         };
 
         // --- Process Payout ---
@@ -3208,11 +3467,15 @@ async function startServer(
     signInstanceToken();
     const sessionTokenTimer = setInterval(signInstanceToken, 30 * 60 * 1000);
     const keyRotationTimer = setInterval(rotateKeys, KEY_ROTATION_MS);
+    const backupTimer = startBackupScheduler();
 
     if (process.env.NODE_ENV === 'test') {
       sessionTokenTimer.unref();
       keyRotationTimer.unref();
       metricsTimer.unref();
+      if (backupTimer && backupTimer.unref) {
+        backupTimer.unref();
+      }
       if (db && db._watcher) {
           db._watcher.unref();
       }
@@ -3277,6 +3540,7 @@ async function startServer(
       clearInterval(keyRotationTimer);
       clearInterval(metricsTimer);
       clearInterval(chunkCleanupTimer);
+      if (backupTimer) clearInterval(backupTimer);
       if (db && db._watcher) {
           db._watcher.unref();
           if (db._watcher.close) db._watcher.close();
@@ -3285,7 +3549,18 @@ async function startServer(
       await closeQueues();
     };
 
-    return { app, timers: [sessionTokenTimer, keyRotationTimer, metricsTimer, chunkCleanupTimer], bot, close };
+    return {
+      app,
+      timers: [
+        sessionTokenTimer,
+        keyRotationTimer,
+        metricsTimer,
+        chunkCleanupTimer,
+        ...(backupTimer ? [backupTimer] : [])
+      ],
+      bot,
+      close
+    };
     
   } catch (error) {
     await logAndEmailError(error, 'FATAL: Failed to start server');

@@ -348,5 +348,54 @@ describe('WooCommerce REST API v3 Emulation (Pirate Ship Integration)', () => {
       const res = await request(app).get('/xmlrpc.php');
       expect(res.status).toBe(404);
     });
+  }); // end WordPress Discovery describe
+
+  describe('Package Weight Metadata', () => {
+
+    it('should include _package_weight_oz in meta_data when packageWeightOz is set', async () => {
+      // Add an order with packageWeightOz
+      mockOrders['order-uuid-weight'] = {
+        orderId: 'order-uuid-weight',
+        amount: 2000,
+        currency: 'USD',
+        status: 'ACCEPTED',
+        receivedAt: '2026-09-10T12:00:00.000Z',
+        packageWeightOz: 2.34,
+        packageAreaSqIn: 12.5,
+        billingContact: { givenName: 'Bob', familyName: 'Test', email: 'bob@test.com' },
+        shippingContact: {
+          givenName: 'Bob', familyName: 'Test',
+          addressLines: ['789 Oak Ave'], locality: 'Tulsa',
+          administrativeDistrictLevel1: 'OK', postalCode: '74101', country: 'US'
+        }
+      };
+
+      const res = await request(app)
+        .get('/wp-json/wc/v3/orders/order-uuid-weight')
+        .auth(testConsumerKey, testConsumerSecret);
+
+      expect(res.status).toBe(200);
+      const metaData = res.body.meta_data;
+      expect(Array.isArray(metaData)).toBe(true);
+
+      const weightMeta = metaData.find(m => m.key === '_package_weight_oz');
+      expect(weightMeta).toBeDefined();
+      expect(weightMeta.value).toBe('2.34');
+
+      const areaMeta = metaData.find(m => m.key === '_package_area_sq_in');
+      expect(areaMeta).toBeDefined();
+      expect(areaMeta.value).toBe('12.50');
+    });
+
+    it('should NOT include _package_weight_oz when packageWeightOz is null', async () => {
+      const res = await request(app)
+        .get('/wp-json/wc/v3/orders/order-uuid-1')
+        .auth(testConsumerKey, testConsumerSecret);
+
+      expect(res.status).toBe(200);
+      const metaData = res.body.meta_data;
+      const weightMeta = metaData.find(m => m.key === '_package_weight_oz');
+      expect(weightMeta).toBeUndefined();
+    });
   });
 });
