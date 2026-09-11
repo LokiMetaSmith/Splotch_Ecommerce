@@ -75,6 +75,24 @@ export function displayOrders(orders, container, noOrdersMessage) {
         </div>
       ` : '';
 
+      const isHoldForPickup = order.status === 'HOLD_FOR_PICKUP';
+      const pickupHtml = isHoldForPickup ? `
+        <div class="mt-3 text-sm bg-amber-50 p-3.5 rounded-lg border border-amber-300">
+            <p class="font-bold text-amber-950 flex items-center gap-1.5 text-base">
+                <svg class="w-5 h-5 text-amber-700 inline flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Ready for Pickup!
+            </p>
+            <p class="text-amber-900 mt-1">Your order is printed and ready at our print shop.</p>
+            <div class="mt-2 text-xs text-amber-950 bg-white/80 p-2.5 rounded border border-amber-200">
+                <p class="font-bold text-gray-900">Splotch Print Shop</p>
+                <p>7712 S. Penn Ave, Oklahoma City, OK 73159</p>
+                <p class="mt-1 text-gray-600">Hours: Tue–Sat 9:00 AM – 5:00 PM &bull; Phone: (405) 255-7889</p>
+            </div>
+        </div>
+      ` : '';
+
+      const displayStatus = safeStatus === 'HOLD_FOR_PICKUP' ? 'READY FOR PICKUP' : safeStatus;
+
       return `
             <div class="order-card p-4 border rounded-lg shadow-sm bg-gray-50">
                 <div class="flex flex-col sm:flex-row justify-between items-start">
@@ -90,8 +108,9 @@ export function displayOrders(orders, container, noOrdersMessage) {
                         <p class="text-sm text-gray-600">Ordered on: ${receivedDate}</p>
                         <p class="text-sm text-gray-600">Amount: ${formattedAmount}</p>
                         <p class="text-sm text-gray-600 flex items-center gap-2">
-                            Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${safeStatus.toLowerCase()}">${safeStatus}</span>
+                            Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${safeStatus.toLowerCase()}">${displayStatus}</span>
                         </p>
+                        ${pickupHtml}
                         ${trackingHtml}
                     </div>
                     <div class="mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">

@@ -496,6 +496,97 @@ async function BootStrap() {
     orderConfirmCheckbox.addEventListener("change", updateSubmitBtnState);
   }
 
+  // Delivery Method & Pickup Handling
+  const deliveryRadios = document.querySelectorAll('input[name="deliveryMethod"]');
+  const sameAsShippingCheckbox = document.getElementById("sameAsShipping");
+
+  const updateBillingAddressUI = () => {
+    const isPickup = document.getElementById("delivery-pickup")?.checked;
+    const sameWrapper = document.getElementById("same-billing-wrapper");
+    const billingContainer = document.getElementById("billing-address-container");
+    const isSame = sameAsShippingCheckbox ? sameAsShippingCheckbox.checked : true;
+
+    if (isPickup) {
+      if (sameWrapper) sameWrapper.classList.add("hidden");
+      if (billingContainer) billingContainer.classList.add("hidden");
+      ["billingAddress", "billingCity", "billingState", "billingPostalCode"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.required = false;
+      });
+    } else {
+      if (sameWrapper) sameWrapper.classList.remove("hidden");
+      if (isSame) {
+        if (billingContainer) billingContainer.classList.add("hidden");
+        ["billingAddress", "billingCity", "billingState", "billingPostalCode"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.required = false;
+        });
+      } else {
+        if (billingContainer) billingContainer.classList.remove("hidden");
+        ["billingAddress", "billingCity", "billingState", "billingPostalCode"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.required = true;
+        });
+      }
+    }
+  };
+
+  const updateDeliveryMethodUI = () => {
+    const isPickup = document.getElementById("delivery-pickup")?.checked;
+    const shippingContainer = document.getElementById("shipping-address-container");
+    const pickupBanner = document.getElementById("pickup-info-banner");
+    const shipLabel = document.getElementById("delivery-option-ship-label");
+    const pickupLabel = document.getElementById("delivery-option-pickup-label");
+
+    if (isPickup) {
+      if (shippingContainer) shippingContainer.classList.add("hidden");
+      if (pickupBanner) pickupBanner.classList.remove("hidden");
+      if (shipLabel) {
+        shipLabel.classList.remove("border-splotch-teal", "bg-teal-50/50");
+        shipLabel.classList.add("border-gray-200");
+      }
+      if (pickupLabel) {
+        pickupLabel.classList.remove("border-gray-200");
+        pickupLabel.classList.add("border-splotch-teal", "bg-teal-50/50");
+      }
+      ["address", "city", "state", "postalCode"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.required = false;
+      });
+    } else {
+      if (shippingContainer) shippingContainer.classList.remove("hidden");
+      if (pickupBanner) pickupBanner.classList.add("hidden");
+      if (shipLabel) {
+        shipLabel.classList.add("border-splotch-teal", "bg-teal-50/50");
+        shipLabel.classList.remove("border-gray-200");
+      }
+      if (pickupLabel) {
+        pickupLabel.classList.add("border-gray-200");
+        pickupLabel.classList.remove("border-splotch-teal", "bg-teal-50/50");
+      }
+      ["address", "city", "state", "postalCode"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.required = true;
+      });
+    }
+    updateBillingAddressUI();
+    fetchOrderEstimate();
+  };
+
+  deliveryRadios.forEach((radio) => {
+    radio.addEventListener("change", updateDeliveryMethodUI);
+  });
+
+  if (sameAsShippingCheckbox) {
+    sameAsShippingCheckbox.addEventListener("change", updateBillingAddressUI);
+  }
+
+  const stateInput = document.getElementById("state");
+  if (stateInput) {
+    stateInput.addEventListener("input", () => fetchOrderEstimate());
+    stateInput.addEventListener("change", () => fetchOrderEstimate());
+  }
+
   canvasPlaceholder = document.getElementById("canvas-placeholder");
   printInkImageUpload = document.getElementById("printInkImageUpload");
   alphaColorPicker = document.getElementById("alphaColorPicker");
@@ -735,6 +826,7 @@ async function BootStrap() {
     stickerMaterialSelect.addEventListener("change", (e) => {
       calculateAndUpdatePrice();
       populateLayerDropdown(e.target.value);
+      checkInventoryStatus(e.target.value);
     });
   }
   if (stickerResolutionSelect) {
@@ -1654,6 +1746,10 @@ async function updateOrderSummary() {
 
   if (!areaInSqIn) return;
 
+  const deliveryMethod = document.querySelector('input[name="deliveryMethod"]:checked')?.value || 'ship';
+  const stateInputVal = document.getElementById("state")?.value?.trim() || '';
+  const destinationState = deliveryMethod === 'pickup' ? 'OK' : stateInputVal;
+
   try {
     const resp = await fetch(`${serverUrl}/api/order/estimate`, {
       method: "POST",
@@ -1661,6 +1757,8 @@ async function updateOrderSummary() {
       body: JSON.stringify({
         subtotalCents: currentOrderAmountCents,
         areaInSqIn,
+        destinationState,
+        deliveryMethod,
       }),
     });
     if (!resp.ok) return;
@@ -1671,13 +1769,35 @@ async function updateOrderSummary() {
     }
 
     const $ = (id) => document.getElementById(id);
-    const fmt = (v) => `$${Number(v).toFixed(2)}`;
+    const fmt = (v) => `$${Number(v || 0).toFixed(2)}`;
 
     if ($("summary-subtotal"))     $("summary-subtotal").textContent     = fmt(data.subtotalDollars);
+
+    if ($("summary-discount-row")) {
+      if (data.pickupDiscountCents > 0) {
+        $("summary-discount-row").classList.remove("hidden");
+        if ($("summary-discount")) $("summary-discount").textContent = `-$${Number(data.pickupDiscountDollars).toFixed(2)}`;
+      } else {
+        $("summary-discount-row").classList.add("hidden");
+      }
+    }
+
     if ($("summary-shipping"))     $("summary-shipping").textContent     = fmt(data.shippingDollars);
     if ($("summary-shipping-label") && data.shippingLabel)
       $("summary-shipping-label").textContent = data.shippingLabel;
-    if ($("summary-tax"))          $("summary-tax").textContent          = fmt(data.taxDollars);
+
+    if ($("summary-tax")) {
+      $("summary-tax").textContent = fmt(data.taxDollars);
+    }
+    if ($("summary-tax-label")) {
+      if (data.isTaxable) {
+        const ratePct = data.taxRate ? (data.taxRate * 100).toFixed(1) : "8.5";
+        $("summary-tax-label").textContent = `Oklahoma tax (${ratePct}%)`;
+      } else {
+        $("summary-tax-label").textContent = "Sales tax (Out of state)";
+      }
+    }
+
     if ($("summary-handling"))     $("summary-handling").textContent     = fmt(data.handlingDollars);
     if ($("summary-square-fee"))   $("summary-square-fee").textContent   = fmt(data.squareFeeDollars);
     if ($("summary-total"))        $("summary-total").textContent        = fmt(data.totalDollars);
@@ -1721,7 +1841,7 @@ async function tokenize(paymentMethod, verificationDetails) {
 
 // --- Config Fetching ---
 function populateResolutionDropdown() {
-  if (!pricingConfig || !stickerResolutionSelect) return;
+  if (!pricingConfig || !pricingConfig.resolutions || !stickerResolutionSelect) return;
   stickerResolutionSelect.innerHTML = ""; // Clear existing options
   pricingConfig.resolutions.forEach((res) => {
     const option = document.createElement("option");
@@ -1731,6 +1851,31 @@ function populateResolutionDropdown() {
   });
   // Set a default selection
   stickerResolutionSelect.value = "dpi_300";
+}
+
+function populateMaterialDropdown() {
+  if (!pricingConfig || !pricingConfig.materials || !stickerMaterialSelect) return;
+  const currentVal = stickerMaterialSelect.value;
+  stickerMaterialSelect.innerHTML = ""; // Clear existing options
+  pricingConfig.materials.forEach((mat) => {
+    const option = document.createElement("option");
+    option.value = mat.id;
+    option.textContent = mat.name;
+    stickerMaterialSelect.appendChild(option);
+  });
+  // Set selection: preserve if valid, else pp_standard, else first material
+  if (currentVal && pricingConfig.materials.some((m) => m.id === currentVal)) {
+    stickerMaterialSelect.value = currentVal;
+  } else if (pricingConfig.materials.some((m) => m.id === "pp_standard")) {
+    stickerMaterialSelect.value = "pp_standard";
+  } else if (pricingConfig.materials.length > 0) {
+    stickerMaterialSelect.value = pricingConfig.materials[0].id;
+  }
+
+  // Populate supported print layers for this material
+  populateLayerDropdown(stickerMaterialSelect.value);
+  // Update material helper text and inventory warning
+  checkInventoryStatus(stickerMaterialSelect.value);
 }
 
 async function fetchPricingInfo() {
@@ -1758,13 +1903,9 @@ async function fetchPricingInfo() {
     }
 
     console.log("[CLIENT] Pricing config loaded:", pricingConfig);
-    // Once config is loaded, populate the dropdown
+    // Once config is loaded, populate the dropdowns
     populateResolutionDropdown();
-
-    // Initial layers population based on default material
-    if (stickerMaterialSelect) {
-      populateLayerDropdown(stickerMaterialSelect.value);
-    }
+    populateMaterialDropdown();
 
     // Re-render layer tabs now that pricingConfig is loaded
     renderLayerTabs();
@@ -1801,6 +1942,9 @@ async function fetchInventory() {
     if (response.ok) {
       inventoryCache = await response.json();
       console.log("[CLIENT] Inventory loaded:", inventoryCache);
+      if (stickerMaterialSelect && stickerMaterialSelect.value) {
+        checkInventoryStatus(stickerMaterialSelect.value);
+      }
     }
   } catch (error) {
     console.error("[CLIENT] Failed to load inventory:", error);
@@ -1817,7 +1961,7 @@ function checkInventoryStatus(materialId) {
     if (materialData && materialData.description) {
       const helperEl = document.getElementById("material-helper");
       if (helperEl) {
-        helperEl.innerHTML = `<span class="block mt-2 p-2 bg-blue-50 border border-blue-100 rounded text-blue-800 text-xs">${materialData.description}</span>`;
+        helperEl.textContent = materialData.description;
       }
     }
   }
@@ -1830,7 +1974,7 @@ function checkInventoryStatus(materialId) {
     stickerMaterialSelect.parentNode.appendChild(warningEl);
   }
 
-  const qty = inventoryCache[materialId];
+  const qty = inventoryCache ? inventoryCache[materialId] : undefined;
 
   // Check if quantity is 0 or less (if tracked)
   if (typeof qty === "number" && qty <= 0) {
@@ -2036,17 +2180,50 @@ async function handlePaymentFormSubmit(event) {
       console.log("[CLIENT] Cut line uploaded. Path:", cutLinePath);
     }
 
-    // --- NEW: Build verificationDetails object ---
+    // --- Build billingContact and shippingContact objects ---
+    const isPickup = (document.querySelector('input[name="deliveryMethod"]:checked')?.value === 'pickup');
+    const sameAsShipping = !document.getElementById("sameAsShipping") || document.getElementById("sameAsShipping").checked;
+
+    const shippingAddressLines = isPickup ? ["7712 S. Penn Ave"] : [document.getElementById("address")?.value || ""];
+    const shippingCity = isPickup ? "Oklahoma City" : (document.getElementById("city")?.value || "");
+    const shippingState = isPickup ? "OK" : (document.getElementById("state")?.value || "");
+    const shippingPostalCode = isPickup ? "73159" : (document.getElementById("postalCode")?.value || "");
+
+    const customBillingAddress = (!isPickup && !sameAsShipping && document.getElementById("billingAddress")?.value?.trim())
+      ? document.getElementById("billingAddress").value.trim()
+      : null;
+    const customBillingCity = (!isPickup && !sameAsShipping && document.getElementById("billingCity")?.value?.trim())
+      ? document.getElementById("billingCity").value.trim()
+      : null;
+    const customBillingState = (!isPickup && !sameAsShipping && document.getElementById("billingState")?.value?.trim())
+      ? document.getElementById("billingState").value.trim()
+      : null;
+    const customBillingPostalCode = (!isPickup && !sameAsShipping && document.getElementById("billingPostalCode")?.value?.trim())
+      ? document.getElementById("billingPostalCode").value.trim()
+      : null;
+
     const billingContact = {
       givenName: document.getElementById("firstName").value,
       familyName: document.getElementById("lastName").value,
       email: document.getElementById("email").value,
       phone: document.getElementById("phone").value,
-      addressLines: [document.getElementById("address").value],
-      city: document.getElementById("city").value,
-      state: document.getElementById("state").value,
-      postalCode: document.getElementById("postalCode").value,
+      addressLines: customBillingAddress ? [customBillingAddress] : shippingAddressLines,
+      city: customBillingCity || shippingCity,
+      state: customBillingState || shippingState,
+      postalCode: customBillingPostalCode || shippingPostalCode,
       countryCode: "US",
+    };
+
+    const shippingContact = {
+      givenName: document.getElementById("firstName").value,
+      familyName: document.getElementById("lastName").value,
+      email: document.getElementById("email").value,
+      phoneNumber: document.getElementById("phone").value,
+      addressLines: shippingAddressLines,
+      locality: shippingCity,
+      administrativeDistrictLevel1: shippingState,
+      postalCode: shippingPostalCode,
+      country: "US",
     };
 
     // Ensure we charge the full grand total (subtotal + shipping + tax + handling + fees)
@@ -2115,18 +2292,24 @@ async function handlePaymentFormSubmit(event) {
       promoAddon: promoAddonCheckbox ? promoAddonCheckbox.checked : false,
       customLayers: allCustomLayers.length > 0 ? allCustomLayers : null,
       numImageLayers: typeof stickers !== "undefined" && stickers ? stickers.length : 1,
+      deliveryMethod: isPickup ? "pickup" : "ship",
+      destinationState: isPickup ? "OK" : (shippingContact.administrativeDistrictLevel1 || ""),
     };
     if (cutLinePath) {
       orderDetails.cutLinePath = cutLinePath;
     }
 
-    // Prepare server contact object (ensure phoneNumber is set)
-    const serverContact = {
+    // Prepare server contact objects
+    const serverBillingContact = {
       ...billingContact,
       phoneNumber: billingContact.phone,
       locality: billingContact.city,
       administrativeDistrictLevel1: billingContact.state,
       country: billingContact.countryCode,
+    };
+
+    const serverShippingContact = {
+      ...shippingContact,
     };
 
     const packageAreaSqIn = (() => {
@@ -2148,8 +2331,8 @@ async function handlePaymentFormSubmit(event) {
       currency: "USD",
       designImagePath,
       orderDetails,
-      billingContact: serverContact,
-      shippingContact: serverContact, // Use same contact for shipping for now
+      billingContact: serverBillingContact,
+      shippingContact: serverShippingContact,
       _csrf: csrfToken, // Add CSRF token to payload
       productId: currentProductId, // Include if it exists
       orderReadyConfirmed: !!(document.getElementById("order-ready-confirm")?.checked),
@@ -5541,8 +5724,7 @@ async function checkAuthStatus() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (verifyRes.ok) {
-        const sellBtn = document.getElementById("sellDesignBtn");
-        if (sellBtn) sellBtn.classList.remove("hidden");
+        // "Sell this Design" button is disabled/hidden
       }
     }
   } catch (e) {

@@ -31,6 +31,7 @@ import { validateUsername, validateUsernameQuery, validateId } from './validator
 import { fileTypeFromFile } from 'file-type';
 import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
 import { calcOrderBreakdown, DEFAULT_SHIPPING_CONFIG } from './lib/costCalc.js';
+import { logOrderTransition, readAuditLogForOrder } from './lib/auditLogger.js';
 
 import { Markup } from 'telegraf';
 import { getOrderStatusKeyboard } from './telegramHelpers.js';
@@ -65,7 +66,7 @@ const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
 
 export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
-export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', ...FINAL_STATUSES];
+export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', 'HOLD_FOR_PICKUP', ...FINAL_STATUSES];
 
 const allowedMimeTypes = ['image/svg+xml', 'application/xml', 'image/png', 'image/jpeg', 'image/webp', 'image/tiff', 'application/pdf', 'application/postscript', 'application/illustrator'];
 // Pre-computed valid bcrypt hash for timing-safe comparison
@@ -220,6 +221,83 @@ let db;
 let app;
 
 const defaultData = { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
+
+export async function runRetentionFlush(dbInstance, options = {}) {
+    const retentionDays = options.retentionDays !== undefined ? options.retentionDays : 30;
+    const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const lowdb = dbInstance?.db || dbInstance;
+    const config = lowdb?.data?.config?.retention || { purgeArtworkOnFlush: false };
+    const purgeArtwork = options.purgeArtworkOnFlush !== undefined ? options.purgeArtworkOnFlush : config.purgeArtworkOnFlush;
+
+    const allOrders = Object.values(lowdb?.data?.orders || {});
+    const flushedOrderIds = [];
+
+    for (const order of allOrders) {
+        if (order.status === 'CANCELED' && (order.shadowDeleted || order.shadowDeletedAt)) {
+            const canceledTime = order.shadowDeletedAt
+                ? new Date(order.shadowDeletedAt).getTime()
+                : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
+
+            if (now - canceledTime >= retentionMs) {
+                logger.info(`[RETENTION] Purging canceled order ${order.orderId} older than ${retentionDays} days.`);
+
+                // Non-volatile audit log record of permanent purge
+                logOrderTransition({
+                    orderId: order.orderId,
+                    fromStatus: 'CANCELED',
+                    toStatus: 'PURGED',
+                    actor: { type: 'system', id: 'retention_worker' },
+                    note: `Order purged after ${retentionDays}-day retention window`,
+                    metadata: {
+                        snapshot: {
+                            amount: order.amount,
+                            customerEmail: order.billingContact?.email || order.customerEmail,
+                            receivedAt: order.receivedAt,
+                            shadowDeletedAt: order.shadowDeletedAt
+                        }
+                    }
+                });
+
+                // Optional artwork purge
+                if (purgeArtwork) {
+                    try {
+                        const filesToPurge = [];
+                        if (order.orderDetails?.imageFile) filesToPurge.push(order.orderDetails.imageFile);
+                        if (order.orderDetails?.previewFile) filesToPurge.push(order.orderDetails.previewFile);
+                        if (order.imagePath) filesToPurge.push(order.imagePath);
+                        if (order.fullResImagePath) filesToPurge.push(order.fullResImagePath);
+
+                        for (const fileRel of filesToPurge) {
+                            if (typeof fileRel === 'string') {
+                                const cleanRel = fileRel.replace(/^(\/|\\)/, '');
+                                const absPath = path.resolve(__dirname, '..', cleanRel);
+                                if (fs.existsSync(absPath)) {
+                                    fs.unlinkSync(absPath);
+                                    logger.info(`[RETENTION] Purged artwork file ${absPath} for order ${order.orderId}`);
+                                }
+                            }
+                        }
+                    } catch (fileErr) {
+                        logger.error(`[RETENTION] Error purging artwork for order ${order.orderId}:`, fileErr);
+                    }
+                }
+
+                if (typeof dbInstance.deleteOrder === 'function') {
+                    await dbInstance.deleteOrder(order.orderId);
+                } else if (lowdb?.data?.orders?.[order.orderId]) {
+                    delete lowdb.data.orders[order.orderId];
+                    if (typeof dbInstance.write === 'function') await dbInstance.write();
+                    else if (typeof lowdb.write === 'function') await lowdb.write();
+                }
+                flushedOrderIds.push(order.orderId);
+            }
+        }
+    }
+
+    return { flushedCount: flushedOrderIds.length, flushedOrderIds };
+}
 
 // Define an async function to contain all server logic
 async function startServer(
@@ -1054,12 +1132,14 @@ async function startServer(
         return res.status(400).json({ errors: errors.array() });
       }
       try {
-        const { subtotalCents, areaInSqIn } = req.body;
+        const { subtotalCents, areaInSqIn, destinationState, deliveryMethod } = req.body;
         const shippingCfg = { ...DEFAULT_SHIPPING_CONFIG, ...(db.data?.config?.shipping || {}) };
         const breakdown = calcOrderBreakdown({
           areaInSqIn: Number(areaInSqIn),
           subtotalCents: Number(subtotalCents),
           config: shippingCfg,
+          destinationState,
+          deliveryMethod
         });
         return res.json({ success: true, ...breakdown });
       } catch (err) {
@@ -1082,6 +1162,7 @@ async function startServer(
       body('squareFeeFixedCents').isInt({ min: 0 }).withMessage('squareFeeFixedCents must be a non-negative integer'),
       body('gramsPerSqIn').isFloat({ min: 0 }).withMessage('gramsPerSqIn must be a non-negative number'),
       body('packageTareGrams').isFloat({ min: 0 }).withMessage('packageTareGrams must be a non-negative number'),
+      body('pickupDiscountCents').optional().isInt({ min: 0 }).withMessage('pickupDiscountCents must be a non-negative integer'),
     ], async (req, res) => {
       if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
       const errors = validationResult(req);
@@ -1094,6 +1175,7 @@ async function startServer(
         squareFeeFixedCents: Number(req.body.squareFeeFixedCents),
         gramsPerSqIn: Number(req.body.gramsPerSqIn),
         packageTareGrams: Number(req.body.packageTareGrams),
+        pickupDiscountCents: req.body.pickupDiscountCents !== undefined ? Number(req.body.pickupDiscountCents) : (DEFAULT_SHIPPING_CONFIG.pickupDiscountCents || 300),
       };
 
       await db.setConfig('shipping', newConfig);
@@ -1594,18 +1676,24 @@ async function startServer(
       body('billingContact.familyName').optional().isLength({ max: 100 }).withMessage('Billing Last Name is too long').not().contains('<').withMessage('Invalid characters in Billing Last Name'),
       body('billingContact.email').isEmail().withMessage('Valid Billing Email is required'),
       body('billingContact.phoneNumber').optional().isString().trim().not().contains('<').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
+      body('billingContact.addressLines').optional().isArray().withMessage('Billing Address Lines must be an array'),
+      body('billingContact.addressLines.*').optional().isString().withMessage('Billing address lines must be strings').isLength({ max: 200 }).withMessage('Address Line is too long').not().contains('<').withMessage('Invalid characters in Address Lines'),
+      body('billingContact.locality').optional().isString().isLength({ max: 100 }).not().contains('<'),
+      body('billingContact.administrativeDistrictLevel1').optional().isString().isLength({ max: 100 }).not().contains('<'),
+      body('billingContact.postalCode').optional().isString().isLength({ max: 20 }).not().contains('<'),
+      body('billingContact.country').optional().isString().isLength({ max: 100 }).not().contains('<'),
 
       // Security & Integrity: Validate Shipping Contact
       body('shippingContact').isObject().withMessage('shippingContact must be an object'),
       body('shippingContact.givenName').notEmpty().withMessage('Shipping First Name is required').isLength({ max: 100 }).withMessage('Shipping First Name is too long').not().contains('<').withMessage('Invalid characters in Shipping First Name'),
       body('shippingContact.familyName').optional().isLength({ max: 100 }).withMessage('Shipping Last Name is too long').not().contains('<').withMessage('Invalid characters in Shipping Last Name'),
       body('shippingContact.email').optional().isEmail().withMessage('Invalid Shipping Email'),
-      body('shippingContact.addressLines').isArray().withMessage('Shipping Address Lines must be an array'),
-      body('shippingContact.addressLines.*').isString().withMessage('Address lines must be strings').isLength({ max: 200 }).withMessage('Address Line is too long').not().contains('<').withMessage('Invalid characters in Address Lines'),
-      body('shippingContact.locality').notEmpty().withMessage('City is required').isLength({ max: 100 }).withMessage('City name is too long').not().contains('<'),
-      body('shippingContact.administrativeDistrictLevel1').notEmpty().withMessage('State/Province is required').isLength({ max: 100 }).withMessage('State/Province name is too long').not().contains('<'),
-      body('shippingContact.postalCode').notEmpty().withMessage('Postal Code is required').isLength({ max: 20 }).withMessage('Postal Code is too long').not().contains('<'),
-      body('shippingContact.country').notEmpty().withMessage('Country is required').isLength({ max: 100 }).withMessage('Country name is too long').not().contains('<'),
+      body('shippingContact.addressLines').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').isArray().withMessage('Shipping Address Lines must be an array'),
+      body('shippingContact.addressLines.*').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').isString().withMessage('Address lines must be strings').isLength({ max: 200 }).withMessage('Address Line is too long').not().contains('<').withMessage('Invalid characters in Address Lines'),
+      body('shippingContact.locality').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('City is required').isLength({ max: 100 }).withMessage('City name is too long').not().contains('<'),
+      body('shippingContact.administrativeDistrictLevel1').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('State/Province is required').isLength({ max: 100 }).withMessage('State/Province name is too long').not().contains('<'),
+      body('shippingContact.postalCode').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('Postal Code is required').isLength({ max: 20 }).withMessage('Postal Code is too long').not().contains('<'),
+      body('shippingContact.country').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('Country is required').isLength({ max: 100 }).withMessage('Country name is too long').not().contains('<'),
       body('shippingContact.phoneNumber').optional().isString().trim().not().contains('<').withMessage('Invalid Phone Number').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
     ], async (req, res) => {
       const errors = validationResult(req);
@@ -1619,7 +1707,8 @@ async function startServer(
         }
 
         const { sourceId, amountCents, currency, designImagePath, productId, orderDetails, billingContact, shippingContact, packageAreaSqIn } = req.body;
-
+        const isPickup = orderDetails?.deliveryMethod === 'pickup';
+        const deliveryMethod = isPickup ? 'pickup' : 'ship';
 
         // Manually construct safe objects to prevent Mass Assignment
         // Variable names updated to avoid conflict with response variable names
@@ -1634,11 +1723,11 @@ async function startServer(
             givenName: shippingContact.givenName,
             familyName: shippingContact.familyName,
             email: shippingContact.email,
-            addressLines: shippingContact.addressLines, // Array of strings (validated)
-            locality: shippingContact.locality,
-            administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1,
-            postalCode: shippingContact.postalCode,
-            country: shippingContact.country,
+            addressLines: shippingContact.addressLines || (isPickup ? ['7712 S. Penn Ave'] : []),
+            locality: shippingContact.locality || (isPickup ? 'Oklahoma City' : ''),
+            administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1 || (isPickup ? 'OK' : ''),
+            postalCode: shippingContact.postalCode || (isPickup ? '73159' : ''),
+            country: shippingContact.country || 'US',
             phoneNumber: shippingContact.phoneNumber
         };
 
@@ -1649,7 +1738,8 @@ async function startServer(
             cutLinePath: orderDetails.cutLinePath,
             promoAddon: orderDetails.promoAddon || false,
             customLayers: orderDetails.customLayers || [],
-            numImageLayers: orderDetails.numImageLayers || 1
+            numImageLayers: orderDetails.numImageLayers || 1,
+            deliveryMethod: deliveryMethod
         };
 
         // --- Product / Creator Payout Logic ---
@@ -1696,6 +1786,9 @@ async function startServer(
         let expectedSubtotal = 0;
         let designBounds = null;
         let selectedResolution = null;
+        const destinationState = isPickup
+            ? 'OK'
+            : (shippingContact?.administrativeDistrictLevel1 || orderDetails?.destinationState || '');
 
         try {
             // Determine which file determines the pricing geometry (Cutline takes precedence if custom)
@@ -1764,6 +1857,8 @@ async function startServer(
                     areaInSqIn: effectiveAreaSqIn,
                     subtotalCents: expectedSubtotal,
                     config: shippingCfg,
+                    destinationState,
+                    deliveryMethod
                 });
 
                 const expectedGrandTotal = orderBreakdown.totalCents;
@@ -1791,27 +1886,34 @@ async function startServer(
         }
         // --------------------------------------
 
-        // Explicitly construct safe billingContact to prevent Mass Assignment
-        const finalBillingContact = {
-            givenName: escapeHtml(billingContact.givenName),
-            familyName: escapeHtml(billingContact.familyName),
-            email: billingContact.email, // email validator ensures format
-            phoneNumber: (typeof billingContact.phoneNumber === 'string') ? billingContact.phoneNumber.trim() : undefined
-        };
-
         // Explicitly construct safe shippingContact to prevent Mass Assignment
         const finalShippingContact = {
             givenName: escapeHtml(shippingContact.givenName),
             familyName: escapeHtml(shippingContact.familyName),
             email: shippingContact.email, // email validator ensures format
             phoneNumber: (typeof shippingContact.phoneNumber === 'string') ? shippingContact.phoneNumber.trim() : undefined,
-            addressLines: Array.isArray(shippingContact.addressLines)
+            addressLines: (Array.isArray(shippingContact.addressLines) && shippingContact.addressLines.length > 0 && shippingContact.addressLines[0])
                 ? shippingContact.addressLines.map(line => escapeHtml(line))
-                : [],
-            locality: escapeHtml(shippingContact.locality),
-            administrativeDistrictLevel1: escapeHtml(shippingContact.administrativeDistrictLevel1),
-            postalCode: escapeHtml(shippingContact.postalCode),
-            country: escapeHtml(shippingContact.country)
+                : (isPickup ? ['7712 S. Penn Ave'] : []),
+            locality: escapeHtml(shippingContact.locality || (isPickup ? 'Oklahoma City' : '')),
+            administrativeDistrictLevel1: escapeHtml(shippingContact.administrativeDistrictLevel1 || (isPickup ? 'OK' : '')),
+            postalCode: escapeHtml(shippingContact.postalCode || (isPickup ? '73159' : '')),
+            country: escapeHtml(shippingContact.country || 'US')
+        };
+
+        // Explicitly construct safe billingContact to prevent Mass Assignment
+        const finalBillingContact = {
+            givenName: escapeHtml(billingContact.givenName),
+            familyName: escapeHtml(billingContact.familyName),
+            email: billingContact.email, // email validator ensures format
+            phoneNumber: (typeof billingContact.phoneNumber === 'string') ? billingContact.phoneNumber.trim() : undefined,
+            addressLines: (Array.isArray(billingContact.addressLines) && billingContact.addressLines.length > 0 && billingContact.addressLines[0])
+                ? billingContact.addressLines.map(line => escapeHtml(line))
+                : (finalShippingContact.addressLines || []),
+            locality: escapeHtml(billingContact.locality || finalShippingContact.locality || ''),
+            administrativeDistrictLevel1: escapeHtml(billingContact.administrativeDistrictLevel1 || finalShippingContact.administrativeDistrictLevel1 || ''),
+            postalCode: escapeHtml(billingContact.postalCode || finalShippingContact.postalCode || ''),
+            country: escapeHtml(billingContact.country || finalShippingContact.country || 'US')
         };
 
         // --- Rich Square Order & Payment ---
@@ -1900,16 +2002,43 @@ async function startServer(
         }
 
         const shippingCfg = { ...DEFAULT_SHIPPING_CONFIG, ...(db.data?.config?.shipping || {}) };
-        const squareTaxes = [
-          {
-            name: `Oklahoma Sales Tax (${(shippingCfg.taxRate * 100).toFixed(1)}%)`,
-            percentage: String(shippingCfg.taxRate * 100),
+        const squareTaxes = [];
+        if (orderBreakdown && orderBreakdown.isTaxable && orderBreakdown.taxCents > 0) {
+          squareTaxes.push({
+            name: `Oklahoma Sales Tax (${((orderBreakdown.taxRate || shippingCfg.taxRate) * 100).toFixed(1)}%)`,
+            percentage: String((orderBreakdown.taxRate || shippingCfg.taxRate) * 100),
             type: 'ADDITIVE'
-          }
-        ];
+          });
+        }
 
-        const squareFulfillments = [
-          {
+        const squareDiscounts = [];
+        if (orderBreakdown && orderBreakdown.pickupDiscountCents > 0) {
+          squareDiscounts.push({
+            name: 'Local Pickup Discount',
+            amountMoney: {
+              amount: BigInt(orderBreakdown.pickupDiscountCents),
+              currency: currency || 'USD'
+            },
+            scope: 'ORDER'
+          });
+        }
+
+        const squareFulfillments = [];
+        if (isPickup) {
+          squareFulfillments.push({
+            type: 'PICKUP',
+            state: 'PROPOSED',
+            pickupDetails: {
+              recipient: {
+                displayName: `${shippingContact.givenName} ${shippingContact.familyName || ''}`.trim(),
+                emailAddress: shippingContact.email || billingContact.email,
+                phoneNumber: shippingContact.phoneNumber || billingContact.phoneNumber || undefined,
+              },
+              note: 'Local Pickup at Splotch Print Shop (7712 S. Penn Ave, Oklahoma City, OK 73159)'
+            }
+          });
+        } else {
+          squareFulfillments.push({
             type: 'SHIPMENT',
             state: 'PROPOSED',
             shipmentDetails: {
@@ -1927,8 +2056,8 @@ async function startServer(
                 }
               }
             }
-          }
-        ];
+          });
+        }
 
         if (squareClient && squareClient.orders && typeof squareClient.orders.create === 'function') {
           try {
@@ -1938,8 +2067,9 @@ async function startServer(
                 locationId: getSecret('SQUARE_LOCATION_ID'),
                 referenceId: randomUUID(),
                 lineItems: squareLineItems,
+                discounts: squareDiscounts.length ? squareDiscounts : undefined,
                 serviceCharges: squareServiceCharges.length ? squareServiceCharges : undefined,
-                taxes: squareTaxes,
+                taxes: squareTaxes.length ? squareTaxes : undefined,
                 fulfillments: squareFulfillments
               }
             });
@@ -1966,26 +2096,26 @@ async function startServer(
           orderId: squareOrderId || undefined,
           amountMoney: amountToChargeMoney,
           autocomplete: true,
-          buyerEmailAddress: billingContact.email,
+          buyerEmailAddress: finalBillingContact.email,
           billingAddress: {
-            firstName: billingContact.givenName,
-            lastName: billingContact.familyName || undefined,
-            addressLine1: shippingContact.addressLines?.[0] || '',
-            addressLine2: shippingContact.addressLines?.[1] || undefined,
-            locality: shippingContact.locality,
-            administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1,
-            postalCode: shippingContact.postalCode,
-            country: shippingContact.country || 'US',
+            firstName: finalBillingContact.givenName,
+            lastName: finalBillingContact.familyName || undefined,
+            addressLine1: finalBillingContact.addressLines?.[0] || '',
+            addressLine2: finalBillingContact.addressLines?.[1] || undefined,
+            locality: finalBillingContact.locality,
+            administrativeDistrictLevel1: finalBillingContact.administrativeDistrictLevel1,
+            postalCode: finalBillingContact.postalCode,
+            country: finalBillingContact.country || 'US',
           },
           shippingAddress: {
-            firstName: shippingContact.givenName,
-            lastName: shippingContact.familyName || undefined,
-            addressLine1: shippingContact.addressLines?.[0] || '',
-            addressLine2: shippingContact.addressLines?.[1] || undefined,
-            locality: shippingContact.locality,
-            administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1,
-            postalCode: shippingContact.postalCode,
-            country: shippingContact.country || 'US',
+            firstName: finalShippingContact.givenName,
+            lastName: finalShippingContact.familyName || undefined,
+            addressLine1: finalShippingContact.addressLines?.[0] || '',
+            addressLine2: finalShippingContact.addressLines?.[1] || undefined,
+            locality: finalShippingContact.locality,
+            administrativeDistrictLevel1: finalShippingContact.administrativeDistrictLevel1,
+            postalCode: finalShippingContact.postalCode,
+            country: finalShippingContact.country || 'US',
           },
           referenceId: randomUUID(),
           note: `Custom Stickers (${quantity}x) - ${shippingContact.givenName} ${shippingContact.familyName || ''}`.trim(),
@@ -2005,7 +2135,11 @@ async function startServer(
           amount: Number(amountCents), // Grand total charged
           subtotalCents: expectedSubtotal || (orderBreakdown?.subtotalCents ?? Number(amountCents)),
           shippingCents: orderBreakdown?.shippingCents ?? 0,
-          shippingLabel: orderBreakdown?.shippingLabel ?? 'USPS First Class',
+          shippingLabel: orderBreakdown?.shippingLabel ?? (isPickup ? 'Local Pickup (Free)' : 'USPS First Class'),
+          deliveryMethod: orderBreakdown?.deliveryMethod || (isPickup ? 'pickup' : 'ship'),
+          pickupDiscountCents: orderBreakdown?.pickupDiscountCents ?? 0,
+          destinationState: destinationState,
+          isTaxable: orderBreakdown?.isTaxable ?? true,
           taxCents: orderBreakdown?.taxCents ?? 0,
           handlingCents: orderBreakdown?.handlingCents ?? 0,
           squareFeeCents: orderBreakdown?.squareFeeCents ?? 0,
@@ -2035,8 +2169,21 @@ async function startServer(
             }
         }
 
+        // Audit log initial order creation
+        logOrderTransition({
+            order: newOrder,
+            fromStatus: null,
+            toStatus: 'NEW',
+            actor: {
+                type: 'customer',
+                id: newOrder.customerDetails?.billing?.email || newOrder.billingContact?.email || 'guest'
+            },
+            note: 'Order created via checkout'
+        });
+
         await db.createOrder(newOrder);
         logger.info(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
+
 
         // Async trigger physical USB drop box processing & RGB indicator
         processIncomingOrderToDropBox(newOrder, storageProvider).catch(err => {
@@ -2424,6 +2571,14 @@ async function startServer(
       order.status = status;
       order.lastUpdatedAt = new Date().toISOString();
 
+      if (status === 'CANCELED') {
+          order.shadowDeleted = true;
+          order.shadowDeletedAt = new Date().toISOString();
+      } else if (oldStatus === 'CANCELED') {
+          order.shadowDeleted = false;
+          order.shadowDeletedAt = null;
+      }
+
       if (status === 'SHIPPED') {
           if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
           if (courier !== undefined) order.courier = courier;
@@ -2434,10 +2589,26 @@ async function startServer(
           const nowIso = new Date().toISOString();
           if (status === 'ACCEPTED' && !order.acceptedAt) order.acceptedAt = nowIso;
           if (status === 'PRINTING' && !order.printingAt) order.printingAt = nowIso;
+          if (status === 'HOLD_FOR_PICKUP' && !order.holdForPickupAt) order.holdForPickupAt = nowIso;
           if (status === 'SHIPPED' && !order.shippedAt) order.shippedAt = nowIso;
           if (status === 'DELIVERED' && !order.deliveredAt) order.deliveredAt = nowIso;
           if (status === 'COMPLETED' && !order.completedAt) order.completedAt = nowIso;
+
+          // Record non-volatile audit journal entry
+          const adminActorId = req.user?.username || req.user?.email || 'admin';
+          logOrderTransition({
+              order,
+              fromStatus: oldStatus,
+              toStatus: status,
+              actor: { type: 'admin', id: adminActorId },
+              note: req.body.note || undefined,
+              metadata: {
+                  trackingNumber: order.trackingNumber,
+                  courier: order.courier
+              }
+          });
       }
+
 
       // Check for stalled message cleanup
       if (order.stalledMessageId) {
@@ -2466,7 +2637,7 @@ async function startServer(
           }
           // Trigger Emails
           if (oldStatus !== status && emailQueue) {
-              const customerEmail = order.customerDetails?.billing?.email || order.customerEmail;
+              const customerEmail = order.customerDetails?.billing?.email || order.customerEmail || order.billingContact?.email;
               if (customerEmail) {
                   if (status === 'CANCELED') {
                       emailQueue.add('order-canceled', {
@@ -2474,6 +2645,13 @@ async function startServer(
                           subject: `Your Order #${order.orderId.substring(0, 8)} has been canceled`,
                           text: `Hi there,\n\nYour order #${order.orderId.substring(0, 8)} has been canceled. If you have any questions, please contact support.\n\nThank you,\nSplotch Team`,
                           html: `<p>Hi there,</p><p>Your order <strong>#${order.orderId.substring(0, 8)}</strong> has been canceled. If you have any questions, please contact support.</p><p>Thank you,<br>Splotch Team</p>`
+                      });
+                  } else if (status === 'HOLD_FOR_PICKUP') {
+                      emailQueue.add('order-ready-for-pickup', {
+                          to: customerEmail,
+                          subject: `Your Order #${order.orderId.substring(0, 8)} is ready for pickup!`,
+                          text: `Hi there,\n\nGreat news! Your order #${order.orderId.substring(0, 8)} is printed and ready for pickup at our print shop!\n\nPickup Location:\nSplotch Print Shop\n7712 S. Penn Ave\nOklahoma City, OK 73159\nPhone: (405) 255-7889\nHours: Tue–Sat 9:00 AM – 5:00 PM\n\nPlease have your order number ready when you arrive.\n\nThank you,\nSplotch Team`,
+                          html: `<p>Hi there,</p><p>Great news! Your order <strong>#${order.orderId.substring(0, 8)}</strong> is printed and ready for pickup at our print shop!</p><div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #e5e7eb;"><strong>Pickup Location:</strong><br>Splotch Print Shop<br>7712 S. Penn Ave<br>Oklahoma City, OK 73159<br><br><strong>Phone:</strong> (405) 255-7889<br><strong>Hours:</strong> Tue–Sat 9:00 AM – 5:00 PM</div><p>Please have your order number ready when you arrive.</p><p>Thank you,<br>Splotch Team</p>`
                       });
                   } else if (status === 'SHIPPED') {
                       let trackingText = '';
@@ -2648,8 +2826,28 @@ async function startServer(
         for (const orderId of orderIds) {
           const order = await db.getOrder(orderId);
           if (order) {
+            const oldStatus = order.status;
             order.status = status;
             order.lastUpdatedAt = new Date().toISOString();
+
+            if (status === 'CANCELED') {
+                order.shadowDeleted = true;
+                order.shadowDeletedAt = new Date().toISOString();
+            } else if (oldStatus === 'CANCELED') {
+                order.shadowDeleted = false;
+                order.shadowDeletedAt = null;
+            }
+
+            if (oldStatus !== status) {
+                const adminActorId = req.user?.username || req.user?.email || 'admin';
+                logOrderTransition({
+                    order,
+                    fromStatus: oldStatus,
+                    toStatus: status,
+                    actor: { type: 'admin', id: adminActorId },
+                    note: 'Bulk status update'
+                });
+            }
 
             if (order.stalledMessageId) {
                 if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
@@ -2775,6 +2973,75 @@ async function startServer(
         }
 
         res.status(200).json({ success: true, order: order });
+    });
+
+    // --- Order Audit History & Retention Endpoints ---
+    app.get('/api/orders/:orderId/history', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+        }
+        const { orderId } = req.params;
+        const order = await db.getOrder(orderId);
+        const diskEvents = readAuditLogForOrder(orderId);
+
+        if (!order && diskEvents.length === 0) {
+            return res.status(404).json({ error: 'Order history not found.' });
+        }
+
+        const history = diskEvents.length > 0 ? diskEvents : (order?.statusHistory || []);
+        res.json({
+            orderId,
+            history,
+            isPurged: !order,
+            shadowDeleted: !!order?.shadowDeleted,
+            shadowDeletedAt: order?.shadowDeletedAt || null
+        });
+    });
+
+    app.get('/api/admin/retention/config', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+        }
+        const lowdb = db.db || db;
+        const retentionConfig = lowdb?.data?.config?.retention || { purgeArtworkOnFlush: false };
+        const allOrders = Object.values(lowdb?.data?.orders || {});
+        const canceledOrders = allOrders.filter(o => o.status === 'CANCELED');
+
+        res.json({
+            purgeArtworkOnFlush: !!retentionConfig.purgeArtworkOnFlush,
+            retentionDays: 30,
+            canceledOrdersCount: canceledOrders.length
+        });
+    });
+
+    app.post('/api/admin/retention/config', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+        }
+        const { purgeArtworkOnFlush } = req.body;
+        if (typeof purgeArtworkOnFlush !== 'boolean') {
+            return res.status(400).json({ error: 'purgeArtworkOnFlush must be a boolean.' });
+        }
+        const lowdb = db.db || db;
+        if (!lowdb.data.config) lowdb.data.config = {};
+        lowdb.data.config.retention = {
+            ...(lowdb.data.config.retention || {}),
+            purgeArtworkOnFlush
+        };
+        if (typeof db.write === 'function') await db.write();
+        else if (typeof lowdb.write === 'function') await lowdb.write();
+
+        logger.info(`[RETENTION] Updated retention config: purgeArtworkOnFlush=${purgeArtworkOnFlush}`);
+        res.json({ success: true, retention: lowdb.data.config.retention });
+    });
+
+    app.post('/api/admin/retention/flush', authenticateToken, async (req, res) => {
+        if (!await isAdmin(req.user)) {
+            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+        }
+        const retentionDays = req.body?.retentionDays !== undefined ? Number(req.body.retentionDays) : 30;
+        const result = await runRetentionFlush(db, { retentionDays });
+        res.json({ success: true, ...result });
     });
 
     // --- Auth Endpoints ---
@@ -3468,11 +3735,19 @@ async function startServer(
     const sessionTokenTimer = setInterval(signInstanceToken, 30 * 60 * 1000);
     const keyRotationTimer = setInterval(rotateKeys, KEY_ROTATION_MS);
     const backupTimer = startBackupScheduler();
+    const retentionInterval = setInterval(() => {
+        runRetentionFlush(db).catch(err => logger.error('[RETENTION] Scheduled flush error:', err));
+    }, 24 * 60 * 60 * 1000);
+
+    if (process.env.NODE_ENV !== 'test') {
+        runRetentionFlush(db).catch(err => logger.error('[RETENTION] Initial flush error:', err));
+    }
 
     if (process.env.NODE_ENV === 'test') {
       sessionTokenTimer.unref();
       keyRotationTimer.unref();
       metricsTimer.unref();
+      retentionInterval.unref();
       if (backupTimer && backupTimer.unref) {
         backupTimer.unref();
       }
@@ -3480,6 +3755,7 @@ async function startServer(
           db._watcher.unref();
       }
     }
+
     
     // --- Global Error Handlers ---
 
@@ -3541,6 +3817,7 @@ async function startServer(
       clearInterval(metricsTimer);
       clearInterval(chunkCleanupTimer);
       if (backupTimer) clearInterval(backupTimer);
+      if (retentionInterval) clearInterval(retentionInterval);
       if (db && db._watcher) {
           db._watcher.unref();
           if (db._watcher.close) db._watcher.close();
@@ -3556,7 +3833,8 @@ async function startServer(
         keyRotationTimer,
         metricsTimer,
         chunkCleanupTimer,
-        ...(backupTimer ? [backupTimer] : [])
+        ...(backupTimer ? [backupTimer] : []),
+        ...(retentionInterval ? [retentionInterval] : [])
       ],
       bot,
       close
@@ -3570,3 +3848,4 @@ async function startServer(
 
 
 export { startServer };
+

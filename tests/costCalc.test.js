@@ -1,4 +1,4 @@
-﻿import { jest } from '@jest/globals';
+import { jest } from '@jest/globals';
 import {
   calcWeight,
   calcShippingEstimate,
@@ -122,5 +122,69 @@ describe('costCalc - calcOrderBreakdown', () => {
     const customConfig = { ...DEFAULT_SHIPPING_CONFIG, handlingFeeCents: 500 };
     const result = calcOrderBreakdown({ areaInSqIn: 4, subtotalCents: 1000, config: customConfig });
     expect(result.handlingCents).toBe(500);
+  });
+
+  it('should not charge sales tax for out-of-state shipping destinations', () => {
+    const outOfState = calcOrderBreakdown({
+      areaInSqIn: 4,
+      subtotalCents: 1000,
+      destinationState: 'TX',
+      deliveryMethod: 'ship',
+    });
+    expect(outOfState.taxCents).toBe(0);
+    expect(outOfState.taxDollars).toBe('0.00');
+    expect(outOfState.isTaxable).toBe(false);
+    expect(outOfState.taxRate).toBe(0);
+
+    const california = calcOrderBreakdown({
+      areaInSqIn: 4,
+      subtotalCents: 1000,
+      destinationState: 'California',
+      deliveryMethod: 'ship',
+    });
+    expect(california.taxCents).toBe(0);
+    expect(california.isTaxable).toBe(false);
+  });
+
+  it('should charge sales tax for Oklahoma shipping destinations', () => {
+    const okState = calcOrderBreakdown({
+      areaInSqIn: 4,
+      subtotalCents: 1000,
+      destinationState: 'OK',
+      deliveryMethod: 'ship',
+    });
+    expect(okState.taxCents).toBeGreaterThan(0);
+    expect(okState.isTaxable).toBe(true);
+
+    const oklahomaFull = calcOrderBreakdown({
+      areaInSqIn: 4,
+      subtotalCents: 1000,
+      destinationState: 'Oklahoma',
+      deliveryMethod: 'ship',
+    });
+    expect(oklahomaFull.taxCents).toBe(okState.taxCents);
+    expect(oklahomaFull.isTaxable).toBe(true);
+  });
+
+  it('should apply $3.00 discount, free shipping, and OK tax for Local Pickup', () => {
+    const pickup = calcOrderBreakdown({
+      areaInSqIn: 4,
+      subtotalCents: 1000, // $10.00
+      deliveryMethod: 'pickup',
+    });
+    expect(pickup.deliveryMethod).toBe('pickup');
+    expect(pickup.shippingCents).toBe(0);
+    expect(pickup.shippingLabel).toBe('Local Pickup (Free)');
+    expect(pickup.pickupDiscountCents).toBe(300);
+    expect(pickup.pickupDiscountDollars).toBe('3.00');
+    expect(pickup.isTaxable).toBe(true); // Pickup happens in OK shop
+
+    // Tax is calculated on discounted subtotal ($7.00)
+    expect(pickup.taxCents).toBe(Math.round(700 * DEFAULT_SHIPPING_CONFIG.taxRate));
+
+    // Grand total = (1000 - 300) + 0 shipping + tax + handling + fee
+    expect(pickup.totalCents).toBe(
+      700 + pickup.shippingCents + pickup.taxCents + pickup.handlingCents + pickup.squareFeeCents
+    );
   });
 });

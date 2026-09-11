@@ -5,6 +5,8 @@ import { getOrderStatusKeyboard } from './telegramHelpers.js';
 import logger from './logger.js';
 import { escapeHtml } from './utils.js';
 import { LowDbAdapter } from './database/lowdb_adapter.js';
+import { logOrderTransition } from './lib/auditLogger.js';
+
 
 let bot;
 
@@ -140,6 +142,9 @@ function initializeBot(db, { startPolling = true } = {}) {
           case 'print':
             newStatus = 'PRINTING';
             break;
+          case 'hold':
+            newStatus = 'HOLD_FOR_PICKUP';
+            break;
           case 'ship':
             newStatus = 'SHIPPED';
             break;
@@ -155,21 +160,49 @@ function initializeBot(db, { startPolling = true } = {}) {
         }
 
         if (newStatus) {
+          const oldStatus = order.status;
           order.status = newStatus;
+          order.lastUpdatedAt = new Date().toISOString();
+
+          if (newStatus === 'CANCELED') {
+            order.shadowDeleted = true;
+            order.shadowDeletedAt = new Date().toISOString();
+          } else if (oldStatus === 'CANCELED') {
+            order.shadowDeleted = false;
+            order.shadowDeletedAt = null;
+          }
+
+          if (oldStatus !== newStatus) {
+            const tgUser = ctx.from?.username || (ctx.from?.id ? `tg_${ctx.from.id}` : 'telegram');
+            logOrderTransition({
+              order,
+              fromStatus: oldStatus,
+              toStatus: newStatus,
+              actor: { type: 'telegram_bot', id: tgUser },
+              note: `Status updated via Telegram bot (${action})`
+            });
+          }
+
           await db.updateOrder(order);
 
-          const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-          const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+
+          const isPickup = order.deliveryMethod === 'pickup';
+          const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+          const printingOrLater = ['PRINTING', 'HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+          const readyOrLater = ['HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
           const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
           const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
           const completedOrLater = ['COMPLETED'];
+
+          const fulfillmentLine = isPickup
+            ? `${readyOrLater.includes(newStatus) ? '✅' : '⬜️'} Ready for Pickup`
+            : `${shippedOrLater.includes(newStatus) ? '✅' : '⬜️'} Shipped\n${deliveredOrLater.includes(newStatus) ? '✅' : '⬜️'} Delivered`;
 
           const statusChecklist = `
 ✅ New
 ${acceptedOrLater.includes(newStatus) ? '✅' : '⬜️'} Accepted
 ${printingOrLater.includes(newStatus) ? '✅' : '⬜️'} Printing
-${shippedOrLater.includes(newStatus) ? '✅' : '⬜️'} Shipped
-${deliveredOrLater.includes(newStatus) ? '✅' : '⬜️'} Delivered
+${fulfillmentLine}
 ${completedOrLater.includes(newStatus) ? '✅' : '⬜️'} Completed
             `;
 

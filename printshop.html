@@ -94,6 +94,11 @@
         color: white;
         font-weight: bold;
       } /* Violet-600 */
+      .filter-btn[data-status="HOLD_FOR_PICKUP"].active {
+        background-color: #c2410c;
+        color: white;
+        font-weight: bold;
+      } /* Orange-700 */
       .filter-btn[data-status="SHIPPED"].active {
         background-color: #047857;
         color: white;
@@ -295,16 +300,16 @@
         >
           <span class="font-bold mr-2">Filter by status:</span>
           <button
-            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-700 focus-visible:ring-offset-2"
-            data-status="ALL"
-            aria-pressed="false"
+            class="filter-btn active px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            data-status="ACTIVE"
+            aria-pressed="true"
           >
-            All
+            Active
           </button>
           <button
-            class="filter-btn active px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
             data-status="NEW"
-            aria-pressed="true"
+            aria-pressed="false"
           >
             New
           </button>
@@ -321,6 +326,13 @@
             aria-pressed="false"
           >
             Printing
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600 focus-visible:ring-offset-2"
+            data-status="HOLD_FOR_PICKUP"
+            aria-pressed="false"
+          >
+            Hold for Pickup
           </button>
           <button
             class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
@@ -350,6 +362,14 @@
           >
             Canceled
           </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-700 focus-visible:ring-offset-2"
+            data-status="ALL"
+            aria-pressed="false"
+          >
+            All
+          </button>
+
           <div class="ml-auto flex items-center space-x-2 pl-4 border-l border-gray-300">
             <button id="toggle-view-btn" class="px-2 py-1 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500" title="Toggle List/Card View">
                 <!-- SVG Icon for List/Grid Toggle -->
@@ -366,6 +386,7 @@
                 <option value="">Bulk Action...</option>
                 <option value="ACCEPTED">Mark Accepted</option>
                 <option value="PRINTING">Mark Printing</option>
+                <option value="HOLD_FOR_PICKUP">Mark Hold for Pickup</option>
                 <option value="SHIPPED">Mark Shipped</option>
                 <option value="DELIVERED">Mark Delivered</option>
                 <option value="COMPLETED">Mark Completed</option>
@@ -976,9 +997,63 @@
             >
               Save Pricing
             </button>
+        </div>
+
+        <!-- Retention & File Cleanup -->
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto mt-8">
+          <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">
+            Retention & File Cleanup
+          </h2>
+          <p class="text-sm text-gray-600 mb-6">
+            Configure order retention policies and customer artwork cleanup for canceled orders.
+          </p>
+          <div class="space-y-4">
+            <div class="flex items-start">
+              <div class="flex items-center h-5">
+                <input
+                  id="purge-artwork-toggle"
+                  type="checkbox"
+                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+              </div>
+              <div class="ml-3 text-sm">
+                <label for="purge-artwork-toggle" class="font-bold text-gray-800 cursor-pointer">
+                  Purge customer artwork from disk when canceled orders are flushed after 30 days
+                </label>
+                <p class="text-gray-500 mt-0.5">
+                  When checked, uploaded artwork files in <code>uploads/</code> are permanently unlinked and deleted when canceled orders pass their 30-day retention window. When unchecked, order metadata is flushed but original artwork files are preserved on disk.
+                </p>
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-md border border-gray-200 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <span class="text-sm font-medium text-gray-700">Canceled Orders in 30-Day Retention:</span>
+                <span id="retention-canceled-count" class="font-bold text-gray-900 ml-1">0</span>
+              </div>
+              <button
+                id="run-retention-flush-btn"
+                type="button"
+                class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-md text-xs font-semibold shadow-sm transition-colors"
+              >
+                Run 30-Day Cleanup Now
+              </button>
+            </div>
+
+            <div class="pt-4 border-t border-gray-200 flex items-center gap-4">
+              <button
+                type="button"
+                id="save-retention-config-btn"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition-colors"
+              >
+                Save Retention Settings
+              </button>
+              <span id="retention-config-status" class="text-sm text-gray-500"></span>
+            </div>
           </div>
         </div>
       </div>
+
     </main>
     <div
       id="login-modal"
@@ -1059,6 +1134,47 @@
         </button>
       </div>
     </div>
+
+    <!-- Order Event History Modal -->
+    <div
+      id="order-history-modal"
+      class="hidden fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="orderHistoryModalTitle"
+    >
+      <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-gray-200">
+        <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+          <div>
+            <h3 id="orderHistoryModalTitle" class="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              Order Event Log
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5" id="history-modal-order-id">Order ID: ...</p>
+          </div>
+          <button
+            id="close-history-modal-btn"
+            class="text-gray-400 hover:text-gray-700 text-2xl font-bold p-1 leading-none rounded-md hover:bg-gray-100 transition-colors"
+            aria-label="Close history modal"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="p-6 overflow-y-auto flex-1 space-y-4" id="history-modal-body">
+          <p class="text-sm text-gray-500 text-center py-4">Loading event history...</p>
+        </div>
+        <div class="px-6 py-3 border-t bg-gray-50 flex justify-between items-center">
+          <span class="text-xs text-gray-400 italic">Non-volatile audit journal</span>
+          <button
+            id="close-history-modal-footer-btn"
+            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md text-sm font-semibold transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <footer class="bg-white shadow-md mt-8">
       <div class="container mx-auto px-6 py-3 text-center text-gray-500">
         &copy; 2026 Splotch Creative LLC

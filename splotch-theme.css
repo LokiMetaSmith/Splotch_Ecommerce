@@ -450,6 +450,7 @@ main.container > div:first-of-type { /* Targets the first div child of main, usu
 .status-new { background-color: #1D4ED8 !important; color: white !important; }
 .status-accepted { background-color: #B45309 !important; color: white !important; }
 .status-printing { background-color: #6D28D9 !important; color: white !important; }
+.status-hold_for_pickup { background-color: #D97706 !important; color: white !important; }
 .status-shipped { background-color: #047857 !important; color: white !important; }
 .status-delivered { background-color: #4338CA !important; color: white !important; }
 .status-completed { background-color: #15803D !important; color: white !important; }

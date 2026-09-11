@@ -107,9 +107,11 @@ export class LowDbAdapter {
         if (!this.db.data.products) this.db.data.products = {};
         if (!this.db.data.credentials) this.db.data.credentials = {};
         if (!this.db.data.config) this.db.data.config = {};
+        if (!this.db.data.config.retention) {
+            this.db.data.config.retention = { purgeArtworkOnFlush: false };
+        }
 
         if (!this.db.data.emailIndex) {
-            this.db.data.emailIndex = {};
             if (this.db.data.users) {
                 logger.info('[LowDbAdapter] Backfilling emailIndex...');
                 for (const [key, user] of Object.entries(this.db.data.users)) {
@@ -248,6 +250,33 @@ export class LowDbAdapter {
         await this.write();
         return order;
     }
+
+    async deleteOrder(id) {
+        if (!this.db.data.orders || !this.db.data.orders[id]) return false;
+        const order = this.db.data.orders[id];
+        delete this.db.data.orders[id];
+
+        // Cache cleanup
+        if (this.db.activeOrders) {
+            const idx = this.db.activeOrders.findIndex(o => o.orderId === id);
+            if (idx !== -1) this.db.activeOrders.splice(idx, 1);
+        }
+        if (this.db.shippedOrders) {
+            const idx = this.db.shippedOrders.findIndex(o => o.orderId === id);
+            if (idx !== -1) this.db.shippedOrders.splice(idx, 1);
+        }
+        if (this.db.userOrderIndex && order.billingContact?.email) {
+            const email = order.billingContact.email;
+            if (this.db.userOrderIndex[email]) {
+                const idx = this.db.userOrderIndex[email].findIndex(o => o.orderId === id);
+                if (idx !== -1) this.db.userOrderIndex[email].splice(idx, 1);
+            }
+        }
+
+        await this.write();
+        return true;
+    }
+
 
     // Explicit cache management methods to replicate server.js logic?
     // Or just make `getActiveOrders` fast?

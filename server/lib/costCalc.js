@@ -92,8 +92,14 @@ export function calcSquareFee({ amountCents, feePercent = 0.029, feeFixedCents =
  * @param {Object} opts
  * @returns {number} totalCents
  */
-export function calcTotal({ subtotalCents, shippingCents, taxCents, handlingCents, squareFeeCents }) {
-  return subtotalCents + shippingCents + taxCents + handlingCents + squareFeeCents;
+/**
+ * Sum all cost components into a grand total.
+ * @param {Object} opts
+ * @returns {number} totalCents
+ */
+export function calcTotal({ subtotalCents, discountCents = 0, shippingCents, taxCents, handlingCents, squareFeeCents }) {
+  const netSubtotal = Math.max(0, subtotalCents - discountCents);
+  return netSubtotal + shippingCents + taxCents + handlingCents + squareFeeCents;
 }
 
 /**
@@ -107,60 +113,103 @@ export const DEFAULT_SHIPPING_CONFIG = {
   squareFeeFixedCents: 30,  // $0.30
   gramsPerSqIn: 0.05,       // 3 mil vinyl
   packageTareGrams: 28,     // ~1 oz envelope + backing
+  pickupDiscountCents: 300, // $3.00 local pickup discount
 };
 
 /**
  * Run a full cost breakdown for an order.
  * @param {Object} opts
- * @param {number} opts.areaInSqIn      Total sticker area in square inches
- * @param {number} opts.subtotalCents   Print cost in cents
- * @param {Object} [opts.config]        Shipping config (falls back to DEFAULT_SHIPPING_CONFIG)
- * @param {Array}  [opts.tiers]         USPS tier table override
+ * @param {number} opts.areaInSqIn       Total sticker area in square inches
+ * @param {number} opts.subtotalCents    Print cost in cents
+ * @param {Object} [opts.config]         Shipping config (falls back to DEFAULT_SHIPPING_CONFIG)
+ * @param {Array}  [opts.tiers]          USPS tier table override
+ * @param {string} [opts.destinationState] Recipient state (e.g. 'OK', 'TX')
+ * @param {string} [opts.deliveryMethod]   'ship' (default) or 'pickup'
  * @returns {Object} Full breakdown with cents and dollar string fields
  */
-export function calcOrderBreakdown({ areaInSqIn, subtotalCents, config = {}, tiers }) {
+export function calcOrderBreakdown({
+  areaInSqIn,
+  subtotalCents,
+  config = {},
+  tiers,
+  destinationState = 'OK',
+  deliveryMethod = 'ship',
+}) {
   const cfg = { ...DEFAULT_SHIPPING_CONFIG, ...config };
+  const isPickup = deliveryMethod === 'pickup';
 
-  const { weightGrams, weightOz } = calcWeight({
+  const weight = calcWeight({
     areaInSqIn,
     gramsPerSqIn: cfg.gramsPerSqIn,
     tareGrams: cfg.packageTareGrams,
   });
 
-  const { rateCents: shippingCents, label: shippingLabel } = calcShippingEstimate({
-    weightOz,
-    tiers,
-  });
+  let shippingCents = 0;
+  let shippingLabel = 'Local Pickup (Free)';
+  let pickupDiscountCents = 0;
 
-  const taxCents = calcTax({ subtotalCents, shippingCents, taxRate: cfg.taxRate });
+  if (isPickup) {
+    const configuredDiscount = typeof cfg.pickupDiscountCents === 'number' ? cfg.pickupDiscountCents : 300;
+    pickupDiscountCents = Math.min(subtotalCents, configuredDiscount);
+  } else {
+    const est = calcShippingEstimate({
+      weightOz: weight.weightOz,
+      tiers,
+    });
+    shippingCents = est.rateCents;
+    shippingLabel = est.label;
+  }
+
+  // Oklahoma sales tax nexus rule:
+  // - Local Pickup: physical transfer occurs in OK -> taxable
+  // - Shipping: taxable only if destination address is in Oklahoma ('OK' or 'Oklahoma')
+  const isOkState = destinationState ? /^(ok|oklahoma)$/i.test(String(destinationState).trim()) : false;
+  const isTaxable = isPickup || isOkState;
+  const effectiveTaxRate = isTaxable ? cfg.taxRate : 0;
+
+  const discountedSubtotal = Math.max(0, subtotalCents - pickupDiscountCents);
+  const taxCents = isTaxable ? calcTax({ subtotalCents: discountedSubtotal, shippingCents, taxRate: cfg.taxRate }) : 0;
   const handlingCents = cfg.handlingFeeCents;
 
-  const preTotalCents = subtotalCents + shippingCents + taxCents + handlingCents;
+  const preTotalCents = discountedSubtotal + shippingCents + taxCents + handlingCents;
   const squareFeeCents = calcSquareFee({
     amountCents: preTotalCents,
     feePercent: cfg.squareFeePercent,
     feeFixedCents: cfg.squareFeeFixedCents,
   });
 
-  const totalCents = calcTotal({ subtotalCents, shippingCents, taxCents, handlingCents, squareFeeCents });
+  const totalCents = calcTotal({
+    subtotalCents,
+    discountCents: pickupDiscountCents,
+    shippingCents,
+    taxCents,
+    handlingCents,
+    squareFeeCents,
+  });
 
   return {
-    weightGrams: Math.round(weightGrams * 10) / 10,
-    weightOz:    Math.round(weightOz * 100) / 100,
+    weightGrams: Math.round(weight.weightGrams * 10) / 10,
+    weightOz:    Math.round(weight.weightOz * 100) / 100,
     subtotalCents,
+    discountCents: pickupDiscountCents,
+    pickupDiscountCents,
     shippingCents,
     shippingLabel,
     taxCents,
-    taxRate: cfg.taxRate,
+    taxRate: effectiveTaxRate,
+    isTaxable,
     handlingCents,
     squareFeeCents,
     totalCents,
-    subtotalDollars:   (subtotalCents   / 100).toFixed(2),
-    shippingDollars:   (shippingCents   / 100).toFixed(2),
-    taxDollars:        (taxCents        / 100).toFixed(2),
-    handlingDollars:   (handlingCents   / 100).toFixed(2),
-    squareFeeDollars:  (squareFeeCents  / 100).toFixed(2),
-    totalDollars:      (totalCents      / 100).toFixed(2),
+    deliveryMethod: isPickup ? 'pickup' : 'ship',
+    subtotalDollars:       (subtotalCents       / 100).toFixed(2),
+    discountDollars:       (pickupDiscountCents / 100).toFixed(2),
+    pickupDiscountDollars: (pickupDiscountCents / 100).toFixed(2),
+    shippingDollars:       (shippingCents       / 100).toFixed(2),
+    taxDollars:            (taxCents            / 100).toFixed(2),
+    handlingDollars:       (handlingCents       / 100).toFixed(2),
+    squareFeeDollars:      (squareFeeCents      / 100).toFixed(2),
+    totalDollars:          (totalCents          / 100).toFixed(2),
   };
 }
 

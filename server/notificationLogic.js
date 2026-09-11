@@ -20,13 +20,24 @@ export const sendNewOrderNotification = async (bot, db, orderId) => {
         return;
     }
 
+    const isPickup = order.deliveryMethod === 'pickup';
+    const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    const printingOrLater = ['PRINTING', 'HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    const readyOrLater = ['HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
+    const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
+    const completedOrLater = ['COMPLETED'];
+
+    const fulfillmentLine = isPickup
+      ? `${readyOrLater.includes(order.status) ? '✅' : '⬜️'} Ready for Pickup`
+      : `${shippedOrLater.includes(order.status) ? '✅' : '⬜️'} Shipped\n${deliveredOrLater.includes(order.status) ? '✅' : '⬜️'} Delivered`;
+
     const statusChecklist = `
 ✅ New
-${['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) ? '✅' : '⬜️'} Accepted
-${['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) ? '✅' : '⬜️'} Printing
-${['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) ? '✅' : '⬜️'} Shipped
-${['DELIVERED', 'COMPLETED'].includes(order.status) ? '✅' : '⬜️'} Delivered
-${['COMPLETED'].includes(order.status) ? '✅' : '⬜️'} Completed
+${acceptedOrLater.includes(order.status) ? '✅' : '⬜️'} Accepted
+${printingOrLater.includes(order.status) ? '✅' : '⬜️'} Printing
+${fulfillmentLine}
+${completedOrLater.includes(order.status) ? '✅' : '⬜️'} Completed
 `;
     const message = `
 New Order: ${order.orderId}
@@ -100,18 +111,23 @@ export const updateOrderStatusNotification = async (bot, db, orderId, status) =>
         throw new Error(msg);
     }
 
-    const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
-    const printingOrLater = ['PRINTING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    const isPickup = order.deliveryMethod === 'pickup';
+    const acceptedOrLater = ['ACCEPTED', 'PRINTING', 'HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    const printingOrLater = ['PRINTING', 'HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    const readyOrLater = ['HOLD_FOR_PICKUP', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
     const shippedOrLater = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
     const deliveredOrLater = ['DELIVERED', 'COMPLETED'];
     const completedOrLater = ['COMPLETED'];
+
+    const fulfillmentLine = isPickup
+      ? `${readyOrLater.includes(order.status) ? '✅' : '⬜️'} Ready for Pickup`
+      : `${shippedOrLater.includes(order.status) ? '✅' : '⬜️'} Shipped\n${deliveredOrLater.includes(order.status) ? '✅' : '⬜️'} Delivered`;
 
     const statusChecklist = `
 ✅ New
 ${acceptedOrLater.includes(order.status) ? '✅' : '⬜️'} Accepted
 ${printingOrLater.includes(order.status) ? '✅' : '⬜️'} Printing
-${shippedOrLater.includes(order.status) ? '✅' : '⬜️'} Shipped
-${deliveredOrLater.includes(order.status) ? '✅' : '⬜️'} Delivered
+${fulfillmentLine}
 ${completedOrLater.includes(order.status) ? '✅' : '⬜️'} Completed
     `;
     const message = `

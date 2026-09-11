@@ -617,11 +617,12 @@ async function fetchAndDisplayOrders(query = "") {
     }
     allOrders = await fetchWithAuth(endpoint);
     if (!Array.isArray(allOrders)) allOrders = [];
-    // After fetching, display with the current filter (defaults to ALL)
+    // After fetching, display with the current filter (defaults to ACTIVE)
     const activeFilter =
       document.querySelector("#filter-container .filter-btn.active")?.dataset
-        .status || "ALL";
+        .status || "ACTIVE";
     filterAndDisplayOrders(activeFilter);
+
 
     updateConnectionStatus("connected");
 
@@ -708,7 +709,10 @@ function filterAndDisplayOrders(status) {
   const ordersToDisplay =
     status === "ALL"
       ? allOrders
+      : status === "ACTIVE"
+      ? allOrders.filter((order) => order.status !== "COMPLETED" && order.status !== "CANCELED")
       : allOrders.filter((order) => order.status === status);
+
 
   const noOrdersText = document.getElementById("no-orders-text");
 
@@ -833,6 +837,7 @@ function displayOrderRow(order) {
     "NEW",
     "ACCEPTED",
     "PRINTING",
+    "HOLD_FOR_PICKUP",
     "SHIPPED",
     "DELIVERED",
     "COMPLETED",
@@ -842,6 +847,7 @@ function displayOrderRow(order) {
     NEW: "bg-blue-100 text-blue-800",
     ACCEPTED: "bg-amber-100 text-amber-800",
     PRINTING: "bg-purple-100 text-purple-800",
+    HOLD_FOR_PICKUP: "bg-orange-100 text-orange-800",
     SHIPPED: "bg-yellow-100 text-yellow-800",
     DELIVERED: "bg-green-100 text-green-800",
     COMPLETED: "bg-gray-100 text-gray-800",
@@ -853,9 +859,21 @@ function displayOrderRow(order) {
   const statusClass =
     statusColors[order.status?.toUpperCase()] || "bg-gray-500 text-white";
 
+  const formatStatusLabel = (s) => s === "HOLD_FOR_PICKUP" ? "Hold for Pickup" : (s.charAt(0) + s.slice(1).toLowerCase());
+
+  let canceledRetentionBadge = "";
+  if (order.status === "CANCELED") {
+    const canceledTime = order.shadowDeletedAt
+      ? new Date(order.shadowDeletedAt).getTime()
+      : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
+    const elapsedDays = Math.floor((Date.now() - canceledTime) / (24 * 60 * 60 * 1000));
+    const remainingDays = Math.max(0, 30 - elapsedDays);
+    canceledRetentionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-800 border border-red-200" title="Canceled orders are automatically purged after 30 days">Purges in ${remainingDays}d</span>`;
+  }
+
   const dropdownHtml = `
     <select class="action-dropdown border rounded-md p-1 text-sm bg-white ${statusClass}" data-order-id="${orderId}">
-        ${statuses.map((s) => `<option value="${s}" ${order.status === s ? "selected" : ""}>${s.charAt(0) + s.slice(1).toLowerCase()}</option>`).join("")}
+        ${statuses.map((s) => `<option value="${s}" ${order.status === s ? "selected" : ""}>${formatStatusLabel(s)}</option>`).join("")}
     </select>
   `;
 
@@ -894,6 +912,14 @@ function displayOrderRow(order) {
       <td class="px-4 py-3">
         <div class="flex flex-col gap-2">
             ${dropdownHtml}
+            <div class="flex items-center gap-1.5 mt-0.5">
+                ${canceledRetentionBadge}
+                <button type="button" class="view-order-history-btn px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[11px] font-semibold border border-gray-300 flex items-center gap-1 shadow-sm transition-colors" data-order-id="${orderId}">
+                    <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    History
+                </button>
+            </div>
+
             <div class="mt-2 text-xs flex flex-col gap-1 tracking-inputs" style="display: ${order.status === 'SHIPPED' || order.status === 'DELIVERED' || order.status === 'COMPLETED' ? 'flex' : 'none'};" data-order-id="${orderId}">
                <select class="border rounded p-1 tracking-courier bg-white" data-order-id="${orderId}">
                    <option value="USPS" ${order.courier === 'USPS' ? 'selected' : ''}>USPS</option>
@@ -933,6 +959,16 @@ export function displayOrder(order) {
   const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`;
   const shippingEmail = escapeHtml(order.shippingContact?.email || "N/A");
 
+  const formatAddress = (contact) => {
+    if (!contact) return "";
+    const lines = Array.isArray(contact.addressLines) ? contact.addressLines.filter(Boolean).join(", ") : (contact.addressLines || "");
+    const cityStateZip = [contact.locality || contact.city, contact.administrativeDistrictLevel1 || contact.state, contact.postalCode].filter(Boolean).join(" ");
+    return [lines, cityStateZip].filter(Boolean).join(", ");
+  };
+  const shippingAddrStr = escapeHtml(formatAddress(order.shippingContact));
+  const billingAddrStr = escapeHtml(formatAddress(order.billingContact));
+  const hasDistinctBilling = billingAddrStr && shippingAddrStr && (billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase());
+
   const quantity = escapeHtml(order.orderDetails?.quantity || "N/A");
   const ppi = getResolutionPpi(order.orderDetails?.resolution || order.resolution);
   const status = escapeHtml(order.status);
@@ -946,6 +982,7 @@ export function displayOrder(order) {
     NEW: "bg-blue-100 text-blue-800",
     ACCEPTED: "bg-amber-100 text-amber-800",
     PRINTING: "bg-purple-100 text-purple-800",
+    HOLD_FOR_PICKUP: "bg-orange-100 text-orange-800",
     SHIPPED: "bg-yellow-100 text-yellow-800",
     DELIVERED: "bg-green-100 text-green-800",
     COMPLETED: "bg-gray-100 text-gray-800",
@@ -971,14 +1008,16 @@ export function displayOrder(order) {
   const statuses = [
     "ACCEPTED",
     "PRINTING",
+    "HOLD_FOR_PICKUP",
     "SHIPPED",
     "DELIVERED",
     "COMPLETED",
     "CANCELED",
   ];
+  const formatStatusLabel = (s) => s === "HOLD_FOR_PICKUP" ? "Hold for Pickup" : (s.charAt(0) + s.slice(1).toLowerCase());
   const dropdownHtml = `
         <select class="action-dropdown border rounded p-1 text-sm font-bold ${statusClass} mt-4" data-order-id="${orderId}">
-            ${statuses.map((s) => `<option value="${s}" ${status === s ? "selected" : ""}>${s.charAt(0) + s.slice(1).toLowerCase()}</option>`).join("")}
+            ${statuses.map((s) => `<option value="${s}" ${status === s ? "selected" : ""}>${formatStatusLabel(s)}</option>`).join("")}
         </select>
     `;
 
@@ -988,6 +1027,22 @@ export function displayOrder(order) {
     .map((c) => `<option value="${c}">${c.toUpperCase()}</option>`)
     .join("");
 
+  const isLocalPickup = order.deliveryMethod === 'pickup' || order.orderDetails?.deliveryMethod === 'pickup';
+  const deliveryBadge = isLocalPickup
+    ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Local Pickup</span>`
+    : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">Ship to Address</span>`;
+
+  let canceledRetentionBadge = "";
+
+  if (status === "CANCELED") {
+    const canceledTime = order.shadowDeletedAt
+      ? new Date(order.shadowDeletedAt).getTime()
+      : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
+    const elapsedDays = Math.floor((Date.now() - canceledTime) / (24 * 60 * 60 * 1000));
+    const remainingDays = Math.max(0, 30 - elapsedDays);
+    canceledRetentionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800 border border-red-200 shadow-sm" title="Canceled orders are automatically purged after 30 days">Purges in ${remainingDays}d</span>`;
+  }
+
   const html = `
     <div class="order-card border-l-4 ${statusClass.split(" ")[0].replace("bg-", "border-")}" id="order-card-${orderId}">
         <div class="flex justify-between items-start">
@@ -996,20 +1051,33 @@ export function displayOrder(order) {
                 <div>
                     <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${orderIdShort}...</span></h3>
                     <p class="text-sm text-gray-600">Received: ${escapeHtml(receivedDate)}</p>
-                    ${alertHtml}
+                    <div class="flex items-center gap-2 mt-1">
+                        ${deliveryBadge}
+                        ${alertHtml}
+                        ${canceledRetentionBadge}
+                    </div>
                 </div>
             </div>
-            <div class="${statusClass} font-bold py-1 px-3 rounded-full text-sm" id="status-badge-${orderId}">${status}</div>
+            <div class="flex items-center gap-2">
+                <button type="button" class="view-order-history-btn px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-xs font-semibold border border-gray-300 flex items-center gap-1 shadow-sm transition-colors" data-order-id="${orderId}">
+                    <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    History
+                </button>
+                <div class="${statusClass} font-bold py-1 px-3 rounded-full text-sm" id="status-badge-${orderId}">${status === 'HOLD_FOR_PICKUP' ? 'HOLD FOR PICKUP' : status}</div>
+            </div>
         </div>
+
 
         <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
             <div>
                 <dt>Billing Name:</dt><dd>${billingName}</dd>
                 <dt>Billing Email:</dt><dd>${billingEmail}</dd>
+                ${hasDistinctBilling ? `<dt class="mt-1 font-semibold text-amber-800">Billing Address:</dt><dd class="text-xs text-gray-700 bg-amber-50 p-1.5 rounded border border-amber-200 mt-0.5">${billingAddrStr}</dd>` : ""}
             </div>
             <div>
                 <dt>Shipping Name:</dt><dd>${shippingName}</dd>
                 <dt>Shipping Email:</dt><dd>${shippingEmail}</dd>
+                ${shippingAddrStr ? `<dt class="mt-1 font-semibold text-blue-800">${isLocalPickup ? 'Pickup Location:' : 'Shipping Address:'}</dt><dd class="text-xs text-gray-700 bg-blue-50/50 p-1.5 rounded border border-blue-100 mt-0.5">${shippingAddrStr}</dd>` : ""}
             </div>
             <div>
                 <dt>Sticker Name:</dt><dd>${stickerName}</dd>
@@ -1087,7 +1155,107 @@ function handleOrderListClick(e) {
     handleTimeLog(orderId, timeLogBtn);
     return;
   }
+
+  const historyBtn = e.target.closest(".view-order-history-btn");
+  if (historyBtn) {
+    const orderId = historyBtn.dataset.orderId;
+    openOrderHistoryModal(orderId);
+    return;
+  }
 }
+
+async function openOrderHistoryModal(orderId) {
+  const modal = document.getElementById("order-history-modal");
+  const modalTitle = document.getElementById("history-modal-order-id");
+  const modalBody = document.getElementById("history-modal-body");
+
+  if (!modal || !modalBody) return;
+
+  if (modalTitle) modalTitle.textContent = `Order ID: ${orderId}`;
+  modalBody.innerHTML = `
+    <div class="flex items-center justify-center py-8">
+      <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+      <span class="ml-3 text-sm text-gray-500">Fetching audit log...</span>
+    </div>
+  `;
+  modal.classList.remove("hidden");
+
+  try {
+    const data = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/history`);
+    const history = data?.history || [];
+
+    if (history.length === 0) {
+      modalBody.innerHTML = `
+        <div class="text-center py-6 text-gray-500 text-sm">
+          No recorded transition history found for this order.
+        </div>
+      `;
+      return;
+    }
+
+    const formatSt = (s) => s === "HOLD_FOR_PICKUP" ? "Hold for Pickup" : (s ? s.charAt(0) + s.slice(1).toLowerCase() : "Initial Creation");
+
+    // Sort newest first
+    const sorted = history.slice().reverse();
+
+    let html = `<div class="relative border-l-2 border-blue-200 ml-4 space-y-6">`;
+    for (const evt of sorted) {
+      const dateStr = new Date(evt.timestamp).toLocaleString();
+      const fromSt = evt.fromStatus ? formatSt(evt.fromStatus) : "Initial Creation";
+      const toSt = formatSt(evt.toStatus);
+      const actorLabel = evt.actor ? `${evt.actor.type.toUpperCase()}: ${evt.actor.id}` : "Unknown";
+
+      let statusColor = "bg-blue-100 text-blue-800 border-blue-300";
+      if (evt.toStatus === "CANCELED" || evt.toStatus === "PURGED") statusColor = "bg-red-100 text-red-800 border-red-300";
+      else if (evt.toStatus === "COMPLETED" || evt.toStatus === "DELIVERED") statusColor = "bg-green-100 text-green-800 border-green-300";
+      else if (evt.toStatus === "SHIPPED") statusColor = "bg-emerald-100 text-emerald-800 border-emerald-300";
+      else if (evt.toStatus === "HOLD_FOR_PICKUP") statusColor = "bg-orange-100 text-orange-800 border-orange-300";
+
+      html += `
+        <div class="relative pl-6">
+          <span class="absolute -left-2.5 top-1.5 w-5 h-5 rounded-full border-2 border-white bg-blue-500 flex items-center justify-center">
+            <span class="w-2 h-2 rounded-full bg-white"></span>
+          </span>
+          <div class="bg-gray-50 p-3.5 rounded-lg border border-gray-200 shadow-sm text-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="font-bold text-gray-800">${fromSt} &rarr; <span class="px-2 py-0.5 rounded text-xs border font-bold ${statusColor}">${toSt}</span></span>
+              <span class="text-xs text-gray-500">${dateStr}</span>
+            </div>
+            <div class="mt-2 text-xs text-gray-600 flex items-center gap-1">
+              <span class="font-semibold text-gray-700">Actor:</span>
+              <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200">${escapeHtml(actorLabel)}</span>
+            </div>
+            ${evt.note ? `<div class="mt-1 text-xs text-gray-600"><span class="font-semibold">Note:</span> ${escapeHtml(evt.note)}</div>` : ""}
+            ${evt.metadata?.trackingNumber ? `<div class="mt-1 text-xs text-gray-600"><span class="font-semibold">Tracking:</span> ${escapeHtml(evt.metadata.courier || "")} ${escapeHtml(evt.metadata.trackingNumber)}</div>` : ""}
+          </div>
+        </div>
+      `;
+    }
+    html += `</div>`;
+
+    if (data.isPurged) {
+      html += `
+        <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-xs text-red-700">
+          <strong>Notice:</strong> This order was purged from the active database under the 30-day retention rule, but its audit record is preserved in the non-volatile journal.
+        </div>
+      `;
+    }
+
+    modalBody.innerHTML = html;
+  } catch (err) {
+    modalBody.innerHTML = `
+      <div class="p-4 bg-red-50 text-red-700 rounded-md text-sm">
+        Failed to load order history: ${escapeHtml(err.message)}
+      </div>
+    `;
+  }
+}
+
+function closeOrderHistoryModal() {
+  const modal = document.getElementById("order-history-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
 
 function handleOrderListChange(e) {
   const actionDropdown = e.target.closest(".action-dropdown");
@@ -2774,6 +2942,85 @@ function initShippingConfigListeners() {
   });
 }
 
+// --- Retention & Storage Configuration ---
+async function loadRetentionConfig() {
+  try {
+    const data = await fetchWithAuth(`${serverUrl}/api/admin/retention/config`);
+    if (!data) return;
+    const toggle = document.getElementById("purge-artwork-toggle");
+    const countEl = document.getElementById("retention-canceled-count");
+
+    if (toggle) toggle.checked = !!data.purgeArtworkOnFlush;
+    if (countEl) countEl.textContent = data.canceledOrdersCount ?? 0;
+  } catch (err) {
+    console.error("[SHOP] Error loading retention config:", err);
+  }
+}
+
+async function saveRetentionConfig() {
+  const toggle = document.getElementById("purge-artwork-toggle");
+  const statusEl = document.getElementById("retention-config-status");
+  if (!toggle) return;
+
+  if (statusEl) {
+    statusEl.textContent = "Saving...";
+    statusEl.className = "text-sm text-gray-500";
+  }
+
+  try {
+    const res = await fetchWithAuth(`${serverUrl}/api/admin/retention/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ purgeArtworkOnFlush: toggle.checked })
+    });
+    if (res && res.success) {
+      if (statusEl) {
+        statusEl.textContent = "Retention settings saved!";
+        statusEl.className = "text-sm text-green-600 font-semibold";
+        setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+      }
+    } else {
+      throw new Error("Failed to save");
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.textContent = `Error: ${err.message}`;
+      statusEl.className = "text-sm text-red-600";
+    }
+  }
+}
+
+async function runRetentionFlushManual() {
+  const confirmed = window.confirm("Are you sure you want to run the 30-day canceled order cleanup now? Orders canceled more than 30 days ago will be permanently removed.");
+  if (!confirmed) return;
+
+  const btn = document.getElementById("run-retention-flush-btn");
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetchWithAuth(`${serverUrl}/api/admin/retention/flush`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ retentionDays: 30 })
+    });
+    alert(`Retention cleanup completed. Flushed ${res.flushedCount || 0} expired orders.`);
+    await loadRetentionConfig();
+    await fetchAndDisplayOrders();
+  } catch (err) {
+    alert(`Failed to run retention cleanup: ${err.message}`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function initRetentionListeners() {
+  document.getElementById("save-retention-config-btn")?.addEventListener("click", saveRetentionConfig);
+  document.getElementById("run-retention-flush-btn")?.addEventListener("click", runRetentionFlushManual);
+  document.getElementById("close-history-modal-btn")?.addEventListener("click", closeOrderHistoryModal);
+  document.getElementById("close-history-modal-footer-btn")?.addEventListener("click", closeOrderHistoryModal);
+}
+
+
 
 // --- Initialization ---
 async function getServerSessionToken() {
@@ -3241,6 +3488,7 @@ export async function init() {
       loadPricingConfigEditor();
       loadPirateShipConfig();
       loadShippingConfig();
+      loadRetentionConfig();
     });
   }
 
@@ -3256,6 +3504,9 @@ export async function init() {
   initPirateShipListeners();
   // Shipping & Fee listeners
   initShippingConfigListeners();
+  // Retention & Storage listeners
+  initRetentionListeners();
+
 
   // Check for a token in the URL from OAuth redirect
   const urlParams = new URLSearchParams(window.location.search);
