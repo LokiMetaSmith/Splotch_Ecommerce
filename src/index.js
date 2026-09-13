@@ -122,8 +122,10 @@ const activeBase = new Proxy(
 
 // Globals for SVG
 let isMetric = false;
-let baseCanvasWidth = 500; // Fixed bounding box frame width
-let baseCanvasHeight = 400; // Fixed bounding box frame height
+const DEFAULT_CANVAS_WIDTH = 500;
+const DEFAULT_CANVAS_HEIGHT = 400;
+let baseCanvasWidth = DEFAULT_CANVAS_WIDTH; // Fixed bounding box frame width
+let baseCanvasHeight = DEFAULT_CANVAS_HEIGHT; // Fixed bounding box frame height
 let currentBounds = null;
 let organicSheetCutline = null; // Automatically generated boolean union of all layer cutlines
 let sheetBoundaryConfig = {
@@ -2598,8 +2600,6 @@ function updateEditingButtonsState(disabled) {
 
 function setCanvasSize(logicalWidth, logicalHeight) {
   if (!canvas || !ctx) return;
-  baseCanvasWidth = logicalWidth;
-  baseCanvasHeight = logicalHeight;
   const dpr = isExporting ? 1 : (window.devicePixelRatio || 1);
 
   // Set the "actual" size of the canvas in device pixels
@@ -2637,8 +2637,7 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   // Update CSS size to match calculated display size exactly, true to life.
   canvas.style.width = `${cssWidth}px`;
   canvas.style.height = `${cssHeight}px`;
-  // Specifically remove object-fit/maxWidth to ensure visual scaling changes are absolute
-  canvas.style.maxWidth = "none";
+  canvas.style.maxWidth = "100%";
   canvas.style.maxHeight = "none";
   canvas.style.objectFit = "fill";
 }
@@ -3131,8 +3130,13 @@ function doRedrawAll() {
   if (!hasContent) {
     minX = 0;
     minY = 0;
-    maxX = baseCanvasWidth;
-    maxY = baseCanvasHeight;
+    maxX = DEFAULT_CANVAS_WIDTH;
+    maxY = DEFAULT_CANVAS_HEIGHT;
+    baseCanvasWidth = DEFAULT_CANVAS_WIDTH;
+    baseCanvasHeight = DEFAULT_CANVAS_HEIGHT;
+  } else {
+    baseCanvasWidth = maxX - minX;
+    baseCanvasHeight = maxY - minY;
   }
 
   if (organicSheetCutline && organicSheetCutline.length > 0) {
