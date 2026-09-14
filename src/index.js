@@ -1762,12 +1762,17 @@ async function updateOrderSummary() {
   try {
     const resp = await fetch(`${serverUrl}/api/order/estimate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {})
+      },
       body: JSON.stringify({
         subtotalCents: currentOrderAmountCents,
         areaInSqIn,
         destinationState,
         deliveryMethod,
+        ...(csrfToken ? { _csrf: csrfToken } : {})
       }),
     });
     if (!resp.ok) return;

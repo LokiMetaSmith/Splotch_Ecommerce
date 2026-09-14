@@ -807,7 +807,7 @@ async function startServer(
 
     app.use(lusca({
         csrf: {
-            blocklist: ['/wp-json', '/wc-auth', '/xmlrpc.php']
+            blocklist: ['/wp-json', '/wc-auth', '/xmlrpc.php', '/api/order/estimate']
         },
         xframe: 'SAMEORIGIN',
         hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},

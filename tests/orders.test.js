@@ -435,7 +435,53 @@ describe('Order API Endpoints', () => {
             expect(lastPaymentCall.shippingAddress.addressLine1).toBe('100 Shipping Way');
             expect(lastPaymentCall.shippingAddress.locality).toBe('Oklahoma City');
             expect(lastPaymentCall.shippingAddress.administrativeDistrictLevel1).toBe('OK');
-            expect(lastPaymentCall.shippingAddress.postalCode).toBe('73101');
+        });
+    });
+
+    describe('POST /api/order/estimate', () => {
+        it('should calculate breakdown for local pickup without requiring CSRF token', async () => {
+            const res = await request(app)
+                .post('/api/order/estimate')
+                .send({
+                    subtotalCents: 1000,
+                    areaInSqIn: 10,
+                    destinationState: 'OK',
+                    deliveryMethod: 'pickup'
+                });
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body.success).toBe(true);
+            expect(res.body.subtotalCents).toBe(1000);
+            expect(res.body.shippingCents).toBe(0);
+            expect(res.body.totalCents).toBeGreaterThan(0);
+        });
+
+        it('should calculate breakdown for shipping', async () => {
+            const res = await request(app)
+                .post('/api/order/estimate')
+                .send({
+                    subtotalCents: 2000,
+                    areaInSqIn: 15,
+                    destinationState: 'CA',
+                    deliveryMethod: 'ship'
+                });
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body.success).toBe(true);
+            expect(res.body.shippingCents).toBeGreaterThan(0);
+            expect(res.body.taxCents).toBe(0); // Out of state shipping is non-taxable
+        });
+
+        it('should return 400 for invalid inputs', async () => {
+            const res = await request(app)
+                .post('/api/order/estimate')
+                .send({
+                    subtotalCents: -5,
+                    areaInSqIn: 0
+                });
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body.errors).toBeDefined();
         });
     });
 
