@@ -817,7 +817,7 @@ async function startServer(
                 'default-src': "'self'",
                 'base-uri': "'self'",
                 'object-src': "'none'",
-                'script-src': "'self' 'sha256-k9DqWELGy2iTdN8DyXZFA3hhlQYfG4ECdTUq1yVTQ6w=' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com https://static.cloudflareinsights.com",
+                'script-src': "'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com https://static.cloudflareinsights.com",
                 'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com https://*.squarecdn.com https://sandbox.web.squarecdn.com",
                 'font-src': "'self' https://fonts.gstatic.com https://*.squarecdn.com https://cash-f.squarecdn.com https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
                 'img-src': "'self' data: blob: https://*.squarecdn.com https://sandbox.web.squarecdn.com",
