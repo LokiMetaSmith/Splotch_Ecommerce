@@ -1733,21 +1733,28 @@ function updateSubmitBtnState() {
   }
 }
 
+function getEffectivePackageAreaSqIn(customQty = null) {
+  const resolutionId = stickerResolutionSelect ? stickerResolutionSelect.value : "dpi_300";
+  const resolution = pricingConfig && pricingConfig.resolutions
+    ? pricingConfig.resolutions.find((r) => r.id === resolutionId)
+    : null;
+  const ppi = resolution ? resolution.ppi : 300;
+  const effectiveQty = (typeof customQty === "number" && customQty > 0)
+    ? customQty
+    : (stickerQuantityInput ? parseInt(stickerQuantityInput.value, 10) || 1 : 1);
+
+  if (currentBounds && currentBounds.width > 0 && currentBounds.height > 0) {
+    const w = currentBounds.width / ppi;
+    const h = currentBounds.height / ppi;
+    return Math.max(0.01, w * h * effectiveQty);
+  }
+  return 1;
+}
+
 async function updateOrderSummary() {
   if (!currentOrderAmountCents || currentOrderAmountCents <= 0) return;
 
-  // Compute area in sq inches from current sticker bounds
-  let areaInSqIn = null;
-  if (typeof bounds !== "undefined" && bounds && selectedResolution?.ppi) {
-    const ppi = selectedResolution.ppi;
-    const w = bounds.width / ppi;
-    const h = bounds.height / ppi;
-    const qty = stickerQuantityInput ? parseInt(stickerQuantityInput.value, 10) || 1 : 1;
-    areaInSqIn = w * h * qty;
-  }
-
-  if (!areaInSqIn) return;
-
+  const areaInSqIn = getEffectivePackageAreaSqIn();
   const deliveryMethod = document.querySelector('input[name="deliveryMethod"]:checked')?.value || 'ship';
   const stateInputVal = document.getElementById("state")?.value?.trim() || '';
   const destinationState = deliveryMethod === 'pickup' ? 'OK' : stateInputVal;
@@ -1807,6 +1814,8 @@ async function updateOrderSummary() {
     console.warn("[CLIENT] Could not load order estimate:", err);
   }
 }
+
+const fetchOrderEstimate = updateOrderSummary;
 
 function formatPrice(amountInCents) {
   const amountInDollars = amountInCents / 100;
@@ -2229,10 +2238,10 @@ async function handlePaymentFormSubmit(event) {
     };
 
     // Ensure we charge the full grand total (subtotal + shipping + tax + handling + fees)
+    await updateOrderSummary();
     let effectiveChargeAmountCents = currentOrderTotalCents;
     if (!effectiveChargeAmountCents || effectiveChargeAmountCents <= 0) {
-      await updateOrderSummary();
-      effectiveChargeAmountCents = currentOrderTotalCents > 0 ? currentOrderTotalCents : currentOrderAmountCents;
+      effectiveChargeAmountCents = currentOrderAmountCents;
     }
 
     const verificationDetails = {
@@ -2314,17 +2323,7 @@ async function handlePaymentFormSubmit(event) {
       ...shippingContact,
     };
 
-    const packageAreaSqIn = (() => {
-      // Sum width * height (in inches) for all stickers using current bounds and resolution
-      if (typeof bounds !== "undefined" && bounds && selectedResolution?.ppi) {
-        const ppi = selectedResolution.ppi;
-        const w = bounds.width / ppi;
-        const h = bounds.height / ppi;
-        const qty = orderDetails.quantity || 1;
-        return w * h * qty;
-      }
-      return null;
-    })();
+    const packageAreaSqIn = getEffectivePackageAreaSqIn(orderDetails.quantity);
 
     const orderPayload = {
       sourceId,

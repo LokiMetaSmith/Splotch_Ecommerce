@@ -817,12 +817,12 @@ async function startServer(
                 'default-src': "'self'",
                 'base-uri': "'self'",
                 'object-src': "'none'",
-                'script-src': "'self' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com https://static.cloudflareinsights.com",
+                'script-src': "'self' 'sha256-k9DqWELGy2iTdN8DyXZFA3hhlQYfG4ECdTUq1yVTQ6w=' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com https://static.cloudflareinsights.com",
                 'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com https://*.squarecdn.com https://sandbox.web.squarecdn.com",
                 'font-src': "'self' https://fonts.gstatic.com https://*.squarecdn.com https://cash-f.squarecdn.com https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
                 'img-src': "'self' data: blob: https://*.squarecdn.com https://sandbox.web.squarecdn.com",
-                'connect-src': "'self' https://*.squarecdn.com https://*.squareup.com https://*.squareupsandbox.com https://*.sentry.io https://cloudflareinsights.com",
-                'frame-src': "'self' https://*.squarecdn.com https://sandbox.web.squarecdn.com",
+                'connect-src': "'self' https://cdn.jsdelivr.net https://*.squarecdn.com https://*.squareup.com https://*.squareupsandbox.com https://*.sentry.io https://cloudflareinsights.com",
+                'frame-src': "'self' https: https://*.squarecdn.com https://sandbox.web.squarecdn.com https://*.squareup.com https://*.visa.com https://*.mastercard.com https://*.cardinalcommerce.com",
                 'worker-src': "'self' blob: https://cdn.jsdelivr.net",
                 'child-src': "'self' blob: https://cdn.jsdelivr.net"
             }
@@ -1695,6 +1695,7 @@ async function startServer(
       body('shippingContact.postalCode').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('Postal Code is required').isLength({ max: 20 }).withMessage('Postal Code is too long').not().contains('<'),
       body('shippingContact.country').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('Country is required').isLength({ max: 100 }).withMessage('Country name is too long').not().contains('<'),
       body('shippingContact.phoneNumber').optional().isString().trim().not().contains('<').withMessage('Invalid Phone Number').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
+      body('packageAreaSqIn').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('packageAreaSqIn must be a non-negative number'),
     ], async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
