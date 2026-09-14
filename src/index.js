@@ -5722,10 +5722,14 @@ function handleGenerateCutline(skipPrompt = false) {
 // --- Creator / Product Functions ---
 async function checkAuthStatus() {
   try {
-    // Check localStorage for token (support both keys for backward compatibility)
-    const token =
-      localStorage.getItem("authToken") ||
-      localStorage.getItem("splotch_token");
+    let token = null;
+    try {
+      token =
+        localStorage.getItem("authToken") ||
+        localStorage.getItem("splotch_token");
+    } catch {
+      // Storage access may be restricted by browser privacy settings
+    }
 
     if (token) {
       const verifyRes = await fetch(`${serverUrl}/api/auth/verify-token`, {
@@ -5733,6 +5737,11 @@ async function checkAuthStatus() {
       });
       if (verifyRes.ok) {
         // "Sell this Design" button is disabled/hidden
+      } else if (verifyRes.status === 401 || verifyRes.status === 403) {
+        try {
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("splotch_token");
+        } catch {}
       }
     }
   } catch (e) {
