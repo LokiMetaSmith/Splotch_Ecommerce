@@ -20,7 +20,7 @@ server/logs/
 
 # Logs and Runtime Data
 *.log
-server/data/
+server/data/*.jsonl
 *.jsonl
 server/db.test.json
 e2e_out.txt
