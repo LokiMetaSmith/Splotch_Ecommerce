@@ -1,12 +1,6 @@
 {
-  "pricePerSquareInchCents": 13,
+  "pricePerSquareInchCents": 11,
   "resolutions": [
-    {
-      "id": "dpi_96",
-      "name": "96 DPI (Draft)",
-      "ppi": 96,
-      "costMultiplier": 1.0
-    },
     {
       "id": "dpi_300",
       "name": "300 DPI (Standard)",
@@ -30,37 +24,13 @@
     {
       "id": "pp_standard",
       "name": "Gloss White Air Release",
-      "costMultiplier": 1.0,
-      "supportedLayers": ["white", "cmyk", "clear"],
+      "costMultiplier": 1,
+      "supportedLayers": [
+        "white",
+        "cmyk",
+        "clear"
+      ],
       "description": "Gloss white 2mil thick wrap vinyl. Outdoor rated, air release adhesive for easy bubble-free application over flat and curved surfaces alike. 3 Year Outdoor Rated Ink and Vinyl"
-    },
-    {
-      "id": "pvc_laminated",
-      "name": "Laminated PVC",
-      "costMultiplier": 1.5,
-      "supportedLayers": ["white", "cmyk", "clear"],
-      "description": "Extra Durable PVC + Lamination. Outdoor rated (5-7 yrs), air release adhesive for easy bubble-free application over flat and curved surfaces alike."
-    },
-    {
-      "id": "finish_holographic",
-      "name": "Holographic",
-      "costMultiplier": 2.0,
-      "supportedLayers": ["white", "cmyk", "clear"],
-      "description": "Premium Iridescent finish that catches the light. Perfect for limited edition prints and retro aesthetic designs."
-    },
-    {
-      "id": "finish_glitter",
-      "name": "Glitter",
-      "costMultiplier": 2.2,
-      "supportedLayers": ["white", "cmyk", "clear"],
-      "description": "Sparkly, textured glitter finish for a highly reflective and premium look."
-    },
-    {
-      "id": "finish_matte",
-      "name": "Matte Soft-Touch",
-      "costMultiplier": 1.8,
-      "supportedLayers": ["white", "cmyk", "clear"],
-      "description": "A velvety, soft-touch matte finish that diffuses light and feels incredibly premium."
     }
   ],
   "layers": [
@@ -72,28 +42,12 @@
     {
       "id": "cmyk",
       "name": "CMYK Artwork",
-      "costMultiplier": 1.0
+      "costMultiplier": 1
     },
     {
       "id": "clear",
       "name": "Clear",
       "costMultiplier": 1.2
-    },
-    {
-      "id": "inlay",
-      "name": "Inlay",
-      "costMultiplier": 1.5,
-      "subTypes": [
-        { "id": "holographic", "name": "Holographic", "costMultiplier": 1.0 },
-        { "id": "glitter", "name": "Glitter", "costMultiplier": 1.2 },
-        { "id": "silver", "name": "Silver", "costMultiplier": 1.1 },
-        { "id": "gold", "name": "Gold", "costMultiplier": 1.1 }
-      ]
-    },
-    {
-      "id": "text",
-      "name": "Text",
-      "costMultiplier": 1.0
     }
   ],
   "complexity": {
@@ -102,7 +56,7 @@
     "tiers": [
       {
         "thresholdInches": 12,
-        "multiplier": 1.0
+        "multiplier": 1
       },
       {
         "thresholdInches": 24,
@@ -117,11 +71,11 @@
   "quantityDiscounts": [
     {
       "quantity": 1,
-      "discount": 0.0
+      "discount": 0
     },
     {
       "quantity": 200,
-      "discount": 0.10
+      "discount": 0.1
     },
     {
       "quantity": 500,
