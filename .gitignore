@@ -31,3 +31,4 @@ backups/
 scratch/
 *.py
 
+server/tests/uploads/.chunks/

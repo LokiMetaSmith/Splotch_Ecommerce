@@ -2494,6 +2494,9 @@ function populatePrintshopSelectors() {
   if (currentConfig && currentConfig !== "new" && printshops.find(s => s.id === currentConfig)) {
       configSelector.value = currentConfig;
       loadPrintshopForm(currentConfig);
+  } else if (printshops.length > 0) {
+      configSelector.value = printshops[0].id;
+      loadPrintshopForm(printshops[0].id);
   } else {
       configSelector.value = "new";
       resetPrintshopForm();
