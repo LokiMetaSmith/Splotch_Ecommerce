@@ -25,11 +25,7 @@
       "id": "pp_standard",
       "name": "Gloss White Air Release",
       "costMultiplier": 1,
-      "supportedLayers": [
-        "white",
-        "cmyk",
-        "clear"
-      ],
+      "supportedLayers": ["white", "cmyk", "clear"],
       "description": "Gloss white 2mil thick wrap vinyl. Outdoor rated, air release adhesive for easy bubble-free application over flat and curved surfaces alike. 3 Year Outdoor Rated Ink and Vinyl"
     }
   ],
