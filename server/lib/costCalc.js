@@ -12,15 +12,15 @@
  * Rates reflect USPS Commercial Base / Pirate Ship discounted rates (2026).
  */
 export const DEFAULT_USPS_TIERS = [
-  { maxOz: 1,        rateCents: 430  }, // First Class <=1 oz
-  { maxOz: 2,        rateCents: 470  }, // First Class <=2 oz
-  { maxOz: 3,        rateCents: 510  }, // First Class <=3 oz
-  { maxOz: 4,        rateCents: 550  }, // First Class <=4 oz
-  { maxOz: 8,        rateCents: 680  }, // First Class <=8 oz
-  { maxOz: 16,       rateCents: 855  }, // Priority Mail <=1 lb
-  { maxOz: 32,       rateCents: 1050 }, // Priority Mail <=2 lb
-  { maxOz: 48,       rateCents: 1250 }, // Priority Mail <=3 lb
-  { maxOz: 64,       rateCents: 1450 }, // Priority Mail <=4 lb
+  { maxOz: 1, rateCents: 430 }, // First Class <=1 oz
+  { maxOz: 2, rateCents: 470 }, // First Class <=2 oz
+  { maxOz: 3, rateCents: 510 }, // First Class <=3 oz
+  { maxOz: 4, rateCents: 550 }, // First Class <=4 oz
+  { maxOz: 8, rateCents: 680 }, // First Class <=8 oz
+  { maxOz: 16, rateCents: 855 }, // Priority Mail <=1 lb
+  { maxOz: 32, rateCents: 1050 }, // Priority Mail <=2 lb
+  { maxOz: 48, rateCents: 1250 }, // Priority Mail <=3 lb
+  { maxOz: 64, rateCents: 1450 }, // Priority Mail <=4 lb
   { maxOz: Infinity, rateCents: 1900 }, // Priority Mail >4 lb (flat fallback)
 ];
 
@@ -32,7 +32,11 @@ export const DEFAULT_USPS_TIERS = [
  * @param {number} [opts.tareGrams]    Fixed packaging tare weight in grams (default 28 g ~= 1 oz)
  * @returns {{ weightGrams: number, weightOz: number }}
  */
-export function calcWeight({ areaInSqIn, gramsPerSqIn = 0.05, tareGrams = 28 }) {
+export function calcWeight({
+  areaInSqIn,
+  gramsPerSqIn = 0.05,
+  tareGrams = 28,
+}) {
   const stickerGrams = areaInSqIn * gramsPerSqIn;
   const totalGrams = stickerGrams + tareGrams;
   const weightOz = totalGrams / 28.3495;
@@ -48,7 +52,7 @@ export function calcWeight({ areaInSqIn, gramsPerSqIn = 0.05, tareGrams = 28 }) 
  */
 export function calcShippingEstimate({ weightOz, tiers = DEFAULT_USPS_TIERS }) {
   const minWeight = Math.max(weightOz, 1); // USPS First Class minimum is 1 oz
-  const tier = tiers.find(t => minWeight <= t.maxOz);
+  const tier = tiers.find((t) => minWeight <= t.maxOz);
   const rateCents = tier ? tier.rateCents : tiers[tiers.length - 1].rateCents;
 
   let label;
@@ -83,7 +87,11 @@ export function calcTax({ subtotalCents, shippingCents, taxRate }) {
  * @param {number} [opts.feeFixedCents] Fixed per-transaction fee in cents (default 30)
  * @returns {number} feeCents
  */
-export function calcSquareFee({ amountCents, feePercent = 0.029, feeFixedCents = 30 }) {
+export function calcSquareFee({
+  amountCents,
+  feePercent = 0.029,
+  feeFixedCents = 30,
+}) {
   return Math.ceil(amountCents * feePercent) + feeFixedCents;
 }
 
@@ -97,9 +105,18 @@ export function calcSquareFee({ amountCents, feePercent = 0.029, feeFixedCents =
  * @param {Object} opts
  * @returns {number} totalCents
  */
-export function calcTotal({ subtotalCents, discountCents = 0, shippingCents, taxCents, handlingCents, squareFeeCents }) {
+export function calcTotal({
+  subtotalCents,
+  discountCents = 0,
+  shippingCents,
+  taxCents,
+  handlingCents,
+  squareFeeCents,
+}) {
   const netSubtotal = Math.max(0, subtotalCents - discountCents);
-  return netSubtotal + shippingCents + taxCents + handlingCents + squareFeeCents;
+  return (
+    netSubtotal + shippingCents + taxCents + handlingCents + squareFeeCents
+  );
 }
 
 /**
@@ -107,12 +124,12 @@ export function calcTotal({ subtotalCents, discountCents = 0, shippingCents, tax
  * Used when no config has been saved to the database yet.
  */
 export const DEFAULT_SHIPPING_CONFIG = {
-  taxRate: 0.085,           // Oklahoma 8.5%
-  handlingFeeCents: 300,    // $3.00 minimum
-  squareFeePercent: 0.029,  // 2.9%
-  squareFeeFixedCents: 30,  // $0.30
-  gramsPerSqIn: 0.05,       // 3 mil vinyl
-  packageTareGrams: 28,     // ~1 oz envelope + backing
+  taxRate: 0.085, // Oklahoma 8.5%
+  handlingFeeCents: 300, // $3.00 minimum
+  squareFeePercent: 0.029, // 2.9%
+  squareFeeFixedCents: 30, // $0.30
+  gramsPerSqIn: 0.05, // 3 mil vinyl
+  packageTareGrams: 28, // ~1 oz envelope + backing
   pickupDiscountCents: 300, // $3.00 local pickup discount
 };
 
@@ -132,11 +149,13 @@ export function calcOrderBreakdown({
   subtotalCents,
   config = {},
   tiers,
-  destinationState = 'OK',
-  deliveryMethod = 'ship',
+  destinationState = "OK",
+  deliveryMethod = "ship",
+  tradeoffs = [],
+  pricingConfig = null,
 }) {
   const cfg = { ...DEFAULT_SHIPPING_CONFIG, ...config };
-  const isPickup = deliveryMethod === 'pickup';
+  const isPickup = deliveryMethod === "pickup";
 
   const weight = calcWeight({
     areaInSqIn,
@@ -144,13 +163,52 @@ export function calcOrderBreakdown({
     tareGrams: cfg.packageTareGrams,
   });
 
+  // Calculate tradeoffs against the initial subtotal
+  let tradeoffModifiersCents = 0;
+  let activeTradeoffDetails = [];
+
+  if (
+    tradeoffs &&
+    tradeoffs.length > 0 &&
+    pricingConfig &&
+    pricingConfig.tradeoffs
+  ) {
+    for (const tradeoffId of tradeoffs) {
+      const tradeoffDef = pricingConfig.tradeoffs[tradeoffId];
+      if (tradeoffDef) {
+        let modifierCents = 0;
+        if (tradeoffDef.type === "percentage") {
+          modifierCents = Math.round(subtotalCents * tradeoffDef.value);
+        } else if (tradeoffDef.type === "flat") {
+          modifierCents = tradeoffDef.valueCents;
+        }
+        tradeoffModifiersCents += modifierCents;
+        activeTradeoffDetails.push({
+          id: tradeoffId,
+          name: tradeoffDef.name,
+          modifierCents: modifierCents,
+          modifierDollars: (modifierCents / 100).toFixed(2),
+        });
+      }
+    }
+  }
+
+  // Adjusted subtotal (it can be lower, but not negative)
+  const adjustedSubtotalCents = Math.max(
+    0,
+    subtotalCents + tradeoffModifiersCents,
+  );
+
   let shippingCents = 0;
-  let shippingLabel = 'Local Pickup (Free)';
+  let shippingLabel = "Local Pickup (Free)";
   let pickupDiscountCents = 0;
 
   if (isPickup) {
-    const configuredDiscount = typeof cfg.pickupDiscountCents === 'number' ? cfg.pickupDiscountCents : 300;
-    pickupDiscountCents = Math.min(subtotalCents, configuredDiscount);
+    const configuredDiscount =
+      typeof cfg.pickupDiscountCents === "number"
+        ? cfg.pickupDiscountCents
+        : 300;
+    pickupDiscountCents = Math.min(adjustedSubtotalCents, configuredDiscount);
   } else {
     const est = calcShippingEstimate({
       weightOz: weight.weightOz,
@@ -163,15 +221,27 @@ export function calcOrderBreakdown({
   // Oklahoma sales tax nexus rule:
   // - Local Pickup: physical transfer occurs in OK -> taxable
   // - Shipping: taxable only if destination address is in Oklahoma ('OK' or 'Oklahoma')
-  const isOkState = destinationState ? /^(ok|oklahoma)$/i.test(String(destinationState).trim()) : false;
+  const isOkState = destinationState
+    ? /^(ok|oklahoma)$/i.test(String(destinationState).trim())
+    : false;
   const isTaxable = isPickup || isOkState;
   const effectiveTaxRate = isTaxable ? cfg.taxRate : 0;
 
-  const discountedSubtotal = Math.max(0, subtotalCents - pickupDiscountCents);
-  const taxCents = isTaxable ? calcTax({ subtotalCents: discountedSubtotal, shippingCents, taxRate: cfg.taxRate }) : 0;
+  const discountedSubtotal = Math.max(
+    0,
+    adjustedSubtotalCents - pickupDiscountCents,
+  );
+  const taxCents = isTaxable
+    ? calcTax({
+        subtotalCents: discountedSubtotal,
+        shippingCents,
+        taxRate: cfg.taxRate,
+      })
+    : 0;
   const handlingCents = cfg.handlingFeeCents;
 
-  const preTotalCents = discountedSubtotal + shippingCents + taxCents + handlingCents;
+  const preTotalCents =
+    discountedSubtotal + shippingCents + taxCents + handlingCents;
   const squareFeeCents = calcSquareFee({
     amountCents: preTotalCents,
     feePercent: cfg.squareFeePercent,
@@ -179,7 +249,7 @@ export function calcOrderBreakdown({
   });
 
   const totalCents = calcTotal({
-    subtotalCents,
+    subtotalCents: adjustedSubtotalCents,
     discountCents: pickupDiscountCents,
     shippingCents,
     taxCents,
@@ -189,8 +259,12 @@ export function calcOrderBreakdown({
 
   return {
     weightGrams: Math.round(weight.weightGrams * 10) / 10,
-    weightOz:    Math.round(weight.weightOz * 100) / 100,
-    subtotalCents,
+    weightOz: Math.round(weight.weightOz * 100) / 100,
+    baseSubtotalCents: subtotalCents,
+    adjustedSubtotalCents,
+    tradeoffModifiersCents,
+    activeTradeoffs: activeTradeoffDetails,
+    subtotalCents: adjustedSubtotalCents,
     discountCents: pickupDiscountCents,
     pickupDiscountCents,
     shippingCents,
@@ -201,15 +275,15 @@ export function calcOrderBreakdown({
     handlingCents,
     squareFeeCents,
     totalCents,
-    deliveryMethod: isPickup ? 'pickup' : 'ship',
-    subtotalDollars:       (subtotalCents       / 100).toFixed(2),
-    discountDollars:       (pickupDiscountCents / 100).toFixed(2),
+    deliveryMethod: isPickup ? "pickup" : "ship",
+    subtotalDollars: (subtotalCents / 100).toFixed(2),
+    discountDollars: (pickupDiscountCents / 100).toFixed(2),
     pickupDiscountDollars: (pickupDiscountCents / 100).toFixed(2),
-    shippingDollars:       (shippingCents       / 100).toFixed(2),
-    taxDollars:            (taxCents            / 100).toFixed(2),
-    handlingDollars:       (handlingCents       / 100).toFixed(2),
-    squareFeeDollars:      (squareFeeCents      / 100).toFixed(2),
-    totalDollars:          (totalCents          / 100).toFixed(2),
+    shippingDollars: (shippingCents / 100).toFixed(2),
+    taxDollars: (taxCents / 100).toFixed(2),
+    handlingDollars: (handlingCents / 100).toFixed(2),
+    squareFeeDollars: (squareFeeCents / 100).toFixed(2),
+    totalDollars: (totalCents / 100).toFixed(2),
+    tradeoffModifiersDollars: (tradeoffModifiersCents / 100).toFixed(2),
   };
 }
-

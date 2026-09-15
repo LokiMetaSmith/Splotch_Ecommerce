@@ -104,6 +104,56 @@ describe('costCalc - calcTotal', () => {
 });
 
 describe('costCalc - calcOrderBreakdown', () => {
+
+  it('should enforce a hard floor of $0 for tradeoff discounts', () => {
+    // $10 subtotal
+    // trade-off 1: flat -$10 (-1000 cents)
+    // trade-off 2: flat -$5 (-500 cents)
+    // Total discounts = -1500
+    // Adjusted subtotal should floor at 0
+    const mockPricingConfig = {
+      tradeoffs: {
+         print_ready: { type: 'flat', valueCents: -1000 },
+         consolidated: { type: 'flat', valueCents: -500 }
+      }
+    };
+
+    const result = calcOrderBreakdown({
+      areaInSqIn: 4,
+      subtotalCents: 1000,
+      config: DEFAULT_SHIPPING_CONFIG,
+      tradeoffs: ['print_ready', 'consolidated'],
+      pricingConfig: mockPricingConfig
+    });
+
+    expect(result.tradeoffModifiersCents).toBe(-1500);
+    expect(result.adjustedSubtotalCents).toBe(0);
+    expect(result.subtotalCents).toBe(0);
+  });
+
+  it('should calculate percentage tradeoffs strictly against the post-discount subtotal', () => {
+    // e.g. If cart subtotal is $100, but a promo discount is already applied?
+    // Wait, the current implementation passes the 'subtotalCents' AFTER promo discount is applied in server.js.
+    // In server.js line ~1943: const stickerSubtotal = Math.max(0, expectedSubtotal - promoAmountCents);
+    // Let's verify calcOrderBreakdown calculates percentage off the passed in subtotalCents correctly.
+    const mockPricingConfig = {
+      tradeoffs: {
+         no_reprints: { type: 'percentage', value: -0.08 }
+      }
+    };
+
+    const result = calcOrderBreakdown({
+      areaInSqIn: 4,
+      subtotalCents: 10000, // $100.00
+      config: DEFAULT_SHIPPING_CONFIG,
+      tradeoffs: ['no_reprints'],
+      pricingConfig: mockPricingConfig
+    });
+
+    expect(result.tradeoffModifiersCents).toBe(-800); // 8% of 10000
+    expect(result.adjustedSubtotalCents).toBe(9200);
+  });
+
   it('should return a full breakdown with dollar strings', () => {
     const result = calcOrderBreakdown({
       areaInSqIn: 4,   // 2x2 inch sticker

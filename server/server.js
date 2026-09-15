@@ -1,194 +1,260 @@
 // server.js
-import express from 'express';
+import express from "express";
 import { SquareClient, SquareEnvironment, SquareError } from "square";
-import crypto, { randomUUID } from 'crypto';
-import { createWooCommerceRouter } from './woocommerce.js';
-import cors from 'cors';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import dns from 'dns';
-import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
-import cookieParser from 'cookie-parser';
-import lusca from 'lusca';
-import compression from 'compression';
-import session from 'express-session';
-import { JSONFilePreset } from 'lowdb/node';
-import jwt from 'jsonwebtoken';
-import { body, validationResult, query, matchedData } from 'express-validator';
-import rateLimit from 'express-rate-limit';
-import bcrypt from 'bcrypt';
-import dotenv from 'dotenv';
-import { google as defaultGoogle } from 'googleapis';
-import * as defaultWebAuthn from '@simplewebauthn/server';
-import { getSecret } from './secretManager.js';
-import { sendEmail as defaultSendEmail } from './email.js';
-import { getCurrentSigningKey, getJwks, rotateKeys, getKey, KEY_ROTATION_MS } from './keyManager.js';
-import { initializeBot } from './bot.js';
-import { initializeTracker } from './tracker.js';
-import { validateUsername, validateUsernameQuery, validateId } from './validators.js';
-import { fileTypeFromFile } from 'file-type';
-import { calculateStickerPrice, getDesignDimensions } from './pricing.js';
-import { calcOrderBreakdown, DEFAULT_SHIPPING_CONFIG } from './lib/costCalc.js';
-import { logOrderTransition, readAuditLogForOrder } from './lib/auditLogger.js';
+import crypto, { randomUUID } from "crypto";
+import { createWooCommerceRouter } from "./woocommerce.js";
+import cors from "cors";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import dns from "dns";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from "@simplewebauthn/server";
+import cookieParser from "cookie-parser";
+import lusca from "lusca";
+import compression from "compression";
+import session from "express-session";
+import { JSONFilePreset } from "lowdb/node";
+import jwt from "jsonwebtoken";
+import { body, validationResult, query, matchedData } from "express-validator";
+import rateLimit from "express-rate-limit";
+import bcrypt from "bcrypt";
+import dotenv from "dotenv";
+import { google as defaultGoogle } from "googleapis";
+import * as defaultWebAuthn from "@simplewebauthn/server";
+import { getSecret } from "./secretManager.js";
+import { sendEmail as defaultSendEmail } from "./email.js";
+import {
+  getCurrentSigningKey,
+  getJwks,
+  rotateKeys,
+  getKey,
+  KEY_ROTATION_MS,
+} from "./keyManager.js";
+import { initializeBot } from "./bot.js";
+import { initializeTracker } from "./tracker.js";
+import {
+  validateUsername,
+  validateUsernameQuery,
+  validateId,
+} from "./validators.js";
+import { fileTypeFromFile } from "file-type";
+import { calculateStickerPrice, getDesignDimensions } from "./pricing.js";
+import { calcOrderBreakdown, DEFAULT_SHIPPING_CONFIG } from "./lib/costCalc.js";
+import { logOrderTransition, readAuditLogForOrder } from "./lib/auditLogger.js";
 
-import { Markup } from 'telegraf';
-import { getOrderStatusKeyboard } from './telegramHelpers.js';
-import DOMPurify from 'dompurify';
-import { JSDOM } from 'jsdom';
-import logger from './logger.js';
-import { performanceLogger } from './performanceLogger.js';
-import Metrics from './metrics.js';
-import { escapeHtml } from './utils.js';
-import { LocalStorageProvider, S3StorageProvider } from './storage.js';
+import { Markup } from "telegraf";
+import { getOrderStatusKeyboard } from "./telegramHelpers.js";
+import DOMPurify from "dompurify";
+import { JSDOM } from "jsdom";
+import logger from "./logger.js";
+import { performanceLogger } from "./performanceLogger.js";
+import Metrics from "./metrics.js";
+import { escapeHtml } from "./utils.js";
+import { LocalStorageProvider, S3StorageProvider } from "./storage.js";
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
-import { startBackupScheduler } from './backupService.js';
-import { createClient } from 'redis';
-import { RedisStore as ConnectRedisStore } from 'connect-redis';
-import { RedisStore as RateLimitRedisStore } from 'rate-limit-redis';
-import { LowDbAdapter } from './database/lowdb_adapter.js';
-import { startEmailWorker } from './workers/emailWorker.js';
-import { startTelegramWorker } from './workers/telegramWorker.js';
-import { startOdooWorker } from './workers/odooWorker.js';
-import { emailQueue, telegramQueue, odooQueue, redisAvailable } from './queueManager.js';
-import { ChunkedUploadManager } from './utils/chunkedUploader.js';
-import sizeOf from 'image-size';
-import { sendNewOrderNotification, updateOrderStatusNotification } from './notificationLogic.js';
-import { processIncomingOrderToDropBox } from './utils/usbDropBox.js'; // SBC Drop Box Integration
-import { wafMiddleware } from './waf.js';
-import OdooClient from './odoo.js';
-import { exec, execFile } from 'child_process';
-import util from 'util';
+import { startBackupScheduler } from "./backupService.js";
+import { createClient } from "redis";
+import { RedisStore as ConnectRedisStore } from "connect-redis";
+import { RedisStore as RateLimitRedisStore } from "rate-limit-redis";
+import { LowDbAdapter } from "./database/lowdb_adapter.js";
+import { startEmailWorker } from "./workers/emailWorker.js";
+import { startTelegramWorker } from "./workers/telegramWorker.js";
+import { startOdooWorker } from "./workers/odooWorker.js";
+import {
+  emailQueue,
+  telegramQueue,
+  odooQueue,
+  redisAvailable,
+} from "./queueManager.js";
+import { ChunkedUploadManager } from "./utils/chunkedUploader.js";
+import sizeOf from "image-size";
+import {
+  sendNewOrderNotification,
+  updateOrderStatusNotification,
+} from "./notificationLogic.js";
+import { processIncomingOrderToDropBox } from "./utils/usbDropBox.js"; // SBC Drop Box Integration
+import { wafMiddleware } from "./waf.js";
+import OdooClient from "./odoo.js";
+import { exec, execFile } from "child_process";
+import util from "util";
 
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
 
-export const FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
-export const VALID_STATUSES = ['NEW', 'ACCEPTED', 'PRINTING', 'HOLD_FOR_PICKUP', ...FINAL_STATUSES];
+export const FINAL_STATUSES = ["SHIPPED", "CANCELED", "COMPLETED", "DELIVERED"];
+export const VALID_STATUSES = [
+  "NEW",
+  "ACCEPTED",
+  "PRINTING",
+  "HOLD_FOR_PICKUP",
+  ...FINAL_STATUSES,
+];
 
-const allowedMimeTypes = ['image/svg+xml', 'application/xml', 'image/png', 'image/jpeg', 'image/webp', 'image/tiff', 'application/pdf', 'application/postscript', 'application/illustrator'];
+const allowedMimeTypes = [
+  "image/svg+xml",
+  "application/xml",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/tiff",
+  "application/pdf",
+  "application/postscript",
+  "application/illustrator",
+];
 // Pre-computed valid bcrypt hash for timing-safe comparison
-const DUMMY_HASH = '$2b$10$e8ypvsBL/MxhtxIydLPU2eoLd4IVyOy0MhGvCRL3DC/xUpoznhhHi';
+const DUMMY_HASH =
+  "$2b$10$e8ypvsBL/MxhtxIydLPU2eoLd4IVyOy0MhGvCRL3DC/xUpoznhhHi";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 let storageProvider;
 const storageProviderType = process.env.STORAGE_PROVIDER;
 // Default to S3 if credentials exist AND not explicitly set to 'local' (or anything else)
 // If STORAGE_PROVIDER is 'local', this will be false even if credentials exist.
-const shouldDefaultToS3 = !storageProviderType && getSecret('S3_BUCKET') && getSecret('AWS_ACCESS_KEY_ID');
+const shouldDefaultToS3 =
+  !storageProviderType &&
+  getSecret("S3_BUCKET") &&
+  getSecret("AWS_ACCESS_KEY_ID");
 
-if (storageProviderType === 's3' || shouldDefaultToS3) {
-    logger.info('[SERVER] Using S3 Storage Provider.');
-    storageProvider = new S3StorageProvider({
-        bucket: getSecret('S3_BUCKET'),
-        region: getSecret('S3_REGION') || 'us-east-1',
-        endpoint: getSecret('S3_ENDPOINT'),
-        accessKeyId: getSecret('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: getSecret('AWS_SECRET_ACCESS_KEY')
-    });
+if (storageProviderType === "s3" || shouldDefaultToS3) {
+  logger.info("[SERVER] Using S3 Storage Provider.");
+  storageProvider = new S3StorageProvider({
+    bucket: getSecret("S3_BUCKET"),
+    region: getSecret("S3_REGION") || "us-east-1",
+    endpoint: getSecret("S3_ENDPOINT"),
+    accessKeyId: getSecret("AWS_ACCESS_KEY_ID"),
+    secretAccessKey: getSecret("AWS_SECRET_ACCESS_KEY"),
+  });
 } else {
-    logger.info('[SERVER] Using Local Storage Provider.');
-    storageProvider = new LocalStorageProvider(path.join(__dirname, 'uploads'));
+  logger.info("[SERVER] Using Local Storage Provider.");
+  storageProvider = new LocalStorageProvider(path.join(__dirname, "uploads"));
 }
 
 // JSDOM window is needed for server-side SVG sanitization
-const { window } = new JSDOM('');
+const { window } = new JSDOM("");
 const createDOMPurify = DOMPurify?.default || DOMPurify;
-const purify = typeof createDOMPurify === 'function' ? createDOMPurify(window) : createDOMPurify;
-
-
-
+const purify =
+  typeof createDOMPurify === "function"
+    ? createDOMPurify(window)
+    : createDOMPurify;
 
 async function enforceCorrectExtension(fileObj, detectedType) {
-    if (!detectedType || !detectedType.ext) return;
+  if (!detectedType || !detectedType.ext) return;
 
-    const currentExt = path.extname(fileObj.filename).toLowerCase().replace('.', '');
-    const correctExt = detectedType.ext;
+  const currentExt = path
+    .extname(fileObj.filename)
+    .toLowerCase()
+    .replace(".", "");
+  const correctExt = detectedType.ext;
 
-    // Strict enforcement: Always rename to detected extension if different
-    // (allowing jpg/jpeg equivalence)
-    const isJpeg = (ext) => ext === 'jpg' || ext === 'jpeg';
-    const match = currentExt === correctExt || (isJpeg(currentExt) && isJpeg(correctExt));
+  // Strict enforcement: Always rename to detected extension if different
+  // (allowing jpg/jpeg equivalence)
+  const isJpeg = (ext) => ext === "jpg" || ext === "jpeg";
+  const match =
+    currentExt === correctExt || (isJpeg(currentExt) && isJpeg(correctExt));
 
-    if (!match) {
-        const nameWithoutExt = path.basename(fileObj.filename, path.extname(fileObj.filename));
-        const newFilename = `${nameWithoutExt}.${correctExt}`;
-        const newPath = path.join(path.dirname(fileObj.path), newFilename);
+  if (!match) {
+    const nameWithoutExt = path.basename(
+      fileObj.filename,
+      path.extname(fileObj.filename),
+    );
+    const newFilename = `${nameWithoutExt}.${correctExt}`;
+    const newPath = path.join(path.dirname(fileObj.path), newFilename);
 
-        await fs.promises.rename(fileObj.path, newPath);
+    await fs.promises.rename(fileObj.path, newPath);
 
-        // Update file object
-        fileObj.filename = newFilename;
-        fileObj.path = newPath;
-        logger.info(`[SECURITY] Renamed uploaded file to enforce extension: ${newFilename}`);
-    }
+    // Update file object
+    fileObj.filename = newFilename;
+    fileObj.path = newPath;
+    logger.info(
+      `[SECURITY] Renamed uploaded file to enforce extension: ${newFilename}`,
+    );
+  }
 }
 
 async function sanitizeSVGFile(filePath) {
-    try {
-        const fileContent = await fs.promises.readFile(filePath, 'utf-8');
-        const sanitized = purify.sanitize(fileContent, { USE_PROFILES: { svg: true } });
+  try {
+    const fileContent = await fs.promises.readFile(filePath, "utf-8");
+    const sanitized = purify.sanitize(fileContent, {
+      USE_PROFILES: { svg: true },
+    });
 
-        // DOMPurify returns an empty string if it finds malicious content.
-        // We also check if the original content was not empty to avoid false positives.
-        if (!sanitized && fileContent.trim() !== '') {
-            await fs.promises.writeFile(filePath, ''); // Overwrite with empty string to reject.
-            logger.warn(`[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`);
-            return false;
-        }
-
-        await fs.promises.writeFile(filePath, sanitized);
-        logger.info(`[SECURITY] SVG file sanitized successfully: ${filePath}`);
-        return true;
-    } catch (error) {
-        logger.error(`[ERROR] Could not sanitize SVG file: ${filePath}`, error);
-        // In case of an error, we should not keep the potentially harmful file.
-        try {
-            await storageProvider.deleteFile(filePath);
-        } catch (unlinkError) {
-            logger.error(`[ERROR] Failed to delete file after sanitization error: ${filePath}`, unlinkError);
-        }
-        return false;
+    // DOMPurify returns an empty string if it finds malicious content.
+    // We also check if the original content was not empty to avoid false positives.
+    if (!sanitized && fileContent.trim() !== "") {
+      await fs.promises.writeFile(filePath, ""); // Overwrite with empty string to reject.
+      logger.warn(
+        `[SECURITY] Malicious content detected in SVG and was rejected: ${filePath}`,
+      );
+      return false;
     }
+
+    await fs.promises.writeFile(filePath, sanitized);
+    logger.info(`[SECURITY] SVG file sanitized successfully: ${filePath}`);
+    return true;
+  } catch (error) {
+    logger.error(`[ERROR] Could not sanitize SVG file: ${filePath}`, error);
+    // In case of an error, we should not keep the potentially harmful file.
+    try {
+      await storageProvider.deleteFile(filePath);
+    } catch (unlinkError) {
+      logger.error(
+        `[ERROR] Failed to delete file after sanitization error: ${filePath}`,
+        unlinkError,
+      );
+    }
+    return false;
+  }
 }
 
 // Load pricing configuration
 let pricingConfig = {};
-const pricingPath = process.env.TEST_PRICING_PATH || path.join(__dirname, 'pricing.json');
+const pricingPath =
+  process.env.TEST_PRICING_PATH || path.join(__dirname, "pricing.json");
 
 function loadPricingConfig() {
-    try {
-        const pricingData = fs.readFileSync(pricingPath, 'utf8');
-        const newConfig = JSON.parse(pricingData);
+  try {
+    const pricingData = fs.readFileSync(pricingPath, "utf8");
+    const newConfig = JSON.parse(pricingData);
 
-        // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
-        if (newConfig.complexity && newConfig.complexity.tiers) {
-            newConfig.complexity.tiers.sort((a, b) =>
-                a.thresholdInches === "Infinity"
-                    ? 1
-                    : b.thresholdInches === "Infinity"
-                        ? -1
-                        : a.thresholdInches - b.thresholdInches
-            );
-        }
-        if (newConfig.quantityDiscounts) {
-            newConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
-        }
-
-        pricingConfig = newConfig;
-        logger.info('[SERVER] Pricing configuration loaded/updated.');
-    } catch (error) {
-        if (Object.keys(pricingConfig).length === 0) {
-            logger.error('[SERVER] FATAL: Could not load pricing.json initially.', error);
-            process.exit(1);
-        } else {
-            logger.warn('[SERVER] Warning: Failed to reload pricing.json. Keeping previous config.', error.message);
-        }
+    // OPTIMIZATION: Sort tiers and discounts once on load to avoid repeated sorting during calculation
+    if (newConfig.complexity && newConfig.complexity.tiers) {
+      newConfig.complexity.tiers.sort((a, b) =>
+        a.thresholdInches === "Infinity"
+          ? 1
+          : b.thresholdInches === "Infinity"
+            ? -1
+            : a.thresholdInches - b.thresholdInches,
+      );
     }
+    if (newConfig.quantityDiscounts) {
+      newConfig.quantityDiscounts.sort((a, b) => b.quantity - a.quantity);
+    }
+
+    pricingConfig = newConfig;
+    logger.info("[SERVER] Pricing configuration loaded/updated.");
+  } catch (error) {
+    if (Object.keys(pricingConfig).length === 0) {
+      logger.error(
+        "[SERVER] FATAL: Could not load pricing.json initially.",
+        error,
+      );
+      process.exit(1);
+    } else {
+      logger.warn(
+        "[SERVER] Warning: Failed to reload pricing.json. Keeping previous config.",
+        error.message,
+      );
+    }
+  }
 }
 
 // Initial load
@@ -196,118 +262,145 @@ loadPricingConfig();
 
 // Watch for changes
 fs.watch(pricingPath, (eventType) => {
-    if (eventType === 'change') {
-        logger.info('[SERVER] pricing.json changed, reloading...');
-        loadPricingConfig();
-    }
+  if (eventType === "change") {
+    logger.info("[SERVER] pricing.json changed, reloading...");
+    loadPricingConfig();
+  }
 });
 
-import { randomBytes } from 'crypto';
+import { randomBytes } from "crypto";
 
 let serverSessionToken;
 const SERVER_INSTANCE_ID = randomUUID();
 
 // Function to sign the instance token with the current key
 const signInstanceToken = () => {
-    const { privateKey, kid } = getCurrentSigningKey();
-    serverSessionToken = jwt.sign(
-        { instanceId: SERVER_INSTANCE_ID },
-        privateKey,
-        { algorithm: 'RS256', expiresIn: '1h', header: { kid } }
-    );
-    logger.info(`[SERVER] Signed new session token with key ID: ${kid}`);
+  const { privateKey, kid } = getCurrentSigningKey();
+  serverSessionToken = jwt.sign(
+    { instanceId: SERVER_INSTANCE_ID },
+    privateKey,
+    { algorithm: "RS256", expiresIn: "1h", header: { kid } },
+  );
+  logger.info(`[SERVER] Signed new session token with key ID: ${kid}`);
 };
 let db;
 let app;
 
-const defaultData = { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} };
+const defaultData = {
+  orders: {},
+  batches: {},
+  users: {},
+  emailIndex: {},
+  credentials: {},
+  config: {},
+  products: {},
+};
 
 export async function runRetentionFlush(dbInstance, options = {}) {
-    const retentionDays = options.retentionDays !== undefined ? options.retentionDays : 30;
-    const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
-    const now = Date.now();
+  const retentionDays =
+    options.retentionDays !== undefined ? options.retentionDays : 30;
+  const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+  const now = Date.now();
 
-    const lowdb = dbInstance?.db || dbInstance;
-    const config = lowdb?.data?.config?.retention || { purgeArtworkOnFlush: false };
-    const purgeArtwork = options.purgeArtworkOnFlush !== undefined ? options.purgeArtworkOnFlush : config.purgeArtworkOnFlush;
+  const lowdb = dbInstance?.db || dbInstance;
+  const config = lowdb?.data?.config?.retention || {
+    purgeArtworkOnFlush: false,
+  };
+  const purgeArtwork =
+    options.purgeArtworkOnFlush !== undefined
+      ? options.purgeArtworkOnFlush
+      : config.purgeArtworkOnFlush;
 
-    const allOrders = Object.values(lowdb?.data?.orders || {});
-    const flushedOrderIds = [];
+  const allOrders = Object.values(lowdb?.data?.orders || {});
+  const flushedOrderIds = [];
 
-    for (const order of allOrders) {
-        if (order.status === 'CANCELED' && (order.shadowDeleted || order.shadowDeletedAt)) {
-            const canceledTime = order.shadowDeletedAt
-                ? new Date(order.shadowDeletedAt).getTime()
-                : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
+  for (const order of allOrders) {
+    if (
+      order.status === "CANCELED" &&
+      (order.shadowDeleted || order.shadowDeletedAt)
+    ) {
+      const canceledTime = order.shadowDeletedAt
+        ? new Date(order.shadowDeletedAt).getTime()
+        : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
 
-            if (now - canceledTime >= retentionMs) {
-                logger.info(`[RETENTION] Purging canceled order ${order.orderId} older than ${retentionDays} days.`);
+      if (now - canceledTime >= retentionMs) {
+        logger.info(
+          `[RETENTION] Purging canceled order ${order.orderId} older than ${retentionDays} days.`,
+        );
 
-                // Non-volatile audit log record of permanent purge
-                logOrderTransition({
-                    orderId: order.orderId,
-                    fromStatus: 'CANCELED',
-                    toStatus: 'PURGED',
-                    actor: { type: 'system', id: 'retention_worker' },
-                    note: `Order purged after ${retentionDays}-day retention window`,
-                    metadata: {
-                        snapshot: {
-                            amount: order.amount,
-                            customerEmail: order.billingContact?.email || order.customerEmail,
-                            receivedAt: order.receivedAt,
-                            shadowDeletedAt: order.shadowDeletedAt
-                        }
-                    }
-                });
+        // Non-volatile audit log record of permanent purge
+        logOrderTransition({
+          orderId: order.orderId,
+          fromStatus: "CANCELED",
+          toStatus: "PURGED",
+          actor: { type: "system", id: "retention_worker" },
+          note: `Order purged after ${retentionDays}-day retention window`,
+          metadata: {
+            snapshot: {
+              amount: order.amount,
+              customerEmail: order.billingContact?.email || order.customerEmail,
+              receivedAt: order.receivedAt,
+              shadowDeletedAt: order.shadowDeletedAt,
+            },
+          },
+        });
 
-                // Optional artwork purge
-                if (purgeArtwork) {
-                    try {
-                        const filesToPurge = [];
-                        if (order.orderDetails?.imageFile) filesToPurge.push(order.orderDetails.imageFile);
-                        if (order.orderDetails?.previewFile) filesToPurge.push(order.orderDetails.previewFile);
-                        if (order.imagePath) filesToPurge.push(order.imagePath);
-                        if (order.fullResImagePath) filesToPurge.push(order.fullResImagePath);
+        // Optional artwork purge
+        if (purgeArtwork) {
+          try {
+            const filesToPurge = [];
+            if (order.orderDetails?.imageFile)
+              filesToPurge.push(order.orderDetails.imageFile);
+            if (order.orderDetails?.previewFile)
+              filesToPurge.push(order.orderDetails.previewFile);
+            if (order.imagePath) filesToPurge.push(order.imagePath);
+            if (order.fullResImagePath)
+              filesToPurge.push(order.fullResImagePath);
 
-                        for (const fileRel of filesToPurge) {
-                            if (typeof fileRel === 'string') {
-                                const cleanRel = fileRel.replace(/^(\/|\\)/, '');
-                                const absPath = path.resolve(__dirname, '..', cleanRel);
-                                if (fs.existsSync(absPath)) {
-                                    fs.unlinkSync(absPath);
-                                    logger.info(`[RETENTION] Purged artwork file ${absPath} for order ${order.orderId}`);
-                                }
-                            }
-                        }
-                    } catch (fileErr) {
-                        logger.error(`[RETENTION] Error purging artwork for order ${order.orderId}:`, fileErr);
-                    }
+            for (const fileRel of filesToPurge) {
+              if (typeof fileRel === "string") {
+                const cleanRel = fileRel.replace(/^(\/|\\)/, "");
+                const absPath = path.resolve(__dirname, "..", cleanRel);
+                if (fs.existsSync(absPath)) {
+                  fs.unlinkSync(absPath);
+                  logger.info(
+                    `[RETENTION] Purged artwork file ${absPath} for order ${order.orderId}`,
+                  );
                 }
-
-                if (typeof dbInstance.deleteOrder === 'function') {
-                    await dbInstance.deleteOrder(order.orderId);
-                } else if (lowdb?.data?.orders?.[order.orderId]) {
-                    delete lowdb.data.orders[order.orderId];
-                    if (typeof dbInstance.write === 'function') await dbInstance.write();
-                    else if (typeof lowdb.write === 'function') await lowdb.write();
-                }
-                flushedOrderIds.push(order.orderId);
+              }
             }
+          } catch (fileErr) {
+            logger.error(
+              `[RETENTION] Error purging artwork for order ${order.orderId}:`,
+              fileErr,
+            );
+          }
         }
-    }
 
-    return { flushedCount: flushedOrderIds.length, flushedOrderIds };
+        if (typeof dbInstance.deleteOrder === "function") {
+          await dbInstance.deleteOrder(order.orderId);
+        } else if (lowdb?.data?.orders?.[order.orderId]) {
+          delete lowdb.data.orders[order.orderId];
+          if (typeof dbInstance.write === "function") await dbInstance.write();
+          else if (typeof lowdb.write === "function") await lowdb.write();
+        }
+        flushedOrderIds.push(order.orderId);
+      }
+    }
+  }
+
+  return { flushedCount: flushedOrderIds.length, flushedOrderIds };
 }
 
 // Define an async function to contain all server logic
 async function startServer(
-    db,
-    bot,
-    sendEmail = defaultSendEmail,
-    dbPath = path.join(__dirname, 'db.json'),
-    injectedSquareClient = null,
-    injectedGoogle = defaultGoogle,
-    injectedWebAuthn = defaultWebAuthn
+  db,
+  bot,
+  sendEmail = defaultSendEmail,
+  dbPath = path.join(__dirname, "db.json"),
+  injectedSquareClient = null,
+  injectedGoogle = defaultGoogle,
+  injectedWebAuthn = defaultWebAuthn,
 ) {
   const lastMagicLinkTokens = new Map();
 
@@ -316,28 +409,28 @@ async function startServer(
     const lowDbInstance = await JSONFilePreset(dbPath, defaultData);
     db = new LowDbAdapter(lowDbInstance);
   } else if (!db.getOrder) {
-     // If db is provided but doesn't look like an adapter (checking for getOrder method), wrap it.
-     // This handles legacy tests passing a lowdb instance or mock.
-     db = new LowDbAdapter(db);
+    // If db is provided but doesn't look like an adapter (checking for getOrder method), wrap it.
+    // This handles legacy tests passing a lowdb instance or mock.
+    db = new LowDbAdapter(db);
   }
 
   // --- Metrics: Instrument DB writes ---
   // Ensure we don't wrap it multiple times if startServer is called with same db instance
   if (!db.write._instrumented) {
-      const originalWrite = db.write;
-      db.write = async function() {
-          const start = process.hrtime();
-          await originalWrite.apply(this, arguments);
-          const diff = process.hrtime(start);
-          const durationMs = (diff[0] * 1e9 + diff[1]) / 1e6;
-          Metrics.trackDbOperation('write', durationMs);
-      };
-      db.write._instrumented = true;
+    const originalWrite = db.write;
+    db.write = async function () {
+      const start = process.hrtime();
+      await originalWrite.apply(this, arguments);
+      const diff = process.hrtime(start);
+      const durationMs = (diff[0] * 1e9 + diff[1]) / 1e6;
+      Metrics.trackDbOperation("write", durationMs);
+    };
+    db.write._instrumented = true;
   }
 
   // --- Metrics: System Monitor ---
   const metricsTimer = setInterval(() => {
-      Metrics.updateSystemMetrics();
+    Metrics.updateSystemMetrics();
   }, 10000); // 10 seconds
 
   // Cache initialization and migration logic removed as it's handled by the DB Adapter
@@ -347,63 +440,69 @@ async function startServer(
 
   // Helper to schedule email (queue or direct for test)
   const scheduleEmail = async (jobName, data) => {
-      if (process.env.NODE_ENV === 'test') {
-           await sendEmail({ ...data, oauth2Client });
-      } else {
-           await emailQueue.add(jobName, data);
-      }
+    if (process.env.NODE_ENV === "test") {
+      await sendEmail({ ...data, oauth2Client });
+    } else {
+      await emailQueue.add(jobName, data);
+    }
   };
 
   // Helper to schedule telegram (queue or direct for test)
   const scheduleTelegram = async (jobName, data) => {
-      if (process.env.NODE_ENV === 'test') {
-           if (jobName === 'send-new-order') {
-                await sendNewOrderNotification(bot, db, data.orderId);
-           } else if (jobName === 'update-status') {
-                await updateOrderStatusNotification(bot, db, data.orderId, data.status);
-           }
-      } else {
-           await telegramQueue.add(jobName, data);
+    if (process.env.NODE_ENV === "test") {
+      if (jobName === "send-new-order") {
+        await sendNewOrderNotification(bot, db, data.orderId);
+      } else if (jobName === "update-status") {
+        await updateOrderStatusNotification(bot, db, data.orderId, data.status);
       }
+    } else {
+      await telegramQueue.add(jobName, data);
+    }
   };
 
   // Initialize Sentry if DSN is provided
-  if (getSecret('SENTRY_DSN')) {
-      Sentry.init({
-          dsn: getSecret('SENTRY_DSN'),
-          integrations: [
-              nodeProfilingIntegration(),
-          ],
-          // Tracing
-          tracesSampleRate: 1.0, //  Capture 100% of the transactions
-          // Set sampling rate for profiling - this is relative to tracesSampleRate
-          profilesSampleRate: 1.0,
-      });
-      logger.info('[SERVER] Sentry initialized.');
+  if (getSecret("SENTRY_DSN")) {
+    Sentry.init({
+      dsn: getSecret("SENTRY_DSN"),
+      integrations: [nodeProfilingIntegration()],
+      // Tracing
+      tracesSampleRate: 1.0, //  Capture 100% of the transactions
+      // Set sampling rate for profiling - this is relative to tracesSampleRate
+      profilesSampleRate: 1.0,
+    });
+    logger.info("[SERVER] Sentry initialized.");
   }
 
-  async function logAndEmailError(error, context = 'General Error') {
+  async function logAndEmailError(error, context = "General Error") {
     // Sanitize error logging to avoid leaking sensitive information in logs/emails.
     // Winston handles file logging and console output.
     logger.error(`[${context}] ${error.message}`, { error, context });
 
     // Capture exception in Sentry
-    if (getSecret('SENTRY_DSN')) {
-        Sentry.captureException(error, {
-            tags: { context }
-        });
+    if (getSecret("SENTRY_DSN")) {
+      Sentry.captureException(error, {
+        tags: { context },
+      });
     }
 
-    if (getSecret('ADMIN_EMAIL') && oauth2Client && oauth2Client.credentials && oauth2Client.credentials.access_token) {
+    if (
+      getSecret("ADMIN_EMAIL") &&
+      oauth2Client &&
+      oauth2Client.credentials &&
+      oauth2Client.credentials.access_token
+    ) {
       try {
-        await scheduleEmail('send-error-email', {
-          to: getSecret('ADMIN_EMAIL'),
+        await scheduleEmail("send-error-email", {
+          to: getSecret("ADMIN_EMAIL"),
           subject: `Print Shop Server Error: ${context}`,
           text: `An error occurred in the Print Shop server.\n\nContext: ${context}\n\nError: ${error.message}`,
           html: `<p>An error occurred in the Print Shop server.</p><p><b>Context:</b> ${escapeHtml(context)}</p><pre>${escapeHtml(error.message)}</pre>`,
         });
       } catch (emailError) {
-        logger.error('CRITICAL: Failed to queue error notification email:', emailError);
+        logger.error(
+          "CRITICAL: Failed to queue error notification email:",
+          emailError,
+        );
       }
     }
   }
@@ -412,31 +511,31 @@ async function startServer(
     app = express();
 
     // Sentry Request Handler must be the first middleware on the app
-    if (getSecret('SENTRY_DSN')) {
-        Sentry.setupExpressErrorHandler(app);
+    if (getSecret("SENTRY_DSN")) {
+      Sentry.setupExpressErrorHandler(app);
     }
 
     app.use(performanceLogger);
     const port = process.env.PORT || 3000;
 
-    const rpID = getSecret('RP_ID');
-    const expectedOrigin = getSecret('EXPECTED_ORIGIN');
+    const rpID = getSecret("RP_ID");
+    const expectedOrigin = getSecret("EXPECTED_ORIGIN");
 
     // --- Google OAuth2 Client ---
     oauth2Client = new injectedGoogle.auth.OAuth2(
-      getSecret('GOOGLE_CLIENT_ID'),
-      getSecret('GOOGLE_CLIENT_SECRET'),
-      `${getSecret('BASE_URL')}/oauth2callback`
+      getSecret("GOOGLE_CLIENT_ID"),
+      getSecret("GOOGLE_CLIENT_SECRET"),
+      `${getSecret("BASE_URL")}/oauth2callback`,
     );
 
     // --- Ensure upload directory exists ---
-    const uploadDir = path.join(__dirname, 'uploads');
+    const uploadDir = path.join(__dirname, "uploads");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
     // --- Database Setup ---
-    logger.info('[SERVER] LowDB database initialized at:', dbPath);
+    logger.info("[SERVER] LowDB database initialized at:", dbPath);
 
     // Load the refresh token from the database if it exists
     const config = await db.getConfig();
@@ -444,25 +543,29 @@ async function startServer(
       oauth2Client.setCredentials({
         refresh_token: config.google_refresh_token,
       });
-      logger.info('[SERVER] Google OAuth2 client configured with stored refresh token.');
+      logger.info(
+        "[SERVER] Google OAuth2 client configured with stored refresh token.",
+      );
     }
 
     // --- Odoo Configuration Seed ---
     let odooConfig = config.odoo || {};
-    if (!odooConfig.url && getSecret('ODOO_URL')) {
-        odooConfig = {
-            url: getSecret('ODOO_URL'),
-            db: getSecret('ODOO_DB'),
-            username: getSecret('ODOO_USERNAME'),
-            password: getSecret('ODOO_PASSWORD'),
-            mappings: {},
-            defaults: {
-                location_id: getSecret('ODOO_LOCATION_ID'),
-                location_dest_id: getSecret('ODOO_LOCATION_DEST_ID')
-            }
-        };
-        await db.setConfig('odoo', odooConfig);
-        logger.info('[SERVER] Odoo configuration seeded from environment variables.');
+    if (!odooConfig.url && getSecret("ODOO_URL")) {
+      odooConfig = {
+        url: getSecret("ODOO_URL"),
+        db: getSecret("ODOO_DB"),
+        username: getSecret("ODOO_USERNAME"),
+        password: getSecret("ODOO_PASSWORD"),
+        mappings: {},
+        defaults: {
+          location_id: getSecret("ODOO_LOCATION_ID"),
+          location_dest_id: getSecret("ODOO_LOCATION_DEST_ID"),
+        },
+      };
+      await db.setConfig("odoo", odooConfig);
+      logger.info(
+        "[SERVER] Odoo configuration seeded from environment variables.",
+      );
     }
 
     // --- Multer Configuration for File Uploads ---
@@ -471,20 +574,27 @@ async function startServer(
       storage: storage,
       limits: {
         fileSize: 150 * 1024 * 1024, // 150 MB limit
-        files: 5,                   // Max 5 file fields
-        fields: 50,                 // Max 50 non-file fields
-        parts: 100                  // Max 100 parts total
-      }
+        files: 5, // Max 5 file fields
+        fields: 50, // Max 50 non-file fields
+        parts: 100, // Max 100 parts total
+      },
     });
-    logger.info('[SERVER] Multer configured for file uploads.');
+    logger.info("[SERVER] Multer configured for file uploads.");
 
     // --- Chunked Upload Configuration ---
-    const chunksBaseDir = path.join(path.dirname(dbPath || __dirname), 'uploads', '.chunks');
-    const chunkedUploadManager = new ChunkedUploadManager(chunksBaseDir, logger);
+    const chunksBaseDir = path.join(
+      path.dirname(dbPath || __dirname),
+      "uploads",
+      ".chunks",
+    );
+    const chunkedUploadManager = new ChunkedUploadManager(
+      chunksBaseDir,
+      logger,
+    );
 
     const chunkStorage = multer.diskStorage({
       destination: (req, file, cb) => {
-        const incomingDir = path.join(chunksBaseDir, '_incoming');
+        const incomingDir = path.join(chunksBaseDir, "_incoming");
         if (!fs.existsSync(incomingDir)) {
           fs.mkdirSync(incomingDir, { recursive: true });
         }
@@ -492,7 +602,7 @@ async function startServer(
       },
       filename: (req, file, cb) => {
         cb(null, `part-${randomUUID()}`);
-      }
+      },
     });
 
     const chunkUpload = multer({
@@ -501,142 +611,183 @@ async function startServer(
         fileSize: 20 * 1024 * 1024, // 20 MB max per chunk
         files: 1,
         fields: 10,
-        parts: 20
-      }
+        parts: 20,
+      },
     });
 
-    const chunkCleanupTimer = setInterval(() => {
-      chunkedUploadManager.cleanupStaleSessions().catch(err => {
-        logger.error('[CHUNKED] Stale session cleanup error:', err);
-      });
-    }, 60 * 60 * 1000);
+    const chunkCleanupTimer = setInterval(
+      () => {
+        chunkedUploadManager.cleanupStaleSessions().catch((err) => {
+          logger.error("[CHUNKED] Stale session cleanup error:", err);
+        });
+      },
+      60 * 60 * 1000,
+    );
     chunkCleanupTimer.unref();
-    
+
     // --- Square Client Initialization ---
-    logger.info('[SERVER] Initializing Square client...');
+    logger.info("[SERVER] Initializing Square client...");
     let squareClient = injectedSquareClient;
 
     if (!squareClient) {
-      if (!getSecret('SQUARE_ACCESS_TOKEN')) {
-        logger.error('[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.');
+      if (!getSecret("SQUARE_ACCESS_TOKEN")) {
+        logger.error(
+          "[SERVER] FATAL: SQUARE_ACCESS_TOKEN is not set in environment variables.",
+        );
         // In a test environment, we don't want to kill the test runner.
-        if (process.env.NODE_ENV !== 'test') {
+        if (process.env.NODE_ENV !== "test") {
           process.exit(1);
         }
       }
       // Determine Square Environment
-      const squareEnv = (getSecret('SQUARE_ENVIRONMENT') || 'sandbox').toLowerCase() === 'production'
+      const squareEnv =
+        (getSecret("SQUARE_ENVIRONMENT") || "sandbox").toLowerCase() ===
+        "production"
           ? SquareEnvironment.Production
           : SquareEnvironment.Sandbox;
 
       squareClient = new SquareClient({
-        version: '2025-07-16',
-        token: getSecret('SQUARE_ACCESS_TOKEN'),
+        version: "2025-07-16",
+        token: getSecret("SQUARE_ACCESS_TOKEN"),
         environment: squareEnv,
       });
-      logger.info(`[SERVER] Square client initialized in ${squareEnv === SquareEnvironment.Production ? 'PRODUCTION' : 'SANDBOX'} mode.`);
-      logger.info('[SERVER] Verifying connection to Square servers...');
+      logger.info(
+        `[SERVER] Square client initialized in ${squareEnv === SquareEnvironment.Production ? "PRODUCTION" : "SANDBOX"} mode.`,
+      );
+      logger.info("[SERVER] Verifying connection to Square servers...");
     } else {
-      logger.info('[SERVER] Using injected Square client.');
+      logger.info("[SERVER] Using injected Square client.");
     }
-    if (process.env.NODE_ENV !== 'test') {
-        try {
-            await new Promise((resolve, reject) => {
-                dns.lookup('connect.squareup.com', (err) => {
-                    if (err) return reject(err);
-                    resolve();
-                });
-            });
-            logger.info('✅ [SERVER] DNS resolution successful. Network connection appears to be working.');
-        } catch (error) {
-            logger.error('❌ [FATAL] Could not resolve Square API domain.');
-            logger.error('   This is likely a network, DNS, or firewall issue on the server.');
-            logger.error('   Full Error:', error.message);
-            process.exit(1);
-        }
-    }
-    logger.info('[SERVER] Square client initialized.');
-  // --- NEW: Local Sanity Check for API properties ---
-    logger.info('[SERVER] Performing sanity check on Square client...');
-    if (!squareClient.locations || !squareClient.payments) {
-        logger.error('❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).');
-        logger.error('   This may indicate an issue with the installed Square SDK package.');
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        await new Promise((resolve, reject) => {
+          dns.lookup("connect.squareup.com", (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+        logger.info(
+          "✅ [SERVER] DNS resolution successful. Network connection appears to be working.",
+        );
+      } catch (error) {
+        logger.error("❌ [FATAL] Could not resolve Square API domain.");
+        logger.error(
+          "   This is likely a network, DNS, or firewall issue on the server.",
+        );
+        logger.error("   Full Error:", error.message);
         process.exit(1);
+      }
     }
-    logger.info('✅ [SERVER] Sanity check passed. Client has required API properties.');
+    logger.info("[SERVER] Square client initialized.");
+    // --- NEW: Local Sanity Check for API properties ---
+    logger.info("[SERVER] Performing sanity check on Square client...");
+    if (!squareClient.locations || !squareClient.payments) {
+      logger.error(
+        "❌ [FATAL] Square client is missing required API properties (locationsApi, paymentsApi).",
+      );
+      logger.error(
+        "   This may indicate an issue with the installed Square SDK package.",
+      );
+      process.exit(1);
+    }
+    logger.info(
+      "✅ [SERVER] Sanity check passed. Client has required API properties.",
+    );
 
     let sessionStore;
     let redisClient;
-    const redisUrl = getSecret('REDIS_URL');
+    const redisUrl = getSecret("REDIS_URL");
     // Only use real Redis in test if explicitly requested
-    const useRealRedis = process.env.TEST_USE_REAL_REDIS === 'true' || process.env.NODE_ENV !== 'test';
+    const useRealRedis =
+      process.env.TEST_USE_REAL_REDIS === "true" ||
+      process.env.NODE_ENV !== "test";
 
     if (redisAvailable && redisUrl && useRealRedis) {
-        try {
-            const client = createClient({ url: redisUrl });
-            client.on('error', (err) => logger.error('Redis Client Error', err));
-            await client.connect();
-            redisClient = client;
-            logger.info('[SERVER] Connected to Redis.');
-        } catch (error) {
-            logger.error('[SERVER] Failed to connect to Redis.', error);
-            // redisClient remains undefined, fallback to memory
-        }
+      try {
+        const client = createClient({ url: redisUrl });
+        client.on("error", (err) => logger.error("Redis Client Error", err));
+        await client.connect();
+        redisClient = client;
+        logger.info("[SERVER] Connected to Redis.");
+      } catch (error) {
+        logger.error("[SERVER] Failed to connect to Redis.", error);
+        // redisClient remains undefined, fallback to memory
+      }
     }
 
     if (redisClient) {
-         sessionStore = new ConnectRedisStore({
-            client: redisClient,
-            prefix: "splotch:",
-        });
-        logger.info('[SERVER] Using Redis for session storage.');
+      sessionStore = new ConnectRedisStore({
+        client: redisClient,
+        prefix: "splotch:",
+      });
+      logger.info("[SERVER] Using Redis for session storage.");
     } else {
-         logger.info('[SERVER] Using MemoryStore for session storage.');
+      logger.info("[SERVER] Using MemoryStore for session storage.");
     }
 
     // --- Middleware ---
     const apiLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
       max: 1000, // Increase max for testing
-      message: 'Too many requests from this IP, please try again after 15 minutes',
-      store: redisClient ? new RateLimitRedisStore({
-          sendCommand: (...args) => redisClient.sendCommand(args),
-          prefix: 'rl:api:',
-      }) : undefined,
+      message:
+        "Too many requests from this IP, please try again after 15 minutes",
+      store: redisClient
+        ? new RateLimitRedisStore({
+            sendCommand: (...args) => redisClient.sendCommand(args),
+            prefix: "rl:api:",
+          })
+        : undefined,
     });
 
     const authLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: (process.env.ENABLE_RATE_LIMIT_TEST === 'true') ? 10 :
-           (process.env.NODE_ENV === 'test') ? 1000 : 50,
-      skipSuccessfulRequests: process.env.ENABLE_RATE_LIMIT_TEST !== 'true',
-      message: { error: 'Too many login attempts from this IP, please try again after 15 minutes.' },
+      max:
+        process.env.ENABLE_RATE_LIMIT_TEST === "true"
+          ? 10
+          : process.env.NODE_ENV === "test"
+            ? 1000
+            : 50,
+      skipSuccessfulRequests: process.env.ENABLE_RATE_LIMIT_TEST !== "true",
+      message: {
+        error:
+          "Too many login attempts from this IP, please try again after 15 minutes.",
+      },
       standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
       legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-      store: redisClient ? new RateLimitRedisStore({
-          sendCommand: (...args) => redisClient.sendCommand(args),
-          prefix: 'rl:auth:',
-      }) : undefined,
+      store: redisClient
+        ? new RateLimitRedisStore({
+            sendCommand: (...args) => redisClient.sendCommand(args),
+            prefix: "rl:auth:",
+          })
+        : undefined,
     });
-    
+
     // SECURITY: Stricter rate limiter for endpoints that trigger emails or temporary tokens
     const emailTriggerLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: (process.env.ENABLE_RATE_LIMIT_TEST === 'true') ? 3 :
-           (process.env.NODE_ENV === 'test' || process.env.NODE_ENV !== 'production') ? 1000 : 3, // Very strict in production to prevent email spam
-      message: 'Too many requests from this IP, please try again after 15 minutes',
+      max:
+        process.env.ENABLE_RATE_LIMIT_TEST === "true"
+          ? 3
+          : process.env.NODE_ENV === "test" ||
+              process.env.NODE_ENV !== "production"
+            ? 1000
+            : 3, // Very strict in production to prevent email spam
+      message:
+        "Too many requests from this IP, please try again after 15 minutes",
       standardHeaders: true,
       legacyHeaders: false,
-      store: redisClient ? new RateLimitRedisStore({
-          sendCommand: (...args) => redisClient.sendCommand(args),
-          prefix: 'rl:email:',
-      }) : undefined,
+      store: redisClient
+        ? new RateLimitRedisStore({
+            sendCommand: (...args) => redisClient.sendCommand(args),
+            prefix: "rl:email:",
+          })
+        : undefined,
     });
 
     const allowedOrigins = [
-      'https://lokimetasmith.github.io',
-      'https://www.splotch.page',
-      'https://splotch.page',
+      "https://lokimetasmith.github.io",
+      "https://www.splotch.page",
+      "https://splotch.page",
     ];
 
     if (process.env.BASE_URL) {
@@ -651,16 +802,19 @@ async function startServer(
         if (!allowedOrigins.includes(parsed)) allowedOrigins.push(parsed);
       } catch (e) {}
     }
-    
-    if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV !== 'production') {
+
+    if (
+      process.env.NODE_ENV === "test" ||
+      process.env.NODE_ENV !== "production"
+    ) {
       allowedOrigins.push(/https?:\/\/(localhost|127\.0\.0\.1):\d+/);
     }
-    
+
     const corsOptions = {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        const isAllowed = allowedOrigins.some(allowedOrigin => {
-          if (typeof allowedOrigin === 'string') {
+        const isAllowed = allowedOrigins.some((allowedOrigin) => {
+          if (typeof allowedOrigin === "string") {
             return allowedOrigin === origin;
           }
           if (allowedOrigin instanceof RegExp) {
@@ -671,246 +825,301 @@ async function startServer(
         if (isAllowed) {
           callback(null, true);
         } else {
-          callback(new Error('Not allowed by CORS'));
+          callback(new Error("Not allowed by CORS"));
         }
       },
       credentials: true,
       optionsSuccessStatus: 200,
-      exposedHeaders: ['X-Server-Session-Token'],
+      exposedHeaders: ["X-Server-Session-Token"],
     };
-    
-   // app.use(limiter);
+
+    // app.use(limiter);
     app.use(compression());
     app.use(cors(corsOptions));
 
     // If running behind a reverse proxy, trust the first hop.
     // This is required for rate limiting and other security features to work correctly.
-    if (getSecret('TRUST_PROXY') === 'true') {
-        app.set('trust proxy', 1);
-        logger.info('[SERVER] Trusting reverse proxy headers.');
+    if (getSecret("TRUST_PROXY") === "true") {
+      app.set("trust proxy", 1);
+      logger.info("[SERVER] Trusting reverse proxy headers.");
     }
 
     // --- CSRF Secret Management ---
-    const weakDefaultCsrfSecret = '12345678901234567890123456789012';
-    let csrfSecret = getSecret('CSRF_SECRET');
+    const weakDefaultCsrfSecret = "12345678901234567890123456789012";
+    let csrfSecret = getSecret("CSRF_SECRET");
 
     if (!csrfSecret || csrfSecret === weakDefaultCsrfSecret) {
-        if (process.env.NODE_ENV === 'production') {
-            logger.error('❌ [FATAL] CSRF_SECRET is not set or is set to the weak default in a production environment.');
-            logger.error('   Please set a strong, unique CSRF_SECRET environment variable.');
-            process.exit(1);
-        } else {
-            // In non-production environments, we can fall back to the weak secret for convenience,
-            // but we should log a clear warning.
-            csrfSecret = weakDefaultCsrfSecret;
-            logger.warn('⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.');
-            logger.warn('   Do not use this configuration in production.');
-        }
+      if (process.env.NODE_ENV === "production") {
+        logger.error(
+          "❌ [FATAL] CSRF_SECRET is not set or is set to the weak default in a production environment.",
+        );
+        logger.error(
+          "   Please set a strong, unique CSRF_SECRET environment variable.",
+        );
+        process.exit(1);
+      } else {
+        // In non-production environments, we can fall back to the weak secret for convenience,
+        // but we should log a clear warning.
+        csrfSecret = weakDefaultCsrfSecret;
+        logger.warn(
+          "⚠️ [SECURITY] CSRF_SECRET is not set or is weak. Using a default for development.",
+        );
+        logger.warn("   Do not use this configuration in production.");
+      }
     } else {
-        logger.info('✅ [SERVER] Custom CSRF_SECRET is set.');
+      logger.info("✅ [SERVER] Custom CSRF_SECRET is set.");
     }
 
     // tiny-csrf uses a specific cookie name and requires the secret to be set in cookieParser
     app.use(cookieParser(csrfSecret));
 
-    const weakDefaultSessionSecret = 'your-super-secret-session-key';
-    let sessionSecret = getSecret('SESSION_SECRET');
+    const weakDefaultSessionSecret = "your-super-secret-session-key";
+    let sessionSecret = getSecret("SESSION_SECRET");
     if (!sessionSecret) {
-        if (process.env.NODE_ENV === 'production') {
-            logger.error('❌ [FATAL] SESSION_SECRET is not set in environment variables.');
-            logger.error('   This is required for security in production. The application will now exit.');
-            process.exit(1);
-        } else {
-            sessionSecret = weakDefaultSessionSecret;
-            logger.warn('⚠️ [SECURITY] SESSION_SECRET is not set. Using a default for development.');
-            logger.warn('   Do not use this configuration in production.');
-        }
+      if (process.env.NODE_ENV === "production") {
+        logger.error(
+          "❌ [FATAL] SESSION_SECRET is not set in environment variables.",
+        );
+        logger.error(
+          "   This is required for security in production. The application will now exit.",
+        );
+        process.exit(1);
+      } else {
+        sessionSecret = weakDefaultSessionSecret;
+        logger.warn(
+          "⚠️ [SECURITY] SESSION_SECRET is not set. Using a default for development.",
+        );
+        logger.warn("   Do not use this configuration in production.");
+      }
     }
 
+    app.use(
+      session({
+        store: sessionStore,
+        secret: sessionSecret,
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+          secure: process.env.NODE_ENV === "production",
+          httpOnly: true,
+          sameSite: "lax",
+        },
+      }),
+    );
 
-    app.use(session({
-      store: sessionStore,
-      secret: sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        sameSite: 'lax'
-      }
-    }));
-
-    app.use(express.json({ limit: '100kb' }));
-    app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+    app.use(express.json({ limit: "100kb" }));
+    app.use(express.urlencoded({ extended: true, limit: "100kb" }));
     app.use(wafMiddleware);
-    app.disable('x-powered-by');
+    app.disable("x-powered-by");
 
     // SECURITY: Block access to sensitive files and directories
     app.use((req, res, next) => {
-        const blockedPrefixes = [
-            '/server/',
-            '/node_modules/',
-            '/.git/',
-            '/verification/',
-            '/.jules/',
-            '/tests/',
-            '/scripts/',
-            '/docs/',
-            '/playwright_tests/',
-            '/playwright_tests_real/',
-            '/.husky/'
-        ];
+      const blockedPrefixes = [
+        "/server/",
+        "/node_modules/",
+        "/.git/",
+        "/verification/",
+        "/.jules/",
+        "/tests/",
+        "/scripts/",
+        "/docs/",
+        "/playwright_tests/",
+        "/playwright_tests_real/",
+        "/.husky/",
+      ];
 
-        const blockedExtensions = [
-            '.md',
-            '.sh',
-            '.log',
-            '.yml',
-            '.yaml',
-            '.config.js',
-            '.config.ts'
-        ];
+      const blockedExtensions = [
+        ".md",
+        ".sh",
+        ".log",
+        ".yml",
+        ".yaml",
+        ".config.js",
+        ".config.ts",
+      ];
 
-        const blockedExact = [
-            '/package.json',
-            '/package-lock.json',
-            '/pnpm-lock.yaml',
-            '/yarn.lock',
-            '/.env',
-            '/Dockerfile',
-            '/.gitignore',
-            '/.eslintignore'
-        ];
+      const blockedExact = [
+        "/package.json",
+        "/package-lock.json",
+        "/pnpm-lock.yaml",
+        "/yarn.lock",
+        "/.env",
+        "/Dockerfile",
+        "/.gitignore",
+        "/.eslintignore",
+      ];
 
-        const reqPath = req.path;
+      const reqPath = req.path;
 
-        const isBlockedPrefix = blockedPrefixes.some(prefix => reqPath.startsWith(prefix));
-        const isBlockedExact = blockedExact.includes(reqPath);
-        const isBlockedExtension = blockedExtensions.some(ext => reqPath.endsWith(ext));
+      const isBlockedPrefix = blockedPrefixes.some((prefix) =>
+        reqPath.startsWith(prefix),
+      );
+      const isBlockedExact = blockedExact.includes(reqPath);
+      const isBlockedExtension = blockedExtensions.some((ext) =>
+        reqPath.endsWith(ext),
+      );
 
-        if (isBlockedPrefix || isBlockedExact || isBlockedExtension) {
-            logger.warn(`[SECURITY] Blocked access to sensitive path: ${reqPath}`);
-            return res.status(403).send('Forbidden');
-        }
-        next();
+      if (isBlockedPrefix || isBlockedExact || isBlockedExtension) {
+        logger.warn(`[SECURITY] Blocked access to sensitive path: ${reqPath}`);
+        return res.status(403).send("Forbidden");
+      }
+      next();
     });
 
     // SECURITY: Add additional security headers not covered by lusca
     app.use((req, res, next) => {
-        // Permissions-Policy: Disables powerful features that the app doesn't need, allows camera for printshop QR scanning
-        res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(self)');
-        // Referrer-Policy: Controls how much referrer information is sent to other sites
-        res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      // Permissions-Policy: Disables powerful features that the app doesn't need, allows camera for printshop QR scanning
+      res.setHeader(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=(self)",
+      );
+      // Referrer-Policy: Controls how much referrer information is sent to other sites
+      res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
-        next();
+      next();
     });
 
-    app.use(lusca({
+    app.use(
+      lusca({
         csrf: {
-            blocklist: ['/wp-json', '/wc-auth', '/xmlrpc.php', '/api/order/estimate']
+          blocklist: [
+            "/wp-json",
+            "/wc-auth",
+            "/xmlrpc.php",
+            "/api/order/estimate",
+          ],
         },
-        xframe: 'SAMEORIGIN',
-        hsts: {maxAge: 31536000, includeSubDomains: true, preload: true},
+        xframe: "SAMEORIGIN",
+        hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
         nosniff: true,
         csp: {
-            policy: {
-                'default-src': "'self'",
-                'base-uri': "'self'",
-                'object-src': "'none'",
-                'script-src': "'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com https://static.cloudflareinsights.com",
-                'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com https://*.squarecdn.com https://sandbox.web.squarecdn.com",
-                'font-src': "'self' https://fonts.gstatic.com https://*.squarecdn.com https://cash-f.squarecdn.com https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
-                'img-src': "'self' data: blob: https://*.squarecdn.com https://sandbox.web.squarecdn.com",
-                'connect-src': "'self' https://cdn.jsdelivr.net https://*.squarecdn.com https://*.squareup.com https://*.squareupsandbox.com https://*.sentry.io https://cloudflareinsights.com",
-                'frame-src': "'self' https: https://*.squarecdn.com https://sandbox.web.squarecdn.com https://*.squareup.com https://*.visa.com https://*.mastercard.com https://*.cardinalcommerce.com",
-                'worker-src': "'self' blob: https://cdn.jsdelivr.net",
-                'child-src': "'self' blob: https://cdn.jsdelivr.net"
-            }
-        }
-    }));
+          policy: {
+            "default-src": "'self'",
+            "base-uri": "'self'",
+            "object-src": "'none'",
+            "script-src":
+              "'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.squarecdn.com https://sandbox.web.squarecdn.com https://static.cloudflareinsights.com",
+            "style-src":
+              "'self' 'unsafe-inline' https://fonts.googleapis.com https://*.squarecdn.com https://sandbox.web.squarecdn.com",
+            "font-src":
+              "'self' https://fonts.gstatic.com https://*.squarecdn.com https://cash-f.squarecdn.com https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net",
+            "img-src":
+              "'self' data: blob: https://*.squarecdn.com https://sandbox.web.squarecdn.com",
+            "connect-src":
+              "'self' https://cdn.jsdelivr.net https://*.squarecdn.com https://*.squareup.com https://*.squareupsandbox.com https://*.sentry.io https://cloudflareinsights.com",
+            "frame-src":
+              "'self' https: https://*.squarecdn.com https://sandbox.web.squarecdn.com https://*.squareup.com https://*.visa.com https://*.mastercard.com https://*.cardinalcommerce.com",
+            "worker-src": "'self' blob: https://cdn.jsdelivr.net",
+            "child-src": "'self' blob: https://cdn.jsdelivr.net",
+          },
+        },
+      }),
+    );
 
     // Allow OAuth iframe / popup embedding for WooCommerce OAuth flow
-    app.use('/wc-auth', (req, res, next) => {
-        res.removeHeader('X-Frame-Options');
-        res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' https:; frame-ancestors *");
-        next();
+    app.use("/wc-auth", (req, res, next) => {
+      res.removeHeader("X-Frame-Options");
+      res.setHeader(
+        "Content-Security-Policy",
+        "default-src 'self' 'unsafe-inline' https:; frame-ancestors *",
+      );
+      next();
     });
 
     // SECURITY: Enforce strict CSP for uploaded files to prevent Stored XSS
     // This sandbox directive prevents script execution even if an attacker uploads a malicious SVG/HTML file
     // that bypasses other checks.
-    app.use('/uploads', (req, res, next) => {
-        res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
-        next();
+    app.use("/uploads", (req, res, next) => {
+      res.setHeader(
+        "Content-Security-Policy",
+        "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      );
+      next();
     });
 
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-        maxAge: '1d'
-    }));
+    app.use(
+      "/uploads",
+      express.static(path.join(__dirname, "uploads"), {
+        maxAge: "1d",
+      }),
+    );
 
-    app.use(express.static(path.join(__dirname, '../dist'), {
-        maxAge: '1h',
-        extensions: ['html']
-    }));
+    app.use(
+      express.static(path.join(__dirname, "../dist"), {
+        maxAge: "1h",
+        extensions: ["html"],
+      }),
+    );
 
-    app.use(express.static(path.join(__dirname, '../public'), {
-        maxAge: '1h',
-        dotfiles: 'allow'
-    }));
+    app.use(
+      express.static(path.join(__dirname, "../public"), {
+        maxAge: "1h",
+        dotfiles: "allow",
+      }),
+    );
 
     // Clean URL aliases for HTML pages (e.g., /printshop -> /printshop.html)
-    const htmlPages = ['printshop', 'orders', 'status', 'magic-login', 'terms'];
+    const htmlPages = ["printshop", "orders", "status", "magic-login", "terms"];
     for (const page of htmlPages) {
-        app.get([`/${page}`, `/${page}/`], (req, res) => {
-            res.sendFile(path.join(__dirname, `../dist/${page}.html`));
-        });
+      app.get([`/${page}`, `/${page}/`], (req, res) => {
+        res.sendFile(path.join(__dirname, `../dist/${page}.html`));
+      });
     }
-
 
     // Cache-Control: Prevent caching of sensitive data (PII, etc.)
     // Placed after static files so it doesn't prevent caching of public assets
     app.use((req, res, next) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        res.setHeader('Surrogate-Control', 'no-store');
-        next();
+      res.setHeader(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, proxy-revalidate",
+      );
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      res.setHeader("Surrogate-Control", "no-store");
+      next();
     });
 
     // Middleware to add the token to every response
     app.use((req, res, next) => {
-        res.setHeader('X-Server-Session-Token', serverSessionToken);
-        next();
+      res.setHeader("X-Server-Session-Token", serverSessionToken);
+      next();
     });
-    logger.info('[SERVER] Middleware (CORS, JSON, static file serving) enabled.');
+    logger.info(
+      "[SERVER] Middleware (CORS, JSON, static file serving) enabled.",
+    );
 
     // --- Helper Functions ---
     async function getUserByEmail(email) {
-        if (!email) return undefined;
-        return await db.getUserByEmail(email);
+      if (!email) return undefined;
+      return await db.getUserByEmail(email);
     }
 
     function authenticateToken(req, res, next) {
-      const authHeader = req.headers['authorization'];
-      const token = authHeader && authHeader.split(' ')[1];
+      const authHeader = req.headers["authorization"];
+      const token = authHeader && authHeader.split(" ")[1];
       if (token == null) return res.sendStatus(401);
 
       // Decode the token header to find the Key ID (kid)
       const decoded = jwt.decode(token, { complete: true });
       if (!decoded || !decoded.header || !decoded.header.kid) {
-          return res.sendStatus(401);
+        return res.sendStatus(401);
       }
 
       const key = getKey(decoded.header.kid);
       if (!key) {
-          return res.sendStatus(401); // Key not found or expired
+        return res.sendStatus(401); // Key not found or expired
       }
 
-      jwt.verify(token, key.publicKey, { algorithms: ['RS256'] }, (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
-        next();
-      });
+      jwt.verify(
+        token,
+        key.publicKey,
+        { algorithms: ["RS256"] },
+        (err, user) => {
+          if (err) return res.sendStatus(403);
+          req.user = user;
+          next();
+        },
+      );
     }
 
     const isAdmin = async (userPayload) => {
@@ -920,368 +1129,518 @@ async function startServer(
 
       // Check env var fallback first (fastest)
       // FIX: Ensure ADMIN_EMAIL is set and not empty before comparing
-      if (getSecret('ADMIN_EMAIL') && userPayload.email === getSecret('ADMIN_EMAIL')) return true;
+      if (
+        getSecret("ADMIN_EMAIL") &&
+        userPayload.email === getSecret("ADMIN_EMAIL")
+      )
+        return true;
 
       // Look up full user object
-      const user = (await getUserByEmail(userPayload.email)) || (userPayload.username ? await db.getUser(userPayload.username) : undefined);
+      const user =
+        (await getUserByEmail(userPayload.email)) ||
+        (userPayload.username
+          ? await db.getUser(userPayload.username)
+          : undefined);
 
-      if (user && user.role === 'admin') return true;
+      if (user && user.role === "admin") return true;
 
       return false;
     };
 
     // --- API Endpoints ---
-    app.use('/api', apiLimiter);
-    app.get('/.well-known/jwks.json', async (req, res) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        const jwks = await getJwks();
-        res.json(jwks);
+    app.use("/api", apiLimiter);
+    app.get("/.well-known/jwks.json", async (req, res) => {
+      res.setHeader(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, proxy-revalidate",
+      );
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      const jwks = await getJwks();
+      res.json(jwks);
     });
 
     // Endpoint for the client's initial token fetch
-    app.get('/api/server-info', (req, res) => {
-        res.json({ serverSessionToken });
+    app.get("/api/server-info", (req, res) => {
+      res.json({ serverSessionToken });
     });
 
     // --- WooCommerce REST API Emulation (Pirate Ship Integration) ---
     const wooCommerceModule = createWooCommerceRouter({
-        db,
-        scheduleEmail,
-        scheduleTelegram,
-        getSecret,
-        logger,
-        bot
+      db,
+      scheduleEmail,
+      scheduleTelegram,
+      getSecret,
+      logger,
+      bot,
     });
     app.use(wooCommerceModule.router);
 
-    app.get('/api/ping', (req, res) => {
+    app.get("/api/ping", (req, res) => {
       res.status(200).json({
-        status: 'ok',
-        message: 'Server is running',
+        status: "ok",
+        message: "Server is running",
         timestamp: new Date().toISOString(),
       });
     });
-    app.get('/api/csrf-token', (req, res) => {
+    app.get("/api/csrf-token", (req, res) => {
       res.json({ csrfToken: res.locals._csrf });
     });
 
-    app.get('/api/config', (req, res) => {
-      const nodeEnv = process.env.NODE_ENV || 'development';
+    app.get("/api/config", (req, res) => {
+      const nodeEnv = process.env.NODE_ENV || "development";
       res.json({
-        squareAppId: getSecret('SQUARE_APPLICATION_ID') || getSecret('SQUARE_APP_ID') || 'sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA',
-        squareLocationId: getSecret('SQUARE_LOCATION_ID') || 'LTS82DEX24XR0',
-        squareEnvironment: getSecret('SQUARE_ENVIRONMENT') || 'sandbox',
+        squareAppId:
+          getSecret("SQUARE_APPLICATION_ID") ||
+          getSecret("SQUARE_APP_ID") ||
+          "sandbox-sq0idb-tawTw_Vl7VGYI6CZfKEshA",
+        squareLocationId: getSecret("SQUARE_LOCATION_ID") || "LTS82DEX24XR0",
+        squareEnvironment: getSecret("SQUARE_ENVIRONMENT") || "sandbox",
         nodeEnv,
-        isDevelopment: nodeEnv === 'development',
+        isDevelopment: nodeEnv === "development",
       });
     });
 
-    app.get('/api/pricing-info', (req, res) => {
-        // PERFORMANCE: Temporarily disabled cache during development to allow pricing updates
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.json(pricingConfig);
+    app.get("/api/pricing-info", (req, res) => {
+      // PERFORMANCE: Temporarily disabled cache during development to allow pricing updates
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json(pricingConfig);
     });
 
-    app.post('/api/admin/pricing', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
-        
-        try {
-            const newPricing = req.body;
-            // Basic structural validation
-            if (!newPricing || typeof newPricing.pricePerSquareInchCents !== 'number') {
-                return res.status(400).json({ error: 'Invalid pricing configuration structure.' });
-            }
-            
-            // Write to pricing.json
-            const currentPricingPath = process.env.TEST_PRICING_PATH || path.join(__dirname, 'pricing.json');
-            await fs.promises.writeFile(currentPricingPath, JSON.stringify(newPricing, null, 2), 'utf8');
-            
-            // Reload the config into memory
-            loadPricingConfig();
-            
-            res.json({ success: true, pricing: pricingConfig });
-        } catch (error) {
-            logger.error('[SERVER] Failed to update pricing.json', error);
-            res.status(500).json({ error: 'Failed to save pricing configuration.' });
+    app.post("/api/admin/pricing", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user)))
+        return res.status(403).json({ error: "Forbidden" });
+
+      try {
+        const newPricing = req.body;
+        // Basic structural validation
+        if (
+          !newPricing ||
+          typeof newPricing.pricePerSquareInchCents !== "number"
+        ) {
+          return res
+            .status(400)
+            .json({ error: "Invalid pricing configuration structure." });
         }
+
+        // Write to pricing.json
+        const currentPricingPath =
+          process.env.TEST_PRICING_PATH || path.join(__dirname, "pricing.json");
+        await fs.promises.writeFile(
+          currentPricingPath,
+          JSON.stringify(newPricing, null, 2),
+          "utf8",
+        );
+
+        // Reload the config into memory
+        loadPricingConfig();
+
+        res.json({ success: true, pricing: pricingConfig });
+      } catch (error) {
+        logger.error("[SERVER] Failed to update pricing.json", error);
+        res
+          .status(500)
+          .json({ error: "Failed to save pricing configuration." });
+      }
     });
 
     // --- Printshop Config Routes ---
-    app.get('/api/admin/printshops', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
-        const shops = await db.getAllPrintshops();
-        res.json(shops);
+    app.get("/api/admin/printshops", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user)))
+        return res.status(403).json({ error: "Forbidden" });
+      const shops = await db.getAllPrintshops();
+      res.json(shops);
     });
 
-    app.post('/api/admin/printshops', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
-        const shop = req.body;
-        const saved = await db.savePrintshop(shop);
-        res.json({ success: true, shop: saved });
+    app.post("/api/admin/printshops", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user)))
+        return res.status(403).json({ error: "Forbidden" });
+      const shop = req.body;
+      const saved = await db.savePrintshop(shop);
+      res.json({ success: true, shop: saved });
     });
 
-    app.delete('/api/admin/printshops/:id', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+    app.delete(
+      "/api/admin/printshops/:id",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
         const { id } = req.params;
         const success = await db.deletePrintshop(id);
         res.json({ success });
-    });
+      },
+    );
 
     // --- Odoo Endpoints ---
-    app.get('/api/admin/odoo/config', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
-        const config = await db.getConfig();
-        const odooConfig = config.odoo || {};
-        const safeConfig = { ...odooConfig };
-        // Mask password
-        if (safeConfig.password) safeConfig.password = '********';
-        res.json(safeConfig);
+    app.get("/api/admin/odoo/config", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user)))
+        return res.status(403).json({ error: "Forbidden" });
+      const config = await db.getConfig();
+      const odooConfig = config.odoo || {};
+      const safeConfig = { ...odooConfig };
+      // Mask password
+      if (safeConfig.password) safeConfig.password = "********";
+      res.json(safeConfig);
     });
 
-    app.post('/api/admin/odoo/config', authenticateToken, [
-        body('url').optional().isURL(),
-        body('db').optional().isString(),
-        body('username').optional().isString(),
-        body('password').optional().isString(),
-        body('mappings').optional().isObject(),
-        body('defaults').optional().isObject(),
-    ], async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+    app.post(
+      "/api/admin/odoo/config",
+      authenticateToken,
+      [
+        body("url").optional().isURL(),
+        body("db").optional().isString(),
+        body("username").optional().isString(),
+        body("password").optional().isString(),
+        body("mappings").optional().isObject(),
+        body("defaults").optional().isObject(),
+      ],
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
         const errors = validationResult(req);
-        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+        if (!errors.isEmpty())
+          return res.status(400).json({ errors: errors.array() });
 
-        const { url, db: odooDb, username, password, mappings, defaults } = req.body;
+        const {
+          url,
+          db: odooDb,
+          username,
+          password,
+          mappings,
+          defaults,
+        } = req.body;
         const config = await db.getConfig();
         const odooConfig = config.odoo || {};
 
         if (url !== undefined) odooConfig.url = url;
         if (odooDb !== undefined) odooConfig.db = odooDb;
         if (username !== undefined) odooConfig.username = username;
-        if (password !== undefined && password !== '********') odooConfig.password = password;
+        if (password !== undefined && password !== "********")
+          odooConfig.password = password;
         if (mappings !== undefined) odooConfig.mappings = mappings;
         if (defaults !== undefined) odooConfig.defaults = defaults;
 
-        await db.setConfig('odoo', odooConfig);
+        await db.setConfig("odoo", odooConfig);
         const safeConfig = { ...odooConfig };
-        if (safeConfig.password) safeConfig.password = '********';
+        if (safeConfig.password) safeConfig.password = "********";
         res.json({ success: true, config: safeConfig });
-    });
+      },
+    );
 
-    app.post('/api/admin/odoo/test', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+    app.post("/api/admin/odoo/test", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user)))
+        return res.status(403).json({ error: "Forbidden" });
 
-        const config = await db.getConfig();
-        const testClient = new OdooClient(config.odoo || {});
+      const config = await db.getConfig();
+      const testClient = new OdooClient(config.odoo || {});
 
-        const result = await testClient.testConnection();
-        if (result.success) {
-            res.json({ success: true, version: result.version });
-        } else {
-            res.status(400).json({ success: false, error: result.error });
-        }
+      const result = await testClient.testConnection();
+      if (result.success) {
+        res.json({ success: true, version: result.version });
+      } else {
+        res.status(400).json({ success: false, error: result.error });
+      }
     });
 
     // --- Pirate Ship / WooCommerce Integration Settings ---
-    app.get('/api/admin/integrations/pirateship', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+    app.get(
+      "/api/admin/integrations/pirateship",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
         const creds = wooCommerceModule.getCredentials();
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
         res.json({
-            success: true,
-            storeUrl: baseUrl,
-            consumerKey: creds.consumerKey,
-            consumerSecret: creds.consumerSecret,
-            endpoints: {
-                discovery: `${baseUrl}/wp-json/wc/v3`,
-                orders: `${baseUrl}/wp-json/wc/v3/orders`
-            }
+          success: true,
+          storeUrl: baseUrl,
+          consumerKey: creds.consumerKey,
+          consumerSecret: creds.consumerSecret,
+          endpoints: {
+            discovery: `${baseUrl}/wp-json/wc/v3`,
+            orders: `${baseUrl}/wp-json/wc/v3/orders`,
+          },
         });
-    });
+      },
+    );
 
-    app.post('/api/admin/integrations/pirateship/regenerate', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
-        const newKey = `ck_splotch_${crypto.randomBytes(8).toString('hex')}`;
-        const newSecret = `cs_splotch_${crypto.randomBytes(8).toString('hex')}`;
+    app.post(
+      "/api/admin/integrations/pirateship/regenerate",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
+        const newKey = `ck_splotch_${crypto.randomBytes(8).toString("hex")}`;
+        const newSecret = `cs_splotch_${crypto.randomBytes(8).toString("hex")}`;
 
         if (!db.data.config) db.data.config = {};
         db.data.config.woocommerce = {
-            consumerKey: newKey,
-            consumerSecret: newSecret
+          consumerKey: newKey,
+          consumerSecret: newSecret,
         };
         await db.write();
 
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        logger.info('[WOOCOMMERCE] Regenerated Pirate Ship credentials');
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        logger.info("[WOOCOMMERCE] Regenerated Pirate Ship credentials");
         res.json({
-            success: true,
-            storeUrl: baseUrl,
-            consumerKey: newKey,
-            consumerSecret: newSecret
+          success: true,
+          storeUrl: baseUrl,
+          consumerKey: newKey,
+          consumerSecret: newSecret,
         });
-    });
+      },
+    );
 
     // --- Shipping Cost Estimate (public — called from checkout before payment) ---
-    app.post('/api/order/estimate', [
-      body('subtotalCents').isInt({ gt: 0 }).withMessage('subtotalCents must be a positive integer'),
-      body('areaInSqIn').isFloat({ gt: 0 }).withMessage('areaInSqIn must be a positive number'),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      try {
-        const { subtotalCents, areaInSqIn, destinationState, deliveryMethod } = req.body;
-        const shippingCfg = { ...DEFAULT_SHIPPING_CONFIG, ...(db.data?.config?.shipping || {}) };
-        const breakdown = calcOrderBreakdown({
-          areaInSqIn: Number(areaInSqIn),
-          subtotalCents: Number(subtotalCents),
-          config: shippingCfg,
-          destinationState,
-          deliveryMethod
-        });
-        return res.json({ success: true, ...breakdown });
-      } catch (err) {
-        logger.error('[ESTIMATE] Error calculating order estimate:', err);
-        return res.status(500).json({ error: 'Failed to calculate estimate.' });
-      }
-    });
+    app.post(
+      "/api/order/estimate",
+      [
+        body("subtotalCents")
+          .isInt({ gt: 0 })
+          .withMessage("subtotalCents must be a positive integer"),
+        body("areaInSqIn")
+          .isFloat({ gt: 0 })
+          .withMessage("areaInSqIn must be a positive number"),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+        try {
+          const {
+            subtotalCents,
+            areaInSqIn,
+            destinationState,
+            deliveryMethod,
+          } = req.body;
+          const shippingCfg = {
+            ...DEFAULT_SHIPPING_CONFIG,
+            ...(db.data?.config?.shipping || {}),
+          };
+          const breakdown = calcOrderBreakdown({
+            areaInSqIn: Number(areaInSqIn),
+            subtotalCents: Number(subtotalCents),
+            config: shippingCfg,
+            destinationState,
+            deliveryMethod,
+          });
+          return res.json({ success: true, ...breakdown });
+        } catch (err) {
+          logger.error("[ESTIMATE] Error calculating order estimate:", err);
+          return res
+            .status(500)
+            .json({ error: "Failed to calculate estimate." });
+        }
+      },
+    );
 
     // --- Shipping Config (admin) ---
-    app.get('/api/admin/shipping/config', authenticateToken, async (req, res) => {
-      if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
-      const saved = db.data?.config?.shipping || {};
-      res.json({ success: true, config: { ...DEFAULT_SHIPPING_CONFIG, ...saved } });
+    app.get(
+      "/api/admin/shipping/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
+        const saved = db.data?.config?.shipping || {};
+        res.json({
+          success: true,
+          config: { ...DEFAULT_SHIPPING_CONFIG, ...saved },
+        });
+      },
+    );
+
+    app.post(
+      "/api/admin/shipping/config",
+      authenticateToken,
+      [
+        body("taxRate")
+          .isFloat({ min: 0, max: 1 })
+          .withMessage("taxRate must be between 0 and 1"),
+        body("handlingFeeCents")
+          .isInt({ min: 0 })
+          .withMessage("handlingFeeCents must be a non-negative integer"),
+        body("squareFeePercent")
+          .isFloat({ min: 0, max: 1 })
+          .withMessage("squareFeePercent must be between 0 and 1"),
+        body("squareFeeFixedCents")
+          .isInt({ min: 0 })
+          .withMessage("squareFeeFixedCents must be a non-negative integer"),
+        body("gramsPerSqIn")
+          .isFloat({ min: 0 })
+          .withMessage("gramsPerSqIn must be a non-negative number"),
+        body("packageTareGrams")
+          .isFloat({ min: 0 })
+          .withMessage("packageTareGrams must be a non-negative number"),
+        body("pickupDiscountCents")
+          .optional()
+          .isInt({ min: 0 })
+          .withMessage("pickupDiscountCents must be a non-negative integer"),
+      ],
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
+        const errors = validationResult(req);
+        if (!errors.isEmpty())
+          return res.status(400).json({ errors: errors.array() });
+
+        const newConfig = {
+          taxRate: Number(req.body.taxRate),
+          handlingFeeCents: Number(req.body.handlingFeeCents),
+          squareFeePercent: Number(req.body.squareFeePercent),
+          squareFeeFixedCents: Number(req.body.squareFeeFixedCents),
+          gramsPerSqIn: Number(req.body.gramsPerSqIn),
+          packageTareGrams: Number(req.body.packageTareGrams),
+          pickupDiscountCents:
+            req.body.pickupDiscountCents !== undefined
+              ? Number(req.body.pickupDiscountCents)
+              : DEFAULT_SHIPPING_CONFIG.pickupDiscountCents || 300,
+        };
+
+        await db.setConfig("shipping", newConfig);
+        logger.info("[SHIPPING] Config updated:", newConfig);
+        return res.json({ success: true, config: newConfig });
+      },
+    );
+
+    app.get("/api/inventory", async (req, res) => {
+      // Public endpoint to get cached inventory status
+      // PERFORMANCE: Allow short caching (1 min) to reduce DB/Odoo load during bursts
+      res.setHeader("Cache-Control", "public, max-age=60");
+      const cache = await db.getInventoryCache();
+      res.json(cache || {});
     });
 
-    app.post('/api/admin/shipping/config', authenticateToken, [
-      body('taxRate').isFloat({ min: 0, max: 1 }).withMessage('taxRate must be between 0 and 1'),
-      body('handlingFeeCents').isInt({ min: 0 }).withMessage('handlingFeeCents must be a non-negative integer'),
-      body('squareFeePercent').isFloat({ min: 0, max: 1 }).withMessage('squareFeePercent must be between 0 and 1'),
-      body('squareFeeFixedCents').isInt({ min: 0 }).withMessage('squareFeeFixedCents must be a non-negative integer'),
-      body('gramsPerSqIn').isFloat({ min: 0 }).withMessage('gramsPerSqIn must be a non-negative number'),
-      body('packageTareGrams').isFloat({ min: 0 }).withMessage('packageTareGrams must be a non-negative number'),
-      body('pickupDiscountCents').optional().isInt({ min: 0 }).withMessage('pickupDiscountCents must be a non-negative integer'),
-    ], async (req, res) => {
-      if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-      const newConfig = {
-        taxRate: Number(req.body.taxRate),
-        handlingFeeCents: Number(req.body.handlingFeeCents),
-        squareFeePercent: Number(req.body.squareFeePercent),
-        squareFeeFixedCents: Number(req.body.squareFeeFixedCents),
-        gramsPerSqIn: Number(req.body.gramsPerSqIn),
-        packageTareGrams: Number(req.body.packageTareGrams),
-        pickupDiscountCents: req.body.pickupDiscountCents !== undefined ? Number(req.body.pickupDiscountCents) : (DEFAULT_SHIPPING_CONFIG.pickupDiscountCents || 300),
-      };
-
-      await db.setConfig('shipping', newConfig);
-      logger.info('[SHIPPING] Config updated:', newConfig);
-      return res.json({ success: true, config: newConfig });
+    app.get("/api/metrics", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      res.json(Metrics.getMetrics());
     });
 
-    app.get('/api/inventory', async (req, res) => {
+    app.post("/api/convert-image", upload.single("file"), async (req, res) => {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
 
-        // Public endpoint to get cached inventory status
-        // PERFORMANCE: Allow short caching (1 min) to reduce DB/Odoo load during bursts
-        res.setHeader('Cache-Control', 'public, max-age=60');
-        const cache = await db.getInventoryCache();
-        res.json(cache || {});
-    });
+      const inputFile = req.file.path;
+      const outputFile = `${inputFile}.png`;
 
-    app.get('/api/metrics', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        res.json(Metrics.getMetrics());
-    });
+      try {
+        // Using [0] to extract the first layer/page of multi-page formats (PDF/TIFF/AI)
+        await execFilePromise("convert", [`${inputFile}[0]`, outputFile]);
 
-    app.post('/api/convert-image', upload.single('file'), async (req, res) => {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
-
-        const inputFile = req.file.path;
-        const outputFile = `${inputFile}.png`;
-
+        res.sendFile(outputFile, async (err) => {
+          if (err) {
+            logger.error("Error sending converted file:", err);
+          }
+          // Cleanup temp files
+          try {
+            await fs.promises.unlink(inputFile);
+            await fs.promises.unlink(outputFile);
+          } catch (cleanupErr) {
+            logger.error(
+              "Error cleaning up conversion temp files:",
+              cleanupErr,
+            );
+          }
+        });
+      } catch (error) {
+        logger.error("Error converting image:", error);
         try {
-            // Using [0] to extract the first layer/page of multi-page formats (PDF/TIFF/AI)
-            await execFilePromise('convert', [`${inputFile}[0]`, outputFile]);
-
-            res.sendFile(outputFile, async (err) => {
-                if (err) {
-                    logger.error("Error sending converted file:", err);
-                }
-                // Cleanup temp files
-                try {
-                    await fs.promises.unlink(inputFile);
-                    await fs.promises.unlink(outputFile);
-                } catch (cleanupErr) {
-                    logger.error("Error cleaning up conversion temp files:", cleanupErr);
-                }
-            });
-        } catch (error) {
-            logger.error("Error converting image:", error);
-            try {
-                await fs.promises.unlink(inputFile);
-            } catch (cleanupErr) {
-                // ignore
-            }
-            res.status(500).json({ error: 'Failed to convert file format.' });
+          await fs.promises.unlink(inputFile);
+        } catch (cleanupErr) {
+          // ignore
         }
+        res.status(500).json({ error: "Failed to convert file format." });
+      }
     });
 
-    app.post('/api/upload-design', authenticateToken, upload.fields([
-        { name: 'designImage', maxCount: 1 },
-        { name: 'cutLineFile', maxCount: 1 }
-    ]), wafMiddleware, async (req, res) => {
+    app.post(
+      "/api/upload-design",
+      authenticateToken,
+      upload.fields([
+        { name: "designImage", maxCount: 1 },
+        { name: "cutLineFile", maxCount: 1 },
+      ]),
+      wafMiddleware,
+      async (req, res) => {
         if (!req.files || !req.files.designImage) {
-            return res.status(400).json({ error: 'No design image file uploaded' });
+          return res
+            .status(400)
+            .json({ error: "No design image file uploaded" });
         }
 
         const designImageFile = req.files.designImage[0];
         let designFileType = await fileTypeFromFile(designImageFile.path);
 
         // Fallback for valid SVGs lacking the XML prolog (which fileTypeFromFile returns undefined for)
-        if (!designFileType && designImageFile.originalname.toLowerCase().endsWith('.svg')) {
-            try {
-                const buffer = Buffer.alloc(100);
-                const fd = await fs.promises.open(designImageFile.path, 'r');
-                const { bytesRead } = await fd.read(buffer, 0, 100, 0);
-                await fd.close();
-                const str = buffer.toString('utf-8', 0, bytesRead).toLowerCase();
-                if (str.includes('<svg')) {
-                    designFileType = { ext: 'svg', mime: 'image/svg+xml' };
-                }
-            } catch (e) {
-                logger.error('Error in SVG fallback detection for designImageFile:', e);
+        if (
+          !designFileType &&
+          designImageFile.originalname.toLowerCase().endsWith(".svg")
+        ) {
+          try {
+            const buffer = Buffer.alloc(100);
+            const fd = await fs.promises.open(designImageFile.path, "r");
+            const { bytesRead } = await fd.read(buffer, 0, 100, 0);
+            await fd.close();
+            const str = buffer.toString("utf-8", 0, bytesRead).toLowerCase();
+            if (str.includes("<svg")) {
+              designFileType = { ext: "svg", mime: "image/svg+xml" };
             }
+          } catch (e) {
+            logger.error(
+              "Error in SVG fallback detection for designImageFile:",
+              e,
+            );
+          }
         }
-        logger.info(`[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`);
+        logger.info(
+          `[DEBUG] File type detected: ${JSON.stringify(designFileType)} for ${designImageFile.path}`,
+        );
 
         // Fallback for plain-text SVGs which lack magic numbers
-        if (!designFileType && designImageFile.originalname.toLowerCase().endsWith('.svg') && designImageFile.mimetype.includes('svg')) {
-             designFileType = { ext: 'svg', mime: 'image/svg+xml' };
-             logger.info(`[DEBUG] Fallback SVG detection applied for ${designImageFile.path}`);
+        if (
+          !designFileType &&
+          designImageFile.originalname.toLowerCase().endsWith(".svg") &&
+          designImageFile.mimetype.includes("svg")
+        ) {
+          designFileType = { ext: "svg", mime: "image/svg+xml" };
+          logger.info(
+            `[DEBUG] Fallback SVG detection applied for ${designImageFile.path}`,
+          );
         }
 
-        if (!designFileType || !allowedMimeTypes.includes(designFileType.mime)) {
-            // It's good practice to remove the invalid file
-            storageProvider.deleteFile(designImageFile.path).catch((err) => {
-                if (err) logger.error("Error deleting invalid file:", err);
+        if (
+          !designFileType ||
+          !allowedMimeTypes.includes(designFileType.mime)
+        ) {
+          // It's good practice to remove the invalid file
+          storageProvider.deleteFile(designImageFile.path).catch((err) => {
+            if (err) logger.error("Error deleting invalid file:", err);
+          });
+          return res
+            .status(400)
+            .json({
+              error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
             });
-            return res.status(400).json({ error: `Invalid file type. Only ${allowedMimeTypes.join(', ')} are allowed.` });
         }
 
         // --- SVG Sanitization for designImage ---
-        if (designFileType.mime === 'image/svg+xml' || designFileType.mime === 'application/xml') {
-            const isSafe = await sanitizeSVGFile(designImageFile.path);
-            if (!isSafe) {
-                return res.status(400).json({ error: 'The uploaded SVG file contains potentially malicious content and was rejected.' });
-            }
+        if (
+          designFileType.mime === "image/svg+xml" ||
+          designFileType.mime === "application/xml"
+        ) {
+          const isSafe = await sanitizeSVGFile(designImageFile.path);
+          if (!isSafe) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "The uploaded SVG file contains potentially malicious content and was rejected.",
+              });
+          }
         }
 
         // --- SECURITY: Enforce correct extension ---
@@ -1289,450 +1648,828 @@ async function startServer(
 
         let cutLinePath = null;
         if (req.files.cutLineFile && req.files.cutLineFile[0]) {
-            const edgecutLineFile = req.files.cutLineFile[0];
-            let edgecutLineFileType = await fileTypeFromFile(edgecutLineFile.path);
+          const edgecutLineFile = req.files.cutLineFile[0];
+          let edgecutLineFileType = await fileTypeFromFile(
+            edgecutLineFile.path,
+          );
 
-            // Fallback for valid SVGs lacking the XML prolog
-            if (!edgecutLineFileType && edgecutLineFile.originalname.toLowerCase().endsWith('.svg')) {
-                try {
-                    const buffer = Buffer.alloc(100);
-                    const fd = await fs.promises.open(edgecutLineFile.path, 'r');
-                    const { bytesRead } = await fd.read(buffer, 0, 100, 0);
-                    await fd.close();
-                    const str = buffer.toString('utf-8', 0, bytesRead).toLowerCase();
-                    if (str.includes('<svg')) {
-                        edgecutLineFileType = { ext: 'svg', mime: 'image/svg+xml' };
-                    }
-                } catch (e) {
-                    logger.error('Error in SVG fallback detection for cutLineFile:', e);
-                }
+          // Fallback for valid SVGs lacking the XML prolog
+          if (
+            !edgecutLineFileType &&
+            edgecutLineFile.originalname.toLowerCase().endsWith(".svg")
+          ) {
+            try {
+              const buffer = Buffer.alloc(100);
+              const fd = await fs.promises.open(edgecutLineFile.path, "r");
+              const { bytesRead } = await fd.read(buffer, 0, 100, 0);
+              await fd.close();
+              const str = buffer.toString("utf-8", 0, bytesRead).toLowerCase();
+              if (str.includes("<svg")) {
+                edgecutLineFileType = { ext: "svg", mime: "image/svg+xml" };
+              }
+            } catch (e) {
+              logger.error(
+                "Error in SVG fallback detection for cutLineFile:",
+                e,
+              );
             }
-            // Fallback for plain-text SVGs which lack magic numbers
-            if (!edgecutLineFileType && edgecutLineFile.originalname.toLowerCase().endsWith('.svg') && edgecutLineFile.mimetype.includes('svg')) {
-                 edgecutLineFileType = { ext: 'svg', mime: 'image/svg+xml' };
-                 logger.info(`[DEBUG] Fallback SVG detection applied for ${edgecutLineFile.path}`);
-            }
+          }
+          // Fallback for plain-text SVGs which lack magic numbers
+          if (
+            !edgecutLineFileType &&
+            edgecutLineFile.originalname.toLowerCase().endsWith(".svg") &&
+            edgecutLineFile.mimetype.includes("svg")
+          ) {
+            edgecutLineFileType = { ext: "svg", mime: "image/svg+xml" };
+            logger.info(
+              `[DEBUG] Fallback SVG detection applied for ${edgecutLineFile.path}`,
+            );
+          }
 
-            // Allow 'svg' extension or 'xml' extension if mime is application/xml (common for SVGs)
-            const isValidCutLine = edgecutLineFileType && (edgecutLineFileType.ext === 'svg' || (edgecutLineFileType.ext === 'xml' && edgecutLineFileType.mime === 'application/xml'));
+          // Allow 'svg' extension or 'xml' extension if mime is application/xml (common for SVGs)
+          const isValidCutLine =
+            edgecutLineFileType &&
+            (edgecutLineFileType.ext === "svg" ||
+              (edgecutLineFileType.ext === "xml" &&
+                edgecutLineFileType.mime === "application/xml"));
 
-            if (!isValidCutLine) {
-                // It's good practice to remove the invalid file
-                storageProvider.deleteFile(edgecutLineFile.path).catch((err) => {
-                    if (err) logger.error("Error deleting invalid file:", err);
-                });
-                return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for the edgecut line.' });
-            }
+          if (!isValidCutLine) {
+            // It's good practice to remove the invalid file
+            storageProvider.deleteFile(edgecutLineFile.path).catch((err) => {
+              if (err) logger.error("Error deleting invalid file:", err);
+            });
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid file type. Only SVG files are allowed for the edgecut line.",
+              });
+          }
 
-            // --- SVG Sanitization for cutLineFile ---
-            const isSafe = await sanitizeSVGFile(edgecutLineFile.path);
-            if (!isSafe) {
-                // Also delete the already processed design image to avoid orphaned files
-                storageProvider.deleteFile(designImageFile.path).catch((err) => { if (err) logger.error("Error deleting orphaned design file:", err); });
-                return res.status(400).json({ error: 'The uploaded cut line file contains potentially malicious content and was rejected.' });
-            }
+          // --- SVG Sanitization for cutLineFile ---
+          const isSafe = await sanitizeSVGFile(edgecutLineFile.path);
+          if (!isSafe) {
+            // Also delete the already processed design image to avoid orphaned files
+            storageProvider.deleteFile(designImageFile.path).catch((err) => {
+              if (err)
+                logger.error("Error deleting orphaned design file:", err);
+            });
+            return res
+              .status(400)
+              .json({
+                error:
+                  "The uploaded cut line file contains potentially malicious content and was rejected.",
+              });
+          }
 
-            // --- SECURITY: Enforce correct extension ---
-            await enforceCorrectExtension(edgecutLineFile, edgecutLineFileType);
+          // --- SECURITY: Enforce correct extension ---
+          await enforceCorrectExtension(edgecutLineFile, edgecutLineFileType);
 
-            // Finalize upload for cut line
-            cutLinePath = await storageProvider.finalizeUpload(edgecutLineFile);
+          // Finalize upload for cut line
+          cutLinePath = await storageProvider.finalizeUpload(edgecutLineFile);
         }
 
-        const designImagePath = await storageProvider.finalizeUpload(designImageFile);
+        const designImagePath =
+          await storageProvider.finalizeUpload(designImageFile);
 
         res.json({
-            success: true,
-            designImagePath: designImagePath,
-            cutLinePath: cutLinePath
+          success: true,
+          designImagePath: designImagePath,
+          cutLinePath: cutLinePath,
         });
-    });
+      },
+    );
 
     // --- Chunked Upload Endpoints ---
 
     // 1. Initialize Chunked Upload Session
-    app.post('/api/upload-chunk/init', authenticateToken, wafMiddleware, async (req, res) => {
+    app.post(
+      "/api/upload-chunk/init",
+      authenticateToken,
+      wafMiddleware,
+      async (req, res) => {
         try {
-            const { filename, totalSize, totalChunks, mimeType, isCutLine } = req.body;
-            const uploadId = req.body.uploadId || randomUUID();
+          const { filename, totalSize, totalChunks, mimeType, isCutLine } =
+            req.body;
+          const uploadId = req.body.uploadId || randomUUID();
 
-            // Basic extension check for filename
-            const ext = path.extname(filename || '').toLowerCase().replace('.', '');
-            const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'tiff', 'tif', 'pdf', 'ai', 'eps'];
-            if (!allowedExtensions.includes(ext)) {
-                return res.status(400).json({ error: `Unsupported file extension .${ext}. Allowed extensions: ${allowedExtensions.join(', ')}` });
-            }
+          // Basic extension check for filename
+          const ext = path
+            .extname(filename || "")
+            .toLowerCase()
+            .replace(".", "");
+          const allowedExtensions = [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "svg",
+            "tiff",
+            "tif",
+            "pdf",
+            "ai",
+            "eps",
+          ];
+          if (!allowedExtensions.includes(ext)) {
+            return res
+              .status(400)
+              .json({
+                error: `Unsupported file extension .${ext}. Allowed extensions: ${allowedExtensions.join(", ")}`,
+              });
+          }
 
-            const session = chunkedUploadManager.initSession({
-                uploadId,
-                filename,
-                totalSize,
-                totalChunks,
-                mimeType,
-                isCutLine
-            });
+          const session = chunkedUploadManager.initSession({
+            uploadId,
+            filename,
+            totalSize,
+            totalChunks,
+            mimeType,
+            isCutLine,
+          });
 
-            res.json({
-                success: true,
-                uploadId: session.uploadId,
-                filename: session.filename,
-                chunkSize: 5 * 1024 * 1024
-            });
+          res.json({
+            success: true,
+            uploadId: session.uploadId,
+            filename: session.filename,
+            chunkSize: 5 * 1024 * 1024,
+          });
         } catch (err) {
-            logger.warn(`[CHUNKED] Init failed: ${err.message}`);
-            res.status(400).json({ error: err.message });
+          logger.warn(`[CHUNKED] Init failed: ${err.message}`);
+          res.status(400).json({ error: err.message });
         }
-    });
+      },
+    );
 
     // 2. Upload Single Chunk
-    app.post('/api/upload-chunk', authenticateToken, chunkUpload.single('chunk'), wafMiddleware, async (req, res) => {
+    app.post(
+      "/api/upload-chunk",
+      authenticateToken,
+      chunkUpload.single("chunk"),
+      wafMiddleware,
+      async (req, res) => {
         if (!req.file) {
-            return res.status(400).json({ error: 'No chunk file uploaded' });
+          return res.status(400).json({ error: "No chunk file uploaded" });
         }
 
         const { uploadId, chunkIndex } = req.body;
         if (!uploadId || chunkIndex === undefined) {
-            try { await fs.promises.unlink(req.file.path); } catch (e) {}
-            return res.status(400).json({ error: 'uploadId and chunkIndex are required' });
+          try {
+            await fs.promises.unlink(req.file.path);
+          } catch (e) {}
+          return res
+            .status(400)
+            .json({ error: "uploadId and chunkIndex are required" });
         }
 
         try {
-            const result = await chunkedUploadManager.saveChunk(uploadId, chunkIndex, req.file.path);
-            res.json({
-                success: true,
-                uploadId,
-                chunkIndex: Number(chunkIndex),
-                receivedChunks: result.receivedChunks,
-                totalChunks: result.totalChunks,
-                isComplete: result.isComplete
-            });
+          const result = await chunkedUploadManager.saveChunk(
+            uploadId,
+            chunkIndex,
+            req.file.path,
+          );
+          res.json({
+            success: true,
+            uploadId,
+            chunkIndex: Number(chunkIndex),
+            receivedChunks: result.receivedChunks,
+            totalChunks: result.totalChunks,
+            isComplete: result.isComplete,
+          });
         } catch (err) {
-            try { await fs.promises.unlink(req.file.path); } catch (e) {}
-            logger.warn(`[CHUNKED] Save chunk failed for session ${uploadId}: ${err.message}`);
-            res.status(400).json({ error: err.message });
+          try {
+            await fs.promises.unlink(req.file.path);
+          } catch (e) {}
+          logger.warn(
+            `[CHUNKED] Save chunk failed for session ${uploadId}: ${err.message}`,
+          );
+          res.status(400).json({ error: err.message });
         }
-    });
+      },
+    );
 
     // 3. Complete and Reassemble Chunked Upload
-    app.post('/api/upload-chunk/complete', authenticateToken, wafMiddleware, async (req, res) => {
+    app.post(
+      "/api/upload-chunk/complete",
+      authenticateToken,
+      wafMiddleware,
+      async (req, res) => {
         const { uploadId } = req.body;
         if (!uploadId) {
-            return res.status(400).json({ error: 'uploadId is required' });
+          return res.status(400).json({ error: "uploadId is required" });
         }
 
         const session = chunkedUploadManager.getSession(uploadId);
         if (!session) {
-            return res.status(404).json({ error: 'Upload session not found or expired' });
+          return res
+            .status(404)
+            .json({ error: "Upload session not found or expired" });
         }
 
         if (!chunkedUploadManager.isComplete(uploadId)) {
-            return res.status(400).json({
-                error: `Upload incomplete: received ${session.receivedChunks.size} of ${session.totalChunks} chunks`
-            });
+          return res.status(400).json({
+            error: `Upload incomplete: received ${session.receivedChunks.size} of ${session.totalChunks} chunks`,
+          });
         }
 
         // Determine directory to stage the assembled file
-        const stageDir = storageProvider.uploadDir || storageProvider.tempDir || path.join(__dirname, 'uploads');
+        const stageDir =
+          storageProvider.uploadDir ||
+          storageProvider.tempDir ||
+          path.join(__dirname, "uploads");
         if (!fs.existsSync(stageDir)) {
-            fs.mkdirSync(stageDir, { recursive: true });
+          fs.mkdirSync(stageDir, { recursive: true });
         }
 
-        const fieldPrefix = session.isCutLine ? 'cutLineFile' : 'designImage';
+        const fieldPrefix = session.isCutLine ? "cutLineFile" : "designImage";
         const tempAssembledFilename = `${fieldPrefix}-${randomUUID()}${path.extname(session.filename)}`;
         const tempAssembledPath = path.join(stageDir, tempAssembledFilename);
 
         try {
-            await chunkedUploadManager.assembleChunks(uploadId, tempAssembledPath);
+          await chunkedUploadManager.assembleChunks(
+            uploadId,
+            tempAssembledPath,
+          );
 
-            // Run file type verification on assembled file
-            let detectedType = await fileTypeFromFile(tempAssembledPath);
+          // Run file type verification on assembled file
+          let detectedType = await fileTypeFromFile(tempAssembledPath);
 
-            // Fallback for valid SVGs lacking the XML prolog
-            if (!detectedType && session.filename.toLowerCase().endsWith('.svg')) {
+          // Fallback for valid SVGs lacking the XML prolog
+          if (
+            !detectedType &&
+            session.filename.toLowerCase().endsWith(".svg")
+          ) {
+            try {
+              const buffer = Buffer.alloc(100);
+              const fd = await fs.promises.open(tempAssembledPath, "r");
+              const { bytesRead } = await fd.read(buffer, 0, 100, 0);
+              await fd.close();
+              const str = buffer.toString("utf-8", 0, bytesRead).toLowerCase();
+              if (str.includes("<svg")) {
+                detectedType = { ext: "svg", mime: "image/svg+xml" };
+              }
+            } catch (e) {
+              logger.error("[CHUNKED] Error in SVG fallback detection:", e);
+            }
+          }
+
+          if (!detectedType || !allowedMimeTypes.includes(detectedType.mime)) {
+            try {
+              await fs.promises.unlink(tempAssembledPath);
+            } catch (e) {}
+            return res
+              .status(400)
+              .json({
+                error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
+              });
+          }
+
+          // SVG Sanitization
+          if (
+            detectedType.mime === "image/svg+xml" ||
+            detectedType.mime === "application/xml"
+          ) {
+            const isSafe = await sanitizeSVGFile(tempAssembledPath);
+            if (!isSafe) {
+              try {
+                await fs.promises.unlink(tempAssembledPath);
+              } catch (e) {}
+              return res
+                .status(400)
+                .json({
+                  error:
+                    "The uploaded SVG file contains potentially malicious content and was rejected.",
+                });
+            }
+          }
+
+          // If cutLineFile, must be SVG
+          if (session.isCutLine) {
+            const isValidCutLine =
+              detectedType &&
+              (detectedType.ext === "svg" ||
+                (detectedType.ext === "xml" &&
+                  detectedType.mime === "application/xml"));
+            if (!isValidCutLine) {
+              try {
+                await fs.promises.unlink(tempAssembledPath);
+              } catch (e) {}
+              return res
+                .status(400)
+                .json({
+                  error:
+                    "Invalid file type. Only SVG files are allowed for cutline.",
+                });
+            }
+          } else {
+            // Pixel bomb / dimension check for raster images
+            try {
+              const dimensions = sizeOf(tempAssembledPath);
+              if (dimensions && dimensions.width && dimensions.height) {
+                const totalPixels = dimensions.width * dimensions.height;
+                if (totalPixels > 50_000_000) {
+                  try {
+                    await fs.promises.unlink(tempAssembledPath);
+                  } catch (e) {}
+                  return res
+                    .status(400)
+                    .json({
+                      error: "Image dimensions too large (exceeds 50MP limit).",
+                    });
+                }
+              }
+            } catch (e) {
+              if (e.message && e.message.includes("50MP")) {
                 try {
-                    const buffer = Buffer.alloc(100);
-                    const fd = await fs.promises.open(tempAssembledPath, 'r');
-                    const { bytesRead } = await fd.read(buffer, 0, 100, 0);
-                    await fd.close();
-                    const str = buffer.toString('utf-8', 0, bytesRead).toLowerCase();
-                    if (str.includes('<svg')) {
-                        detectedType = { ext: 'svg', mime: 'image/svg+xml' };
-                    }
-                } catch (e) {
-                    logger.error('[CHUNKED] Error in SVG fallback detection:', e);
-                }
+                  await fs.promises.unlink(tempAssembledPath);
+                } catch (e) {}
+                return res.status(400).json({ error: e.message });
+              }
+              // Non-raster formats like PDF might not parse with image-size, which is normal
             }
+          }
 
-            if (!detectedType || !allowedMimeTypes.includes(detectedType.mime)) {
-                try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
-                return res.status(400).json({ error: `Invalid file type. Only ${allowedMimeTypes.join(', ')} are allowed.` });
-            }
+          // Enforce extension
+          const fileObj = {
+            path: tempAssembledPath,
+            filename: tempAssembledFilename,
+            originalname: session.filename,
+            mimetype: detectedType.mime,
+          };
+          await enforceCorrectExtension(fileObj, detectedType);
 
-            // SVG Sanitization
-            if (detectedType.mime === 'image/svg+xml' || detectedType.mime === 'application/xml') {
-                const isSafe = await sanitizeSVGFile(tempAssembledPath);
-                if (!isSafe) {
-                    try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
-                    return res.status(400).json({ error: 'The uploaded SVG file contains potentially malicious content and was rejected.' });
-                }
-            }
+          // Finalize upload with storage provider
+          const finalPath = await storageProvider.finalizeUpload(fileObj);
 
-            // If cutLineFile, must be SVG
-            if (session.isCutLine) {
-                const isValidCutLine = detectedType && (detectedType.ext === 'svg' || (detectedType.ext === 'xml' && detectedType.mime === 'application/xml'));
-                if (!isValidCutLine) {
-                    try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
-                    return res.status(400).json({ error: 'Invalid file type. Only SVG files are allowed for cutline.' });
-                }
-            } else {
-                // Pixel bomb / dimension check for raster images
-                try {
-                    const dimensions = sizeOf(tempAssembledPath);
-                    if (dimensions && dimensions.width && dimensions.height) {
-                        const totalPixels = dimensions.width * dimensions.height;
-                        if (totalPixels > 50_000_000) {
-                            try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
-                            return res.status(400).json({ error: 'Image dimensions too large (exceeds 50MP limit).' });
-                        }
-                    }
-                } catch (e) {
-                    if (e.message && e.message.includes('50MP')) {
-                        try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
-                        return res.status(400).json({ error: e.message });
-                    }
-                    // Non-raster formats like PDF might not parse with image-size, which is normal
-                }
-            }
-
-            // Enforce extension
-            const fileObj = {
-                path: tempAssembledPath,
-                filename: tempAssembledFilename,
-                originalname: session.filename,
-                mimetype: detectedType.mime
-            };
-            await enforceCorrectExtension(fileObj, detectedType);
-
-            // Finalize upload with storage provider
-            const finalPath = await storageProvider.finalizeUpload(fileObj);
-
-            res.json({
-                success: true,
-                filePath: finalPath,
-                isCutLine: session.isCutLine
-            });
+          res.json({
+            success: true,
+            filePath: finalPath,
+            isCutLine: session.isCutLine,
+          });
         } catch (err) {
-            try { await fs.promises.unlink(tempAssembledPath); } catch (e) {}
-            logger.error(`[CHUNKED] Assembly/finalization error for session ${uploadId}:`, err);
-            res.status(500).json({ error: err.message || 'Failed to assemble and finalize upload' });
+          try {
+            await fs.promises.unlink(tempAssembledPath);
+          } catch (e) {}
+          logger.error(
+            `[CHUNKED] Assembly/finalization error for session ${uploadId}:`,
+            err,
+          );
+          res
+            .status(500)
+            .json({
+              error: err.message || "Failed to assemble and finalize upload",
+            });
         }
-    });
+      },
+    );
 
     // 4. Abort Chunked Upload Session
-    app.post('/api/upload-chunk/abort', authenticateToken, wafMiddleware, async (req, res) => {
+    app.post(
+      "/api/upload-chunk/abort",
+      authenticateToken,
+      wafMiddleware,
+      async (req, res) => {
         const { uploadId } = req.body;
         if (!uploadId) {
-            return res.status(400).json({ error: 'uploadId is required' });
+          return res.status(400).json({ error: "uploadId is required" });
         }
 
         try {
-            await chunkedUploadManager.abortSession(uploadId);
-            res.json({ success: true, message: 'Upload session aborted' });
+          await chunkedUploadManager.abortSession(uploadId);
+          res.json({ success: true, message: "Upload session aborted" });
         } catch (err) {
-            res.status(400).json({ error: err.message });
+          res.status(400).json({ error: err.message });
         }
-    });
+      },
+    );
 
     // --- Product Endpoints ---
-    app.post('/api/products', authenticateToken, [
-        body('name').notEmpty().withMessage('Product name is required').isString().trim().escape(),
-        body('designImagePath').notEmpty().withMessage('Design image is required').isString().custom(value => {
-            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
-            if (value.startsWith('/uploads/')) return true;
-            if (value.startsWith('http')) return true; // Allow URLs
-            throw new Error('Path must start with /uploads/ or be a valid URL');
-        }),
-        body('cutLinePath').optional().isString().custom(value => {
-            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
-            if (value.startsWith('/uploads/')) return true;
-            if (value.startsWith('http')) return true; // Allow URLs
-            throw new Error('Path must start with /uploads/ or be a valid URL');
-        }),
-        body('defaults').optional().isObject(),
-        body('creatorProfitCents').isInt({ min: 0 }).withMessage('Creator profit must be a non-negative integer'),
-    ], async (req, res) => {
+    app.post(
+      "/api/products",
+      authenticateToken,
+      [
+        body("name")
+          .notEmpty()
+          .withMessage("Product name is required")
+          .isString()
+          .trim()
+          .escape(),
+        body("designImagePath")
+          .notEmpty()
+          .withMessage("Design image is required")
+          .isString()
+          .custom((value) => {
+            if (value.includes(".."))
+              throw new Error("Path cannot contain directory traversal");
+            if (value.startsWith("/uploads/")) return true;
+            if (value.startsWith("http")) return true; // Allow URLs
+            throw new Error("Path must start with /uploads/ or be a valid URL");
+          }),
+        body("cutLinePath")
+          .optional()
+          .isString()
+          .custom((value) => {
+            if (value.includes(".."))
+              throw new Error("Path cannot contain directory traversal");
+            if (value.startsWith("/uploads/")) return true;
+            if (value.startsWith("http")) return true; // Allow URLs
+            throw new Error("Path must start with /uploads/ or be a valid URL");
+          }),
+        body("defaults").optional().isObject(),
+        body("creatorProfitCents")
+          .isInt({ min: 0 })
+          .withMessage("Creator profit must be a non-negative integer"),
+      ],
+      async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
+          return res.status(400).json({ errors: errors.array() });
         }
 
         if (req.user.isGuest) {
-            return res.status(403).json({ error: 'Forbidden: Guests cannot create products.' });
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Guests cannot create products." });
         }
 
         try {
-            const { name, designImagePath, cutLinePath, creatorProfitCents, defaults } = matchedData(req);
+          const {
+            name,
+            designImagePath,
+            cutLinePath,
+            creatorProfitCents,
+            defaults,
+          } = matchedData(req);
 
-            // Robust lookup for creator
-            let creator = null;
-            // The token payload from authenticateToken is in req.user
-            if (req.user.email) {
-                creator = await getUserByEmail(req.user.email);
-            } else if (req.user.username) {
-                // Check both direct access and scan
-                creator = await db.getUser(req.user.username);
-            }
+          // Robust lookup for creator
+          let creator = null;
+          // The token payload from authenticateToken is in req.user
+          if (req.user.email) {
+            creator = await getUserByEmail(req.user.email);
+          } else if (req.user.username) {
+            // Check both direct access and scan
+            creator = await db.getUser(req.user.username);
+          }
 
-            if (!creator) {
-                return res.status(401).json({ error: 'User not found.' });
-            }
+          if (!creator) {
+            return res.status(401).json({ error: "User not found." });
+          }
 
-            const productId = randomUUID();
-            const newProduct = {
-                productId,
-                creatorId: creator.id || creator.username, // Use ID if available, else username (legacy)
-                creatorName: creator.username,
-                name,
-                designImagePath,
-                cutLinePath,
-                creatorProfitCents: Number(creatorProfitCents),
-                defaults: defaults || {},
-                createdAt: new Date().toISOString(),
-                status: 'active'
-            };
+          const productId = randomUUID();
+          const newProduct = {
+            productId,
+            creatorId: creator.id || creator.username, // Use ID if available, else username (legacy)
+            creatorName: creator.username,
+            name,
+            designImagePath,
+            cutLinePath,
+            creatorProfitCents: Number(creatorProfitCents),
+            defaults: defaults || {},
+            createdAt: new Date().toISOString(),
+            status: "active",
+          };
 
-            await db.createProduct(newProduct);
+          await db.createProduct(newProduct);
 
-            logger.info(`[SERVER] New product created: ${productId} by ${newProduct.creatorName}`);
-            res.status(201).json({ success: true, product: newProduct });
-
+          logger.info(
+            `[SERVER] New product created: ${productId} by ${newProduct.creatorName}`,
+          );
+          res.status(201).json({ success: true, product: newProduct });
         } catch (error) {
-            await logAndEmailError(error, 'Error creating product');
-            res.status(500).json({ error: 'Internal Server Error' });
+          await logAndEmailError(error, "Error creating product");
+          res.status(500).json({ error: "Internal Server Error" });
         }
-    });
+      },
+    );
 
-    app.get('/api/products/:productId', validateId('productId'), async (req, res) => {
+    app.get(
+      "/api/products/:productId",
+      validateId("productId"),
+      async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
+          return res.status(400).json({ errors: errors.array() });
         }
         const { productId } = req.params;
         const product = await db.getProduct(productId);
         if (!product) {
-            return res.status(404).json({ error: 'Product not found' });
+          return res.status(404).json({ error: "Product not found" });
         }
         res.json({
-            productId: product.productId,
-            name: product.name,
-            designImagePath: product.designImagePath,
-            cutLinePath: product.cutLinePath,
-            creatorProfitCents: product.creatorProfitCents,
-            defaults: product.defaults,
-            creatorName: product.creatorName
+          productId: product.productId,
+          name: product.name,
+          designImagePath: product.designImagePath,
+          cutLinePath: product.cutLinePath,
+          creatorProfitCents: product.creatorProfitCents,
+          defaults: product.defaults,
+          creatorName: product.creatorName,
         });
-    });
+      },
+    );
 
     // --- Order Endpoints ---
-    app.post('/api/create-order', authenticateToken, [
-      body('sourceId').notEmpty().withMessage('sourceId is required').isString().withMessage('sourceId must be a string'),
-      body('amountCents').isInt({ gt: 0 }).withMessage('amountCents must be a positive integer'),
-      body('currency').optional().isString().withMessage('currency must be a string').isAlpha().withMessage('currency must be alphabetic'),
-      body('designImagePath').notEmpty().withMessage('designImagePath is required').custom(value => {
-            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
-            if (value.startsWith('/uploads/')) return true;
-            if (value.startsWith('http')) return true; // Allow URLs
-            throw new Error('Path must start with /uploads/ or be a valid URL');
-      }),
-      // Security Fix: Validate orderDetails structure
-      body('orderDetails').isObject().withMessage('orderDetails must be an object'),
-      body('orderDetails.quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),
-      body('orderDetails.promoAddon').optional().isBoolean().withMessage('Promo Addon must be a boolean'),
-      // Security: Validate material and resolution against allowed values to prevent injection
-      body('orderDetails.material').optional().isString().withMessage('Material must be a string').custom(value => {
-            const validMaterials = pricingConfig.materials.map(m => m.id);
+    app.post(
+      "/api/create-order",
+      authenticateToken,
+      [
+        body("sourceId")
+          .notEmpty()
+          .withMessage("sourceId is required")
+          .isString()
+          .withMessage("sourceId must be a string"),
+        body("amountCents")
+          .isInt({ gt: 0 })
+          .withMessage("amountCents must be a positive integer"),
+        body("currency")
+          .optional()
+          .isString()
+          .withMessage("currency must be a string")
+          .isAlpha()
+          .withMessage("currency must be alphabetic"),
+        body("designImagePath")
+          .notEmpty()
+          .withMessage("designImagePath is required")
+          .custom((value) => {
+            if (value.includes(".."))
+              throw new Error("Path cannot contain directory traversal");
+            if (value.startsWith("/uploads/")) return true;
+            if (value.startsWith("http")) return true; // Allow URLs
+            throw new Error("Path must start with /uploads/ or be a valid URL");
+          }),
+        // Security Fix: Validate orderDetails structure
+        body("orderDetails")
+          .isObject()
+          .withMessage("orderDetails must be an object"),
+        body("orderDetails.quantity")
+          .isInt({ gt: 0 })
+          .withMessage("Quantity must be a positive integer"),
+        body("orderDetails.promoAddon")
+          .optional()
+          .isBoolean()
+          .withMessage("Promo Addon must be a boolean"),
+        // Security: Validate material and resolution against allowed values to prevent injection
+        body("orderDetails.material")
+          .optional()
+          .isString()
+          .withMessage("Material must be a string")
+          .custom((value) => {
+            const validMaterials = pricingConfig.materials.map((m) => m.id);
             if (!validMaterials.includes(value)) {
-                throw new Error(`Invalid material. Must be one of: ${validMaterials.join(', ')}`);
+              throw new Error(
+                `Invalid material. Must be one of: ${validMaterials.join(", ")}`,
+              );
             }
             return true;
-      }),
-      body('orderDetails.resolution').optional().isString().withMessage('Resolution must be a string').custom(value => {
-            const validResolutions = pricingConfig.resolutions.map(r => r.id);
+          }),
+        body("orderDetails.resolution")
+          .optional()
+          .isString()
+          .withMessage("Resolution must be a string")
+          .custom((value) => {
+            const validResolutions = pricingConfig.resolutions.map((r) => r.id);
             if (!validResolutions.includes(value)) {
-                throw new Error(`Invalid resolution. Must be one of: ${validResolutions.join(', ')}`);
+              throw new Error(
+                `Invalid resolution. Must be one of: ${validResolutions.join(", ")}`,
+              );
             }
             return true;
-      }),
-      body('orderDetails.cutLinePath').optional({ nullable: true }).isString().withMessage('cutLinePath must be a string').custom(value => {
-            if (value.includes('..')) throw new Error('Path cannot contain directory traversal');
-            if (value.startsWith('/uploads/')) return true;
-            if (value.startsWith('http')) return true; // Allow URLs
-            throw new Error('Path must start with /uploads/ or be a valid URL');
-      }),
+          }),
+        body("orderDetails.cutLinePath")
+          .optional({ nullable: true })
+          .isString()
+          .withMessage("cutLinePath must be a string")
+          .custom((value) => {
+            if (value.includes(".."))
+              throw new Error("Path cannot contain directory traversal");
+            if (value.startsWith("/uploads/")) return true;
+            if (value.startsWith("http")) return true; // Allow URLs
+            throw new Error("Path must start with /uploads/ or be a valid URL");
+          }),
 
-      // Security & Integrity: Validate Billing Contact
-      body('billingContact').isObject().withMessage('billingContact must be an object'),
-      body('billingContact.givenName').notEmpty().withMessage('Billing First Name is required').isLength({ max: 100 }).withMessage('Billing First Name is too long').not().contains('<').withMessage('Invalid characters in Billing First Name'),
-      body('billingContact.familyName').optional().isLength({ max: 100 }).withMessage('Billing Last Name is too long').not().contains('<').withMessage('Invalid characters in Billing Last Name'),
-      body('billingContact.email').isEmail().withMessage('Valid Billing Email is required'),
-      body('billingContact.phoneNumber').optional().isString().trim().not().contains('<').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
-      body('billingContact.addressLines').optional().isArray().withMessage('Billing Address Lines must be an array'),
-      body('billingContact.addressLines.*').optional().isString().withMessage('Billing address lines must be strings').isLength({ max: 200 }).withMessage('Address Line is too long').not().contains('<').withMessage('Invalid characters in Address Lines'),
-      body('billingContact.locality').optional().isString().isLength({ max: 100 }).not().contains('<'),
-      body('billingContact.administrativeDistrictLevel1').optional().isString().isLength({ max: 100 }).not().contains('<'),
-      body('billingContact.postalCode').optional().isString().isLength({ max: 20 }).not().contains('<'),
-      body('billingContact.country').optional().isString().isLength({ max: 100 }).not().contains('<'),
+        // Security & Integrity: Validate Billing Contact
+        body("billingContact")
+          .isObject()
+          .withMessage("billingContact must be an object"),
+        body("billingContact.givenName")
+          .notEmpty()
+          .withMessage("Billing First Name is required")
+          .isLength({ max: 100 })
+          .withMessage("Billing First Name is too long")
+          .not()
+          .contains("<")
+          .withMessage("Invalid characters in Billing First Name"),
+        body("billingContact.familyName")
+          .optional()
+          .isLength({ max: 100 })
+          .withMessage("Billing Last Name is too long")
+          .not()
+          .contains("<")
+          .withMessage("Invalid characters in Billing Last Name"),
+        body("billingContact.email")
+          .isEmail()
+          .withMessage("Valid Billing Email is required"),
+        body("billingContact.phoneNumber")
+          .optional()
+          .isString()
+          .trim()
+          .not()
+          .contains("<")
+          .isLength({ max: 20 })
+          .withMessage("Invalid Phone Number"),
+        body("billingContact.addressLines")
+          .optional()
+          .isArray()
+          .withMessage("Billing Address Lines must be an array"),
+        body("billingContact.addressLines.*")
+          .optional()
+          .isString()
+          .withMessage("Billing address lines must be strings")
+          .isLength({ max: 200 })
+          .withMessage("Address Line is too long")
+          .not()
+          .contains("<")
+          .withMessage("Invalid characters in Address Lines"),
+        body("billingContact.locality")
+          .optional()
+          .isString()
+          .isLength({ max: 100 })
+          .not()
+          .contains("<"),
+        body("billingContact.administrativeDistrictLevel1")
+          .optional()
+          .isString()
+          .isLength({ max: 100 })
+          .not()
+          .contains("<"),
+        body("billingContact.postalCode")
+          .optional()
+          .isString()
+          .isLength({ max: 20 })
+          .not()
+          .contains("<"),
+        body("billingContact.country")
+          .optional()
+          .isString()
+          .isLength({ max: 100 })
+          .not()
+          .contains("<"),
 
-      // Security & Integrity: Validate Shipping Contact
-      body('shippingContact').isObject().withMessage('shippingContact must be an object'),
-      body('shippingContact.givenName').notEmpty().withMessage('Shipping First Name is required').isLength({ max: 100 }).withMessage('Shipping First Name is too long').not().contains('<').withMessage('Invalid characters in Shipping First Name'),
-      body('shippingContact.familyName').optional().isLength({ max: 100 }).withMessage('Shipping Last Name is too long').not().contains('<').withMessage('Invalid characters in Shipping Last Name'),
-      body('shippingContact.email').optional().isEmail().withMessage('Invalid Shipping Email'),
-      body('shippingContact.addressLines').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').isArray().withMessage('Shipping Address Lines must be an array'),
-      body('shippingContact.addressLines.*').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').isString().withMessage('Address lines must be strings').isLength({ max: 200 }).withMessage('Address Line is too long').not().contains('<').withMessage('Invalid characters in Address Lines'),
-      body('shippingContact.locality').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('City is required').isLength({ max: 100 }).withMessage('City name is too long').not().contains('<'),
-      body('shippingContact.administrativeDistrictLevel1').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('State/Province is required').isLength({ max: 100 }).withMessage('State/Province name is too long').not().contains('<'),
-      body('shippingContact.postalCode').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('Postal Code is required').isLength({ max: 20 }).withMessage('Postal Code is too long').not().contains('<'),
-      body('shippingContact.country').if((val, { req }) => req.body?.orderDetails?.deliveryMethod !== 'pickup').notEmpty().withMessage('Country is required').isLength({ max: 100 }).withMessage('Country name is too long').not().contains('<'),
-      body('shippingContact.phoneNumber').optional().isString().trim().not().contains('<').withMessage('Invalid Phone Number').isLength({ max: 20 }).withMessage('Invalid Phone Number'),
-      body('packageAreaSqIn').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('packageAreaSqIn must be a non-negative number'),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      try {
-        // --- Guard: Confirmation Checkbox ---
-        if (!req.body.orderReadyConfirmed) {
-          return res.status(400).json({ error: 'Order confirmation required. Please check the confirmation box before submitting.' });
+        // Security & Integrity: Validate Shipping Contact
+        body("shippingContact")
+          .isObject()
+          .withMessage("shippingContact must be an object"),
+        body("shippingContact.givenName")
+          .notEmpty()
+          .withMessage("Shipping First Name is required")
+          .isLength({ max: 100 })
+          .withMessage("Shipping First Name is too long")
+          .not()
+          .contains("<")
+          .withMessage("Invalid characters in Shipping First Name"),
+        body("shippingContact.familyName")
+          .optional()
+          .isLength({ max: 100 })
+          .withMessage("Shipping Last Name is too long")
+          .not()
+          .contains("<")
+          .withMessage("Invalid characters in Shipping Last Name"),
+        body("shippingContact.email")
+          .optional()
+          .isEmail()
+          .withMessage("Invalid Shipping Email"),
+        body("shippingContact.addressLines")
+          .if(
+            (val, { req }) =>
+              req.body?.orderDetails?.deliveryMethod !== "pickup",
+          )
+          .isArray()
+          .withMessage("Shipping Address Lines must be an array"),
+        body("shippingContact.addressLines.*")
+          .if(
+            (val, { req }) =>
+              req.body?.orderDetails?.deliveryMethod !== "pickup",
+          )
+          .isString()
+          .withMessage("Address lines must be strings")
+          .isLength({ max: 200 })
+          .withMessage("Address Line is too long")
+          .not()
+          .contains("<")
+          .withMessage("Invalid characters in Address Lines"),
+        body("shippingContact.locality")
+          .if(
+            (val, { req }) =>
+              req.body?.orderDetails?.deliveryMethod !== "pickup",
+          )
+          .notEmpty()
+          .withMessage("City is required")
+          .isLength({ max: 100 })
+          .withMessage("City name is too long")
+          .not()
+          .contains("<"),
+        body("shippingContact.administrativeDistrictLevel1")
+          .if(
+            (val, { req }) =>
+              req.body?.orderDetails?.deliveryMethod !== "pickup",
+          )
+          .notEmpty()
+          .withMessage("State/Province is required")
+          .isLength({ max: 100 })
+          .withMessage("State/Province name is too long")
+          .not()
+          .contains("<"),
+        body("shippingContact.postalCode")
+          .if(
+            (val, { req }) =>
+              req.body?.orderDetails?.deliveryMethod !== "pickup",
+          )
+          .notEmpty()
+          .withMessage("Postal Code is required")
+          .isLength({ max: 20 })
+          .withMessage("Postal Code is too long")
+          .not()
+          .contains("<"),
+        body("shippingContact.country")
+          .if(
+            (val, { req }) =>
+              req.body?.orderDetails?.deliveryMethod !== "pickup",
+          )
+          .notEmpty()
+          .withMessage("Country is required")
+          .isLength({ max: 100 })
+          .withMessage("Country name is too long")
+          .not()
+          .contains("<"),
+        body("shippingContact.phoneNumber")
+          .optional()
+          .isString()
+          .trim()
+          .not()
+          .contains("<")
+          .withMessage("Invalid Phone Number")
+          .isLength({ max: 20 })
+          .withMessage("Invalid Phone Number"),
+        body("packageAreaSqIn")
+          .optional({ nullable: true })
+          .isFloat({ min: 0 })
+          .withMessage("packageAreaSqIn must be a non-negative number"),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
         }
+        try {
+          // --- Guard: Confirmation Checkbox ---
+          if (!req.body.orderReadyConfirmed) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Order confirmation required. Please check the confirmation box before submitting.",
+              });
+          }
 
-        const { sourceId, amountCents, currency, designImagePath, productId, orderDetails, billingContact, shippingContact, packageAreaSqIn } = req.body;
-        const isPickup = orderDetails?.deliveryMethod === 'pickup';
-        const deliveryMethod = isPickup ? 'pickup' : 'ship';
+          const {
+            sourceId,
+            amountCents,
+            currency,
+            designImagePath,
+            productId,
+            orderDetails,
+            billingContact,
+            shippingContact,
+            packageAreaSqIn,
+          } = req.body;
+          const isPickup = orderDetails?.deliveryMethod === "pickup";
+          const deliveryMethod = isPickup ? "pickup" : "ship";
 
-        // Manually construct safe objects to prevent Mass Assignment
-        // Variable names updated to avoid conflict with response variable names
-        const inputSafeBillingContact = {
+          // Manually construct safe objects to prevent Mass Assignment
+          // Variable names updated to avoid conflict with response variable names
+          const inputSafeBillingContact = {
             givenName: billingContact.givenName,
             familyName: billingContact.familyName,
             email: billingContact.email,
-            phoneNumber: billingContact.phoneNumber
-        };
+            phoneNumber: billingContact.phoneNumber,
+          };
 
-        const inputSafeShippingContact = {
+          const inputSafeShippingContact = {
             givenName: shippingContact.givenName,
             familyName: shippingContact.familyName,
             email: shippingContact.email,
-            addressLines: shippingContact.addressLines || (isPickup ? ['7712 S. Penn Ave'] : []),
-            locality: shippingContact.locality || (isPickup ? 'Oklahoma City' : ''),
-            administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1 || (isPickup ? 'OK' : ''),
-            postalCode: shippingContact.postalCode || (isPickup ? '73159' : ''),
-            country: shippingContact.country || 'US',
-            phoneNumber: shippingContact.phoneNumber
-        };
+            addressLines:
+              shippingContact.addressLines ||
+              (isPickup ? ["7712 S. Penn Ave"] : []),
+            locality:
+              shippingContact.locality || (isPickup ? "Oklahoma City" : ""),
+            administrativeDistrictLevel1:
+              shippingContact.administrativeDistrictLevel1 ||
+              (isPickup ? "OK" : ""),
+            postalCode: shippingContact.postalCode || (isPickup ? "73159" : ""),
+            country: shippingContact.country || "US",
+            phoneNumber: shippingContact.phoneNumber,
+          };
 
-        const inputSafeOrderDetails = {
+          const inputSafeOrderDetails = {
             quantity: orderDetails.quantity,
             material: orderDetails.material,
             resolution: orderDetails.resolution,
@@ -1740,17 +2477,19 @@ async function startServer(
             promoAddon: orderDetails.promoAddon || false,
             customLayers: orderDetails.customLayers || [],
             numImageLayers: orderDetails.numImageLayers || 1,
-            deliveryMethod: deliveryMethod
-        };
+            deliveryMethod: deliveryMethod,
+          };
 
-        // --- Product / Creator Payout Logic ---
-        let product = null;
-        let creator = null;
+          // --- Product / Creator Payout Logic ---
+          let product = null;
+          let creator = null;
 
-        if (productId) {
+          if (productId) {
             product = await db.getProduct(productId);
             if (!product) {
-                return res.status(400).json({ error: 'Invalid productId. Product not found.' });
+              return res
+                .status(400)
+                .json({ error: "Invalid productId. Product not found." });
             }
 
             // Verify price integrity if needed.
@@ -1765,541 +2504,760 @@ async function startServer(
             const creatorId = product.creatorId;
             // CreatorId might be username or ID.
             if (creatorId) {
-                creator = await db.getUserById(creatorId) || await db.getUser(creatorId);
+              creator =
+                (await db.getUserById(creatorId)) ||
+                (await db.getUser(creatorId));
             }
 
             // SECURITY: Verify that the payment covers at least the creator's profit margin.
             // This prevents attackers from paying 1 cent for a product where the creator gets $50 payout.
             const quantity = orderDetails.quantity || 1;
-            const minRequiredAmount = (product.creatorProfitCents || 0) * quantity;
+            const minRequiredAmount =
+              (product.creatorProfitCents || 0) * quantity;
             // We also enforce a global minimum of 1 cent per item to cover printing/base costs roughly.
             const globalMin = 1 * quantity;
 
             if (amountCents < minRequiredAmount || amountCents < globalMin) {
-                logger.warn(`[SECURITY] Price manipulation attempt detected. Order amount: ${amountCents}, Min Required: ${minRequiredAmount}`);
-                return res.status(400).json({ error: 'Order amount is too low.' });
+              logger.warn(
+                `[SECURITY] Price manipulation attempt detected. Order amount: ${amountCents}, Min Required: ${minRequiredAmount}`,
+              );
+              return res
+                .status(400)
+                .json({ error: "Order amount is too low." });
             }
-        }
+          }
 
-        // --- SECURITY: Validate Order Price ---
-        let orderBreakdown = null;
-        let effectiveAreaSqIn = null;
-        let expectedSubtotal = 0;
-        let designBounds = null;
-        let selectedResolution = null;
-        const destinationState = isPickup
-            ? 'OK'
-            : (shippingContact?.administrativeDistrictLevel1 || orderDetails?.destinationState || '');
+          // --- SECURITY: Validate Order Price ---
+          let orderBreakdown = null;
+          let effectiveAreaSqIn = null;
+          let expectedSubtotal = 0;
+          let designBounds = null;
+          let selectedResolution = null;
+          const destinationState = isPickup
+            ? "OK"
+            : shippingContact?.administrativeDistrictLevel1 ||
+              orderDetails?.destinationState ||
+              "";
 
-        try {
+          try {
             // Determine which file determines the pricing geometry (Cutline takes precedence if custom)
             // But if it's a product, the product definition might dictate paths.
             // For now, trust the paths in body (validated to be in /uploads/).
             let validationPath = designImagePath;
             if (orderDetails.cutLinePath) {
-                validationPath = orderDetails.cutLinePath;
+              validationPath = orderDetails.cutLinePath;
             } else if (product && product.cutLinePath) {
-                validationPath = product.cutLinePath;
+              validationPath = product.cutLinePath;
             }
 
             // Ensure the file is available locally for measuring
-            const localPath = await storageProvider.getLocalCopy(validationPath);
+            const localPath =
+              await storageProvider.getLocalCopy(validationPath);
 
             // Get dimensions/complexity
             // We use the validationPath file to calculate bounds and perimeter.
             // Note: If the file is missing (deleted?), this will throw, which is good (fail secure).
             if (fs.existsSync(localPath)) {
-                const dimensions = await getDesignDimensions(localPath);
-                designBounds = dimensions.bounds;
+              const dimensions = await getDesignDimensions(localPath);
+              designBounds = dimensions.bounds;
 
-                const quantity = orderDetails.quantity || 1;
-                // Use default material if not specified
-                const material = orderDetails.material || (product && product.defaults && product.defaults.material) || 'pp_standard';
-                // Use default resolution (300DPI) if not specified.
-                // Note: Client currently defaults to 'dpi_300' if not explicit.
-                const resolutionId = orderDetails.resolution || (product && product.defaults && product.defaults.resolution) || 'dpi_300';
-                const resolution = pricingConfig.resolutions.find(r => r.id === resolutionId) || pricingConfig.resolutions[0];
-                selectedResolution = resolution;
+              const quantity = orderDetails.quantity || 1;
+              // Use default material if not specified
+              const material =
+                orderDetails.material ||
+                (product && product.defaults && product.defaults.material) ||
+                "pp_standard";
+              // Use default resolution (300DPI) if not specified.
+              // Note: Client currently defaults to 'dpi_300' if not explicit.
+              const resolutionId =
+                orderDetails.resolution ||
+                (product && product.defaults && product.defaults.resolution) ||
+                "dpi_300";
+              const resolution =
+                pricingConfig.resolutions.find((r) => r.id === resolutionId) ||
+                pricingConfig.resolutions[0];
+              selectedResolution = resolution;
 
-                const priceResult = calculateStickerPrice(
-                    pricingConfig,
-                    quantity,
-                    material,
-                    dimensions.bounds,
-                    dimensions.cutline,
-                    resolution,
-                    null,
-                    orderDetails.customLayers,
-                    orderDetails.numImageLayers || 1
+              const priceResult = calculateStickerPrice(
+                pricingConfig,
+                quantity,
+                material,
+                dimensions.bounds,
+                dimensions.cutline,
+                resolution,
+                null,
+                orderDetails.customLayers,
+                orderDetails.numImageLayers || 1,
+              );
+
+              expectedSubtotal = priceResult.total;
+
+              // Add Creator Profit if applicable
+              if (product) {
+                expectedSubtotal += product.creatorProfitCents * quantity;
+              }
+
+              // Promo Addon Logic
+              if (orderDetails.promoAddon) {
+                if (quantity < 50) {
+                  expectedSubtotal += 200;
+                }
+              }
+
+              // Compute package area in square inches
+              effectiveAreaSqIn =
+                typeof packageAreaSqIn === "number" && packageAreaSqIn > 0
+                  ? packageAreaSqIn
+                  : dimensions.bounds
+                    ? (dimensions.bounds.width / (resolution.ppi || 300)) *
+                      (dimensions.bounds.height / (resolution.ppi || 300)) *
+                      quantity
+                    : 1;
+
+              // Fetch shipping config and calculate full breakdown (subtotal + shipping + tax + handling + square fee)
+              const shippingCfg = {
+                ...DEFAULT_SHIPPING_CONFIG,
+                ...(db.data?.config?.shipping || {}),
+              };
+              orderBreakdown = calcOrderBreakdown({
+                areaInSqIn: effectiveAreaSqIn,
+                subtotalCents: expectedSubtotal,
+                config: shippingCfg,
+                destinationState,
+                deliveryMethod,
+              });
+
+              const expectedGrandTotal = orderBreakdown.totalCents;
+              const submittedTotal = Number(amountCents);
+
+              // Allow a small tolerance (e.g., 5 cents) for rounding differences
+              if (Math.abs(expectedGrandTotal - submittedTotal) > 5) {
+                logger.warn(
+                  `[SECURITY] Price mismatch for Order. Expected Grand Total: ${expectedGrandTotal}, Received: ${submittedTotal}. Diff: ${expectedGrandTotal - submittedTotal}`,
                 );
-
-                expectedSubtotal = priceResult.total;
-
-                // Add Creator Profit if applicable
-                if (product) {
-                    expectedSubtotal += (product.creatorProfitCents * quantity);
-                }
-                
-                // Promo Addon Logic
-                if (orderDetails.promoAddon) {
-                    if (quantity < 50) {
-                        expectedSubtotal += 200;
-                    }
-                }
-
-                // Compute package area in square inches
-                effectiveAreaSqIn = (typeof packageAreaSqIn === 'number' && packageAreaSqIn > 0)
-                    ? packageAreaSqIn
-                    : (dimensions.bounds ? ((dimensions.bounds.width / (resolution.ppi || 300)) * (dimensions.bounds.height / (resolution.ppi || 300)) * quantity) : 1);
-
-                // Fetch shipping config and calculate full breakdown (subtotal + shipping + tax + handling + square fee)
-                const shippingCfg = { ...DEFAULT_SHIPPING_CONFIG, ...(db.data?.config?.shipping || {}) };
-                orderBreakdown = calcOrderBreakdown({
-                    areaInSqIn: effectiveAreaSqIn,
-                    subtotalCents: expectedSubtotal,
-                    config: shippingCfg,
-                    destinationState,
-                    deliveryMethod
-                });
-
-                const expectedGrandTotal = orderBreakdown.totalCents;
-                const submittedTotal = Number(amountCents);
-
-                // Allow a small tolerance (e.g., 5 cents) for rounding differences
-                if (Math.abs(expectedGrandTotal - submittedTotal) > 5) {
-                    logger.warn(`[SECURITY] Price mismatch for Order. Expected Grand Total: ${expectedGrandTotal}, Received: ${submittedTotal}. Diff: ${expectedGrandTotal - submittedTotal}`);
-                    logger.warn(`[SECURITY] Breakdown - Subtotal: ${expectedSubtotal}, Shipping: ${orderBreakdown.shippingCents}, Tax: ${orderBreakdown.taxCents}, Handling: ${orderBreakdown.handlingCents}, SquareFee: ${orderBreakdown.squareFeeCents}`);
-                    logger.warn(`[SECURITY] Inputs: q=${quantity}, mat=${material}, res=${resolution.id}, layers=${JSON.stringify(orderDetails.customLayers)}, bounds=${JSON.stringify(dimensions.bounds)}`);
-                    return res.status(400).json({ error: 'Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.' });
-                } else {
-                    logger.info(`[SECURITY] Price validated. Expected Grand Total: ${expectedGrandTotal}, Received: ${submittedTotal}`);
-                }
+                logger.warn(
+                  `[SECURITY] Breakdown - Subtotal: ${expectedSubtotal}, Shipping: ${orderBreakdown.shippingCents}, Tax: ${orderBreakdown.taxCents}, Handling: ${orderBreakdown.handlingCents}, SquareFee: ${orderBreakdown.squareFeeCents}`,
+                );
+                logger.warn(
+                  `[SECURITY] Inputs: q=${quantity}, mat=${material}, res=${resolution.id}, layers=${JSON.stringify(orderDetails.customLayers)}, bounds=${JSON.stringify(dimensions.bounds)}`,
+                );
+                return res
+                  .status(400)
+                  .json({
+                    error:
+                      "Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.",
+                  });
+              } else {
+                logger.info(
+                  `[SECURITY] Price validated. Expected Grand Total: ${expectedGrandTotal}, Received: ${submittedTotal}`,
+                );
+              }
             } else {
-                logger.warn(`[SECURITY] Could not validate price because file not found: ${localPath}`);
-                // Proceeding cautiously - or should we fail?
-                // If it's a fresh upload, it should be there.
-                // Failsafe: Reject.
-                return res.status(400).json({ error: 'Validation failed: Design file not found.' });
+              logger.warn(
+                `[SECURITY] Could not validate price because file not found: ${localPath}`,
+              );
+              // Proceeding cautiously - or should we fail?
+              // If it's a fresh upload, it should be there.
+              // Failsafe: Reject.
+              return res
+                .status(400)
+                .json({ error: "Validation failed: Design file not found." });
             }
-        } catch (validationError) {
-            logger.error('[SECURITY] Error during price validation:', validationError);
-            return res.status(400).json({ error: 'Order validation failed.' });
-        }
-        // --------------------------------------
+          } catch (validationError) {
+            logger.error(
+              "[SECURITY] Error during price validation:",
+              validationError,
+            );
+            return res.status(400).json({ error: "Order validation failed." });
+          }
+          // --------------------------------------
 
-        // Explicitly construct safe shippingContact to prevent Mass Assignment
-        const finalShippingContact = {
+          // Explicitly construct safe shippingContact to prevent Mass Assignment
+          const finalShippingContact = {
             givenName: escapeHtml(shippingContact.givenName),
             familyName: escapeHtml(shippingContact.familyName),
             email: shippingContact.email, // email validator ensures format
-            phoneNumber: (typeof shippingContact.phoneNumber === 'string') ? shippingContact.phoneNumber.trim() : undefined,
-            addressLines: (Array.isArray(shippingContact.addressLines) && shippingContact.addressLines.length > 0 && shippingContact.addressLines[0])
-                ? shippingContact.addressLines.map(line => escapeHtml(line))
-                : (isPickup ? ['7712 S. Penn Ave'] : []),
-            locality: escapeHtml(shippingContact.locality || (isPickup ? 'Oklahoma City' : '')),
-            administrativeDistrictLevel1: escapeHtml(shippingContact.administrativeDistrictLevel1 || (isPickup ? 'OK' : '')),
-            postalCode: escapeHtml(shippingContact.postalCode || (isPickup ? '73159' : '')),
-            country: escapeHtml(shippingContact.country || 'US')
-        };
+            phoneNumber:
+              typeof shippingContact.phoneNumber === "string"
+                ? shippingContact.phoneNumber.trim()
+                : undefined,
+            addressLines:
+              Array.isArray(shippingContact.addressLines) &&
+              shippingContact.addressLines.length > 0 &&
+              shippingContact.addressLines[0]
+                ? shippingContact.addressLines.map((line) => escapeHtml(line))
+                : isPickup
+                  ? ["7712 S. Penn Ave"]
+                  : [],
+            locality: escapeHtml(
+              shippingContact.locality || (isPickup ? "Oklahoma City" : ""),
+            ),
+            administrativeDistrictLevel1: escapeHtml(
+              shippingContact.administrativeDistrictLevel1 ||
+                (isPickup ? "OK" : ""),
+            ),
+            postalCode: escapeHtml(
+              shippingContact.postalCode || (isPickup ? "73159" : ""),
+            ),
+            country: escapeHtml(shippingContact.country || "US"),
+          };
 
-        // Explicitly construct safe billingContact to prevent Mass Assignment
-        const finalBillingContact = {
+          // Explicitly construct safe billingContact to prevent Mass Assignment
+          const finalBillingContact = {
             givenName: escapeHtml(billingContact.givenName),
             familyName: escapeHtml(billingContact.familyName),
             email: billingContact.email, // email validator ensures format
-            phoneNumber: (typeof billingContact.phoneNumber === 'string') ? billingContact.phoneNumber.trim() : undefined,
-            addressLines: (Array.isArray(billingContact.addressLines) && billingContact.addressLines.length > 0 && billingContact.addressLines[0])
-                ? billingContact.addressLines.map(line => escapeHtml(line))
-                : (finalShippingContact.addressLines || []),
-            locality: escapeHtml(billingContact.locality || finalShippingContact.locality || ''),
-            administrativeDistrictLevel1: escapeHtml(billingContact.administrativeDistrictLevel1 || finalShippingContact.administrativeDistrictLevel1 || ''),
-            postalCode: escapeHtml(billingContact.postalCode || finalShippingContact.postalCode || ''),
-            country: escapeHtml(billingContact.country || finalShippingContact.country || 'US')
-        };
+            phoneNumber:
+              typeof billingContact.phoneNumber === "string"
+                ? billingContact.phoneNumber.trim()
+                : undefined,
+            addressLines:
+              Array.isArray(billingContact.addressLines) &&
+              billingContact.addressLines.length > 0 &&
+              billingContact.addressLines[0]
+                ? billingContact.addressLines.map((line) => escapeHtml(line))
+                : finalShippingContact.addressLines || [],
+            locality: escapeHtml(
+              billingContact.locality || finalShippingContact.locality || "",
+            ),
+            administrativeDistrictLevel1: escapeHtml(
+              billingContact.administrativeDistrictLevel1 ||
+                finalShippingContact.administrativeDistrictLevel1 ||
+                "",
+            ),
+            postalCode: escapeHtml(
+              billingContact.postalCode ||
+                finalShippingContact.postalCode ||
+                "",
+            ),
+            country: escapeHtml(
+              billingContact.country || finalShippingContact.country || "US",
+            ),
+          };
 
-        // --- Rich Square Order & Payment ---
-        let squareOrderId = null;
-        let amountToChargeMoney = {
-          amount: BigInt(amountCents),
-          currency: currency || 'USD',
-        };
+          // --- Rich Square Order & Payment ---
+          let squareOrderId = null;
+          let amountToChargeMoney = {
+            amount: BigInt(amountCents),
+            currency: currency || "USD",
+          };
 
-        const quantity = orderDetails.quantity || 1;
-        const materialObj = pricingConfig.materials?.find(m => m.id === orderDetails.material);
-        const materialName = materialObj ? materialObj.name : (orderDetails.material || 'Standard');
-        const resolutionObj = pricingConfig.resolutions?.find(r => r.id === orderDetails.resolution);
-        const resolutionName = resolutionObj ? resolutionObj.name : (orderDetails.resolution || 'Standard');
+          const quantity = orderDetails.quantity || 1;
+          const materialObj = pricingConfig.materials?.find(
+            (m) => m.id === orderDetails.material,
+          );
+          const materialName = materialObj
+            ? materialObj.name
+            : orderDetails.material || "Standard";
+          const resolutionObj = pricingConfig.resolutions?.find(
+            (r) => r.id === orderDetails.resolution,
+          );
+          const resolutionName = resolutionObj
+            ? resolutionObj.name
+            : orderDetails.resolution || "Standard";
 
-        const promoAmountCents = (orderDetails.promoAddon && quantity < 50) ? 200 : 0;
-        const stickerSubtotal = Math.max(0, expectedSubtotal - promoAmountCents);
-        const isDivisible = quantity > 0 && (stickerSubtotal % quantity === 0);
+          const promoAmountCents =
+            orderDetails.promoAddon && quantity < 50 ? 200 : 0;
+          const stickerSubtotal = Math.max(
+            0,
+            expectedSubtotal - promoAmountCents,
+          );
+          const isDivisible = quantity > 0 && stickerSubtotal % quantity === 0;
 
-        let sizeNote = '';
-        if (designBounds && selectedResolution && selectedResolution.ppi) {
-            const wIn = (designBounds.width / selectedResolution.ppi).toFixed(1);
-            const hIn = (designBounds.height / selectedResolution.ppi).toFixed(1);
+          let sizeNote = "";
+          if (designBounds && selectedResolution && selectedResolution.ppi) {
+            const wIn = (designBounds.width / selectedResolution.ppi).toFixed(
+              1,
+            );
+            const hIn = (designBounds.height / selectedResolution.ppi).toFixed(
+              1,
+            );
             sizeNote = ` (${wIn}" x ${hIn}")`;
-        }
-
-        const squareLineItems = [
-          {
-            name: product ? (product.title || 'Custom Stickers') : `Custom Die-Cut Stickers${sizeNote}`,
-            quantity: isDivisible ? String(quantity) : '1',
-            note: `Material: ${materialName} | Resolution: ${resolutionName}${orderDetails.customLayers?.length ? ` | Layers: ${orderDetails.customLayers.length}` : ''}`,
-            basePriceMoney: {
-              amount: BigInt(isDivisible ? Math.round(stickerSubtotal / quantity) : stickerSubtotal),
-              currency: currency || 'USD'
-            }
           }
-        ];
 
-        if (orderDetails.promoAddon) {
-          squareLineItems.push({
-            name: 'Holographic Promo Sticker',
-            quantity: '1',
-            note: quantity >= 50 ? 'Free promo sticker on orders of 50+' : 'Addon holographic promo sticker',
-            basePriceMoney: {
-              amount: BigInt(quantity >= 50 ? 0 : 200),
-              currency: currency || 'USD'
-            }
-          });
-        }
-
-        const squareServiceCharges = [];
-        if (orderBreakdown && orderBreakdown.shippingCents > 0) {
-          squareServiceCharges.push({
-            name: `Estimated Shipping (${orderBreakdown.shippingLabel || 'USPS'})`,
-            amountMoney: {
-              amount: BigInt(orderBreakdown.shippingCents),
-              currency: currency || 'USD'
-            },
-            calculationPhase: 'SUBTOTAL_PHASE',
-            taxable: true
-          });
-        }
-
-        if (orderBreakdown && orderBreakdown.handlingCents > 0) {
-          squareServiceCharges.push({
-            name: 'Handling Fee',
-            amountMoney: {
-              amount: BigInt(orderBreakdown.handlingCents),
-              currency: currency || 'USD'
-            },
-            calculationPhase: 'SUBTOTAL_PHASE',
-            taxable: false
-          });
-        }
-
-        if (orderBreakdown && orderBreakdown.squareFeeCents > 0) {
-          squareServiceCharges.push({
-            name: 'Payment Processing Fee',
-            amountMoney: {
-              amount: BigInt(orderBreakdown.squareFeeCents),
-              currency: currency || 'USD'
-            },
-            calculationPhase: 'SUBTOTAL_PHASE',
-            taxable: false
-          });
-        }
-
-        const shippingCfg = { ...DEFAULT_SHIPPING_CONFIG, ...(db.data?.config?.shipping || {}) };
-        const squareTaxes = [];
-        if (orderBreakdown && orderBreakdown.isTaxable && orderBreakdown.taxCents > 0) {
-          squareTaxes.push({
-            name: `Oklahoma Sales Tax (${((orderBreakdown.taxRate || shippingCfg.taxRate) * 100).toFixed(1)}%)`,
-            percentage: String((orderBreakdown.taxRate || shippingCfg.taxRate) * 100),
-            type: 'ADDITIVE'
-          });
-        }
-
-        const squareDiscounts = [];
-        if (orderBreakdown && orderBreakdown.pickupDiscountCents > 0) {
-          squareDiscounts.push({
-            name: 'Local Pickup Discount',
-            amountMoney: {
-              amount: BigInt(orderBreakdown.pickupDiscountCents),
-              currency: currency || 'USD'
-            },
-            scope: 'ORDER'
-          });
-        }
-
-        const squareFulfillments = [];
-        if (isPickup) {
-          squareFulfillments.push({
-            type: 'PICKUP',
-            state: 'PROPOSED',
-            pickupDetails: {
-              recipient: {
-                displayName: `${shippingContact.givenName} ${shippingContact.familyName || ''}`.trim(),
-                emailAddress: shippingContact.email || billingContact.email,
-                phoneNumber: shippingContact.phoneNumber || billingContact.phoneNumber || undefined,
+          const squareLineItems = [
+            {
+              name: product
+                ? product.title || "Custom Stickers"
+                : `Custom Die-Cut Stickers${sizeNote}`,
+              quantity: isDivisible ? String(quantity) : "1",
+              note: `Material: ${materialName} | Resolution: ${resolutionName}${orderDetails.customLayers?.length ? ` | Layers: ${orderDetails.customLayers.length}` : ""}`,
+              basePriceMoney: {
+                amount: BigInt(
+                  isDivisible
+                    ? Math.round(stickerSubtotal / quantity)
+                    : stickerSubtotal,
+                ),
+                currency: currency || "USD",
               },
-              note: 'Local Pickup at Splotch Print Shop (7712 S. Penn Ave, Oklahoma City, OK 73159)'
-            }
-          });
-        } else {
-          squareFulfillments.push({
-            type: 'SHIPMENT',
-            state: 'PROPOSED',
-            shipmentDetails: {
-              recipient: {
-                displayName: `${shippingContact.givenName} ${shippingContact.familyName || ''}`.trim(),
-                emailAddress: shippingContact.email || billingContact.email,
-                phoneNumber: shippingContact.phoneNumber || billingContact.phoneNumber || undefined,
-                address: {
-                  addressLine1: shippingContact.addressLines?.[0] || '',
-                  addressLine2: shippingContact.addressLines?.[1] || undefined,
-                  locality: shippingContact.locality,
-                  administrativeDistrictLevel1: shippingContact.administrativeDistrictLevel1,
-                  postalCode: shippingContact.postalCode,
-                  country: shippingContact.country || 'US'
-                }
-              }
-            }
-          });
-        }
+            },
+          ];
 
-        if (squareClient && squareClient.orders && typeof squareClient.orders.create === 'function') {
-          try {
-            const squareOrderRes = await squareClient.orders.create({
-              idempotencyKey: randomUUID(),
-              order: {
-                locationId: getSecret('SQUARE_LOCATION_ID'),
-                referenceId: randomUUID(),
-                lineItems: squareLineItems,
-                discounts: squareDiscounts.length ? squareDiscounts : undefined,
-                serviceCharges: squareServiceCharges.length ? squareServiceCharges : undefined,
-                taxes: squareTaxes.length ? squareTaxes : undefined,
-                fulfillments: squareFulfillments
-              }
+          if (orderDetails.promoAddon) {
+            squareLineItems.push({
+              name: "Holographic Promo Sticker",
+              quantity: "1",
+              note:
+                quantity >= 50
+                  ? "Free promo sticker on orders of 50+"
+                  : "Addon holographic promo sticker",
+              basePriceMoney: {
+                amount: BigInt(quantity >= 50 ? 0 : 200),
+                currency: currency || "USD",
+              },
             });
+          }
 
-            if (squareOrderRes && squareOrderRes.order) {
-              squareOrderId = squareOrderRes.order.id;
-              if (squareOrderRes.order.totalMoney) {
-                amountToChargeMoney = squareOrderRes.order.totalMoney;
+          const squareServiceCharges = [];
+          if (orderBreakdown && orderBreakdown.shippingCents > 0) {
+            squareServiceCharges.push({
+              name: `Estimated Shipping (${orderBreakdown.shippingLabel || "USPS"})`,
+              amountMoney: {
+                amount: BigInt(orderBreakdown.shippingCents),
+                currency: currency || "USD",
+              },
+              calculationPhase: "SUBTOTAL_PHASE",
+              taxable: true,
+            });
+          }
+
+          if (orderBreakdown && orderBreakdown.handlingCents > 0) {
+            squareServiceCharges.push({
+              name: "Handling Fee",
+              amountMoney: {
+                amount: BigInt(orderBreakdown.handlingCents),
+                currency: currency || "USD",
+              },
+              calculationPhase: "SUBTOTAL_PHASE",
+              taxable: false,
+            });
+          }
+
+          if (orderBreakdown && orderBreakdown.squareFeeCents > 0) {
+            squareServiceCharges.push({
+              name: "Payment Processing Fee",
+              amountMoney: {
+                amount: BigInt(orderBreakdown.squareFeeCents),
+                currency: currency || "USD",
+              },
+              calculationPhase: "SUBTOTAL_PHASE",
+              taxable: false,
+            });
+          }
+
+          const shippingCfg = {
+            ...DEFAULT_SHIPPING_CONFIG,
+            ...(db.data?.config?.shipping || {}),
+          };
+          const squareTaxes = [];
+          if (
+            orderBreakdown &&
+            orderBreakdown.isTaxable &&
+            orderBreakdown.taxCents > 0
+          ) {
+            squareTaxes.push({
+              name: `Oklahoma Sales Tax (${((orderBreakdown.taxRate || shippingCfg.taxRate) * 100).toFixed(1)}%)`,
+              percentage: String(
+                (orderBreakdown.taxRate || shippingCfg.taxRate) * 100,
+              ),
+              type: "ADDITIVE",
+            });
+          }
+
+          const squareDiscounts = [];
+          if (orderBreakdown && orderBreakdown.pickupDiscountCents > 0) {
+            squareDiscounts.push({
+              name: "Local Pickup Discount",
+              amountMoney: {
+                amount: BigInt(orderBreakdown.pickupDiscountCents),
+                currency: currency || "USD",
+              },
+              scope: "ORDER",
+            });
+          }
+
+          const squareFulfillments = [];
+          if (isPickup) {
+            squareFulfillments.push({
+              type: "PICKUP",
+              state: "PROPOSED",
+              pickupDetails: {
+                recipient: {
+                  displayName:
+                    `${shippingContact.givenName} ${shippingContact.familyName || ""}`.trim(),
+                  emailAddress: shippingContact.email || billingContact.email,
+                  phoneNumber:
+                    shippingContact.phoneNumber ||
+                    billingContact.phoneNumber ||
+                    undefined,
+                },
+                note: "Local Pickup at Splotch Print Shop (7712 S. Penn Ave, Oklahoma City, OK 73159)",
+              },
+            });
+          } else {
+            squareFulfillments.push({
+              type: "SHIPMENT",
+              state: "PROPOSED",
+              shipmentDetails: {
+                recipient: {
+                  displayName:
+                    `${shippingContact.givenName} ${shippingContact.familyName || ""}`.trim(),
+                  emailAddress: shippingContact.email || billingContact.email,
+                  phoneNumber:
+                    shippingContact.phoneNumber ||
+                    billingContact.phoneNumber ||
+                    undefined,
+                  address: {
+                    addressLine1: shippingContact.addressLines?.[0] || "",
+                    addressLine2:
+                      shippingContact.addressLines?.[1] || undefined,
+                    locality: shippingContact.locality,
+                    administrativeDistrictLevel1:
+                      shippingContact.administrativeDistrictLevel1,
+                    postalCode: shippingContact.postalCode,
+                    country: shippingContact.country || "US",
+                  },
+                },
+              },
+            });
+          }
+
+          if (
+            squareClient &&
+            squareClient.orders &&
+            typeof squareClient.orders.create === "function"
+          ) {
+            try {
+              const squareOrderRes = await squareClient.orders.create({
+                idempotencyKey: randomUUID(),
+                order: {
+                  locationId: getSecret("SQUARE_LOCATION_ID"),
+                  referenceId: randomUUID(),
+                  lineItems: squareLineItems,
+                  discounts: squareDiscounts.length
+                    ? squareDiscounts
+                    : undefined,
+                  serviceCharges: squareServiceCharges.length
+                    ? squareServiceCharges
+                    : undefined,
+                  taxes: squareTaxes.length ? squareTaxes : undefined,
+                  fulfillments: squareFulfillments,
+                },
+              });
+
+              if (squareOrderRes && squareOrderRes.order) {
+                squareOrderId = squareOrderRes.order.id;
+                if (squareOrderRes.order.totalMoney) {
+                  amountToChargeMoney = squareOrderRes.order.totalMoney;
+                }
+                logger.info(
+                  `[SERVER] Created detailed Square Order ${squareOrderId} with total ${amountToChargeMoney.amount}`,
+                );
               }
-              logger.info(`[SERVER] Created detailed Square Order ${squareOrderId} with total ${amountToChargeMoney.amount}`);
-            }
-          } catch (orderErr) {
-            logger.warn('[SERVER] Could not create detailed Square Order, falling back to direct payment:', orderErr?.message || orderErr);
-            if (orderErr?.errors) {
-              logger.warn('[SERVER] Square Order errors:', JSON.stringify(orderErr.errors));
+            } catch (orderErr) {
+              logger.warn(
+                "[SERVER] Could not create detailed Square Order, falling back to direct payment:",
+                orderErr?.message || orderErr,
+              );
+              if (orderErr?.errors) {
+                logger.warn(
+                  "[SERVER] Square Order errors:",
+                  JSON.stringify(orderErr.errors),
+                );
+              }
             }
           }
-        }
 
-        const paymentPayload = {
-          sourceId: sourceId,
-          idempotencyKey: randomUUID(),
-          locationId: getSecret('SQUARE_LOCATION_ID'),
-          orderId: squareOrderId || undefined,
-          amountMoney: amountToChargeMoney,
-          autocomplete: true,
-          buyerEmailAddress: finalBillingContact.email,
-          billingAddress: {
-            firstName: finalBillingContact.givenName,
-            lastName: finalBillingContact.familyName || undefined,
-            addressLine1: finalBillingContact.addressLines?.[0] || '',
-            addressLine2: finalBillingContact.addressLines?.[1] || undefined,
-            locality: finalBillingContact.locality,
-            administrativeDistrictLevel1: finalBillingContact.administrativeDistrictLevel1,
-            postalCode: finalBillingContact.postalCode,
-            country: finalBillingContact.country || 'US',
-          },
-          shippingAddress: {
-            firstName: finalShippingContact.givenName,
-            lastName: finalShippingContact.familyName || undefined,
-            addressLine1: finalShippingContact.addressLines?.[0] || '',
-            addressLine2: finalShippingContact.addressLines?.[1] || undefined,
-            locality: finalShippingContact.locality,
-            administrativeDistrictLevel1: finalShippingContact.administrativeDistrictLevel1,
-            postalCode: finalShippingContact.postalCode,
-            country: finalShippingContact.country || 'US',
-          },
-          referenceId: randomUUID(),
-          note: `Custom Stickers (${quantity}x) - ${shippingContact.givenName} ${shippingContact.familyName || ''}`.trim(),
-        };
+          const paymentPayload = {
+            sourceId: sourceId,
+            idempotencyKey: randomUUID(),
+            locationId: getSecret("SQUARE_LOCATION_ID"),
+            orderId: squareOrderId || undefined,
+            amountMoney: amountToChargeMoney,
+            autocomplete: true,
+            buyerEmailAddress: finalBillingContact.email,
+            billingAddress: {
+              firstName: finalBillingContact.givenName,
+              lastName: finalBillingContact.familyName || undefined,
+              addressLine1: finalBillingContact.addressLines?.[0] || "",
+              addressLine2: finalBillingContact.addressLines?.[1] || undefined,
+              locality: finalBillingContact.locality,
+              administrativeDistrictLevel1:
+                finalBillingContact.administrativeDistrictLevel1,
+              postalCode: finalBillingContact.postalCode,
+              country: finalBillingContact.country || "US",
+            },
+            shippingAddress: {
+              firstName: finalShippingContact.givenName,
+              lastName: finalShippingContact.familyName || undefined,
+              addressLine1: finalShippingContact.addressLines?.[0] || "",
+              addressLine2: finalShippingContact.addressLines?.[1] || undefined,
+              locality: finalShippingContact.locality,
+              administrativeDistrictLevel1:
+                finalShippingContact.administrativeDistrictLevel1,
+              postalCode: finalShippingContact.postalCode,
+              country: finalShippingContact.country || "US",
+            },
+            referenceId: randomUUID(),
+            note: `Custom Stickers (${quantity}x) - ${shippingContact.givenName} ${shippingContact.familyName || ""}`.trim(),
+          };
 
-        const paymentResult = await squareClient.payments.create(paymentPayload);
-        if ( paymentResult.errors ) {
-          logger.error('[SERVER] Square API returned an error:', JSON.stringify(paymentResult.errors));
-          return res.status(400).json({ error: 'Square API Error', details: paymentResult.errors });
-        }
-        logger.info('[SERVER] Square payment successful. Payment ID:', paymentResult.payment.id);
+          const paymentResult =
+            await squareClient.payments.create(paymentPayload);
+          if (paymentResult.errors) {
+            logger.error(
+              "[SERVER] Square API returned an error:",
+              JSON.stringify(paymentResult.errors),
+            );
+            return res
+              .status(400)
+              .json({
+                error: "Square API Error",
+                details: paymentResult.errors,
+              });
+          }
+          logger.info(
+            "[SERVER] Square payment successful. Payment ID:",
+            paymentResult.payment.id,
+          );
 
-        const newOrder = {
-          orderId: randomUUID(),
-          paymentId: paymentResult.payment.id,
-          squareOrderId: paymentResult.payment.orderId,
-          amount: Number(amountCents), // Grand total charged
-          subtotalCents: expectedSubtotal || (orderBreakdown?.subtotalCents ?? Number(amountCents)),
-          shippingCents: orderBreakdown?.shippingCents ?? 0,
-          shippingLabel: orderBreakdown?.shippingLabel ?? (isPickup ? 'Local Pickup (Free)' : 'USPS First Class'),
-          deliveryMethod: orderBreakdown?.deliveryMethod || (isPickup ? 'pickup' : 'ship'),
-          pickupDiscountCents: orderBreakdown?.pickupDiscountCents ?? 0,
-          destinationState: destinationState,
-          isTaxable: orderBreakdown?.isTaxable ?? true,
-          taxCents: orderBreakdown?.taxCents ?? 0,
-          handlingCents: orderBreakdown?.handlingCents ?? 0,
-          squareFeeCents: orderBreakdown?.squareFeeCents ?? 0,
-          currency: currency || 'USD',
-          status: 'NEW',
-          orderDetails: inputSafeOrderDetails,
-          billingContact: finalBillingContact,
-          shippingContact: finalShippingContact,
-          designImagePath: designImagePath,
-          receivedAt: new Date().toISOString(),
-          productId: productId || null,
-          creatorId: creator ? (creator.id || creator.username) : null,
-          packageAreaSqIn: effectiveAreaSqIn ? Number(Number(effectiveAreaSqIn).toFixed(2)) : null,
-          packageWeightOz: orderBreakdown?.weightOz ?? null,
-        };
+          const newOrder = {
+            orderId: randomUUID(),
+            paymentId: paymentResult.payment.id,
+            squareOrderId: paymentResult.payment.orderId,
+            amount: Number(amountCents), // Grand total charged
+            subtotalCents:
+              expectedSubtotal ||
+              (orderBreakdown?.subtotalCents ?? Number(amountCents)),
+            shippingCents: orderBreakdown?.shippingCents ?? 0,
+            shippingLabel:
+              orderBreakdown?.shippingLabel ??
+              (isPickup ? "Local Pickup (Free)" : "USPS First Class"),
+            deliveryMethod:
+              orderBreakdown?.deliveryMethod || (isPickup ? "pickup" : "ship"),
+            pickupDiscountCents: orderBreakdown?.pickupDiscountCents ?? 0,
+            destinationState: destinationState,
+            isTaxable: orderBreakdown?.isTaxable ?? true,
+            taxCents: orderBreakdown?.taxCents ?? 0,
+            handlingCents: orderBreakdown?.handlingCents ?? 0,
+            squareFeeCents: orderBreakdown?.squareFeeCents ?? 0,
+            currency: currency || "USD",
+            status: "NEW",
+            orderDetails: inputSafeOrderDetails,
+            billingContact: finalBillingContact,
+            shippingContact: finalShippingContact,
+            designImagePath: designImagePath,
+            receivedAt: new Date().toISOString(),
+            productId: productId || null,
+            creatorId: creator ? creator.id || creator.username : null,
+            packageAreaSqIn: effectiveAreaSqIn
+              ? Number(Number(effectiveAreaSqIn).toFixed(2))
+              : null,
+            packageWeightOz: orderBreakdown?.weightOz ?? null,
+          };
 
-        // --- Process Payout ---
-        if (product && creator) {
+          // --- Process Payout ---
+          if (product && creator) {
             const quantity = inputSafeOrderDetails.quantity || 1;
             const payoutAmount = product.creatorProfitCents * quantity;
 
             if (payoutAmount > 0) {
-                if (typeof creator.walletBalanceCents === 'undefined') creator.walletBalanceCents = 0;
-                creator.walletBalanceCents += payoutAmount;
-                logger.info(`[SERVER] Added ${payoutAmount} cents to wallet of ${creator.username}. New balance: ${creator.walletBalanceCents}`);
-                await db.updateUser(creator);
+              if (typeof creator.walletBalanceCents === "undefined")
+                creator.walletBalanceCents = 0;
+              creator.walletBalanceCents += payoutAmount;
+              logger.info(
+                `[SERVER] Added ${payoutAmount} cents to wallet of ${creator.username}. New balance: ${creator.walletBalanceCents}`,
+              );
+              await db.updateUser(creator);
             }
-        }
+          }
 
-        // Audit log initial order creation
-        logOrderTransition({
+          // Audit log initial order creation
+          logOrderTransition({
             order: newOrder,
             fromStatus: null,
-            toStatus: 'NEW',
+            toStatus: "NEW",
             actor: {
-                type: 'customer',
-                id: newOrder.customerDetails?.billing?.email || newOrder.billingContact?.email || 'guest'
+              type: "customer",
+              id:
+                newOrder.customerDetails?.billing?.email ||
+                newOrder.billingContact?.email ||
+                "guest",
             },
-            note: 'Order created via checkout'
-        });
+            note: "Order created via checkout",
+          });
 
-        await db.createOrder(newOrder);
-        logger.info(`[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`);
+          await db.createOrder(newOrder);
+          logger.info(
+            `[SERVER] New order created and stored. Order ID: ${newOrder.orderId}.`,
+          );
 
+          // Async trigger physical USB drop box processing & RGB indicator
+          processIncomingOrderToDropBox(newOrder, storageProvider).catch(
+            (err) => {
+              logger.error(`[DropBox] Background task failed: ${err.message}`);
+            },
+          );
 
-        // Async trigger physical USB drop box processing & RGB indicator
-        processIncomingOrderToDropBox(newOrder, storageProvider).catch(err => {
-            logger.error(`[DropBox] Background task failed: ${err.message}`);
-        });
+          // Send Telegram notification
+          if (
+            getSecret("TELEGRAM_BOT_TOKEN") &&
+            getSecret("TELEGRAM_CHANNEL_ID")
+          ) {
+            try {
+              await scheduleTelegram("send-new-order", {
+                orderId: newOrder.orderId,
+              });
+            } catch (error) {
+              logger.error("[TELEGRAM] Failed to queue message:", error);
+            }
+          }
 
-        // Send Telegram notification
-        if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
-             try {
-                await scheduleTelegram('send-new-order', { orderId: newOrder.orderId });
-             } catch (error) {
-                 logger.error('[TELEGRAM] Failed to queue message:', error);
-             }
-        }
-
-        return res.status(201).json({ success: true, order: newOrder });
-      } catch (error) {
-        await logAndEmailError(error, 'Critical error in /api/create-order');
-        if (error instanceof SquareError) {
+          return res.status(201).json({ success: true, order: newOrder });
+        } catch (error) {
+          await logAndEmailError(error, "Critical error in /api/create-order");
+          if (error instanceof SquareError) {
             logger.error(error.statusCode);
             logger.error(error.message);
             logger.error(error.body);
+          }
+          // Handle mocked Square errors or real Square errors that expose status code directly
+          // Also handle explicit "Card declined" error from tests as 400 if statusCode is missing/invalid
+          if (
+            (error.statusCode &&
+              Number(error.statusCode) >= 400 &&
+              Number(error.statusCode) < 500) ||
+            error.message === "Card declined"
+          ) {
+            const status =
+              (error.statusCode && Number(error.statusCode)) || 400;
+            return res
+              .status(status)
+              .json({
+                error: "Square API Error",
+                details: error.result ? error.result.errors : error.message,
+              });
+          }
+          if (error.result && error.result.errors) {
+            return res
+              .status(error.statusCode || 500)
+              .json({
+                error: "Square API Error",
+                details: error.result.errors,
+              });
+          }
+          // SECURITY: Do not leak error details to the client
+          return res
+            .status(500)
+            .json({
+              error: "Internal Server Error",
+              message: "An unexpected error occurred.",
+            });
         }
-        // Handle mocked Square errors or real Square errors that expose status code directly
-        // Also handle explicit "Card declined" error from tests as 400 if statusCode is missing/invalid
-        if ((error.statusCode && Number(error.statusCode) >= 400 && Number(error.statusCode) < 500) || error.message === 'Card declined') {
-             const status = (error.statusCode && Number(error.statusCode)) || 400;
-             return res.status(status).json({ error: 'Square API Error', details: error.result ? error.result.errors : error.message });
-        }
-        if (error.result && error.result.errors) {
-          return res.status(error.statusCode || 500).json({ error: 'Square API Error', details: error.result.errors });
-        }
-        // SECURITY: Do not leak error details to the client
-        return res.status(500).json({ error: 'Internal Server Error', message: 'An unexpected error occurred.' });
+      },
+    );
+    app.get("/api/auth/verify-token", authenticateToken, (req, res) => {
+      // If the middleware succeeds, req.user is populated with the token payload.
+      // The client expects an object with a `username` property for the welcome message.
+      const userPayload = req.user;
+      const username = userPayload.username || userPayload.email; // Fallback to email
+
+      if (!username) {
+        // This case should be rare, but it's good practice to handle it.
+        return res
+          .status(400)
+          .json({ error: "Token is valid, but contains no user identifier." });
       }
-    });
-    app.get('/api/auth/verify-token', authenticateToken, (req, res) => {
-  // If the middleware succeeds, req.user is populated with the token payload.
-  // The client expects an object with a `username` property for the welcome message.
-  const userPayload = req.user;
-  const username = userPayload.username || userPayload.email; // Fallback to email
 
-  if (!username) {
-    // This case should be rare, but it's good practice to handle it.
-    return res.status(400).json({ error: 'Token is valid, but contains no user identifier.' });
-  }
-
-  // Return a consistent object that includes the username.
-  res.status(200).json({
-    username: username,
-    ...userPayload
-  });
+      // Return a consistent object that includes the username.
+      res.status(200).json({
+        username: username,
+        ...userPayload,
+      });
     });
-    app.get('/api/orders', authenticateToken, async (req, res) => {
+    app.get("/api/orders", authenticateToken, async (req, res) => {
       // This endpoint is for the print shop dashboard and should only be accessible by admins.
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
+      if (!(await isAdmin(req.user))) {
+        return res
+          .status(403)
+          .json({
+            error:
+              "Forbidden: You do not have permission to access this resource.",
+          });
       }
       let allOrders = await db.getAllOrders();
 
       const { printshopId } = req.query;
-            if (printshopId) {
+      if (printshopId) {
         const shop = await db.getPrintshop(printshopId);
         if (shop && shop.machines && shop.machines.length > 0) {
-          const workingMachines = shop.machines.filter(m => m.status === 'working');
-          
-          allOrders = allOrders.filter(order => {
-             if (!order.stickers || order.stickers.length === 0) return true;
-             
-             return order.stickers.every(sticker => {
-                 const material = sticker.material || 'pp_standard'; // Default
-                 const resId = sticker.resolution ? sticker.resolution.id : null;
-                 const layers = sticker.customLayers && sticker.customLayers.length > 0 ? sticker.customLayers : ['cmyk'];
-                 
-                 return workingMachines.some(m => {
-                     // Check material
-                     if (m.supportedMaterials && m.supportedMaterials.length > 0) {
-                         if (!m.supportedMaterials.includes(material)) return false;
-                     }
-                     
-                     // Check resolution
-                     if (resId && m.supportedResolutions && m.supportedResolutions.length > 0) {
-                         if (!m.supportedResolutions.includes(resId)) return false;
-                     }
-                     
-                     // Check layers
-                     if (m.supportedLayers && m.supportedLayers.length > 0) {
-                         const hasAllLayers = layers.every(l => {
-                             const type = typeof l === 'string' ? l : l.type;
-                             // Fallback to true if layer type is not tracked, but generally all should be checked
-                             return m.supportedLayers.includes(type);
-                         });
-                         if (!hasAllLayers) return false;
-                     }
-                     
-                     return true;
-                 });
-             });
+          const workingMachines = shop.machines.filter(
+            (m) => m.status === "working",
+          );
+
+          allOrders = allOrders.filter((order) => {
+            if (!order.stickers || order.stickers.length === 0) return true;
+
+            return order.stickers.every((sticker) => {
+              const material = sticker.material || "pp_standard"; // Default
+              const resId = sticker.resolution ? sticker.resolution.id : null;
+              const layers =
+                sticker.customLayers && sticker.customLayers.length > 0
+                  ? sticker.customLayers
+                  : ["cmyk"];
+
+              return workingMachines.some((m) => {
+                // Check material
+                if (m.supportedMaterials && m.supportedMaterials.length > 0) {
+                  if (!m.supportedMaterials.includes(material)) return false;
+                }
+
+                // Check resolution
+                if (
+                  resId &&
+                  m.supportedResolutions &&
+                  m.supportedResolutions.length > 0
+                ) {
+                  if (!m.supportedResolutions.includes(resId)) return false;
+                }
+
+                // Check layers
+                if (m.supportedLayers && m.supportedLayers.length > 0) {
+                  const hasAllLayers = layers.every((l) => {
+                    const type = typeof l === "string" ? l : l.type;
+                    // Fallback to true if layer type is not tracked, but generally all should be checked
+                    return m.supportedLayers.includes(type);
+                  });
+                  if (!hasAllLayers) return false;
+                }
+
+                return true;
+              });
+            });
           });
         } else if (shop && shop.capabilities) {
           // Fallback for legacy printshops
-          allOrders = allOrders.filter(order => {
-             if (!order.stickers || order.stickers.length === 0) return true;
-             
-             for (const sticker of order.stickers) {
-                 const material = sticker.material || 'vinyl'; // Default
-                 if (shop.capabilities.materials && shop.capabilities.materials.length > 0) {
-                     if (!shop.capabilities.materials.includes(material)) return false;
-                 }
-                 const maxDim = Math.max(sticker.width, sticker.height);
-                 if (shop.capabilities.maxWidth && maxDim > shop.capabilities.maxWidth) {
-                     return false;
-                 }
-             }
-             return true;
+          allOrders = allOrders.filter((order) => {
+            if (!order.stickers || order.stickers.length === 0) return true;
+
+            for (const sticker of order.stickers) {
+              const material = sticker.material || "vinyl"; // Default
+              if (
+                shop.capabilities.materials &&
+                shop.capabilities.materials.length > 0
+              ) {
+                if (!shop.capabilities.materials.includes(material))
+                  return false;
+              }
+              const maxDim = Math.max(sticker.width, sticker.height);
+              if (
+                shop.capabilities.maxWidth &&
+                maxDim > shop.capabilities.maxWidth
+              ) {
+                return false;
+              }
+            }
+            return true;
           });
         }
       }
@@ -2307,9 +3265,14 @@ async function startServer(
       res.status(200).json(allOrders.slice().reverse());
     });
 
-    app.get('/api/admin/sales-metrics', authenticateToken, async (req, res) => {
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.' });
+    app.get("/api/admin/sales-metrics", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user))) {
+        return res
+          .status(403)
+          .json({
+            error:
+              "Forbidden: You do not have permission to access this resource.",
+          });
       }
       const allOrders = await db.getAllOrders();
       let totalOrders = 0;
@@ -2318,96 +3281,128 @@ async function startServer(
       let acceptedOrders = 0;
 
       const now = new Date();
-      const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
 
-      let ackCount = 0; let totalAckTime = 0;
-      let printCount = 0; let totalPrintTime = 0;
-      let shipCount = 0; let totalShipTime = 0;
+      let ackCount = 0;
+      let totalAckTime = 0;
+      let printCount = 0;
+      let totalPrintTime = 0;
+      let shipCount = 0;
+      let totalShipTime = 0;
 
-      allOrders.forEach(order => {
-        if (order.status !== 'CANCELED') {
-           totalOrders++;
+      allOrders.forEach((order) => {
+        if (order.status !== "CANCELED") {
+          totalOrders++;
         }
-        
-        if (order.status === 'ACCEPTED') {
-           acceptedOrders++;
+
+        if (order.status === "ACCEPTED") {
+          acceptedOrders++;
         }
 
         const receivedDate = new Date(order.receivedAt);
-        
+
         // Only count completed sales for this month in revenue
-        if (order.status === 'COMPLETED' && receivedDate.getMonth() === currentMonth && receivedDate.getFullYear() === currentYear) {
-           totalRevenueCents += (order.amount || 0);
+        if (
+          order.status === "COMPLETED" &&
+          receivedDate.getMonth() === currentMonth &&
+          receivedDate.getFullYear() === currentYear
+        ) {
+          totalRevenueCents += order.amount || 0;
         }
 
-        if (receivedDate >= twentyFourHoursAgo && order.status !== 'CANCELED') {
-            recentOrders++;
+        if (receivedDate >= twentyFourHoursAgo && order.status !== "CANCELED") {
+          recentOrders++;
         }
 
         // Metrics logic
         if (order.acceptedAt && order.receivedAt) {
-            ackCount++;
-            totalAckTime += (new Date(order.acceptedAt) - new Date(order.receivedAt));
+          ackCount++;
+          totalAckTime +=
+            new Date(order.acceptedAt) - new Date(order.receivedAt);
         }
         if (order.printingAt && order.acceptedAt) {
-            printCount++;
-            totalPrintTime += (new Date(order.printingAt) - new Date(order.acceptedAt));
+          printCount++;
+          totalPrintTime +=
+            new Date(order.printingAt) - new Date(order.acceptedAt);
         }
         if (order.shippedAt && order.printingAt) {
-            shipCount++;
-            totalShipTime += (new Date(order.shippedAt) - new Date(order.printingAt));
+          shipCount++;
+          totalShipTime +=
+            new Date(order.shippedAt) - new Date(order.printingAt);
         }
       });
 
       const msToHours = (ms) => ms / (1000 * 60 * 60);
 
       res.status(200).json({
-          totalOrders,
-          acceptedOrders,
-          totalRevenue: totalRevenueCents / 100, // format to dollars
-          recentOrders,
-          avgAcknowledgeTimeHours: ackCount > 0 ? msToHours(totalAckTime / ackCount) : 0,
-          avgPrintTimeHours: printCount > 0 ? msToHours(totalPrintTime / printCount) : 0,
-          avgShipTimeHours: shipCount > 0 ? msToHours(totalShipTime / shipCount) : 0
+        totalOrders,
+        acceptedOrders,
+        totalRevenue: totalRevenueCents / 100, // format to dollars
+        recentOrders,
+        avgAcknowledgeTimeHours:
+          ackCount > 0 ? msToHours(totalAckTime / ackCount) : 0,
+        avgPrintTimeHours:
+          printCount > 0 ? msToHours(totalPrintTime / printCount) : 0,
+        avgShipTimeHours:
+          shipCount > 0 ? msToHours(totalShipTime / shipCount) : 0,
       });
     });
 
-    app.get('/api/orders/search', authenticateToken, [
-        query('q').notEmpty().withMessage('Query is required').isString().trim(),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      // SECURITY: Prevent guest tokens (used for checkout) from searching existing orders
-      if (req.user.isGuest) {
-          return res.status(403).json({ error: 'Forbidden: Guests cannot search orders.' });
-      }
+    app.get(
+      "/api/orders/search",
+      authenticateToken,
+      [
+        query("q")
+          .notEmpty()
+          .withMessage("Query is required")
+          .isString()
+          .trim(),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+        // SECURITY: Prevent guest tokens (used for checkout) from searching existing orders
+        if (req.user.isGuest) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Guests cannot search orders." });
+        }
 
-      const { q } = req.query;
-      const user = await getUserByEmail(req.user.email);
-      if (!user) {
-        return res.status(401).json({ error: 'User not found' });
-      }
+        const { q } = req.query;
+        const user = await getUserByEmail(req.user.email);
+        if (!user) {
+          return res.status(401).json({ error: "User not found" });
+        }
 
-      // isAdmin is defined in this file (server.js) as an async function since line 719.
-      const isUserAdmin = await isAdmin(req.user);
-      const filteredOrders = await db.searchOrders(q, user.email, isUserAdmin);
+        // isAdmin is defined in this file (server.js) as an async function since line 719.
+        const isUserAdmin = await isAdmin(req.user);
+        const filteredOrders = await db.searchOrders(
+          q,
+          user.email,
+          isUserAdmin,
+        );
 
-      if (filteredOrders.length === 0) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
-      res.status(200).json(filteredOrders.slice().reverse());
-    });
+        if (filteredOrders.length === 0) {
+          return res.status(404).json({ error: "Order not found" });
+        }
+        res.status(200).json(filteredOrders.slice().reverse());
+      },
+    );
 
-    app.get('/api/orders/my-orders', authenticateToken, async (req, res) => {
+    app.get("/api/orders/my-orders", authenticateToken, async (req, res) => {
       if (!req.user || !req.user.email) {
-        return res.status(401).json({ error: 'Authentication token is invalid or missing email.' });
+        return res
+          .status(401)
+          .json({ error: "Authentication token is invalid or missing email." });
       }
       if (req.user.isGuest) {
-          return res.status(403).json({ error: 'Forbidden: Guests cannot view order history.' });
+        return res
+          .status(403)
+          .json({ error: "Forbidden: Guests cannot view order history." });
       }
       const userEmail = req.user.email;
 
@@ -2416,41 +3411,64 @@ async function startServer(
       res.status(200).json(userOrders.slice().reverse());
     });
 
-    app.get('/api/orders/:orderId', authenticateToken, validateId('orderId'), async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-          return res.status(400).json({ errors: errors.array() });
-      }
-      // SECURITY: Prevent guest tokens from viewing order details
-      if (req.user.isGuest) {
-          return res.status(403).json({ error: 'Forbidden: Guests cannot view order details.' });
-      }
-
-      const { orderId } = req.params;
-      const order = await db.getOrder(orderId);
-
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
-
-      // Check if the user is an admin or the owner of the order.
-      if (await isAdmin(req.user) || (req.user.email && req.user.email === order.billingContact.email)) {
-        return res.json(order);
-      }
-
-      // To avoid leaking information, return 404 even if the order exists but the user is not authorized.
-      return res.status(404).json({ error: 'Order not found' });
-    });
-
-    app.post('/api/orders/:orderId/time-log', authenticateToken, [
-        ...validateId('orderId'),
-        body('duration').isInt({ min: 1 }).withMessage('Duration must be positive integer (minutes)'),
-        body('description').notEmpty().withMessage('Description is required').isString().trim().escape(),
-    ], async (req, res) => {
+    app.get(
+      "/api/orders/:orderId",
+      authenticateToken,
+      validateId("orderId"),
+      async (req, res) => {
         const errors = validationResult(req);
-        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+        // SECURITY: Prevent guest tokens from viewing order details
+        if (req.user.isGuest) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Guests cannot view order details." });
+        }
 
-        if (!await isAdmin(req.user)) return res.status(403).json({ error: 'Forbidden' });
+        const { orderId } = req.params;
+        const order = await db.getOrder(orderId);
+
+        if (!order) {
+          return res.status(404).json({ error: "Order not found" });
+        }
+
+        // Check if the user is an admin or the owner of the order.
+        if (
+          (await isAdmin(req.user)) ||
+          (req.user.email && req.user.email === order.billingContact.email)
+        ) {
+          return res.json(order);
+        }
+
+        // To avoid leaking information, return 404 even if the order exists but the user is not authorized.
+        return res.status(404).json({ error: "Order not found" });
+      },
+    );
+
+    app.post(
+      "/api/orders/:orderId/time-log",
+      authenticateToken,
+      [
+        ...validateId("orderId"),
+        body("duration")
+          .isInt({ min: 1 })
+          .withMessage("Duration must be positive integer (minutes)"),
+        body("description")
+          .notEmpty()
+          .withMessage("Description is required")
+          .isString()
+          .trim()
+          .escape(),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty())
+          return res.status(400).json({ errors: errors.array() });
+
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
 
         const { orderId } = req.params;
         const { duration, description } = req.body; // duration in minutes
@@ -2467,442 +3485,594 @@ async function startServer(
         const fullDescription = `[Order ${orderId}] ${description} (User: ${req.user.username})`;
 
         try {
-            await odooQueue.add('push-time-log', {
-                taskId: null, // Let worker use default
-                duration: durationHours,
-                description: fullDescription,
-                user: req.user.username,
-                orderId
-            });
-            logger.info(`[SERVER] Time log queued for order ${orderId}`);
-            res.json({ success: true, message: 'Time log queued.' });
+          await odooQueue.add("push-time-log", {
+            taskId: null, // Let worker use default
+            duration: durationHours,
+            description: fullDescription,
+            user: req.user.username,
+            orderId,
+          });
+          logger.info(`[SERVER] Time log queued for order ${orderId}`);
+          res.json({ success: true, message: "Time log queued." });
         } catch (error) {
-            await logAndEmailError(error, 'Error queuing time log');
-            res.status(500).json({ error: 'Internal Server Error' });
+          await logAndEmailError(error, "Error queuing time log");
+          res.status(500).json({ error: "Internal Server Error" });
         }
-    });
-
+      },
+    );
 
     // Get messages for an order
-    app.get('/api/orders/:orderId/messages', authenticateToken, validateId('orderId'), async (req, res) => {
+    app.get(
+      "/api/orders/:orderId/messages",
+      authenticateToken,
+      validateId("orderId"),
+      async (req, res) => {
         try {
-            const orderId = req.params.orderId;
-            const order = await db.get('orders').find({ id: orderId }).value();
-            if (!order) return res.status(404).json({ error: 'Order not found' });
-            
-            res.json(order.messages || []);
+          const orderId = req.params.orderId;
+          const order = await db.get("orders").find({ id: orderId }).value();
+          if (!order) return res.status(404).json({ error: "Order not found" });
+
+          res.json(order.messages || []);
         } catch (error) {
-            console.error('Error fetching messages:', error);
-            res.status(500).json({ error: 'Failed to fetch messages' });
+          console.error("Error fetching messages:", error);
+          res.status(500).json({ error: "Failed to fetch messages" });
         }
-    });
+      },
+    );
 
     // Send a message (email) to the customer
-    app.post('/api/orders/:orderId/messages', authenticateToken, validateId('orderId'), [
-        body('message').isString().trim().notEmpty().withMessage('Message is required')
-    ], async (req, res) => {
+    app.post(
+      "/api/orders/:orderId/messages",
+      authenticateToken,
+      validateId("orderId"),
+      [
+        body("message")
+          .isString()
+          .trim()
+          .notEmpty()
+          .withMessage("Message is required"),
+      ],
+      async (req, res) => {
         const errors = validationResult(req);
-        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+        if (!errors.isEmpty())
+          return res.status(400).json({ errors: errors.array() });
 
         try {
-            const orderId = req.params.orderId;
-            const { message } = req.body;
-            
-            const order = await db.get('orders').find({ id: orderId }).value();
-            if (!order) return res.status(404).json({ error: 'Order not found' });
+          const orderId = req.params.orderId;
+          const { message } = req.body;
 
-            const customerEmail = order.customerEmail || order.email || order.userEmail;
-            if (!customerEmail) return res.status(400).json({ error: 'Customer email not found for this order' });
+          const order = await db.get("orders").find({ id: orderId }).value();
+          if (!order) return res.status(404).json({ error: "Order not found" });
 
-            const newMessage = {
-                id: crypto.randomUUID(),
-                sender: 'printshop',
-                content: message,
-                timestamp: new Date().toISOString()
-            };
+          const customerEmail =
+            order.customerEmail || order.email || order.userEmail;
+          if (!customerEmail)
+            return res
+              .status(400)
+              .json({ error: "Customer email not found for this order" });
 
-            // Initialize messages if needed
-            if (!order.messages) {
-                order.messages = [];
-            }
-            order.messages.push(newMessage);
+          const newMessage = {
+            id: crypto.randomUUID(),
+            sender: "printshop",
+            content: message,
+            timestamp: new Date().toISOString(),
+          };
 
-            // Send email (dynamic import for the email utility so we don't break if not at top)
-            try {
-                const { sendEmail } = await import('./utils/email.js');
-                await sendEmail({
-                    to: customerEmail,
-                    subject: `Update on your Splotch order #${orderId.substring(0, 8)}`,
-                    text: `Hello,\n\nRegarding your order #${orderId.substring(0, 8)}:\n\n${message}\n\nThanks,\nSplotch Print Shop`
-                });
-            } catch(emailErr) {
-                console.error("Failed to send email, but logged message to DB", emailErr);
-            }
+          // Initialize messages if needed
+          if (!order.messages) {
+            order.messages = [];
+          }
+          order.messages.push(newMessage);
 
-            await db.write();
-            res.status(201).json(newMessage);
+          // Send email (dynamic import for the email utility so we don't break if not at top)
+          try {
+            const { sendEmail } = await import("./utils/email.js");
+            await sendEmail({
+              to: customerEmail,
+              subject: `Update on your Splotch order #${orderId.substring(0, 8)}`,
+              text: `Hello,\n\nRegarding your order #${orderId.substring(0, 8)}:\n\n${message}\n\nThanks,\nSplotch Print Shop`,
+            });
+          } catch (emailErr) {
+            console.error(
+              "Failed to send email, but logged message to DB",
+              emailErr,
+            );
+          }
+
+          await db.write();
+          res.status(201).json(newMessage);
         } catch (error) {
-            console.error('Error sending message:', error);
-            res.status(500).json({ error: 'Failed to send message' });
+          console.error("Error sending message:", error);
+          res.status(500).json({ error: "Failed to send message" });
         }
-    });
+      },
+    );
 
-    app.post('/api/orders/:orderId/status', authenticateToken, [
-      ...validateId('orderId'),
-      body('status').notEmpty().withMessage('status is required').isIn(VALID_STATUSES).withMessage('Invalid status'),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { orderId } = req.params;
-      const { status, trackingNumber, courier } = req.body;
-      const order = await db.getOrder(orderId);
-
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found.' });
-      }
-
-      // Check for admin role
-      if (!await isAdmin(req.user)) {
-          return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-      }
-
-      const oldStatus = order.status;
-      order.status = status;
-      order.lastUpdatedAt = new Date().toISOString();
-
-      if (status === 'CANCELED') {
-          order.shadowDeleted = true;
-          order.shadowDeletedAt = new Date().toISOString();
-      } else if (oldStatus === 'CANCELED') {
-          order.shadowDeleted = false;
-          order.shadowDeletedAt = null;
-      }
-
-      if (status === 'SHIPPED') {
-          if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
-          if (courier !== undefined) order.courier = courier;
-      }
-
-      // Record state transition timestamps for metrics
-      if (oldStatus !== status) {
-          const nowIso = new Date().toISOString();
-          if (status === 'ACCEPTED' && !order.acceptedAt) order.acceptedAt = nowIso;
-          if (status === 'PRINTING' && !order.printingAt) order.printingAt = nowIso;
-          if (status === 'HOLD_FOR_PICKUP' && !order.holdForPickupAt) order.holdForPickupAt = nowIso;
-          if (status === 'SHIPPED' && !order.shippedAt) order.shippedAt = nowIso;
-          if (status === 'DELIVERED' && !order.deliveredAt) order.deliveredAt = nowIso;
-          if (status === 'COMPLETED' && !order.completedAt) order.completedAt = nowIso;
-
-          // Record non-volatile audit journal entry
-          const adminActorId = req.user?.username || req.user?.email || 'admin';
-          logOrderTransition({
-              order,
-              fromStatus: oldStatus,
-              toStatus: status,
-              actor: { type: 'admin', id: adminActorId },
-              note: req.body.note || undefined,
-              metadata: {
-                  trackingNumber: order.trackingNumber,
-                  courier: order.courier
-              }
-          });
-      }
-
-
-      // Check for stalled message cleanup
-      if (order.stalledMessageId) {
-          if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
-             try {
-                 await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.stalledMessageId);
-                 logger.info(`[TELEGRAM] Deleted stalled message for order ${orderId}`);
-             } catch (err) {
-                 logger.error('[TELEGRAM] Failed to delete stalled message:', err);
-             }
-          }
-          delete order.stalledMessageId;
-      }
-
-      await db.updateOrder(order);
-      logger.info(`[SERVER] Order ID ${orderId} status updated to ${status}.`);
-
-      try {
-          // Update Telegram message
-          if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID') && order.telegramMessageId) {
-             try {
-                await scheduleTelegram('update-status', { orderId: order.orderId, status: order.status });
-             } catch (error) {
-                logger.error('[TELEGRAM] Failed to queue status update:', error);
-             }
-          }
-          // Trigger Emails
-          if (oldStatus !== status && emailQueue) {
-              const customerEmail = order.customerDetails?.billing?.email || order.customerEmail || order.billingContact?.email;
-              if (customerEmail) {
-                  if (status === 'CANCELED') {
-                      emailQueue.add('order-canceled', {
-                          to: customerEmail,
-                          subject: `Your Order #${order.orderId.substring(0, 8)} has been canceled`,
-                          text: `Hi there,\n\nYour order #${order.orderId.substring(0, 8)} has been canceled. If you have any questions, please contact support.\n\nThank you,\nSplotch Team`,
-                          html: `<p>Hi there,</p><p>Your order <strong>#${order.orderId.substring(0, 8)}</strong> has been canceled. If you have any questions, please contact support.</p><p>Thank you,<br>Splotch Team</p>`
-                      });
-                  } else if (status === 'HOLD_FOR_PICKUP') {
-                      emailQueue.add('order-ready-for-pickup', {
-                          to: customerEmail,
-                          subject: `Your Order #${order.orderId.substring(0, 8)} is ready for pickup!`,
-                          text: `Hi there,\n\nGreat news! Your order #${order.orderId.substring(0, 8)} is printed and ready for pickup at our print shop!\n\nPickup Location:\nSplotch Print Shop\n7712 S. Penn Ave\nOklahoma City, OK 73159\nPhone: (405) 255-7889\nHours: Tue–Sat 9:00 AM – 5:00 PM\n\nPlease have your order number ready when you arrive.\n\nThank you,\nSplotch Team`,
-                          html: `<p>Hi there,</p><p>Great news! Your order <strong>#${order.orderId.substring(0, 8)}</strong> is printed and ready for pickup at our print shop!</p><div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #e5e7eb;"><strong>Pickup Location:</strong><br>Splotch Print Shop<br>7712 S. Penn Ave<br>Oklahoma City, OK 73159<br><br><strong>Phone:</strong> (405) 255-7889<br><strong>Hours:</strong> Tue–Sat 9:00 AM – 5:00 PM</div><p>Please have your order number ready when you arrive.</p><p>Thank you,<br>Splotch Team</p>`
-                      });
-                  } else if (status === 'SHIPPED') {
-                      let trackingText = '';
-                      let trackingHtml = '';
-                      if (order.trackingNumber && order.courier) {
-                          trackingText = `\n\nTracking Information:\nCarrier: ${order.courier}\nTracking Number: ${order.trackingNumber}`;
-                          trackingHtml = `<p><strong>Tracking Information:</strong><br>Carrier: ${order.courier}<br>Tracking Number: ${order.trackingNumber}</p>`;
-                      }
-                      emailQueue.add('order-shipped', {
-                          to: customerEmail,
-                          subject: `Your Order #${order.orderId.substring(0, 8)} has shipped!`,
-                          text: `Hi there,\n\nGreat news! Your order #${order.orderId.substring(0, 8)} has shipped and is on its way to you.${trackingText}\n\nThank you,\nSplotch Team`,
-                          html: `<p>Hi there,</p><p>Great news! Your order <strong>#${order.orderId.substring(0, 8)}</strong> has shipped and is on its way to you.</p>${trackingHtml}<p>Thank you,<br>Splotch Team</p>`
-                      });
-                  } else if (status === 'DELIVERED') {
-                      emailQueue.add('order-delivered', {
-                          to: customerEmail,
-                          subject: `Your Order #${order.orderId.substring(0, 8)} has been delivered!`,
-                          text: `Hi there,\n\nYour order #${order.orderId.substring(0, 8)} has been delivered. We hope you love your new stickers!\n\nThank you,\nSplotch Team`,
-                          html: `<p>Hi there,</p><p>Your order <strong>#${order.orderId.substring(0, 8)}</strong> has been delivered. We hope you love your new stickers!</p><p>Thank you,<br>Splotch Team</p>`
-                      });
-                  }
-              }
-          }
-
-          res.status(200).json({ success: true, order: order });
-      } catch (error) {
-        await logAndEmailError(error, 'Error updating order status');
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-    app.post('/api/admin/batches', authenticateToken, [
-      body('orderIds').isArray().notEmpty().withMessage('orderIds array is required'),
-      body('status').optional().isString(),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-      }
-
-      const { orderIds, status } = req.body;
-      const batchId = 'batch-' + crypto.randomUUID().substring(0, 8);
-
-      const newBatch = {
-        batchId,
-        orderIds,
-        status: status || 'NESTED',
-        createdAt: new Date().toISOString()
-      };
-
-      try {
-        await db.createBatch(newBatch);
-        res.status(201).json({ success: true, batch: newBatch });
-      } catch (error) {
-        await logAndEmailError(error, 'Error creating batch');
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-    app.get('/api/admin/batches/:batchId', authenticateToken, async (req, res) => {
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-      }
-
-      try {
-        const batch = await db.getBatch(req.params.batchId);
-        if (!batch) {
-          return res.status(404).json({ error: 'Batch not found.' });
-        }
-        res.status(200).json({ batch });
-      } catch (error) {
-        await logAndEmailError(error, 'Error fetching batch');
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-    app.post('/api/admin/batches/:batchId/status', authenticateToken, [
-      body('status').notEmpty().withMessage('status is required').isIn(VALID_STATUSES).withMessage('Invalid status'),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-      }
-
-      const { status } = req.body;
-      const { batchId } = req.params;
-
-      try {
-        const batch = await db.getBatch(batchId);
-        if (!batch) {
-          return res.status(404).json({ error: 'Batch not found.' });
-        }
-
-        batch.status = status;
-        await db.updateBatch(batch);
-
-        const updatedOrders = [];
-        await Promise.all(batch.orderIds.map(async (orderId) => {
-          const order = await db.getOrder(orderId);
-          if (order) {
-            order.status = status;
-            order.lastUpdatedAt = new Date().toISOString();
-            await db.updateOrder(order);
-            updatedOrders.push(order);
-          }
-        }));
-
-        res.status(200).json({ success: true, batch, updatedOrdersCount: updatedOrders.length });
-      } catch (error) {
-        await logAndEmailError(error, 'Error updating batch status');
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-    app.get('/api/admin/scan/:identifier', authenticateToken, async (req, res) => {
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-      }
-
-      const { identifier } = req.params;
-
-      try {
-        // Try as batch first
-        if (identifier.startsWith('batch-')) {
-            const batch = await db.getBatch(identifier);
-            if (batch) {
-                return res.status(200).json({ type: 'batch', data: batch });
-            }
-        }
-
-        // Try as order
-        const order = await db.getOrder(identifier);
-        if (order) {
-            return res.status(200).json({ type: 'order', data: order });
-        }
-
-        res.status(404).json({ error: 'Entity not found.' });
-
-      } catch (error) {
-        await logAndEmailError(error, 'Error scanning identifier');
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-    app.post('/api/admin/orders/bulk-status', authenticateToken, [
-      body('orderIds').isArray().notEmpty().withMessage('orderIds array is required'),
-      body('status').notEmpty().withMessage('status is required').isIn(VALID_STATUSES).withMessage('Invalid status'),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      // Check for admin role
-      if (!await isAdmin(req.user)) {
-          return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-      }
-
-      const { orderIds, status } = req.body;
-      const updatedOrders = [];
-
-      try {
-        for (const orderId of orderIds) {
-          const order = await db.getOrder(orderId);
-          if (order) {
-            const oldStatus = order.status;
-            order.status = status;
-            order.lastUpdatedAt = new Date().toISOString();
-
-            if (status === 'CANCELED') {
-                order.shadowDeleted = true;
-                order.shadowDeletedAt = new Date().toISOString();
-            } else if (oldStatus === 'CANCELED') {
-                order.shadowDeleted = false;
-                order.shadowDeletedAt = null;
-            }
-
-            if (oldStatus !== status) {
-                const adminActorId = req.user?.username || req.user?.email || 'admin';
-                logOrderTransition({
-                    order,
-                    fromStatus: oldStatus,
-                    toStatus: status,
-                    actor: { type: 'admin', id: adminActorId },
-                    note: 'Bulk status update'
-                });
-            }
-
-            if (order.stalledMessageId) {
-                if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID')) {
-                   try {
-                       await bot.telegram.deleteMessage(getSecret('TELEGRAM_CHANNEL_ID'), order.stalledMessageId);
-                   } catch (err) {
-                       logger.error('[TELEGRAM] Failed to delete stalled message:', err);
-                   }
-                }
-                delete order.stalledMessageId;
-            }
-
-            await db.updateOrder(order);
-            updatedOrders.push(order);
-
-            // Update Telegram message
-            if (getSecret('TELEGRAM_BOT_TOKEN') && getSecret('TELEGRAM_CHANNEL_ID') && order.telegramMessageId) {
-               try {
-                  await scheduleTelegram('update-status', { orderId: order.orderId, status: order.status });
-               } catch (error) {
-                  logger.error('[TELEGRAM] Failed to queue status update:', error);
-               }
-            }
-          }
-        }
-        
-        logger.info(`[SERVER] Bulk updated ${updatedOrders.length} orders to status ${status}.`);
-        res.status(200).json({ success: true, updatedCount: updatedOrders.length });
-      } catch (error) {
-        await logAndEmailError(error, 'Error in bulk order status update');
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-    app.post('/api/orders/:orderId/tracking', authenticateToken, [
-        ...validateId('orderId'),
-        body('trackingNumber').notEmpty().withMessage('trackingNumber is required').isString().trim(),
-        body('courier').notEmpty().withMessage('courier is required').isString().trim(),
-    ], async (req, res) => {
+    app.post(
+      "/api/orders/:orderId/status",
+      authenticateToken,
+      [
+        ...validateId("orderId"),
+        body("status")
+          .notEmpty()
+          .withMessage("status is required")
+          .isIn(VALID_STATUSES)
+          .withMessage("Invalid status"),
+      ],
+      async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
+          return res.status(400).json({ errors: errors.array() });
+        }
+        const { orderId } = req.params;
+        const { status, trackingNumber, courier } = req.body;
+        const order = await db.getOrder(orderId);
+
+        if (!order) {
+          return res.status(404).json({ error: "Order not found." });
         }
 
         // Check for admin role
-        if (!await isAdmin(req.user)) {
-            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+
+        const oldStatus = order.status;
+        order.status = status;
+        order.lastUpdatedAt = new Date().toISOString();
+
+        if (status === "CANCELED") {
+          order.shadowDeleted = true;
+          order.shadowDeletedAt = new Date().toISOString();
+        } else if (oldStatus === "CANCELED") {
+          order.shadowDeleted = false;
+          order.shadowDeletedAt = null;
+        }
+
+        if (status === "SHIPPED") {
+          if (trackingNumber !== undefined)
+            order.trackingNumber = trackingNumber;
+          if (courier !== undefined) order.courier = courier;
+        }
+
+        // Record state transition timestamps for metrics
+        if (oldStatus !== status) {
+          const nowIso = new Date().toISOString();
+          if (status === "ACCEPTED" && !order.acceptedAt)
+            order.acceptedAt = nowIso;
+          if (status === "PRINTING" && !order.printingAt)
+            order.printingAt = nowIso;
+          if (status === "HOLD_FOR_PICKUP" && !order.holdForPickupAt)
+            order.holdForPickupAt = nowIso;
+          if (status === "SHIPPED" && !order.shippedAt)
+            order.shippedAt = nowIso;
+          if (status === "DELIVERED" && !order.deliveredAt)
+            order.deliveredAt = nowIso;
+          if (status === "COMPLETED" && !order.completedAt)
+            order.completedAt = nowIso;
+
+          // Record non-volatile audit journal entry
+          const adminActorId = req.user?.username || req.user?.email || "admin";
+          logOrderTransition({
+            order,
+            fromStatus: oldStatus,
+            toStatus: status,
+            actor: { type: "admin", id: adminActorId },
+            note: req.body.note || undefined,
+            metadata: {
+              trackingNumber: order.trackingNumber,
+              courier: order.courier,
+            },
+          });
+        }
+
+        // Check for stalled message cleanup
+        if (order.stalledMessageId) {
+          if (
+            getSecret("TELEGRAM_BOT_TOKEN") &&
+            getSecret("TELEGRAM_CHANNEL_ID")
+          ) {
+            try {
+              await bot.telegram.deleteMessage(
+                getSecret("TELEGRAM_CHANNEL_ID"),
+                order.stalledMessageId,
+              );
+              logger.info(
+                `[TELEGRAM] Deleted stalled message for order ${orderId}`,
+              );
+            } catch (err) {
+              logger.error("[TELEGRAM] Failed to delete stalled message:", err);
+            }
+          }
+          delete order.stalledMessageId;
+        }
+
+        await db.updateOrder(order);
+        logger.info(
+          `[SERVER] Order ID ${orderId} status updated to ${status}.`,
+        );
+
+        try {
+          // Update Telegram message
+          if (
+            getSecret("TELEGRAM_BOT_TOKEN") &&
+            getSecret("TELEGRAM_CHANNEL_ID") &&
+            order.telegramMessageId
+          ) {
+            try {
+              await scheduleTelegram("update-status", {
+                orderId: order.orderId,
+                status: order.status,
+              });
+            } catch (error) {
+              logger.error("[TELEGRAM] Failed to queue status update:", error);
+            }
+          }
+          // Trigger Emails
+          if (oldStatus !== status && emailQueue) {
+            const customerEmail =
+              order.customerDetails?.billing?.email ||
+              order.customerEmail ||
+              order.billingContact?.email;
+            if (customerEmail) {
+              if (status === "CANCELED") {
+                emailQueue.add("order-canceled", {
+                  to: customerEmail,
+                  subject: `Your Order #${order.orderId.substring(0, 8)} has been canceled`,
+                  text: `Hi there,\n\nYour order #${order.orderId.substring(0, 8)} has been canceled. If you have any questions, please contact support.\n\nThank you,\nSplotch Team`,
+                  html: `<p>Hi there,</p><p>Your order <strong>#${order.orderId.substring(0, 8)}</strong> has been canceled. If you have any questions, please contact support.</p><p>Thank you,<br>Splotch Team</p>`,
+                });
+              } else if (status === "HOLD_FOR_PICKUP") {
+                emailQueue.add("order-ready-for-pickup", {
+                  to: customerEmail,
+                  subject: `Your Order #${order.orderId.substring(0, 8)} is ready for pickup!`,
+                  text: `Hi there,\n\nGreat news! Your order #${order.orderId.substring(0, 8)} is printed and ready for pickup at our print shop!\n\nPickup Location:\nSplotch Print Shop\n7712 S. Penn Ave\nOklahoma City, OK 73159\nPhone: (405) 255-7889\nHours: Tue–Sat 9:00 AM – 5:00 PM\n\nPlease have your order number ready when you arrive.\n\nThank you,\nSplotch Team`,
+                  html: `<p>Hi there,</p><p>Great news! Your order <strong>#${order.orderId.substring(0, 8)}</strong> is printed and ready for pickup at our print shop!</p><div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #e5e7eb;"><strong>Pickup Location:</strong><br>Splotch Print Shop<br>7712 S. Penn Ave<br>Oklahoma City, OK 73159<br><br><strong>Phone:</strong> (405) 255-7889<br><strong>Hours:</strong> Tue–Sat 9:00 AM – 5:00 PM</div><p>Please have your order number ready when you arrive.</p><p>Thank you,<br>Splotch Team</p>`,
+                });
+              } else if (status === "SHIPPED") {
+                let trackingText = "";
+                let trackingHtml = "";
+                if (order.trackingNumber && order.courier) {
+                  trackingText = `\n\nTracking Information:\nCarrier: ${order.courier}\nTracking Number: ${order.trackingNumber}`;
+                  trackingHtml = `<p><strong>Tracking Information:</strong><br>Carrier: ${order.courier}<br>Tracking Number: ${order.trackingNumber}</p>`;
+                }
+                emailQueue.add("order-shipped", {
+                  to: customerEmail,
+                  subject: `Your Order #${order.orderId.substring(0, 8)} has shipped!`,
+                  text: `Hi there,\n\nGreat news! Your order #${order.orderId.substring(0, 8)} has shipped and is on its way to you.${trackingText}\n\nThank you,\nSplotch Team`,
+                  html: `<p>Hi there,</p><p>Great news! Your order <strong>#${order.orderId.substring(0, 8)}</strong> has shipped and is on its way to you.</p>${trackingHtml}<p>Thank you,<br>Splotch Team</p>`,
+                });
+              } else if (status === "DELIVERED") {
+                emailQueue.add("order-delivered", {
+                  to: customerEmail,
+                  subject: `Your Order #${order.orderId.substring(0, 8)} has been delivered!`,
+                  text: `Hi there,\n\nYour order #${order.orderId.substring(0, 8)} has been delivered. We hope you love your new stickers!\n\nThank you,\nSplotch Team`,
+                  html: `<p>Hi there,</p><p>Your order <strong>#${order.orderId.substring(0, 8)}</strong> has been delivered. We hope you love your new stickers!</p><p>Thank you,<br>Splotch Team</p>`,
+                });
+              }
+            }
+          }
+
+          res.status(200).json({ success: true, order: order });
+        } catch (error) {
+          await logAndEmailError(error, "Error updating order status");
+          res.status(500).json({ error: "Internal Server Error" });
+        }
+      },
+    );
+
+    app.post(
+      "/api/admin/batches",
+      authenticateToken,
+      [
+        body("orderIds")
+          .isArray()
+          .notEmpty()
+          .withMessage("orderIds array is required"),
+        body("status").optional().isString(),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+
+        const { orderIds, status } = req.body;
+        const batchId = "batch-" + crypto.randomUUID().substring(0, 8);
+
+        const newBatch = {
+          batchId,
+          orderIds,
+          status: status || "NESTED",
+          createdAt: new Date().toISOString(),
+        };
+
+        try {
+          await db.createBatch(newBatch);
+          res.status(201).json({ success: true, batch: newBatch });
+        } catch (error) {
+          await logAndEmailError(error, "Error creating batch");
+          res.status(500).json({ error: "Internal Server Error" });
+        }
+      },
+    );
+
+    app.get(
+      "/api/admin/batches/:batchId",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+
+        try {
+          const batch = await db.getBatch(req.params.batchId);
+          if (!batch) {
+            return res.status(404).json({ error: "Batch not found." });
+          }
+          res.status(200).json({ batch });
+        } catch (error) {
+          await logAndEmailError(error, "Error fetching batch");
+          res.status(500).json({ error: "Internal Server Error" });
+        }
+      },
+    );
+
+    app.post(
+      "/api/admin/batches/:batchId/status",
+      authenticateToken,
+      [
+        body("status")
+          .notEmpty()
+          .withMessage("status is required")
+          .isIn(VALID_STATUSES)
+          .withMessage("Invalid status"),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+
+        const { status } = req.body;
+        const { batchId } = req.params;
+
+        try {
+          const batch = await db.getBatch(batchId);
+          if (!batch) {
+            return res.status(404).json({ error: "Batch not found." });
+          }
+
+          batch.status = status;
+          await db.updateBatch(batch);
+
+          const updatedOrders = [];
+          await Promise.all(
+            batch.orderIds.map(async (orderId) => {
+              const order = await db.getOrder(orderId);
+              if (order) {
+                order.status = status;
+                order.lastUpdatedAt = new Date().toISOString();
+                await db.updateOrder(order);
+                updatedOrders.push(order);
+              }
+            }),
+          );
+
+          res
+            .status(200)
+            .json({
+              success: true,
+              batch,
+              updatedOrdersCount: updatedOrders.length,
+            });
+        } catch (error) {
+          await logAndEmailError(error, "Error updating batch status");
+          res.status(500).json({ error: "Internal Server Error" });
+        }
+      },
+    );
+
+    app.get(
+      "/api/admin/scan/:identifier",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+
+        const { identifier } = req.params;
+
+        try {
+          // Try as batch first
+          if (identifier.startsWith("batch-")) {
+            const batch = await db.getBatch(identifier);
+            if (batch) {
+              return res.status(200).json({ type: "batch", data: batch });
+            }
+          }
+
+          // Try as order
+          const order = await db.getOrder(identifier);
+          if (order) {
+            return res.status(200).json({ type: "order", data: order });
+          }
+
+          res.status(404).json({ error: "Entity not found." });
+        } catch (error) {
+          await logAndEmailError(error, "Error scanning identifier");
+          res.status(500).json({ error: "Internal Server Error" });
+        }
+      },
+    );
+
+    app.post(
+      "/api/admin/orders/bulk-status",
+      authenticateToken,
+      [
+        body("orderIds")
+          .isArray()
+          .notEmpty()
+          .withMessage("orderIds array is required"),
+        body("status")
+          .notEmpty()
+          .withMessage("status is required")
+          .isIn(VALID_STATUSES)
+          .withMessage("Invalid status"),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+
+        // Check for admin role
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+
+        const { orderIds, status } = req.body;
+        const updatedOrders = [];
+
+        try {
+          for (const orderId of orderIds) {
+            const order = await db.getOrder(orderId);
+            if (order) {
+              const oldStatus = order.status;
+              order.status = status;
+              order.lastUpdatedAt = new Date().toISOString();
+
+              if (status === "CANCELED") {
+                order.shadowDeleted = true;
+                order.shadowDeletedAt = new Date().toISOString();
+              } else if (oldStatus === "CANCELED") {
+                order.shadowDeleted = false;
+                order.shadowDeletedAt = null;
+              }
+
+              if (oldStatus !== status) {
+                const adminActorId =
+                  req.user?.username || req.user?.email || "admin";
+                logOrderTransition({
+                  order,
+                  fromStatus: oldStatus,
+                  toStatus: status,
+                  actor: { type: "admin", id: adminActorId },
+                  note: "Bulk status update",
+                });
+              }
+
+              if (order.stalledMessageId) {
+                if (
+                  getSecret("TELEGRAM_BOT_TOKEN") &&
+                  getSecret("TELEGRAM_CHANNEL_ID")
+                ) {
+                  try {
+                    await bot.telegram.deleteMessage(
+                      getSecret("TELEGRAM_CHANNEL_ID"),
+                      order.stalledMessageId,
+                    );
+                  } catch (err) {
+                    logger.error(
+                      "[TELEGRAM] Failed to delete stalled message:",
+                      err,
+                    );
+                  }
+                }
+                delete order.stalledMessageId;
+              }
+
+              await db.updateOrder(order);
+              updatedOrders.push(order);
+
+              // Update Telegram message
+              if (
+                getSecret("TELEGRAM_BOT_TOKEN") &&
+                getSecret("TELEGRAM_CHANNEL_ID") &&
+                order.telegramMessageId
+              ) {
+                try {
+                  await scheduleTelegram("update-status", {
+                    orderId: order.orderId,
+                    status: order.status,
+                  });
+                } catch (error) {
+                  logger.error(
+                    "[TELEGRAM] Failed to queue status update:",
+                    error,
+                  );
+                }
+              }
+            }
+          }
+
+          logger.info(
+            `[SERVER] Bulk updated ${updatedOrders.length} orders to status ${status}.`,
+          );
+          res
+            .status(200)
+            .json({ success: true, updatedCount: updatedOrders.length });
+        } catch (error) {
+          await logAndEmailError(error, "Error in bulk order status update");
+          res.status(500).json({ error: "Internal Server Error" });
+        }
+      },
+    );
+
+    app.post(
+      "/api/orders/:orderId/tracking",
+      authenticateToken,
+      [
+        ...validateId("orderId"),
+        body("trackingNumber")
+          .notEmpty()
+          .withMessage("trackingNumber is required")
+          .isString()
+          .trim(),
+        body("courier")
+          .notEmpty()
+          .withMessage("courier is required")
+          .isString()
+          .trim(),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+
+        // Check for admin role
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
         }
 
         const { orderId } = req.params;
         const { trackingNumber, courier } = req.body;
         const order = await db.getOrder(orderId);
         if (!order) {
-            return res.status(404).json({ error: 'Order not found.' });
+          return res.status(404).json({ error: "Order not found." });
         }
         order.trackingNumber = trackingNumber;
         order.courier = courier;
@@ -2912,36 +4082,42 @@ async function startServer(
 
         // Send shipment notification email
         if (order.billingContact && order.billingContact.email) {
-            try {
-                const customerName = order.billingContact.givenName || 'Valued Customer';
-                const shippingAddress = order.shippingContact;
-                const orderDate = new Date(order.receivedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                // FIX: Sanitize address lines to prevent XSS
-                const safeAddressLines = shippingAddress.addressLines.map(line => escapeHtml(line)).join('<br>');
-                const addressHtml = `
+          try {
+            const customerName =
+              order.billingContact.givenName || "Valued Customer";
+            const shippingAddress = order.shippingContact;
+            const orderDate = new Date(order.receivedAt).toLocaleDateString(
+              "en-US",
+              { year: "numeric", month: "long", day: "numeric" },
+            );
+            // FIX: Sanitize address lines to prevent XSS
+            const safeAddressLines = shippingAddress.addressLines
+              .map((line) => escapeHtml(line))
+              .join("<br>");
+            const addressHtml = `
                     <address>
                         ${escapeHtml(shippingAddress.givenName)} ${escapeHtml(shippingAddress.familyName)}<br>
                         ${safeAddressLines}<br>
                         ${escapeHtml(shippingAddress.locality)}, ${escapeHtml(shippingAddress.administrativeDistrictLevel1)} ${escapeHtml(shippingAddress.postalCode)}<br>
                         ${escapeHtml(shippingAddress.country)}<br>
-                        ${escapeHtml(shippingAddress.phoneNumber || '')}
+                        ${escapeHtml(shippingAddress.phoneNumber || "")}
                     </address>
                 `;
-                // NOTE: The product name is hardcoded as "Stickers" because the current
-                // order creation process only supports a single product type. This can be
-                // expanded in the future if more products are added.
-                const productDetailsHtml = `
+            // NOTE: The product name is hardcoded as "Stickers" because the current
+            // order creation process only supports a single product type. This can be
+            // expanded in the future if more products are added.
+            const productDetailsHtml = `
                     <tr>
                         <td style="padding: 10px; border-bottom: 1px solid #ddd;">Stickers</td>
                         <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails?.quantity || 0}</td>
                     </tr>
                 `;
 
-                await scheduleEmail('send-shipping-email', {
-                    to: order.billingContact.email,
-                    subject: `Your Splotch order #${order.orderId} has shipped!`,
-                    text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || 0}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join('\n')}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
-                    html: `
+            await scheduleEmail("send-shipping-email", {
+              to: order.billingContact.email,
+              subject: `Your Splotch order #${order.orderId} has shipped!`,
+              text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || 0}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join("\n")}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ""}\n\nStay in touch!\nSplotch`,
+              html: `
                         <p>Hey ${customerName},</p>
                         <p>Heads up—your order has been sent out!</p>
                         <p><b>Ordered:</b> ${orderDate}</p>
@@ -2965,182 +4141,247 @@ async function startServer(
                         <p>Stay in touch!</p>
                         <p><b>Splotch</b></p>
                     `,
-                });
-                logger.info(`[SERVER] Shipment notification email queued for order ID ${orderId}.`);
-            } catch (emailError) {
-                // Log the error, but don't block the API response since the tracking info was saved.
-                logger.error(`Failed to queue shipment notification for order ${orderId}:`, emailError);
-            }
+            });
+            logger.info(
+              `[SERVER] Shipment notification email queued for order ID ${orderId}.`,
+            );
+          } catch (emailError) {
+            // Log the error, but don't block the API response since the tracking info was saved.
+            logger.error(
+              `Failed to queue shipment notification for order ${orderId}:`,
+              emailError,
+            );
+          }
         }
 
         res.status(200).json({ success: true, order: order });
-    });
+      },
+    );
 
     // --- Order Audit History & Retention Endpoints ---
-    app.get('/api/orders/:orderId/history', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) {
-            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+    app.get(
+      "/api/orders/:orderId/history",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
         }
         const { orderId } = req.params;
         const order = await db.getOrder(orderId);
         const diskEvents = readAuditLogForOrder(orderId);
 
         if (!order && diskEvents.length === 0) {
-            return res.status(404).json({ error: 'Order history not found.' });
+          return res.status(404).json({ error: "Order history not found." });
         }
 
-        const history = diskEvents.length > 0 ? diskEvents : (order?.statusHistory || []);
+        const history =
+          diskEvents.length > 0 ? diskEvents : order?.statusHistory || [];
         res.json({
-            orderId,
-            history,
-            isPurged: !order,
-            shadowDeleted: !!order?.shadowDeleted,
-            shadowDeletedAt: order?.shadowDeletedAt || null
+          orderId,
+          history,
+          isPurged: !order,
+          shadowDeleted: !!order?.shadowDeleted,
+          shadowDeletedAt: order?.shadowDeletedAt || null,
         });
-    });
+      },
+    );
 
-    app.get('/api/admin/retention/config', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) {
-            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+    app.get(
+      "/api/admin/retention/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
         }
         const lowdb = db.db || db;
-        const retentionConfig = lowdb?.data?.config?.retention || { purgeArtworkOnFlush: false };
+        const retentionConfig = lowdb?.data?.config?.retention || {
+          purgeArtworkOnFlush: false,
+        };
         const allOrders = Object.values(lowdb?.data?.orders || {});
-        const canceledOrders = allOrders.filter(o => o.status === 'CANCELED');
+        const canceledOrders = allOrders.filter((o) => o.status === "CANCELED");
 
         res.json({
-            purgeArtworkOnFlush: !!retentionConfig.purgeArtworkOnFlush,
-            retentionDays: 30,
-            canceledOrdersCount: canceledOrders.length
+          purgeArtworkOnFlush: !!retentionConfig.purgeArtworkOnFlush,
+          retentionDays: 30,
+          canceledOrdersCount: canceledOrders.length,
         });
-    });
+      },
+    );
 
-    app.post('/api/admin/retention/config', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) {
-            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+    app.post(
+      "/api/admin/retention/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
         }
         const { purgeArtworkOnFlush } = req.body;
-        if (typeof purgeArtworkOnFlush !== 'boolean') {
-            return res.status(400).json({ error: 'purgeArtworkOnFlush must be a boolean.' });
+        if (typeof purgeArtworkOnFlush !== "boolean") {
+          return res
+            .status(400)
+            .json({ error: "purgeArtworkOnFlush must be a boolean." });
         }
         const lowdb = db.db || db;
         if (!lowdb.data.config) lowdb.data.config = {};
         lowdb.data.config.retention = {
-            ...(lowdb.data.config.retention || {}),
-            purgeArtworkOnFlush
+          ...(lowdb.data.config.retention || {}),
+          purgeArtworkOnFlush,
         };
-        if (typeof db.write === 'function') await db.write();
-        else if (typeof lowdb.write === 'function') await lowdb.write();
+        if (typeof db.write === "function") await db.write();
+        else if (typeof lowdb.write === "function") await lowdb.write();
 
-        logger.info(`[RETENTION] Updated retention config: purgeArtworkOnFlush=${purgeArtworkOnFlush}`);
+        logger.info(
+          `[RETENTION] Updated retention config: purgeArtworkOnFlush=${purgeArtworkOnFlush}`,
+        );
         res.json({ success: true, retention: lowdb.data.config.retention });
-    });
+      },
+    );
 
-    app.post('/api/admin/retention/flush', authenticateToken, async (req, res) => {
-        if (!await isAdmin(req.user)) {
-            return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+    app.post(
+      "/api/admin/retention/flush",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
         }
-        const retentionDays = req.body?.retentionDays !== undefined ? Number(req.body.retentionDays) : 30;
+        const retentionDays =
+          req.body?.retentionDays !== undefined
+            ? Number(req.body.retentionDays)
+            : 30;
         const result = await runRetentionFlush(db, { retentionDays });
         res.json({ success: true, ...result });
-    });
+      },
+    );
 
     // --- Auth Endpoints ---
-    app.post('/api/auth/register-user', authLimiter, [
-      ...validateUsername,
-      body('password')
-        .notEmpty().withMessage('password is required')
-        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { username, password } = req.body;
-
-      const existingUser = await db.getUser(username);
-      if (existingUser) {
-        return res.status(400).json({ error: 'User already exists' });
-      }
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const user = {
-        id: randomUUID(),
-        username,
-        password: hashedPassword,
-        credentials: [],
-      };
-      await db.createUser(user);
-
-      // Send notification email to admin
-      if (getSecret('ADMIN_EMAIL')) {
-        try {
-          await scheduleEmail('send-admin-notification', {
-            to: getSecret('ADMIN_EMAIL'),
-            subject: 'New User Account Created',
-            text: `A new user has registered on the Print Shop.\n\nUsername: ${username}`,
-            html: `<p>A new user has registered on the Print Shop.</p><p><b>Username:</b> ${username}</p>`,
-          });
-        } catch (emailError) {
-          logger.error('Failed to queue new user notification email:', emailError);
-        }
-      }
-
-      res.json({ success: true });
-    });
-
-    app.post('/api/auth/login', authLimiter, [
-      ...validateUsername,
-      body('password').notEmpty().withMessage('password is required'),
-    ], async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { username, password } = req.body;
-      // Prevent prototype pollution
-      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
-        return res.status(400).json({ error: 'Invalid username or password' });
-      }
-      const user = await db.getUser(username);
-
-      // Sentinel: Timing attack mitigation.
-      // Always perform bcrypt comparison to prevent username enumeration via timing analysis.
-      // If user is not found or has no password, compare against a dummy hash.
-      const targetHash = (user && user.password) ? user.password : DUMMY_HASH;
-      const validPassword = await bcrypt.compare(password, targetHash);
-
-      if (!user || !user.password || !validPassword) {
-        return res.status(400).json({ error: 'Invalid username or password' });
-      }
-      const { privateKey, kid } = getCurrentSigningKey();
-      const payload = { username: user.username };
-      if (user.email) {
-          payload.email = user.email;
-      }
-      const token = jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
-      res.json({ token });
-    });
-    
-    app.get('/api/test/last-magic-link', (req, res) => {
-        if (process.env.NODE_ENV !== 'test') {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        const { email } = req.query;
-        if (email) {
-            res.json({ token: lastMagicLinkTokens.get(email) });
-        } else {
-            // Fallback to the last inserted token for backward compatibility
-            const lastToken = Array.from(lastMagicLinkTokens.values()).pop();
-            res.json({ token: lastToken });
-        }
-    });
-
-    app.post('/api/auth/magic-login', emailTriggerLimiter, [
-      body('email').isEmail().withMessage('email is not valid'),
-    ], async (req, res) => {
+    app.post(
+      "/api/auth/register-user",
+      authLimiter,
+      [
+        ...validateUsername,
+        body("password")
+          .notEmpty()
+          .withMessage("password is required")
+          .isLength({ min: 8 })
+          .withMessage("Password must be at least 8 characters long"),
+      ],
+      async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
+          return res.status(400).json({ errors: errors.array() });
+        }
+        const { username, password } = req.body;
+
+        const existingUser = await db.getUser(username);
+        if (existingUser) {
+          return res.status(400).json({ error: "User already exists" });
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = {
+          id: randomUUID(),
+          username,
+          password: hashedPassword,
+          credentials: [],
+        };
+        await db.createUser(user);
+
+        // Send notification email to admin
+        if (getSecret("ADMIN_EMAIL")) {
+          try {
+            await scheduleEmail("send-admin-notification", {
+              to: getSecret("ADMIN_EMAIL"),
+              subject: "New User Account Created",
+              text: `A new user has registered on the Print Shop.\n\nUsername: ${username}`,
+              html: `<p>A new user has registered on the Print Shop.</p><p><b>Username:</b> ${username}</p>`,
+            });
+          } catch (emailError) {
+            logger.error(
+              "Failed to queue new user notification email:",
+              emailError,
+            );
+          }
+        }
+
+        res.json({ success: true });
+      },
+    );
+
+    app.post(
+      "/api/auth/login",
+      authLimiter,
+      [
+        ...validateUsername,
+        body("password").notEmpty().withMessage("password is required"),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+        const { username, password } = req.body;
+        // Prevent prototype pollution
+        if (["__proto__", "constructor", "prototype"].includes(username)) {
+          return res
+            .status(400)
+            .json({ error: "Invalid username or password" });
+        }
+        const user = await db.getUser(username);
+
+        // Sentinel: Timing attack mitigation.
+        // Always perform bcrypt comparison to prevent username enumeration via timing analysis.
+        // If user is not found or has no password, compare against a dummy hash.
+        const targetHash = user && user.password ? user.password : DUMMY_HASH;
+        const validPassword = await bcrypt.compare(password, targetHash);
+
+        if (!user || !user.password || !validPassword) {
+          return res
+            .status(400)
+            .json({ error: "Invalid username or password" });
+        }
+        const { privateKey, kid } = getCurrentSigningKey();
+        const payload = { username: user.username };
+        if (user.email) {
+          payload.email = user.email;
+        }
+        const token = jwt.sign(payload, privateKey, {
+          algorithm: "RS256",
+          expiresIn: "1h",
+          header: { kid },
+        });
+        res.json({ token });
+      },
+    );
+
+    app.get("/api/test/last-magic-link", (req, res) => {
+      if (process.env.NODE_ENV !== "test") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const { email } = req.query;
+      if (email) {
+        res.json({ token: lastMagicLinkTokens.get(email) });
+      } else {
+        // Fallback to the last inserted token for backward compatibility
+        const lastToken = Array.from(lastMagicLinkTokens.values()).pop();
+        res.json({ token: lastToken });
+      }
+    });
+
+    app.post(
+      "/api/auth/magic-login",
+      emailTriggerLimiter,
+      [body("email").isEmail().withMessage("email is not valid")],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
         }
         const { email } = req.body;
 
@@ -3148,76 +4389,112 @@ async function startServer(
         // flood the database with unverified accounts. The user is created only after verification.
 
         const { privateKey, kid } = getCurrentSigningKey();
-        const token = jwt.sign({ email }, privateKey, { algorithm: 'RS256', expiresIn: '15m', header: { kid } });
+        const token = jwt.sign({ email }, privateKey, {
+          algorithm: "RS256",
+          expiresIn: "15m",
+          header: { kid },
+        });
 
         // SECURITY: Only store the token in memory during testing to prevent memory leaks in production.
-        if (process.env.NODE_ENV === 'test') {
-            lastMagicLinkTokens.set(email, token);
+        if (process.env.NODE_ENV === "test") {
+          lastMagicLinkTokens.set(email, token);
         }
 
-        const magicLink = `${getSecret('BASE_URL')}/magic-login.html?token=${token}`;
+        const magicLink = `${getSecret("BASE_URL")}/magic-login.html?token=${token}`;
 
         // The magic link is sensitive and should not be logged.
         // logger.info('Magic Link (for testing):', magicLink);
 
         try {
-            if (process.env.NODE_ENV === 'test' && sendEmail === defaultSendEmail) {
-                logger.info('[TEST] Skipping email send. Magic Link:', magicLink);
-            } else {
-                await scheduleEmail('send-magic-link', {
-                    to: email,
-                    subject: 'Your Magic Link for Splotch',
-                    text: `Click here to log in: ${magicLink}`,
-                    html: `<p>Click here to log in: <a href="${magicLink}">${magicLink}</a></p>`,
-                });
-            }
-            res.json({ success: true, message: 'Magic link sent! Please check your email.' });
+          if (
+            process.env.NODE_ENV === "test" &&
+            sendEmail === defaultSendEmail
+          ) {
+            logger.info("[TEST] Skipping email send. Magic Link:", magicLink);
+          } else {
+            await scheduleEmail("send-magic-link", {
+              to: email,
+              subject: "Your Magic Link for Splotch",
+              text: `Click here to log in: ${magicLink}`,
+              html: `<p>Click here to log in: <a href="${magicLink}">${magicLink}</a></p>`,
+            });
+          }
+          res.json({
+            success: true,
+            message: "Magic link sent! Please check your email.",
+          });
         } catch (error) {
-            await logAndEmailError(error, 'Failed to queue magic link email');
-            res.status(500).json({ error: 'Failed to send magic link email.' });
+          await logAndEmailError(error, "Failed to queue magic link email");
+          res.status(500).json({ error: "Failed to send magic link email." });
         }
-    });
-    
-    app.post('/api/auth/verify-magic-link', [
-        body('token').notEmpty().withMessage('Token is required').isString().withMessage('Token must be a string'),
-    ], (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { token } = req.body;
+      },
+    );
 
-      const decodedHeader = jwt.decode(token, { complete: true });
-      if (!decodedHeader || !decodedHeader.header || !decodedHeader.header.kid) {
-          return res.status(401).json({ error: 'Invalid token structure' });
-      }
-      const key = getKey(decodedHeader.header.kid);
-      if (!key) {
-          return res.status(401).json({ error: 'Key not found' });
-      }
-
-      jwt.verify(token, key.publicKey, { algorithms: ['RS256'] }, async (err, decoded) => {
-        if (err) {
-          return res.status(401).json({ error: 'Invalid or expired token' });
+    app.post(
+      "/api/auth/verify-magic-link",
+      [
+        body("token")
+          .notEmpty()
+          .withMessage("Token is required")
+          .isString()
+          .withMessage("Token must be a string"),
+      ],
+      (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
         }
-        let user = await getUserByEmail(decoded.email);
-        if (!user) {
-           // User verified their email by clicking the link, so we create the account now.
-           user = {
-               id: randomUUID(),
-               email: decoded.email,
-               credentials: [],
-           };
-           await db.createUser(user);
-           logger.info(`[SERVER] New user created after magic link verification: ${decoded.email}`);
-        }
-        const { privateKey, kid } = getCurrentSigningKey();
-        const authToken = jwt.sign({ email: user.email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
-        res.json({ success: true, token: authToken });
-      });
-    });
+        const { token } = req.body;
 
-    app.get('/api/auth/verify-token', authenticateToken, (req, res) => {
+        const decodedHeader = jwt.decode(token, { complete: true });
+        if (
+          !decodedHeader ||
+          !decodedHeader.header ||
+          !decodedHeader.header.kid
+        ) {
+          return res.status(401).json({ error: "Invalid token structure" });
+        }
+        const key = getKey(decodedHeader.header.kid);
+        if (!key) {
+          return res.status(401).json({ error: "Key not found" });
+        }
+
+        jwt.verify(
+          token,
+          key.publicKey,
+          { algorithms: ["RS256"] },
+          async (err, decoded) => {
+            if (err) {
+              return res
+                .status(401)
+                .json({ error: "Invalid or expired token" });
+            }
+            let user = await getUserByEmail(decoded.email);
+            if (!user) {
+              // User verified their email by clicking the link, so we create the account now.
+              user = {
+                id: randomUUID(),
+                email: decoded.email,
+                credentials: [],
+              };
+              await db.createUser(user);
+              logger.info(
+                `[SERVER] New user created after magic link verification: ${decoded.email}`,
+              );
+            }
+            const { privateKey, kid } = getCurrentSigningKey();
+            const authToken = jwt.sign({ email: user.email }, privateKey, {
+              algorithm: "RS256",
+              expiresIn: "1h",
+              header: { kid },
+            });
+            res.json({ success: true, token: authToken });
+          },
+        );
+      },
+    );
+
+    app.get("/api/auth/verify-token", authenticateToken, (req, res) => {
       // If the middleware succeeds, req.user is populated with the token payload.
       // The client expects an object with a `username` property for the welcome message.
       const userPayload = req.user;
@@ -3225,80 +4502,94 @@ async function startServer(
 
       if (!username) {
         // This case should be rare, but it's good practice to handle it.
-        return res.status(400).json({ error: 'Token is valid, but contains no user identifier.' });
+        return res
+          .status(400)
+          .json({ error: "Token is valid, but contains no user identifier." });
       }
 
       // Return a consistent object that includes the username.
       res.status(200).json({
         username: username,
-        ...userPayload
+        ...userPayload,
       });
     });
-    
-    app.post('/api/auth/issue-temp-token', emailTriggerLimiter, [
-      body('email').isEmail().withMessage('A valid email is required'),
-    ], (req, res) => {
-      try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-          return res.status(400).json({ errors: errors.array() });
+
+    app.post(
+      "/api/auth/issue-temp-token",
+      emailTriggerLimiter,
+      [body("email").isEmail().withMessage("A valid email is required")],
+      (req, res) => {
+        try {
+          const errors = validationResult(req);
+          if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+          }
+
+          const { email } = req.body;
+
+          // Ensure we have a key
+          const keyInfo = getCurrentSigningKey();
+          if (!keyInfo || !keyInfo.privateKey) {
+            console.error("No signing key available in issue-temp-token");
+            return res.json({
+              success: true,
+              token: "fallback-mock-token-for-test",
+            });
+          }
+
+          const { privateKey, kid } = keyInfo;
+          // SECURITY: Mark token as guest to prevent privilege escalation or data access
+          const token = jwt.sign({ email, isGuest: true }, privateKey, {
+            algorithm: "RS256",
+            expiresIn: "5m",
+            header: { kid },
+          });
+
+          logger.info(`[SERVER] Issued temporary token for email: ${email}`);
+          res.json({ success: true, token });
+        } catch (e) {
+          console.error("Error in issue-temp-token:", e);
+          res.status(500).json({ error: "Internal Server Error" });
         }
-
-        const { email } = req.body;
-
-        // Ensure we have a key
-        const keyInfo = getCurrentSigningKey();
-        if (!keyInfo || !keyInfo.privateKey) {
-            console.error('No signing key available in issue-temp-token');
-            return res.json({ success: true, token: 'fallback-mock-token-for-test' });
-        }
-        
-        const { privateKey, kid } = keyInfo;
-        // SECURITY: Mark token as guest to prevent privilege escalation or data access
-        const token = jwt.sign({ email, isGuest: true }, privateKey, { algorithm: 'RS256', expiresIn: '5m', header: { kid } });
-
-        logger.info(`[SERVER] Issued temporary token for email: ${email}`);
-        res.json({ success: true, token });
-      } catch (e) {
-        console.error('Error in issue-temp-token:', e);
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
+      },
+    );
 
     // --- Google OAuth Endpoints ---
-    app.get('/auth/google', (req, res) => {
+    app.get("/auth/google", (req, res) => {
       const scopes = [
-        'https://www.googleapis.com/auth/gmail.send',
-        'https://www.googleapis.com/auth/userinfo.email',
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/userinfo.email",
       ];
 
       // SECURITY: Generate a random state to prevent CSRF
-      const state = randomBytes(16).toString('hex');
-      res.cookie('oauth_state', state, {
+      const state = randomBytes(16).toString("hex");
+      res.cookie("oauth_state", state, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === "production",
         maxAge: 600000, // 10 minutes
-        signed: true
+        signed: true,
       });
 
       const url = oauth2Client.generateAuthUrl({
-        access_type: 'offline',
+        access_type: "offline",
         scope: scopes,
-        state: state
+        state: state,
       });
 
       res.redirect(url);
     });
 
-    app.get('/oauth2callback', async (req, res) => {
+    app.get("/oauth2callback", async (req, res) => {
       const { code, state } = req.query;
 
       // SECURITY: Verify state parameter to prevent CSRF
       const storedState = req.signedCookies.oauth_state;
       if (!state || !storedState || state !== storedState) {
-          return res.status(403).send('Authentication failed: Invalid state parameter.');
+        return res
+          .status(403)
+          .send("Authentication failed: Invalid state parameter.");
       }
-      res.clearCookie('oauth_state');
+      res.clearCookie("oauth_state");
 
       try {
         const { tokens } = await oauth2Client.getToken(code);
@@ -3306,21 +4597,24 @@ async function startServer(
 
         // If a refresh token is received, store it securely for future use.
         if (tokens.refresh_token) {
-          await db.setConfig('google_refresh_token', tokens.refresh_token);
-          logger.info('[SERVER] Google OAuth2 refresh token stored.');
+          await db.setConfig("google_refresh_token", tokens.refresh_token);
+          logger.info("[SERVER] Google OAuth2 refresh token stored.");
         }
 
         // The user is authenticated with Google, now get their profile info
-        const oauth2 = injectedGoogle.oauth2({ version: 'v2', auth: oauth2Client });
+        const oauth2 = injectedGoogle.oauth2({
+          version: "v2",
+          auth: oauth2Client,
+        });
         const userInfo = await oauth2.userinfo.get();
         const userEmail = userInfo.data.email;
-        logger.info('Google authentication successful for:', userEmail);
+        logger.info("Google authentication successful for:", userEmail);
 
         // Find or create a user in our database
         let user = await getUserByEmail(userEmail);
         if (!user) {
           // Create a new user if they don't exist
-          const newUsername = userEmail.split('@')[0]; // Use email prefix as username
+          const newUsername = userEmail.split("@")[0]; // Use email prefix as username
           user = {
             id: randomUUID(),
             username: newUsername,
@@ -3333,19 +4627,21 @@ async function startServer(
           logger.info(`New user created for ${userEmail}`);
 
           // Send notification email to admin
-          if (getSecret('ADMIN_EMAIL')) {
+          if (getSecret("ADMIN_EMAIL")) {
             try {
-              await scheduleEmail('send-admin-notification-google', {
-                to: getSecret('ADMIN_EMAIL'),
-                subject: 'New User Account Created (via Google)',
+              await scheduleEmail("send-admin-notification-google", {
+                to: getSecret("ADMIN_EMAIL"),
+                subject: "New User Account Created (via Google)",
                 text: `A new user has registered using their Google account.\n\nEmail: ${userEmail}\nUsername: ${newUsername}`,
                 html: `<p>A new user has registered using their Google account.</p><p><b>Email:</b> ${userEmail}</p><p><b>Username:</b> ${newUsername}</p>`,
               });
             } catch (emailError) {
-              logger.error('Failed to queue new user notification email:', emailError);
+              logger.error(
+                "Failed to queue new user notification email:",
+                emailError,
+              );
             }
           }
-
         } else {
           // User exists, just update their tokens
           user.google_tokens = tokens;
@@ -3354,378 +4650,522 @@ async function startServer(
 
         // Create a JWT for the user to log them in
         const { privateKey, kid } = getCurrentSigningKey();
-        const token = jwt.sign({ username: user.username, email: user.email }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
+        const token = jwt.sign(
+          { username: user.username, email: user.email },
+          privateKey,
+          { algorithm: "RS256", expiresIn: "1h", header: { kid } },
+        );
 
         // Redirect back to the printshop dashboard with the token
         res.redirect(`/printshop.html?token=${token}`);
       } catch (error) {
-        await logAndEmailError(error, 'Error in /oauth2callback');
-        res.status(500).send('Authentication failed.');
+        await logAndEmailError(error, "Error in /oauth2callback");
+        res.status(500).send("Authentication failed.");
       }
     });
-
 
     // --- WebAuthn (Passkey) Endpoints ---
     function getEffectiveRpID(req) {
-      if (req.hostname === 'localhost' || req.hostname === '127.0.0.1') {
-        return 'localhost';
+      if (req.hostname === "localhost" || req.hostname === "127.0.0.1") {
+        return "localhost";
       }
-      return rpID || 'splotch.page';
+      return rpID || "splotch.page";
     }
 
-    app.post('/api/auth/pre-register', authLimiter, validateUsername, async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { username } = req.body;
-      // Prevent prototype pollution
-      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
-        return res.status(400).json({ error: 'Invalid username.' });
-      }
-      let user = await db.getUser(username);
-
-      if (!user) {
-        // Create a new user if they don't exist
-        user = {
-          id: randomUUID(),
-          username: username,
-          password: null, // No password for WebAuthn-only users
-          credentials: [],
-        };
-        await db.createUser(user);
-        logger.info(`New user created for WebAuthn pre-registration: ${username}`);
-      }
-
-      const effectiveRpID = getEffectiveRpID(req);
-      const options = await injectedWebAuthn.generateRegistrationOptions({
-        rpID: effectiveRpID,
-        rpName: 'Splotch',
-        userName: username,
-        authenticatorSelection: {
-          userVerification: 'preferred',
-        },
-      });
-
-      user.challenge = options.challenge;
-      await db.updateUser(user);
-
-      res.json(options);
-    });
-
-    app.post('/api/auth/register-verify', authLimiter, validateUsername, async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { body } = req;
-      const { username } = req.body;
-      // Prevent prototype pollution
-      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
-        return res.status(400).json({ error: 'Invalid username.' });
-      }
-      const user = await db.getUser(username);
-      const effectiveRpID = getEffectiveRpID(req);
-      const allowedRPIDs = Array.from(new Set([effectiveRpID, rpID, 'splotch.page', 'www.splotch.page', 'localhost'].filter(Boolean)));
-      const allowedOrigins = Array.from(new Set([expectedOrigin, 'https://splotch.page', 'https://www.splotch.page', 'http://localhost:3000'].filter(Boolean)));
-      try {
-        const verification = await injectedWebAuthn.verifyRegistrationResponse({
-          response: body,
-          expectedChallenge: user.challenge,
-          expectedOrigin: allowedOrigins,
-          expectedRPID: allowedRPIDs,
-          requireUserVerification: false,
-        });
-        const { verified, registrationInfo } = verification;
-        if (verified && registrationInfo) {
-          const credId = registrationInfo.credential?.id || registrationInfo.credentialID || registrationInfo.id;
-          const pubKey = registrationInfo.credential?.publicKey || registrationInfo.credentialPublicKey || registrationInfo.publicKey;
-          const credRecord = {
-            id: credId,
-            credentialID: credId,
-            publicKey: pubKey,
-            credentialPublicKey: pubKey,
-            counter: registrationInfo.credential?.counter ?? registrationInfo.counter ?? 0,
-            transports: registrationInfo.credential?.transports || registrationInfo.transports || [],
-          };
-          if (!user.credentials) user.credentials = [];
-          user.credentials = user.credentials.filter(c => (c.credentialID || c.id) !== credId);
-          user.credentials.push(credRecord);
-          await db.updateUser(user);
-          await db.saveCredential(credRecord);
+    app.post(
+      "/api/auth/pre-register",
+      authLimiter,
+      validateUsername,
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
         }
-        res.json({ verified });
-      } catch (error) {
-        await logAndEmailError(error, 'Error in /api/auth/register-verify');
-        // SECURITY: Do not leak error details to the client
-        const errorMessage = process.env.NODE_ENV === 'production' ? 'Verification failed.' : `Verification failed: ${error.message}`;
-        res.status(400).json({ error: errorMessage });
-      }
-    });
+        const { username } = req.body;
+        // Prevent prototype pollution
+        if (["__proto__", "constructor", "prototype"].includes(username)) {
+          return res.status(400).json({ error: "Invalid username." });
+        }
+        let user = await db.getUser(username);
 
-    app.get('/api/auth/login-options', authLimiter, validateUsernameQuery, async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { username } = req.query;
-      // Prevent prototype pollution
-      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
-        return res.status(400).json({ error: 'User not found' });
-      }
-      const user = await db.getUser(username);
-      if (!user) {
-        return res.status(400).json({ error: 'User not found' });
-      }
-      const effectiveRpID = getEffectiveRpID(req);
-      const options = await injectedWebAuthn.generateAuthenticationOptions({
-        rpID: effectiveRpID,
-        allowCredentials: (user.credentials || []).map(cred => {
-          const credObj = {
-            id: cred.credentialID || cred.id,
-            type: 'public-key',
+        if (!user) {
+          // Create a new user if they don't exist
+          user = {
+            id: randomUUID(),
+            username: username,
+            password: null, // No password for WebAuthn-only users
+            credentials: [],
           };
-          if (Array.isArray(cred.transports) && cred.transports.length > 0) {
-            credObj.transports = cred.transports;
-          }
-          return credObj;
-        }),
-        userVerification: 'preferred',
-      });
-      user.challenge = options.challenge;
-      await db.updateUser(user);
-      res.json(options);
-    });
+          await db.createUser(user);
+          logger.info(
+            `New user created for WebAuthn pre-registration: ${username}`,
+          );
+        }
 
-    app.post('/api/auth/login-verify', authLimiter, validateUsername, async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { body } = req;
-      const { username } = req.body;
-      // Prevent prototype pollution
-      if (['__proto__', 'constructor', 'prototype'].includes(username)) {
-        return res.status(400).json({ error: 'Invalid username.' });
-      }
-      const user = await db.getUser(username);
-      const credential = await db.getCredential(body.id);
-      if (!credential) {
-        return res.status(400).json({ error: 'Credential not found.' });
-      }
-      const effectiveRpID = getEffectiveRpID(req);
-      const allowedRPIDs = Array.from(new Set([effectiveRpID, rpID, 'splotch.page', 'www.splotch.page', 'localhost'].filter(Boolean)));
-      const allowedOrigins = Array.from(new Set([expectedOrigin, 'https://splotch.page', 'https://www.splotch.page', 'http://localhost:3000'].filter(Boolean)));
-      try {
-        const rawPubKey = credential.publicKey || credential.credentialPublicKey;
-        const pubKeyBytes = rawPubKey instanceof Uint8Array ? rawPubKey :
-          Buffer.isBuffer(rawPubKey) ? new Uint8Array(rawPubKey) :
-          (typeof rawPubKey === 'object' && rawPubKey !== null) ? new Uint8Array(Object.values(rawPubKey)) :
-          (typeof rawPubKey === 'string') ? Buffer.from(rawPubKey, 'base64url') : new Uint8Array();
-
-        const verification = await injectedWebAuthn.verifyAuthenticationResponse({
-          response: body,
-          expectedChallenge: user.challenge,
-          expectedOrigin: allowedOrigins,
-          expectedRPID: allowedRPIDs,
-          credential: {
-            id: credential.id || credential.credentialID,
-            publicKey: pubKeyBytes,
-            counter: credential.counter || 0,
-            transports: (Array.isArray(credential.transports) && credential.transports.length > 0) ? credential.transports : undefined,
+        const effectiveRpID = getEffectiveRpID(req);
+        const options = await injectedWebAuthn.generateRegistrationOptions({
+          rpID: effectiveRpID,
+          rpName: "Splotch",
+          userName: username,
+          authenticatorSelection: {
+            userVerification: "preferred",
           },
-          requireUserVerification: false,
         });
-        const { verified, authenticationInfo } = verification;
-        if (verified) {
-          if (authenticationInfo && typeof authenticationInfo.newCounter === 'number') {
-            credential.counter = authenticationInfo.newCounter;
-            await db.saveCredential(credential);
-          }
-          const { privateKey, kid } = getCurrentSigningKey();
-          const payload = { username: user.username };
-          if (user.email) {
-              payload.email = user.email;
-          }
-          const token = jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
-          res.json({ verified, token });
-        } else {
-          res.json({ verified });
+
+        user.challenge = options.challenge;
+        await db.updateUser(user);
+
+        res.json(options);
+      },
+    );
+
+    app.post(
+      "/api/auth/register-verify",
+      authLimiter,
+      validateUsername,
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
         }
-      } catch (error) {
-        await logAndEmailError(error, 'Error in /api/auth/login-verify');
-        // SECURITY: Do not leak error details to the client
-        const errorMessage = process.env.NODE_ENV === 'production' ? 'Verification failed.' : `Verification failed: ${error.message}`;
-        res.status(400).json({ error: errorMessage });
-      }
-    });
+        const { body } = req;
+        const { username } = req.body;
+        // Prevent prototype pollution
+        if (["__proto__", "constructor", "prototype"].includes(username)) {
+          return res.status(400).json({ error: "Invalid username." });
+        }
+        const user = await db.getUser(username);
+        const effectiveRpID = getEffectiveRpID(req);
+        const allowedRPIDs = Array.from(
+          new Set(
+            [
+              effectiveRpID,
+              rpID,
+              "splotch.page",
+              "www.splotch.page",
+              "localhost",
+            ].filter(Boolean),
+          ),
+        );
+        const allowedOrigins = Array.from(
+          new Set(
+            [
+              expectedOrigin,
+              "https://splotch.page",
+              "https://www.splotch.page",
+              "http://localhost:3000",
+            ].filter(Boolean),
+          ),
+        );
+        try {
+          const verification =
+            await injectedWebAuthn.verifyRegistrationResponse({
+              response: body,
+              expectedChallenge: user.challenge,
+              expectedOrigin: allowedOrigins,
+              expectedRPID: allowedRPIDs,
+              requireUserVerification: false,
+            });
+          const { verified, registrationInfo } = verification;
+          if (verified && registrationInfo) {
+            const credId =
+              registrationInfo.credential?.id ||
+              registrationInfo.credentialID ||
+              registrationInfo.id;
+            const pubKey =
+              registrationInfo.credential?.publicKey ||
+              registrationInfo.credentialPublicKey ||
+              registrationInfo.publicKey;
+            const credRecord = {
+              id: credId,
+              credentialID: credId,
+              publicKey: pubKey,
+              credentialPublicKey: pubKey,
+              counter:
+                registrationInfo.credential?.counter ??
+                registrationInfo.counter ??
+                0,
+              transports:
+                registrationInfo.credential?.transports ||
+                registrationInfo.transports ||
+                [],
+            };
+            if (!user.credentials) user.credentials = [];
+            user.credentials = user.credentials.filter(
+              (c) => (c.credentialID || c.id) !== credId,
+            );
+            user.credentials.push(credRecord);
+            await db.updateUser(user);
+            await db.saveCredential(credRecord);
+          }
+          res.json({ verified });
+        } catch (error) {
+          await logAndEmailError(error, "Error in /api/auth/register-verify");
+          // SECURITY: Do not leak error details to the client
+          const errorMessage =
+            process.env.NODE_ENV === "production"
+              ? "Verification failed."
+              : `Verification failed: ${error.message}`;
+          res.status(400).json({ error: errorMessage });
+        }
+      },
+    );
+
+    app.get(
+      "/api/auth/login-options",
+      authLimiter,
+      validateUsernameQuery,
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+        const { username } = req.query;
+        // Prevent prototype pollution
+        if (["__proto__", "constructor", "prototype"].includes(username)) {
+          return res.status(400).json({ error: "User not found" });
+        }
+        const user = await db.getUser(username);
+        if (!user) {
+          return res.status(400).json({ error: "User not found" });
+        }
+        const effectiveRpID = getEffectiveRpID(req);
+        const options = await injectedWebAuthn.generateAuthenticationOptions({
+          rpID: effectiveRpID,
+          allowCredentials: (user.credentials || []).map((cred) => {
+            const credObj = {
+              id: cred.credentialID || cred.id,
+              type: "public-key",
+            };
+            if (Array.isArray(cred.transports) && cred.transports.length > 0) {
+              credObj.transports = cred.transports;
+            }
+            return credObj;
+          }),
+          userVerification: "preferred",
+        });
+        user.challenge = options.challenge;
+        await db.updateUser(user);
+        res.json(options);
+      },
+    );
+
+    app.post(
+      "/api/auth/login-verify",
+      authLimiter,
+      validateUsername,
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+        const { body } = req;
+        const { username } = req.body;
+        // Prevent prototype pollution
+        if (["__proto__", "constructor", "prototype"].includes(username)) {
+          return res.status(400).json({ error: "Invalid username." });
+        }
+        const user = await db.getUser(username);
+        const credential = await db.getCredential(body.id);
+        if (!credential) {
+          return res.status(400).json({ error: "Credential not found." });
+        }
+        const effectiveRpID = getEffectiveRpID(req);
+        const allowedRPIDs = Array.from(
+          new Set(
+            [
+              effectiveRpID,
+              rpID,
+              "splotch.page",
+              "www.splotch.page",
+              "localhost",
+            ].filter(Boolean),
+          ),
+        );
+        const allowedOrigins = Array.from(
+          new Set(
+            [
+              expectedOrigin,
+              "https://splotch.page",
+              "https://www.splotch.page",
+              "http://localhost:3000",
+            ].filter(Boolean),
+          ),
+        );
+        try {
+          const rawPubKey =
+            credential.publicKey || credential.credentialPublicKey;
+          const pubKeyBytes =
+            rawPubKey instanceof Uint8Array
+              ? rawPubKey
+              : Buffer.isBuffer(rawPubKey)
+                ? new Uint8Array(rawPubKey)
+                : typeof rawPubKey === "object" && rawPubKey !== null
+                  ? new Uint8Array(Object.values(rawPubKey))
+                  : typeof rawPubKey === "string"
+                    ? Buffer.from(rawPubKey, "base64url")
+                    : new Uint8Array();
+
+          const verification =
+            await injectedWebAuthn.verifyAuthenticationResponse({
+              response: body,
+              expectedChallenge: user.challenge,
+              expectedOrigin: allowedOrigins,
+              expectedRPID: allowedRPIDs,
+              credential: {
+                id: credential.id || credential.credentialID,
+                publicKey: pubKeyBytes,
+                counter: credential.counter || 0,
+                transports:
+                  Array.isArray(credential.transports) &&
+                  credential.transports.length > 0
+                    ? credential.transports
+                    : undefined,
+              },
+              requireUserVerification: false,
+            });
+          const { verified, authenticationInfo } = verification;
+          if (verified) {
+            if (
+              authenticationInfo &&
+              typeof authenticationInfo.newCounter === "number"
+            ) {
+              credential.counter = authenticationInfo.newCounter;
+              await db.saveCredential(credential);
+            }
+            const { privateKey, kid } = getCurrentSigningKey();
+            const payload = { username: user.username };
+            if (user.email) {
+              payload.email = user.email;
+            }
+            const token = jwt.sign(payload, privateKey, {
+              algorithm: "RS256",
+              expiresIn: "1h",
+              header: { kid },
+            });
+            res.json({ verified, token });
+          } else {
+            res.json({ verified });
+          }
+        } catch (error) {
+          await logAndEmailError(error, "Error in /api/auth/login-verify");
+          // SECURITY: Do not leak error details to the client
+          const errorMessage =
+            process.env.NODE_ENV === "production"
+              ? "Verification failed."
+              : `Verification failed: ${error.message}`;
+          res.status(400).json({ error: errorMessage });
+        }
+      },
+    );
 
     // --- User Management Endpoints ---
-    app.post('/api/admin/users', authenticateToken, [
-      ...validateUsername,
-      body('password').notEmpty().withMessage('password is required').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
-      body('role').optional().isIn(['admin', 'user']).withMessage('Invalid role'),
-    ], async (req, res) => {
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-      }
+    app.post(
+      "/api/admin/users",
+      authenticateToken,
+      [
+        ...validateUsername,
+        body("password")
+          .notEmpty()
+          .withMessage("password is required")
+          .isLength({ min: 8 })
+          .withMessage("Password must be at least 8 characters long"),
+        body("role")
+          .optional()
+          .isIn(["admin", "user"])
+          .withMessage("Invalid role"),
+      ],
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
 
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-      const { username, password, role } = req.body;
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+        const { username, password, role } = req.body;
 
-      const existingUser = await db.getUser(username);
-      if (existingUser) {
-        return res.status(400).json({ error: 'User already exists' });
-      }
+        const existingUser = await db.getUser(username);
+        if (existingUser) {
+          return res.status(400).json({ error: "User already exists" });
+        }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const user = {
-        id: randomUUID(),
-        username,
-        password: hashedPassword,
-        credentials: [],
-        ...(role === 'admin' ? { role: 'admin' } : {})
-      };
-      await db.createUser(user);
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = {
+          id: randomUUID(),
+          username,
+          password: hashedPassword,
+          credentials: [],
+          ...(role === "admin" ? { role: "admin" } : {}),
+        };
+        await db.createUser(user);
 
-      logger.info(`[SERVER] Admin ${req.user.username || req.user.email} created new user: ${username}`);
-      res.status(201).json({ success: true, message: 'User created successfully' });
-    });
+        logger.info(
+          `[SERVER] Admin ${req.user.username || req.user.email} created new user: ${username}`,
+        );
+        res
+          .status(201)
+          .json({ success: true, message: "User created successfully" });
+      },
+    );
 
-    app.get('/api/admin/users', authenticateToken, async (req, res) => {
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
+    app.get("/api/admin/users", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user))) {
+        return res
+          .status(403)
+          .json({ error: "Forbidden: Admin access required." });
       }
       const usernames = await db.listUsernames();
       res.status(200).json({ usernames });
     });
 
-    app.delete('/api/admin/users/:username', authenticateToken, async (req, res) => {
-      if (!await isAdmin(req.user)) {
-        return res.status(403).json({ error: 'Forbidden: Admin access required.' });
-      }
-      const { username } = req.params;
+    app.delete(
+      "/api/admin/users/:username",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+        const { username } = req.params;
 
-      // Prevent deleting self (basic safeguard)
-      if (req.user.username === username) {
-          return res.status(400).json({ error: 'Cannot delete your own admin account.' });
-      }
+        // Prevent deleting self (basic safeguard)
+        if (req.user.username === username) {
+          return res
+            .status(400)
+            .json({ error: "Cannot delete your own admin account." });
+        }
 
-      const deleted = await db.deleteUser(username);
-      if (!deleted) {
-        return res.status(404).json({ error: 'User not found' });
-      }
+        const deleted = await db.deleteUser(username);
+        if (!deleted) {
+          return res.status(404).json({ error: "User not found" });
+        }
 
-      logger.info(`[SERVER] Admin ${req.user.username || req.user.email} deleted user: ${username}`);
-      res.status(200).json({ success: true, message: 'User deleted successfully' });
-    });
+        logger.info(
+          `[SERVER] Admin ${req.user.username || req.user.email} deleted user: ${username}`,
+        );
+        res
+          .status(200)
+          .json({ success: true, message: "User deleted successfully" });
+      },
+    );
 
     // --- Data Compliance Endpoints ---
-    app.get('/api/auth/user/data', authenticateToken, async (req, res) => {
-        if (req.user.isGuest) {
-            return res.status(403).json({ error: 'Forbidden' });
+    app.get("/api/auth/user/data", authenticateToken, async (req, res) => {
+      if (req.user.isGuest) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      try {
+        let user;
+        if (req.user.email) {
+          user = await getUserByEmail(req.user.email);
         }
-        try {
-            let user;
-            if (req.user.email) {
-                user = await getUserByEmail(req.user.email);
-            }
-            if (!user && req.user.username) {
-                user = await db.getUser(req.user.username);
-            }
-            if (!user) {
-                return res.status(404).json({ error: 'User not found' });
-            }
-
-            // Fetch orders
-            const orders = user.email ? await db.getUserOrders(user.email) : [];
-
-            // Return data excluding sensitive fields like password
-            const userData = { ...user };
-            delete userData.password;
-            delete userData.google_tokens;
-            delete userData.challenge;
-
-            res.json({ user: userData, orders });
-        } catch (error) {
-            await logAndEmailError(error, 'Error fetching user data');
-            res.status(500).json({ error: 'Internal Server Error' });
+        if (!user && req.user.username) {
+          user = await db.getUser(req.user.username);
         }
+        if (!user) {
+          return res.status(404).json({ error: "User not found" });
+        }
+
+        // Fetch orders
+        const orders = user.email ? await db.getUserOrders(user.email) : [];
+
+        // Return data excluding sensitive fields like password
+        const userData = { ...user };
+        delete userData.password;
+        delete userData.google_tokens;
+        delete userData.challenge;
+
+        res.json({ user: userData, orders });
+      } catch (error) {
+        await logAndEmailError(error, "Error fetching user data");
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
 
-    app.delete('/api/auth/user', authenticateToken, async (req, res) => {
-        if (req.user.isGuest) {
-            return res.status(403).json({ error: 'Forbidden' });
+    app.delete("/api/auth/user", authenticateToken, async (req, res) => {
+      if (req.user.isGuest) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      try {
+        let user;
+        if (req.user.email) {
+          user = await getUserByEmail(req.user.email);
         }
-        try {
-            let user;
-            if (req.user.email) {
-                user = await getUserByEmail(req.user.email);
-            }
-            if (!user && req.user.username) {
-                user = await db.getUser(req.user.username);
-            }
-            if (!user) {
-                return res.status(404).json({ error: 'User not found' });
-            }
-
-            // Anonymize orders
-            if (user.email) {
-                const orders = await db.getUserOrders(user.email);
-                for (const order of orders) {
-                    let updated = false;
-                    if (order.billingContact) {
-                        order.billingContact.givenName = 'REDACTED';
-                        order.billingContact.familyName = 'REDACTED';
-                        order.billingContact.email = 'redacted@example.com';
-                        order.billingContact.phoneNumber = 'REDACTED';
-                        updated = true;
-                    }
-                    if (order.shippingContact) {
-                        order.shippingContact.givenName = 'REDACTED';
-                        order.shippingContact.familyName = 'REDACTED';
-                        order.shippingContact.email = 'redacted@example.com';
-                        order.shippingContact.phoneNumber = 'REDACTED';
-                        order.shippingContact.addressLines = ['REDACTED'];
-                        updated = true;
-                    }
-                    if (updated) {
-                        await db.updateOrder(order);
-                    }
-                }
-            }
-
-            // Delete user
-            await db.deleteUser(user.username || user.id);
-            logger.info(`[COMPLIANCE] User deleted account: ${user.username || user.id}`);
-
-            res.json({ success: true, message: 'Account deleted successfully.' });
-        } catch (error) {
-            await logAndEmailError(error, 'Error deleting user account');
-            res.status(500).json({ error: 'Internal Server Error' });
+        if (!user && req.user.username) {
+          user = await db.getUser(req.user.username);
         }
+        if (!user) {
+          return res.status(404).json({ error: "User not found" });
+        }
+
+        // Anonymize orders
+        if (user.email) {
+          const orders = await db.getUserOrders(user.email);
+          for (const order of orders) {
+            let updated = false;
+            if (order.billingContact) {
+              order.billingContact.givenName = "REDACTED";
+              order.billingContact.familyName = "REDACTED";
+              order.billingContact.email = "redacted@example.com";
+              order.billingContact.phoneNumber = "REDACTED";
+              updated = true;
+            }
+            if (order.shippingContact) {
+              order.shippingContact.givenName = "REDACTED";
+              order.shippingContact.familyName = "REDACTED";
+              order.shippingContact.email = "redacted@example.com";
+              order.shippingContact.phoneNumber = "REDACTED";
+              order.shippingContact.addressLines = ["REDACTED"];
+              updated = true;
+            }
+            if (updated) {
+              await db.updateOrder(order);
+            }
+          }
+        }
+
+        // Delete user
+        await db.deleteUser(user.username || user.id);
+        logger.info(
+          `[COMPLIANCE] User deleted account: ${user.username || user.id}`,
+        );
+
+        res.json({ success: true, message: "Account deleted successfully." });
+      } catch (error) {
+        await logAndEmailError(error, "Error deleting user account");
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
 
     // Initialize the shipment tracker
     initializeTracker(db);
 
     // Start background workers
-    if (process.env.NODE_ENV !== 'test') {
-        try {
-            startEmailWorker(oauth2Client, sendEmail, db);
-            if (bot) {
-                startTelegramWorker(bot, db);
-            }
-            startOdooWorker(db, storageProvider);
-            // Schedule inventory sync every hour
-            odooQueue.add('sync-inventory', {}, { repeat: { every: 3600000 }, jobId: 'sync-inventory-job' });
-            logger.info('[SERVER] Background workers started.');
-        } catch (workerError) {
-            logger.error('[SERVER] Failed to start background workers:', workerError);
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        startEmailWorker(oauth2Client, sendEmail, db);
+        if (bot) {
+          startTelegramWorker(bot, db);
         }
+        startOdooWorker(db, storageProvider);
+        // Schedule inventory sync every hour
+        odooQueue.add(
+          "sync-inventory",
+          {},
+          { repeat: { every: 3600000 }, jobId: "sync-inventory-job" },
+        );
+        logger.info("[SERVER] Background workers started.");
+      } catch (workerError) {
+        logger.error(
+          "[SERVER] Failed to start background workers:",
+          workerError,
+        );
+      }
     }
 
     // Ensure keys are loaded/created before signing the first token
@@ -3736,15 +5176,22 @@ async function startServer(
     const sessionTokenTimer = setInterval(signInstanceToken, 30 * 60 * 1000);
     const keyRotationTimer = setInterval(rotateKeys, KEY_ROTATION_MS);
     const backupTimer = startBackupScheduler();
-    const retentionInterval = setInterval(() => {
-        runRetentionFlush(db).catch(err => logger.error('[RETENTION] Scheduled flush error:', err));
-    }, 24 * 60 * 60 * 1000);
+    const retentionInterval = setInterval(
+      () => {
+        runRetentionFlush(db).catch((err) =>
+          logger.error("[RETENTION] Scheduled flush error:", err),
+        );
+      },
+      24 * 60 * 60 * 1000,
+    );
 
-    if (process.env.NODE_ENV !== 'test') {
-        runRetentionFlush(db).catch(err => logger.error('[RETENTION] Initial flush error:', err));
+    if (process.env.NODE_ENV !== "test") {
+      runRetentionFlush(db).catch((err) =>
+        logger.error("[RETENTION] Initial flush error:", err),
+      );
     }
 
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === "test") {
       sessionTokenTimer.unref();
       keyRotationTimer.unref();
       metricsTimer.unref();
@@ -3753,62 +5200,69 @@ async function startServer(
         backupTimer.unref();
       }
       if (db && db._watcher) {
-          db._watcher.unref();
+        db._watcher.unref();
       }
     }
 
-    
     // --- Global Error Handlers ---
 
     // 404 Handler for API routes
-    app.use('/api', (req, res) => {
-        res.status(404).json({ error: 'Not Found' });
+    app.use("/api", (req, res) => {
+      res.status(404).json({ error: "Not Found" });
     });
 
     // Global Error Handler
     // eslint-disable-next-line no-unused-vars
     app.use((err, req, res, next) => {
-        // Handle JSON parsing errors (e.g. invalid JSON in request body)
-        if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-            logger.warn(`[SECURITY] Malformed JSON detected from ${req.ip}`);
-            return res.status(400).json({ error: 'Bad Request: Malformed JSON' });
+      // Handle JSON parsing errors (e.g. invalid JSON in request body)
+      if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+        logger.warn(`[SECURITY] Malformed JSON detected from ${req.ip}`);
+        return res.status(400).json({ error: "Bad Request: Malformed JSON" });
+      }
+
+      // Handle Multer errors
+      if (err instanceof multer.MulterError) {
+        logger.error(`[SERVER] Multer Error: ${err.message}`, err);
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(413).json({ error: "File too large" });
         }
+        return res.status(400).json({ error: err.message });
+      }
 
-        // Handle Multer errors
-        if (err instanceof multer.MulterError) {
-            logger.error(`[SERVER] Multer Error: ${err.message}`, err);
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(413).json({ error: 'File too large' });
-            }
-            return res.status(400).json({ error: err.message });
-        }
+      // Handle CSRF errors
+      if (
+        err.message === "CSRF token missing" ||
+        err.message === "CSRF token mismatch"
+      ) {
+        logger.warn(`[SECURITY] ${err.message} from ${req.ip}`);
+        return res.status(403).json({ error: err.message });
+      }
 
-        // Handle CSRF errors
-        if (err.message === 'CSRF token missing' || err.message === 'CSRF token mismatch') {
-            logger.warn(`[SECURITY] ${err.message} from ${req.ip}`);
-            return res.status(403).json({ error: err.message });
-        }
+      // Handle Stream/Multipart errors (like truncated forms)
+      if (
+        err.message === "Unexpected end of form" ||
+        err.message === "Multipart: Boundary not found"
+      ) {
+        logger.warn(`[SERVER] Form Data Error: ${err.message}`);
+        return res
+          .status(400)
+          .json({ error: "Invalid or truncated form data" });
+      }
 
-        // Handle Stream/Multipart errors (like truncated forms)
-        if (err.message === 'Unexpected end of form' || err.message === 'Multipart: Boundary not found') {
-            logger.warn(`[SERVER] Form Data Error: ${err.message}`);
-            return res.status(400).json({ error: 'Invalid or truncated form data' });
-        }
+      logger.error("[SERVER] Unhandled Error:", err);
 
-        logger.error('[SERVER] Unhandled Error:', err);
+      // Hide stack trace in production (and generally in API responses)
+      const response = {
+        error: "Internal Server Error",
+      };
 
-        // Hide stack trace in production (and generally in API responses)
-        const response = {
-            error: 'Internal Server Error'
-        };
+      // Only include error details in non-production environments if needed for debugging,
+      // but be careful not to leak sensitive info.
+      if (process.env.NODE_ENV !== "production") {
+        response.message = err.message;
+      }
 
-        // Only include error details in non-production environments if needed for debugging,
-        // but be careful not to leak sensitive info.
-        if (process.env.NODE_ENV !== 'production') {
-            response.message = err.message;
-        }
-
-        res.status(500).json(response);
+      res.status(500).json(response);
     });
 
     // Create a close method to gracefully tear down the server instance, timers, and watchers
@@ -3820,10 +5274,10 @@ async function startServer(
       if (backupTimer) clearInterval(backupTimer);
       if (retentionInterval) clearInterval(retentionInterval);
       if (db && db._watcher) {
-          db._watcher.unref();
-          if (db._watcher.close) db._watcher.close();
+        db._watcher.unref();
+        if (db._watcher.close) db._watcher.close();
       }
-      const { closeQueues } = await import('./queueManager.js');
+      const { closeQueues } = await import("./queueManager.js");
       await closeQueues();
     };
 
@@ -3835,18 +5289,15 @@ async function startServer(
         metricsTimer,
         chunkCleanupTimer,
         ...(backupTimer ? [backupTimer] : []),
-        ...(retentionInterval ? [retentionInterval] : [])
+        ...(retentionInterval ? [retentionInterval] : []),
       ],
       bot,
-      close
+      close,
     };
-    
   } catch (error) {
-    await logAndEmailError(error, 'FATAL: Failed to start server');
+    await logAndEmailError(error, "FATAL: Failed to start server");
     process.exit(1);
   }
 }
 
-
 export { startServer };
-
