@@ -2,7 +2,7 @@ import { test, expect } from './test-setup.js';
 
 test.describe('Mobile Responsiveness', () => {
 
-  test('Critical elements should be visible on mobile', async ({ page }) => {
+  test('Critical elements should be visible on mobile', async ({ page, isMobile }) => {
     await page.goto('/');
 
     // Wait for the page to be ready
@@ -25,7 +25,9 @@ test.describe('Mobile Responsiveness', () => {
     await expect(orderHistoryButton).toBeVisible();
     await expect(fileInput).toBeVisible();
     await expect(canvasContainer).toBeVisible();
+    if(isMobile) { await page.click('.mobile-tab-btn[data-tab="art"]', { force: true }); }
     await expect(editingControls).toBeVisible();
+    if(isMobile) { await page.click('.mobile-tab-btn[data-tab="specs"]', { force: true }); }
     await expect(paymentForm).toBeVisible();
   });
 

@@ -770,7 +770,7 @@
                       <span class="text-xs text-gray-500 mb-1">Cut Shape</span>
                       <select
                         id="cutShapeSelect"
-                        class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-[200px]"
+                        class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                       >
                         <option value="trace">Custom Contour</option>
                         <option value="circle">Standard Circle</option>
@@ -813,7 +813,7 @@
                       >
                       <select
                         id="cutTypeSelect"
-                        class="input px-2 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm w-full max-w-[200px]"
+                        class="input px-2 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm w-full"
                       >
                         <option value="die_cut">
                           Die Cut (Through backer)
@@ -1307,13 +1307,13 @@
                     <button
                       type="button"
                       id="decreaseQuantityBtn"
-                      class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-l-md border border-r-0 border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-5 sm:py-2 sm:px-4 rounded-l-md border border-r-0 border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
                       aria-label="Decrease quantity"
                     >
                       -
                     </button>
                     <input
-                      class="input block w-full px-3 py-2 bg-white border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-center z-10"
+                      class="input block w-full px-3 py-3 sm:py-2 bg-white border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-center z-10 min-h-[44px] sm:min-h-0"
                       id="stickerQuantity"
                       name="stickerQuantity"
                       type="number"
@@ -1324,7 +1324,7 @@
                     <button
                       type="button"
                       id="increaseQuantityBtn"
-                      class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-r-md border border-l-0 border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-5 sm:py-2 sm:px-4 rounded-r-md border border-l-0 border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
                       aria-label="Increase quantity"
                     >
                       +
@@ -2208,7 +2208,31 @@
         </div>
       </form>
 
+      <!-- Mobile Sticky Conversion Bar -->
+      <div
+        id="mobile-sticky-conversion"
+        class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 p-3 lg:hidden flex justify-between items-center transition-transform transform translate-y-full"
+      >
+        <div class="flex flex-col">
+          <span
+            class="text-xs text-gray-500 font-semibold uppercase tracking-wider"
+            >Estimated Total</span
+          >
+          <span id="mobileStickyPrice" class="text-lg font-bold text-gray-900"
+            >$0.00</span
+          >
+        </div>
+        <button
+          type="button"
+          id="mobileStickyCheckoutBtn"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-full shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 transition-colors"
+        >
+          Checkout
+        </button>
+      </div>
+
       <!-- Product Creation Modal -->
+
       <div
         id="productModal"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden"
