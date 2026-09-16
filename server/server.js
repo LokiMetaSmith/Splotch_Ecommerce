@@ -47,6 +47,7 @@ import { fileTypeFromFile } from "file-type";
 import { calculateStickerPrice, getDesignDimensions } from "./pricing.js";
 import { calcOrderBreakdown, DEFAULT_SHIPPING_CONFIG } from "./lib/costCalc.js";
 import { logOrderTransition, readAuditLogForOrder } from "./lib/auditLogger.js";
+import { getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from "./lib/telegramReminder.js";
 
 import { Markup } from "telegraf";
 import { getOrderStatusKeyboard } from "./telegramHelpers.js";
@@ -88,7 +89,7 @@ import util from "util";
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
 
-export const FINAL_STATUSES = ["SHIPPED", "CANCELED", "COMPLETED", "DELIVERED"];
+export const FINAL_STATUSES = ["SHIPPED", "CANCELED", "COMPLETED", "DELIVERED", "ARCHIVED"];
 export const VALID_STATUSES = [
   "NEW",
   "ACCEPTED",
@@ -317,7 +318,8 @@ export async function runRetentionFlush(dbInstance, options = {}) {
   for (const order of allOrders) {
     if (
       order.status === "CANCELED" &&
-      (order.shadowDeleted || order.shadowDeletedAt)
+      (order.shadowDeleted || order.shadowDeletedAt) &&
+      !order.isArchived
     ) {
       const canceledTime = order.shadowDeletedAt
         ? new Date(order.shadowDeletedAt).getTime()
@@ -325,16 +327,17 @@ export async function runRetentionFlush(dbInstance, options = {}) {
 
       if (now - canceledTime >= retentionMs) {
         logger.info(
-          `[RETENTION] Purging canceled order ${order.orderId} older than ${retentionDays} days.`,
+          `[RETENTION] Archiving canceled order ${order.orderId} older than ${retentionDays} days (preserving non-critical metadata).`,
         );
 
-        // Non-volatile audit log record of permanent purge
+        // Non-volatile audit log record of permanent archive
         logOrderTransition({
           orderId: order.orderId,
+          order,
           fromStatus: "CANCELED",
-          toStatus: "PURGED",
+          toStatus: "ARCHIVED",
           actor: { type: "system", id: "retention_worker" },
-          note: `Order purged after ${retentionDays}-day retention window`,
+          note: `Order archived after ${retentionDays}-day retention window (all order metadata, pricing, contact, and specs preserved)`,
           metadata: {
             snapshot: {
               amount: order.amount,
@@ -345,7 +348,11 @@ export async function runRetentionFlush(dbInstance, options = {}) {
           },
         });
 
-        // Optional artwork purge
+        // Mark as archived so order and all non-critical metadata are persistently preserved
+        order.isArchived = true;
+        order.archivedAt = new Date().toISOString();
+
+        // Optional artwork purge: frees disk space while keeping all order metadata
         if (purgeArtwork) {
           try {
             const filesToPurge = [];
@@ -364,11 +371,12 @@ export async function runRetentionFlush(dbInstance, options = {}) {
                 if (fs.existsSync(absPath)) {
                   fs.unlinkSync(absPath);
                   logger.info(
-                    `[RETENTION] Purged artwork file ${absPath} for order ${order.orderId}`,
+                    `[RETENTION] Purged heavy artwork file ${absPath} for order ${order.orderId}`,
                   );
                 }
               }
             }
+            order.artworkPruned = true;
           } catch (fileErr) {
             logger.error(
               `[RETENTION] Error purging artwork for order ${order.orderId}:`,
@@ -377,19 +385,21 @@ export async function runRetentionFlush(dbInstance, options = {}) {
           }
         }
 
-        if (typeof dbInstance.deleteOrder === "function") {
-          await dbInstance.deleteOrder(order.orderId);
-        } else if (lowdb?.data?.orders?.[order.orderId]) {
-          delete lowdb.data.orders[order.orderId];
-          if (typeof dbInstance.write === "function") await dbInstance.write();
-          else if (typeof lowdb.write === "function") await lowdb.write();
+        // Persist the updated archived order in the database (never delete it!)
+        if (typeof dbInstance.updateOrder === "function") {
+          await dbInstance.updateOrder(order);
+        } else if (typeof dbInstance.write === "function") {
+          await dbInstance.write();
+        } else if (typeof lowdb.write === "function") {
+          await lowdb.write();
         }
+
         flushedOrderIds.push(order.orderId);
       }
     }
   }
 
-  return { flushedCount: flushedOrderIds.length, flushedOrderIds };
+  return { flushedCount: flushedOrderIds.length, flushedOrderIds, archivedCount: flushedOrderIds.length };
 }
 
 // Define an async function to contain all server logic
@@ -538,7 +548,7 @@ async function startServer(
     logger.info("[SERVER] LowDB database initialized at:", dbPath);
 
     // Load the refresh token from the database if it exists
-    const config = await db.getConfig();
+    const config = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
     if (config?.google_refresh_token) {
       oauth2Client.setCredentials({
         refresh_token: config.google_refresh_token,
@@ -562,7 +572,12 @@ async function startServer(
           location_dest_id: getSecret("ODOO_LOCATION_DEST_ID"),
         },
       };
-      await db.setConfig("odoo", odooConfig);
+      if (typeof db.setConfig === "function") {
+        await db.setConfig("odoo", odooConfig);
+      } else if (db.data) {
+        if (!db.data.config) db.data.config = {};
+        db.data.config.odoo = odooConfig;
+      }
       logger.info(
         "[SERVER] Odoo configuration seeded from environment variables.",
       );
@@ -1352,16 +1367,45 @@ async function startServer(
           return res.status(403).json({ error: "Forbidden" });
         const creds = wooCommerceModule.getCredentials();
         const baseUrl = `${req.protocol}://${req.get("host")}`;
+        const lowdb = db.db || db;
+        const autoSync = lowdb.data?.config?.woocommerce?.autoSync !== false;
         res.json({
           success: true,
           storeUrl: baseUrl,
           consumerKey: creds.consumerKey,
           consumerSecret: creds.consumerSecret,
+          autoSync,
           endpoints: {
             discovery: `${baseUrl}/wp-json/wc/v3`,
             orders: `${baseUrl}/wp-json/wc/v3/orders`,
           },
         });
+      },
+    );
+
+    app.post(
+      "/api/admin/integrations/pirateship/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
+
+        const { autoSync } = req.body;
+        if (typeof autoSync !== "boolean") {
+          return res.status(400).json({ error: "autoSync must be a boolean." });
+        }
+
+        const lowdb = db.db || db;
+        if (!lowdb.data) lowdb.data = {};
+        if (!lowdb.data.config) lowdb.data.config = {};
+        if (!lowdb.data.config.woocommerce) lowdb.data.config.woocommerce = {};
+        lowdb.data.config.woocommerce.autoSync = autoSync;
+
+        if (typeof db.write === "function") await db.write();
+        else if (typeof lowdb.write === "function") await lowdb.write();
+
+        logger.info(`[WOOCOMMERCE] Updated Pirate Ship autoSync: ${autoSync}`);
+        res.json({ success: true, autoSync });
       },
     );
 
@@ -1374,12 +1418,16 @@ async function startServer(
         const newKey = `ck_splotch_${crypto.randomBytes(8).toString("hex")}`;
         const newSecret = `cs_splotch_${crypto.randomBytes(8).toString("hex")}`;
 
-        if (!db.data.config) db.data.config = {};
-        db.data.config.woocommerce = {
+        const lowdb = db.db || db;
+        if (!lowdb.data) lowdb.data = {};
+        if (!lowdb.data.config) lowdb.data.config = {};
+        lowdb.data.config.woocommerce = {
+          ...(lowdb.data.config.woocommerce || {}),
           consumerKey: newKey,
           consumerSecret: newSecret,
         };
-        await db.write();
+        if (typeof db.write === "function") await db.write();
+        else if (typeof lowdb.write === "function") await lowdb.write();
 
         const baseUrl = `${req.protocol}://${req.get("host")}`;
         logger.info("[WOOCOMMERCE] Regenerated Pirate Ship credentials");
@@ -1388,6 +1436,7 @@ async function startServer(
           storeUrl: baseUrl,
           consumerKey: newKey,
           consumerSecret: newSecret,
+          autoSync: lowdb.data.config.woocommerce.autoSync !== false,
         });
       },
     );
@@ -2478,6 +2527,10 @@ async function startServer(
             customLayers: orderDetails.customLayers || [],
             numImageLayers: orderDetails.numImageLayers || 1,
             deliveryMethod: deliveryMethod,
+            dimensions: orderDetails.dimensions || null,
+            size: orderDetails.size || null,
+            cutType: orderDetails.cutType || "die_cut",
+            stickerName: orderDetails.stickerName || null,
           };
 
           // --- Product / Creator Payout Logic ---
@@ -2773,6 +2826,10 @@ async function startServer(
               1,
             );
             sizeNote = ` (${wIn}" x ${hIn}")`;
+            inputSafeOrderDetails.size = `${wIn}" × ${hIn}"`;
+            inputSafeOrderDetails.widthInches = Number(wIn);
+            inputSafeOrderDetails.heightInches = Number(hIn);
+            inputSafeOrderDetails.dimensions = designBounds;
           }
 
           const squareLineItems = [
@@ -3626,9 +3683,14 @@ async function startServer(
         if (status === "CANCELED") {
           order.shadowDeleted = true;
           order.shadowDeletedAt = new Date().toISOString();
-        } else if (oldStatus === "CANCELED") {
+        } else if (status === "ARCHIVED") {
+          order.isArchived = true;
+          order.archivedAt = new Date().toISOString();
+        } else if (oldStatus === "CANCELED" || oldStatus === "ARCHIVED") {
           order.shadowDeleted = false;
           order.shadowDeletedAt = null;
+          order.isArchived = false;
+          order.archivedAt = null;
         }
 
         if (status === "SHIPPED") {
@@ -3687,6 +3749,7 @@ async function startServer(
             }
           }
           delete order.stalledMessageId;
+          delete order.lastStalledAlertAt;
         }
 
         await db.updateOrder(order);
@@ -3965,9 +4028,14 @@ async function startServer(
               if (status === "CANCELED") {
                 order.shadowDeleted = true;
                 order.shadowDeletedAt = new Date().toISOString();
-              } else if (oldStatus === "CANCELED") {
+              } else if (status === "ARCHIVED") {
+                order.isArchived = true;
+                order.archivedAt = new Date().toISOString();
+              } else if (oldStatus === "CANCELED" || oldStatus === "ARCHIVED") {
                 order.shadowDeleted = false;
                 order.shadowDeletedAt = null;
+                order.isArchived = false;
+                order.archivedAt = null;
               }
 
               if (oldStatus !== status) {
@@ -4000,6 +4068,7 @@ async function startServer(
                   }
                 }
                 delete order.stalledMessageId;
+                delete order.lastStalledAlertAt;
               }
 
               await db.updateOrder(order);
@@ -4158,6 +4227,123 @@ async function startServer(
       },
     );
 
+    // --- Order Shipping Label & Package Dimensions ---
+    app.post(
+      "/api/orders/:orderId/order-label",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+
+        const { orderId } = req.params;
+        const order = await db.getOrder(orderId);
+        if (!order) {
+          return res.status(404).json({ error: "Order not found." });
+        }
+
+        const { weightOz, length, width, height } = req.body || {};
+
+        if (weightOz !== undefined && weightOz !== null && weightOz !== "") {
+          const parsedWeight = Number(weightOz);
+          if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+            return res.status(400).json({ error: "weightOz must be a positive number." });
+          }
+          order.packageWeightOz = parsedWeight;
+        }
+
+        if (length !== undefined || width !== undefined || height !== undefined) {
+          const parsedL = Number(length) || order.packageDimensions?.length || 6;
+          const parsedW = Number(width) || order.packageDimensions?.width || 4;
+          const parsedH = Number(height) || order.packageDimensions?.height || 0.5;
+          if (parsedL <= 0 || parsedW <= 0 || parsedH <= 0) {
+            return res.status(400).json({ error: "Package dimensions must be positive numbers." });
+          }
+          order.packageDimensions = { length: parsedL, width: parsedW, height: parsedH };
+        }
+
+        order.exportToPirateship = true;
+        order.labelRequested = true;
+        order.labelRequestedAt = new Date().toISOString();
+
+        // Check if EasyPost can generate label directly
+        let easyPostGenerated = false;
+        const easyPostKey = getSecret("EASYPOST_API_KEY");
+        if (easyPostKey) {
+          try {
+            const EasyPostPkg = await import("@easypost/api");
+            const EasyPost = EasyPostPkg.default?.default || EasyPostPkg.default || EasyPostPkg;
+            const client = new EasyPost(easyPostKey);
+
+            const toAddress = {
+              name: `${order.shippingContact?.givenName || ""} ${order.shippingContact?.familyName || ""}`.trim() || "Customer",
+              street1: order.shippingContact?.addressLines?.[0] || "",
+              street2: order.shippingContact?.addressLines?.[1] || undefined,
+              city: order.shippingContact?.locality || order.shippingContact?.city || "",
+              state: order.shippingContact?.administrativeDistrictLevel1 || order.shippingContact?.state || "",
+              zip: order.shippingContact?.postalCode || "",
+              country: order.shippingContact?.country || "US",
+            };
+
+            const fromAddress = {
+              name: "Splotch Print Shop",
+              street1: getSecret("RETURN_STREET1") || "123 Main St",
+              city: getSecret("RETURN_CITY") || "Oklahoma City",
+              state: getSecret("RETURN_STATE") || "OK",
+              zip: getSecret("RETURN_ZIP") || "73102",
+              country: "US",
+            };
+
+            const parcel = {
+              weight: order.packageWeightOz || 1.0,
+              length: order.packageDimensions?.length || 6,
+              width: order.packageDimensions?.width || 4,
+              height: order.packageDimensions?.height || 0.5,
+            };
+
+            const shipment = await client.Shipment.create({
+              to_address: toAddress,
+              from_address: fromAddress,
+              parcel: parcel,
+            });
+
+            if (shipment.rates && shipment.rates.length > 0) {
+              const lowestRate = client.Utils.getLowestRate(shipment.rates);
+              const boughtShipment = await client.Shipment.buy(shipment.id, lowestRate.id);
+              if (boughtShipment.tracking_code) {
+                order.trackingNumber = boughtShipment.tracking_code;
+                order.courier = boughtShipment.selected_rate?.carrier || "USPS";
+                order.labelUrl = boughtShipment.postage_label?.label_url || null;
+                easyPostGenerated = true;
+                logger.info(`[SHIPPING] Purchased EasyPost label for order ${orderId}: ${order.trackingNumber}`);
+              }
+            }
+          } catch (epError) {
+            logger.warn(`[SHIPPING] EasyPost label generation skipped/failed: ${epError.message}`);
+          }
+        }
+
+        await db.updateOrder(order);
+        logger.info(
+          `[SHIPPING] Order label requested for order ${orderId}. Weight: ${order.packageWeightOz}oz, Dimensions: ${JSON.stringify(order.packageDimensions)}`,
+        );
+
+        res.json({
+          success: true,
+          orderId,
+          labelRequested: true,
+          exportToPirateship: true,
+          packageWeightOz: order.packageWeightOz,
+          packageDimensions: order.packageDimensions,
+          trackingNumber: order.trackingNumber || null,
+          labelUrl: order.labelUrl || null,
+          easyPostGenerated,
+        });
+      },
+    );
+
     // --- Order Audit History & Retention Endpoints ---
     app.get(
       "/api/orders/:orderId/history",
@@ -4182,6 +4368,9 @@ async function startServer(
           orderId,
           history,
           isPurged: !order,
+          isArchived: !!order?.isArchived,
+          archivedAt: order?.archivedAt || null,
+          artworkPruned: !!order?.artworkPruned,
           shadowDeleted: !!order?.shadowDeleted,
           shadowDeletedAt: order?.shadowDeletedAt || null,
         });
@@ -4202,12 +4391,14 @@ async function startServer(
           purgeArtworkOnFlush: false,
         };
         const allOrders = Object.values(lowdb?.data?.orders || {});
-        const canceledOrders = allOrders.filter((o) => o.status === "CANCELED");
+        const canceledOrders = allOrders.filter((o) => o.status === "CANCELED" && !o.isArchived);
+        const archivedOrders = allOrders.filter((o) => o.isArchived || o.status === "ARCHIVED");
 
         res.json({
           purgeArtworkOnFlush: !!retentionConfig.purgeArtworkOnFlush,
           retentionDays: 30,
           canceledOrdersCount: canceledOrders.length,
+          archivedOrdersCount: archivedOrders.length,
         });
       },
     );
@@ -4258,6 +4449,102 @@ async function startServer(
             : 30;
         const result = await runRetentionFlush(db, { retentionDays });
         res.json({ success: true, ...result });
+      },
+    );
+
+    // --- Telegram Alert / Reminder Configuration ---
+    app.get(
+      "/api/admin/telegram/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+        const lowdb = db.db || db;
+        const config = getTelegramConfig(lowdb);
+        res.json(config);
+      },
+    );
+
+    app.post(
+      "/api/admin/telegram/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res
+            .status(403)
+            .json({ error: "Forbidden: Admin access required." });
+        }
+
+        const {
+          enabled,
+          stalledThresholdHours,
+          checkIntervalMinutes,
+          repeatReminderHours,
+        } = req.body;
+
+        if (enabled !== undefined && typeof enabled !== "boolean") {
+          return res.status(400).json({ error: "enabled must be a boolean." });
+        }
+
+        const parsedThreshold =
+          stalledThresholdHours !== undefined ? Number(stalledThresholdHours) : undefined;
+        if (
+          parsedThreshold !== undefined &&
+          (!Number.isFinite(parsedThreshold) || parsedThreshold <= 0 || parsedThreshold > 168)
+        ) {
+          return res.status(400).json({
+            error: "stalledThresholdHours must be a positive number up to 168 (1 week).",
+          });
+        }
+
+        const parsedInterval =
+          checkIntervalMinutes !== undefined ? Number(checkIntervalMinutes) : undefined;
+        if (
+          parsedInterval !== undefined &&
+          (!Number.isFinite(parsedInterval) || parsedInterval < 1 || parsedInterval > 1440)
+        ) {
+          return res.status(400).json({
+            error: "checkIntervalMinutes must be between 1 and 1440 (24 hours).",
+          });
+        }
+
+        const parsedRepeat =
+          repeatReminderHours !== undefined ? Number(repeatReminderHours) : undefined;
+        if (
+          parsedRepeat !== undefined &&
+          (!Number.isFinite(parsedRepeat) || parsedRepeat < 0 || parsedRepeat > 168)
+        ) {
+          return res.status(400).json({
+            error: "repeatReminderHours must be a number between 0 and 168.",
+          });
+        }
+
+        const lowdb = db.db || db;
+        if (!lowdb.data) lowdb.data = {};
+        if (!lowdb.data.config) lowdb.data.config = {};
+        const currentConfig = getTelegramConfig(lowdb);
+
+        lowdb.data.config.telegram = {
+          enabled: enabled !== undefined ? enabled : currentConfig.enabled,
+          stalledThresholdHours:
+            parsedThreshold !== undefined ? parsedThreshold : currentConfig.stalledThresholdHours,
+          checkIntervalMinutes:
+            parsedInterval !== undefined ? parsedInterval : currentConfig.checkIntervalMinutes,
+          repeatReminderHours:
+            parsedRepeat !== undefined ? parsedRepeat : currentConfig.repeatReminderHours,
+        };
+
+        if (typeof db.write === "function") await db.write();
+        else if (typeof lowdb.write === "function") await lowdb.write();
+
+        logger.info(
+          `[TELEGRAM] Updated Telegram alert config: ${JSON.stringify(lowdb.data.config.telegram)}`,
+        );
+
+        res.json({ success: true, telegram: lowdb.data.config.telegram });
       },
     );
 
@@ -5283,6 +5570,7 @@ async function startServer(
 
     return {
       app,
+      db,
       timers: [
         sessionTokenTimer,
         keyRotationTimer,

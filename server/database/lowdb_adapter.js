@@ -69,7 +69,7 @@ export class LowDbAdapter {
 
         this._ensureStructure();
 
-        this.FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+        this.FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED', 'ARCHIVED'];
     }
 
     _ensureStructure() {
@@ -136,7 +136,7 @@ export class LowDbAdapter {
 
     // --- Helper to manage caches ---
     _updateCaches(order, oldStatus) {
-        const isFinal = this.FINAL_STATUSES.includes(order.status);
+        const isFinal = this.FINAL_STATUSES.includes(order.status) || !!order.isArchived;
         const wasFinal = oldStatus ? this.FINAL_STATUSES.includes(oldStatus) : false;
 
         // Active Orders
@@ -231,7 +231,7 @@ export class LowDbAdapter {
 
         // Active Orders
         if (this.db.activeOrders) {
-            const isFinal = this.FINAL_STATUSES.includes(order.status);
+            const isFinal = this.FINAL_STATUSES.includes(order.status) || !!order.isArchived;
             const idx = this.db.activeOrders.findIndex(o => o.orderId === order.orderId);
             if (idx !== -1) {
                 if (isFinal) {
@@ -251,10 +251,40 @@ export class LowDbAdapter {
         return order;
     }
 
-    async deleteOrder(id) {
+    async archiveOrder(id) {
+        if (!this.db.data.orders || !this.db.data.orders[id]) return null;
+        const order = this.db.data.orders[id];
+        order.isArchived = true;
+        order.archivedAt = new Date().toISOString();
+
+        // Active Orders cache cleanup
+        if (this.db.activeOrders) {
+            const idx = this.db.activeOrders.findIndex(o => o.orderId === id);
+            if (idx !== -1) this.db.activeOrders.splice(idx, 1);
+        }
+
+        await this.write();
+        return order;
+    }
+
+    async deleteOrder(id, hard = false) {
         if (!this.db.data.orders || !this.db.data.orders[id]) return false;
         const order = this.db.data.orders[id];
-        delete this.db.data.orders[id];
+
+        if (hard) {
+            delete this.db.data.orders[id];
+            if (this.db.userOrderIndex && order.billingContact?.email) {
+                const email = order.billingContact.email;
+                if (this.db.userOrderIndex[email]) {
+                    const idx = this.db.userOrderIndex[email].findIndex(o => o.orderId === id);
+                    if (idx !== -1) this.db.userOrderIndex[email].splice(idx, 1);
+                }
+            }
+        } else {
+            // Soft delete: archive order and retain all non-critical metadata & specs
+            order.isArchived = true;
+            order.archivedAt = new Date().toISOString();
+        }
 
         // Cache cleanup
         if (this.db.activeOrders) {
@@ -264,13 +294,6 @@ export class LowDbAdapter {
         if (this.db.shippedOrders) {
             const idx = this.db.shippedOrders.findIndex(o => o.orderId === id);
             if (idx !== -1) this.db.shippedOrders.splice(idx, 1);
-        }
-        if (this.db.userOrderIndex && order.billingContact?.email) {
-            const email = order.billingContact.email;
-            if (this.db.userOrderIndex[email]) {
-                const idx = this.db.userOrderIndex[email].findIndex(o => o.orderId === id);
-                if (idx !== -1) this.db.userOrderIndex[email].splice(idx, 1);
-            }
         }
 
         await this.write();
@@ -284,7 +307,7 @@ export class LowDbAdapter {
 
     _ensureActiveCache() {
         if (!this.db.activeOrders) {
-            this.db.activeOrders = Object.values(this.db.data.orders).filter(o => !this.FINAL_STATUSES.includes(o.status));
+            this.db.activeOrders = Object.values(this.db.data.orders).filter(o => !this.FINAL_STATUSES.includes(o.status) && !o.isArchived);
         }
     }
 
@@ -357,7 +380,7 @@ export class LowDbAdapter {
 
          // Active Orders
          if (this.db.activeOrders) {
-             const isFinal = this.FINAL_STATUSES.includes(order.status);
+              const isFinal = this.FINAL_STATUSES.includes(order.status) || !!order.isArchived;
              // We don't know if it WAS final without oldStatus.
              // If we don't have oldStatus, we might have to scan?
              // Or just remove and re-add?

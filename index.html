@@ -104,8 +104,26 @@
         color: #713f12;
         margin: 1rem auto;
         max-width: 800px;
+        position: relative;
       "
     >
+      <button
+        id="dismiss-adblock-warning-btn"
+        type="button"
+        style="
+          position: absolute;
+          top: 0.5rem;
+          right: 0.75rem;
+          background: transparent;
+          border: none;
+          font-size: 1.25rem;
+          line-height: 1;
+          font-weight: bold;
+          color: #713f12;
+          cursor: pointer;
+        "
+        aria-label="Dismiss payment blocker warning"
+      >&times;</button>
       <p style="font-weight: bold">Payment Form Blocked 🛡️</p>
       <p>
         It looks like an ad blocker is preventing our secure payment form from

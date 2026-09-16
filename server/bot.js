@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { getSecret } from './secretManager.js';
-import { getOrderStatusKeyboard } from './telegramHelpers.js';
+import { getOrderStatusKeyboard, formatOrderPrintDetails, getOrderJobUrl } from './telegramHelpers.js';
 import logger from './logger.js';
 import { escapeHtml } from './utils.js';
 import { LowDbAdapter } from './database/lowdb_adapter.js';
@@ -79,9 +79,17 @@ function initializeBot(db, { startPolling = true } = {}) {
         // SECURITY: Use HTML mode for safer rendering.
         let list = `<b>${title}:</b>\n\n`;
         orders.forEach(order => {
+          const details = order.orderDetails || {};
+          let sizeStr = details.size || (details.widthInches && details.heightInches ? `${details.widthInches}"×${details.heightInches}"` : '');
+          const resStr = details.resolution ? (details.resolution.startsWith?.('dpi_') ? `${details.resolution.replace('dpi_', '')} DPI` : details.resolution) : '300 DPI';
+          const jobUrl = getOrderJobUrl(order, getSecret('BASE_URL'));
           list += `• <b>Order ID:</b> <code>${order.orderId}</code>\n`;
           list += `  <b>Status:</b> ${order.status}\n`;
-          list += `  <b>Customer:</b> ${order.billingContact.givenName} ${order.billingContact.familyName}\n\n`;
+          list += `  <b>Customer:</b> ${escapeHtml(order.billingContact?.givenName || '')} ${escapeHtml(order.billingContact?.familyName || '')}\n`;
+          if (sizeStr) list += `  <b>Size:</b> ${escapeHtml(sizeStr)} | <b>Resolution:</b> ${escapeHtml(resStr)}\n`;
+          else list += `  <b>Resolution:</b> ${escapeHtml(resStr)}\n`;
+          if (jobUrl) list += `  <b>Job:</b> <a href="${jobUrl}">Open in Printshop</a>\n`;
+          list += `\n`;
         });
 
         ctx.replyWithHTML(list)
@@ -167,9 +175,14 @@ function initializeBot(db, { startPolling = true } = {}) {
           if (newStatus === 'CANCELED') {
             order.shadowDeleted = true;
             order.shadowDeletedAt = new Date().toISOString();
-          } else if (oldStatus === 'CANCELED') {
+          } else if (newStatus === 'ARCHIVED') {
+            order.isArchived = true;
+            order.archivedAt = new Date().toISOString();
+          } else if (oldStatus === 'CANCELED' || oldStatus === 'ARCHIVED') {
             order.shadowDeleted = false;
             order.shadowDeletedAt = null;
+            order.isArchived = false;
+            order.archivedAt = null;
           }
 
           if (oldStatus !== newStatus) {
@@ -206,16 +219,19 @@ ${fulfillmentLine}
 ${completedOrLater.includes(newStatus) ? '✅' : '⬜️'} Completed
             `;
 
+          const printDetails = formatOrderPrintDetails(order, getSecret('BASE_URL'));
           const message = `
 Order: ${order.orderId}
-Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
-Email: ${order.billingContact.email}
-Quantity: ${order.orderDetails.quantity}
+Customer: ${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}
+Email: ${order.billingContact?.email || ''}
+Quantity: ${order.orderDetails?.quantity || 0}
 Amount: $${(order.amount / 100).toFixed(2)}
 
+${printDetails}
+
 ${statusChecklist}
-            `;
-          const keyboard = getOrderStatusKeyboard(order);
+          `.trim();
+          const keyboard = getOrderStatusKeyboard(order, getSecret('BASE_URL'));
           ctx.editMessageText(message, { reply_markup: keyboard });
         }
       }

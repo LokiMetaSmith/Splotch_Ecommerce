@@ -1,4 +1,4 @@
-import { getOrderStatusKeyboard } from './telegramHelpers.js';
+import { getOrderStatusKeyboard, formatOrderPrintDetails } from './telegramHelpers.js';
 import { getSecret } from './secretManager.js';
 import logger from './logger.js';
 import path from 'path';
@@ -39,16 +39,19 @@ ${printingOrLater.includes(order.status) ? '✅' : '⬜️'} Printing
 ${fulfillmentLine}
 ${completedOrLater.includes(order.status) ? '✅' : '⬜️'} Completed
 `;
+    const printDetails = formatOrderPrintDetails(order, getSecret('BASE_URL'));
     const message = `
 New Order: ${order.orderId}
-Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
-Email: ${order.billingContact.email}
-Quantity: ${order.orderDetails.quantity}
+Customer: ${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}
+Email: ${order.billingContact?.email || ''}
+Quantity: ${order.orderDetails?.quantity || 0}
 Amount: $${(order.amount / 100).toFixed(2)}
 
+${printDetails}
+
 ${statusChecklist}
-  `;
-    const keyboard = getOrderStatusKeyboard(order);
+  `.trim();
+    const keyboard = getOrderStatusKeyboard(order, getSecret('BASE_URL'));
     const sentMessage = await bot.telegram.sendMessage(CHANNEL_ID, message, { reply_markup: keyboard });
 
     // Save message ID immediately to DB to avoid race condition with status updates
@@ -130,15 +133,18 @@ ${printingOrLater.includes(order.status) ? '✅' : '⬜️'} Printing
 ${fulfillmentLine}
 ${completedOrLater.includes(order.status) ? '✅' : '⬜️'} Completed
     `;
+    const printDetails = formatOrderPrintDetails(order, getSecret('BASE_URL'));
     const message = `
 Order: ${order.orderId}
-Customer: ${order.billingContact.givenName} ${order.billingContact.familyName}
-Email: ${order.billingContact.email}
+Customer: ${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}
+Email: ${order.billingContact?.email || ''}
 Quantity: ${order.orderDetails?.quantity || 0}
 Amount: $${(order.amount / 100).toFixed(2)}
 
+${printDetails}
+
 ${statusChecklist}
-    `;
+    `.trim();
 
     if (order.status === 'COMPLETED' || order.status === 'CANCELED') {
         // Use catch to avoid failing the job if message is already deleted
@@ -150,7 +156,7 @@ ${statusChecklist}
             await bot.telegram.deleteMessage(CHANNEL_ID, order.telegramCutLineMessageId).catch(e => logger.warn('[NOTIFICATION] Failed to delete cut line document:', e.message));
         }
     } else {
-        const keyboard = getOrderStatusKeyboard(order);
+        const keyboard = getOrderStatusKeyboard(order, getSecret('BASE_URL'));
         await bot.telegram.editMessageText(
             CHANNEL_ID,
             order.telegramMessageId,

@@ -23,6 +23,7 @@ let JWKS; // To hold the remote key set verifier
 const svgCache = new Map(); // Cache for SVG strings to avoid redundant fetches
 let currentViewMode = localStorage.getItem('splotchViewMode') || 'card';
 let currentPricingConfig = {};
+let pirateShipAutoSync = true;
 
 // Pagination state
 let currentPage = 1;
@@ -710,8 +711,12 @@ function filterAndDisplayOrders(status) {
     status === "ALL"
       ? allOrders
       : status === "ACTIVE"
-      ? allOrders.filter((order) => order.status !== "COMPLETED" && order.status !== "CANCELED")
-      : allOrders.filter((order) => order.status === status);
+      ? allOrders.filter((order) => order.status !== "COMPLETED" && order.status !== "CANCELED" && order.status !== "ARCHIVED" && !order.isArchived)
+      : status === "ARCHIVED"
+      ? allOrders.filter((order) => order.isArchived || order.status === "ARCHIVED")
+      : status === "CANCELED"
+      ? allOrders.filter((order) => order.status === "CANCELED" && !order.isArchived)
+      : allOrders.filter((order) => order.status === status && !order.isArchived);
 
 
   const noOrdersText = document.getElementById("no-orders-text");
@@ -842,6 +847,7 @@ function displayOrderRow(order) {
     "DELIVERED",
     "COMPLETED",
     "CANCELED",
+    "ARCHIVED",
   ];
   const statusColors = {
     NEW: "bg-blue-100 text-blue-800",
@@ -852,6 +858,7 @@ function displayOrderRow(order) {
     DELIVERED: "bg-green-100 text-green-800",
     COMPLETED: "bg-gray-100 text-gray-800",
     CANCELED: "bg-red-100 text-red-800",
+    ARCHIVED: "bg-gray-200 text-gray-800",
   };
   const alert = getOrderAlert(order);
   const alertHtml = alert ? `<div class="inline-flex items-center gap-1 mt-1 text-[10px] px-1.5 py-0.5 rounded border ${alert.classes}">${alert.icon} ${alert.text}</div>` : "";
@@ -861,14 +868,16 @@ function displayOrderRow(order) {
 
   const formatStatusLabel = (s) => s === "HOLD_FOR_PICKUP" ? "Hold for Pickup" : (s.charAt(0) + s.slice(1).toLowerCase());
 
-  let canceledRetentionBadge = "";
-  if (order.status === "CANCELED") {
+  let retentionBadge = "";
+  if (order.isArchived || order.status === "ARCHIVED") {
+    retentionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-300" title="Order is archived. All order metadata, specifications, and history are preserved.${order.artworkPruned ? ' Artwork files pruned.' : ''}">Archived${order.artworkPruned ? ' (Pruned)' : ''}</span>`;
+  } else if (order.status === "CANCELED") {
     const canceledTime = order.shadowDeletedAt
       ? new Date(order.shadowDeletedAt).getTime()
       : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
     const elapsedDays = Math.floor((Date.now() - canceledTime) / (24 * 60 * 60 * 1000));
     const remainingDays = Math.max(0, 30 - elapsedDays);
-    canceledRetentionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-800 border border-red-200" title="Canceled orders are automatically purged after 30 days">Purges in ${remainingDays}d</span>`;
+    retentionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200" title="Canceled orders are automatically archived after 30 days. Order metadata is permanently preserved.">Archives in ${remainingDays}d</span>`;
   }
 
   const dropdownHtml = `
@@ -896,12 +905,18 @@ function displayOrderRow(order) {
       <td class="px-4 py-3">
         <div class="font-medium text-gray-900">${billingName}</div>
         <div class="text-xs text-gray-500"><a href="mailto:${billingEmail}" class="hover:underline">${billingEmail}</a></div>
+        <div class="mt-1">
+          <button type="button" class="copy-address-btn text-[11px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy formatted shipping address">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            Copy Address
+          </button>
+        </div>
       </td>
       <td class="px-4 py-3">
         <div class="flex items-center gap-2">
             ${designImagePath && order.designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
                 <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
-            </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">N/A</div>`}
+            </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[10px] text-gray-500 font-semibold text-center leading-tight p-1">${order.artworkPruned ? 'Pruned' : 'N/A'}</div>`}
             <div>
                 <div class="text-xs font-semibold">Qty: ${quantity}</div>
                 ${cutFilePath ? `<a href="${serverPrefix}${cutFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block mt-1">Download SVG</a>` : ""}
@@ -913,12 +928,18 @@ function displayOrderRow(order) {
         <div class="flex flex-col gap-2">
             ${dropdownHtml}
             <div class="flex items-center gap-1.5 mt-0.5">
-                ${canceledRetentionBadge}
+                ${retentionBadge}
                 <button type="button" class="view-order-history-btn px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[11px] font-semibold border border-gray-300 flex items-center gap-1 shadow-sm transition-colors" data-order-id="${orderId}">
                     <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     History
                 </button>
             </div>
+            ${order.exportToPirateship || order.labelRequested ? `
+              <div class="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-1 w-fit">
+                <span class="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
+                Queued for Pirate Ship
+              </div>
+            ` : ""}
 
             <div class="mt-2 text-xs flex flex-col gap-1 tracking-inputs" style="display: ${order.status === 'SHIPPED' || order.status === 'DELIVERED' || order.status === 'COMPLETED' ? 'flex' : 'none'};" data-order-id="${orderId}">
                <select class="border rounded p-1 tracking-courier bg-white" data-order-id="${orderId}">
@@ -987,6 +1008,7 @@ export function displayOrder(order) {
     DELIVERED: "bg-green-100 text-green-800",
     COMPLETED: "bg-gray-100 text-gray-800",
     CANCELED: "bg-red-100 text-red-800",
+    ARCHIVED: "bg-gray-200 text-gray-800",
   };
   const alert = getOrderAlert(order);
   const alertHtml = alert ? `<span class="inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded border ${alert.classes}">${alert.icon} ${alert.text}</span>` : "";
@@ -1013,6 +1035,7 @@ export function displayOrder(order) {
     "DELIVERED",
     "COMPLETED",
     "CANCELED",
+    "ARCHIVED",
   ];
   const formatStatusLabel = (s) => s === "HOLD_FOR_PICKUP" ? "Hold for Pickup" : (s.charAt(0) + s.slice(1).toLowerCase());
   const dropdownHtml = `
@@ -1032,16 +1055,79 @@ export function displayOrder(order) {
     ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Local Pickup</span>`
     : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">Ship to Address</span>`;
 
-  let canceledRetentionBadge = "";
+  let retentionBadge = "";
 
-  if (status === "CANCELED") {
+  if (order.isArchived || status === "ARCHIVED") {
+    retentionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-300 shadow-sm" title="Order is archived. All order specifications, pricing, and history are preserved.${order.artworkPruned ? ' Artwork files pruned.' : ''}">Archived${order.artworkPruned ? ' (Pruned)' : ''}</span>`;
+  } else if (status === "CANCELED") {
     const canceledTime = order.shadowDeletedAt
       ? new Date(order.shadowDeletedAt).getTime()
       : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
     const elapsedDays = Math.floor((Date.now() - canceledTime) / (24 * 60 * 60 * 1000));
     const remainingDays = Math.max(0, 30 - elapsedDays);
-    canceledRetentionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800 border border-red-200 shadow-sm" title="Canceled orders are automatically purged after 30 days">Purges in ${remainingDays}d</span>`;
+    retentionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 shadow-sm" title="Canceled orders are automatically archived after 30 days. Order metadata is permanently preserved.">Archives in ${remainingDays}d</span>`;
   }
+
+  const isShippable = !isLocalPickup && status !== "CANCELED" && status !== "COMPLETED" && status !== "DELIVERED" && status !== "ARCHIVED" && !order.isArchived;
+  const defaultWeight = order.packageWeightOz ?? (order.orderDetails?.quantity ? Math.max(1, Math.round(order.orderDetails.quantity * 0.05 * 10) / 10) : 1);
+  const defaultLength = order.packageDimensions?.length ?? 6;
+  const defaultWidth = order.packageDimensions?.width ?? 4;
+  const defaultHeight = order.packageDimensions?.height ?? 0.5;
+
+  const packageControlsHtml = isShippable ? `
+    <div class="mt-4 p-3 bg-purple-50/60 rounded-md border border-purple-200 package-panel" data-order-id="${orderId}">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <span class="text-xs font-bold text-purple-900 flex items-center gap-1">
+          <span>📦</span> Package &amp; Shipping Label
+          ${!pirateShipAutoSync ? '<span class="ml-1 text-[10px] font-normal bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">Manual Queue</span>' : ''}
+        </span>
+        <div class="flex items-center gap-2">
+          ${order.exportToPirateship || order.labelRequested ? `
+            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-100 px-2 py-0.5 rounded border border-purple-300">
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
+              Queued for Pirate Ship
+            </span>
+          ` : ''}
+          ${order.labelUrl ? `
+            <a href="${escapeHtml(order.labelUrl)}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1">
+              📄 View Label
+            </a>
+          ` : ''}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div>
+          <label class="block text-[11px] text-gray-600 font-medium mb-0.5">Weight (oz)</label>
+          <input type="number" step="0.1" min="0.1" max="1000" class="package-weight-input w-full p-1 border border-gray-300 rounded text-xs bg-white" data-order-id="${orderId}" value="${defaultWeight}">
+        </div>
+        <div>
+          <label class="block text-[11px] text-gray-600 font-medium mb-0.5">Length (in)</label>
+          <input type="number" step="0.1" min="0.1" max="100" class="package-length-input w-full p-1 border border-gray-300 rounded text-xs bg-white" data-order-id="${orderId}" value="${defaultLength}">
+        </div>
+        <div>
+          <label class="block text-[11px] text-gray-600 font-medium mb-0.5">Width (in)</label>
+          <input type="number" step="0.1" min="0.1" max="100" class="package-width-input w-full p-1 border border-gray-300 rounded text-xs bg-white" data-order-id="${orderId}" value="${defaultWidth}">
+        </div>
+        <div>
+          <label class="block text-[11px] text-gray-600 font-medium mb-0.5">Height (in)</label>
+          <input type="number" step="0.1" min="0.1" max="100" class="package-height-input w-full p-1 border border-gray-300 rounded text-xs bg-white" data-order-id="${orderId}" value="${defaultHeight}">
+        </div>
+      </div>
+
+      <div class="mt-2.5 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-purple-100">
+        <p class="text-[11px] text-gray-500">
+          ${pirateShipAutoSync
+            ? 'Package specifications will be synced with Pirate Ship upon order import.'
+            : 'Click <strong>Order Label</strong> to queue this order for Pirate Ship with these dimensions.'}
+        </p>
+        <button type="button" class="order-label-btn px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors cursor-pointer" data-order-id="${orderId}">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+          ${order.labelRequested || order.exportToPirateship ? 'Update / Order Label' : 'Order Label'}
+        </button>
+      </div>
+    </div>
+  ` : '';
 
   const html = `
     <div class="order-card border-l-4 ${statusClass.split(" ")[0].replace("bg-", "border-")}" id="order-card-${orderId}">
@@ -1054,7 +1140,7 @@ export function displayOrder(order) {
                     <div class="flex items-center gap-2 mt-1">
                         ${deliveryBadge}
                         ${alertHtml}
-                        ${canceledRetentionBadge}
+                        ${retentionBadge}
                     </div>
                 </div>
             </div>
@@ -1077,7 +1163,17 @@ export function displayOrder(order) {
             <div>
                 <dt>Shipping Name:</dt><dd>${shippingName}</dd>
                 <dt>Shipping Email:</dt><dd>${shippingEmail}</dd>
-                ${shippingAddrStr ? `<dt class="mt-1 font-semibold text-blue-800">${isLocalPickup ? 'Pickup Location:' : 'Shipping Address:'}</dt><dd class="text-xs text-gray-700 bg-blue-50/50 p-1.5 rounded border border-blue-100 mt-0.5">${shippingAddrStr}</dd>` : ""}
+                ${shippingAddrStr ? `
+                  <dt class="mt-1 font-semibold text-blue-800 flex items-center justify-between">
+                    <span>${isLocalPickup ? 'Pickup Location:' : 'Shipping Address:'}</span>
+                    ${!isLocalPickup ? `
+                      <button type="button" class="copy-address-btn text-xs text-blue-600 hover:text-blue-800 font-normal hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy formatted shipping address">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        Copy Address
+                      </button>` : ''}
+                  </dt>
+                  <dd class="text-xs text-gray-700 bg-blue-50/50 p-1.5 rounded border border-blue-100 mt-0.5">${shippingAddrStr}</dd>
+                ` : ""}
             </div>
             <div>
                 <dt>Sticker Name:</dt><dd>${stickerName}</dd>
@@ -1091,15 +1187,17 @@ export function displayOrder(order) {
 
         <div class="mt-4">
             <dt>Sticker Design:</dt>
-            <a class="sticker-peel-container" href="${designImagePath}" target="_blank">
+            ${designImagePath && order.designImagePath ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank">
                 <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
-            </a>
+            </a>` : `<div class="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 font-semibold p-2 text-center">${order.artworkPruned ? 'Artwork Pruned' : 'No Preview'}</div>`}
             ${cutFilePath ? `<div class="mt-2"><dt>Cut File:</dt><dd><a href="${serverUrl}${cutFilePath}" class="text-blue-500 underline text-sm" target="_blank" download>Download SVG / XML</a></dd></div>` : ""}
         </div>
 
         <div class="mt-2 flex flex-wrap gap-2">
             ${dropdownHtml}
         </div>
+
+        ${packageControlsHtml}
 
         <div class="mt-4" id="tracking-info-${orderId}" style="display: ${trackingDisplay};">
             <input class="border rounded-md p-2" type="text" id="tracking-number-${orderId}" placeholder="Enter Tracking Number">
@@ -1162,6 +1260,20 @@ function handleOrderListClick(e) {
     openOrderHistoryModal(orderId);
     return;
   }
+
+  const copyAddressBtn = e.target.closest(".copy-address-btn");
+  if (copyAddressBtn) {
+    const orderId = copyAddressBtn.dataset.orderId;
+    copyShippingAddress(orderId, copyAddressBtn);
+    return;
+  }
+
+  const orderLabelBtn = e.target.closest(".order-label-btn");
+  if (orderLabelBtn) {
+    const orderId = orderLabelBtn.dataset.orderId;
+    orderShippingLabel(orderId, orderLabelBtn);
+    return;
+  }
 }
 
 async function openOrderHistoryModal(orderId) {
@@ -1207,6 +1319,7 @@ async function openOrderHistoryModal(orderId) {
 
       let statusColor = "bg-blue-100 text-blue-800 border-blue-300";
       if (evt.toStatus === "CANCELED" || evt.toStatus === "PURGED") statusColor = "bg-red-100 text-red-800 border-red-300";
+      else if (evt.toStatus === "ARCHIVED") statusColor = "bg-gray-200 text-gray-800 border-gray-400";
       else if (evt.toStatus === "COMPLETED" || evt.toStatus === "DELIVERED") statusColor = "bg-green-100 text-green-800 border-green-300";
       else if (evt.toStatus === "SHIPPED") statusColor = "bg-emerald-100 text-emerald-800 border-emerald-300";
       else if (evt.toStatus === "HOLD_FOR_PICKUP") statusColor = "bg-orange-100 text-orange-800 border-orange-300";
@@ -1233,10 +1346,16 @@ async function openOrderHistoryModal(orderId) {
     }
     html += `</div>`;
 
-    if (data.isPurged) {
+    if (data.isArchived) {
+      html += `
+        <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
+          <strong>Archived Order:</strong> This order is permanently archived. All specifications, customer details, pricing, and audit transition history are preserved.${data.artworkPruned ? " Heavy uploaded artwork files were pruned to save disk storage." : ""}
+        </div>
+      `;
+    } else if (data.isPurged) {
       html += `
         <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-xs text-red-700">
-          <strong>Notice:</strong> This order was purged from the active database under the 30-day retention rule, but its audit record is preserved in the non-volatile journal.
+          <strong>Notice:</strong> This order was purged from the active database under the legacy 30-day retention rule, but its audit record is preserved in the non-volatile journal.
         </div>
       `;
     }
@@ -2798,10 +2917,20 @@ async function loadPirateShipConfig() {
       const storeUrlInput = document.getElementById("pirateship-store-url");
       const keyInput = document.getElementById("pirateship-consumer-key");
       const secretInput = document.getElementById("pirateship-consumer-secret");
+      const autoSyncToggle = document.getElementById("pirateship-auto-sync-toggle");
+      const statusBadge = document.getElementById("pirateship-sync-status-badge");
 
       if (storeUrlInput) storeUrlInput.value = data.storeUrl || window.location.origin;
       if (keyInput) keyInput.value = data.consumerKey || "";
       if (secretInput) secretInput.value = data.consumerSecret || "";
+
+      pirateShipAutoSync = data.autoSync !== false;
+      if (autoSyncToggle) {
+        autoSyncToggle.checked = pirateShipAutoSync;
+      }
+      if (statusBadge) {
+        statusBadge.textContent = `WooCommerce REST API v3 Compatible • Status: ${pirateShipAutoSync ? "Auto-Sync Active" : "Manual Queue Mode"}`;
+      }
     }
   } catch (error) {
     console.warn("Failed to load Pirate Ship configuration:", error);
@@ -2868,6 +2997,188 @@ function initPirateShipListeners() {
       showErrorToast(`Error regenerating keys: ${err.message}`);
     }
   });
+
+  document.getElementById("pirateship-auto-sync-toggle")?.addEventListener("change", async (e) => {
+    const isChecked = e.target.checked;
+    const statusBadge = document.getElementById("pirateship-sync-status-badge");
+    try {
+      const res = await fetchWithAuth(`${serverUrl}/api/admin/integrations/pirateship/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoSync: isChecked })
+      });
+      if (res && res.success) {
+        pirateShipAutoSync = isChecked;
+        if (statusBadge) {
+          statusBadge.textContent = `WooCommerce REST API v3 Compatible • Status: ${pirateShipAutoSync ? "Auto-Sync Active" : "Manual Queue Mode"}`;
+        }
+        showSuccessToast(`Pirate Ship Auto-Sync ${isChecked ? "enabled" : "disabled"}.`);
+
+        // Invalidate cached order HTML to update panels immediately
+        for (const ord of allOrders) {
+          ord._cachedHtml = null;
+        }
+        const activeFilterBtn = document.querySelector(".filter-btn.active");
+        const currentFilter = activeFilterBtn?.dataset?.status || "ALL";
+        filterAndDisplayOrders(currentFilter);
+      } else {
+        throw new Error(res?.error || "Failed to update Pirate Ship auto-sync");
+      }
+    } catch (err) {
+      showErrorToast(`Failed to update setting: ${err.message}`);
+      e.target.checked = !isChecked;
+    }
+  });
+}
+
+// --- Address Formatting & Copying ---
+export function formatFullShippingAddress(order) {
+  if (!order) return "";
+  const contact = order.shippingContact || order.customerDetails?.shipping || order.billingContact || order.customerDetails?.billing;
+  if (!contact) return "";
+
+  const name = [contact.givenName, contact.familyName].filter(Boolean).join(" ") ||
+    contact.name ||
+    order.customerDetails?.name ||
+    order.customerName ||
+    "";
+
+  let lines = [];
+  if (Array.isArray(contact.addressLines)) {
+    lines = contact.addressLines.filter(Boolean);
+  } else if (typeof contact.addressLines === "string" && contact.addressLines) {
+    lines = [contact.addressLines];
+  } else if (contact.street1 || contact.address1) {
+    lines = [contact.street1 || contact.address1, contact.street2 || contact.address2].filter(Boolean);
+  }
+
+  const city = contact.locality || contact.city || "";
+  const state = contact.administrativeDistrictLevel1 || contact.state || "";
+  const zip = contact.postalCode || contact.zip || "";
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const country = contact.country && contact.country !== "US" ? contact.country : "";
+
+  return [name, ...lines, cityStateZip, country].filter(Boolean).join("\n");
+}
+
+export async function copyShippingAddress(orderId, btnEl) {
+  const order = allOrders.find((o) => o.orderId === orderId);
+  if (!order) return;
+  const addressText = formatFullShippingAddress(order);
+  if (!addressText) {
+    showErrorToast("No shipping address found for this order.");
+    return;
+  }
+
+  const showFeedback = () => {
+    if (btnEl) {
+      const origContent = btnEl.innerHTML;
+      btnEl.innerHTML = `<span class="text-green-600 font-bold">✓ Copied!</span>`;
+      setTimeout(() => {
+        btnEl.innerHTML = origContent;
+      }, 2000);
+    }
+    showSuccessToast("Address copied to clipboard!");
+  };
+
+  try {
+    await navigator.clipboard.writeText(addressText);
+    showFeedback();
+  } catch (err) {
+    // Fallback for non-secure contexts or permission restrictions
+    const ta = document.createElement("textarea");
+    ta.value = addressText;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      showFeedback();
+    } catch (fallbackErr) {
+      showErrorToast("Failed to copy address to clipboard.");
+    } finally {
+      document.body.removeChild(ta);
+    }
+  }
+}
+
+// --- Order Shipping Label & Package Dimensions ---
+export async function orderShippingLabel(orderId, btnEl) {
+  const order = allOrders.find((o) => o.orderId === orderId);
+  if (!order) return;
+
+  const card = document.getElementById(`order-card-${orderId}`) || btnEl?.closest(".order-card") || btnEl?.closest("tr");
+  let weightOz = order.packageWeightOz;
+  let length = order.packageDimensions?.length;
+  let width = order.packageDimensions?.width;
+  let height = order.packageDimensions?.height;
+
+  if (card) {
+    const weightInput = card.querySelector(`.package-weight-input[data-order-id="${orderId}"]`) || card.querySelector(`.package-weight-input`);
+    const lengthInput = card.querySelector(`.package-length-input[data-order-id="${orderId}"]`) || card.querySelector(`.package-length-input`);
+    const widthInput = card.querySelector(`.package-width-input[data-order-id="${orderId}"]`) || card.querySelector(`.package-width-input`);
+    const heightInput = card.querySelector(`.package-height-input[data-order-id="${orderId}"]`) || card.querySelector(`.package-height-input`);
+
+    if (weightInput && weightInput.value) weightOz = parseFloat(weightInput.value);
+    if (lengthInput && lengthInput.value) length = parseFloat(lengthInput.value);
+    if (widthInput && widthInput.value) width = parseFloat(widthInput.value);
+    if (heightInput && heightInput.value) height = parseFloat(heightInput.value);
+  }
+
+  weightOz = Number(weightOz) || 1.0;
+  length = Number(length) || 6;
+  width = Number(width) || 4;
+  height = Number(height) || 0.5;
+
+  const origBtnText = btnEl ? btnEl.innerHTML : "";
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = "Ordering...";
+  }
+
+  try {
+    const res = await fetchWithAuth(`${serverUrl}/api/orders/${encodeURIComponent(orderId)}/order-label`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weightOz, length, width, height })
+    });
+
+    if (res && res.success) {
+      order.packageWeightOz = res.packageWeightOz ?? weightOz;
+      order.packageDimensions = res.packageDimensions ?? { length, width, height };
+      order.exportToPirateship = true;
+      order.labelRequested = true;
+      order._cachedHtml = null; // Invalidate cache
+
+      if (res.trackingNumber) {
+        order.trackingNumber = res.trackingNumber;
+        order.courier = res.courier || "USPS";
+      }
+      if (res.labelUrl) {
+        order.labelUrl = res.labelUrl;
+      }
+
+      if (res.easyPostGenerated) {
+        showSuccessToast(`Label generated! Tracking: ${res.trackingNumber}`);
+      } else {
+        showSuccessToast(`Order queued for Pirate Ship! (${order.packageWeightOz} oz, ${order.packageDimensions.length}×${order.packageDimensions.width}×${order.packageDimensions.height}")`);
+      }
+
+      // Re-render
+      const activeFilterBtn = document.querySelector(".filter-btn.active");
+      const currentFilter = activeFilterBtn?.dataset?.status || "ALL";
+      filterAndDisplayOrders(currentFilter);
+    } else {
+      throw new Error(res?.error || "Failed to order label");
+    }
+  } catch (err) {
+    showErrorToast(`Error ordering label: ${err.message}`);
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.innerHTML = origBtnText;
+    }
+  }
 }
 
 // --- Shipping & Fee Configuration ---
@@ -2952,9 +3263,11 @@ async function loadRetentionConfig() {
     if (!data) return;
     const toggle = document.getElementById("purge-artwork-toggle");
     const countEl = document.getElementById("retention-canceled-count");
+    const archivedCountEl = document.getElementById("retention-archived-count");
 
     if (toggle) toggle.checked = !!data.purgeArtworkOnFlush;
     if (countEl) countEl.textContent = data.canceledOrdersCount ?? 0;
+    if (archivedCountEl) archivedCountEl.textContent = data.archivedOrdersCount ?? 0;
   } catch (err) {
     console.error("[SHOP] Error loading retention config:", err);
   }
@@ -2994,7 +3307,7 @@ async function saveRetentionConfig() {
 }
 
 async function runRetentionFlushManual() {
-  const confirmed = window.confirm("Are you sure you want to run the 30-day canceled order cleanup now? Orders canceled more than 30 days ago will be permanently removed.");
+  const confirmed = window.confirm("Run the 30-day retention archival now? Orders canceled more than 30 days ago will be archived. All order records, customer contact info, and pricing are permanently preserved.");
   if (!confirmed) return;
 
   const btn = document.getElementById("run-retention-flush-btn");
@@ -3006,11 +3319,11 @@ async function runRetentionFlushManual() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ retentionDays: 30 })
     });
-    alert(`Retention cleanup completed. Flushed ${res.flushedCount || 0} expired orders.`);
+    alert(`Retention archival completed. Archived ${res.flushedCount || 0} orders.`);
     await loadRetentionConfig();
     await fetchAndDisplayOrders();
   } catch (err) {
-    alert(`Failed to run retention cleanup: ${err.message}`);
+    alert(`Failed to run retention archival: ${err.message}`);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -3022,6 +3335,101 @@ function initRetentionListeners() {
   document.getElementById("close-history-modal-btn")?.addEventListener("click", closeOrderHistoryModal);
   document.getElementById("close-history-modal-footer-btn")?.addEventListener("click", closeOrderHistoryModal);
 }
+
+// --- Telegram Bot & Alert Cadence Configuration ---
+async function loadTelegramConfig() {
+  try {
+    const data = await fetchWithAuth(`${serverUrl}/api/admin/telegram/config`);
+    if (!data) return;
+
+    const enabledToggle = document.getElementById("telegram-alerts-enabled");
+    const thresholdInput = document.getElementById("telegram-stalled-threshold");
+    const intervalInput = document.getElementById("telegram-check-interval");
+    const repeatInput = document.getElementById("telegram-repeat-hours");
+
+    if (enabledToggle) enabledToggle.checked = data.enabled !== false;
+    if (thresholdInput) thresholdInput.value = data.stalledThresholdHours ?? 4;
+    if (intervalInput) intervalInput.value = data.checkIntervalMinutes ?? 60;
+    if (repeatInput) repeatInput.value = data.repeatReminderHours ?? 0;
+  } catch (err) {
+    console.error("[SHOP] Error loading Telegram config:", err);
+  }
+}
+
+async function saveTelegramConfig(e) {
+  if (e && typeof e.preventDefault === "function") {
+    e.preventDefault();
+  }
+
+  const enabledToggle = document.getElementById("telegram-alerts-enabled");
+  const thresholdInput = document.getElementById("telegram-stalled-threshold");
+  const intervalInput = document.getElementById("telegram-check-interval");
+  const repeatInput = document.getElementById("telegram-repeat-hours");
+  const statusEl = document.getElementById("telegram-config-status");
+  const saveBtn = document.getElementById("save-telegram-config-btn");
+
+  if (!enabledToggle || !thresholdInput || !intervalInput || !repeatInput) return;
+
+  const stalledThresholdHours = Number(thresholdInput.value);
+  const checkIntervalMinutes = Number(intervalInput.value);
+  const repeatReminderHours = Number(repeatInput.value);
+
+  if (isNaN(stalledThresholdHours) || stalledThresholdHours <= 0 || stalledThresholdHours > 168) {
+    alert("Stalled threshold must be a number between 1 and 168 hours.");
+    return;
+  }
+
+  if (isNaN(checkIntervalMinutes) || checkIntervalMinutes < 1 || checkIntervalMinutes > 1440) {
+    alert("Check cadence must be a number between 1 and 1440 minutes.");
+    return;
+  }
+
+  if (isNaN(repeatReminderHours) || repeatReminderHours < 0 || repeatReminderHours > 168) {
+    alert("Repeat nag cadence must be a number between 0 and 168 hours.");
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.textContent = "Saving...";
+    statusEl.className = "text-sm text-gray-500";
+  }
+  if (saveBtn) saveBtn.disabled = true;
+
+  try {
+    const res = await fetchWithAuth(`${serverUrl}/api/admin/telegram/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        enabled: enabledToggle.checked,
+        stalledThresholdHours,
+        checkIntervalMinutes,
+        repeatReminderHours
+      })
+    });
+
+    if (res && res.success) {
+      if (statusEl) {
+        statusEl.textContent = "Telegram settings saved!";
+        statusEl.className = "text-sm text-green-600 font-semibold";
+        setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+      }
+    } else {
+      throw new Error(res?.error || "Failed to save Telegram settings");
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.textContent = `Error: ${err.message}`;
+      statusEl.className = "text-sm text-red-600";
+    }
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+function initTelegramConfigListeners() {
+  document.getElementById("telegram-config-form")?.addEventListener("submit", saveTelegramConfig);
+}
+
 
 
 
@@ -3492,6 +3900,7 @@ export async function init() {
       loadPirateShipConfig();
       loadShippingConfig();
       loadRetentionConfig();
+      loadTelegramConfig();
     });
   }
 
@@ -3509,6 +3918,8 @@ export async function init() {
   initShippingConfigListeners();
   // Retention & Storage listeners
   initRetentionListeners();
+  // Telegram Bot & Alert Cadence listeners
+  initTelegramConfigListeners();
 
 
   // Check for a token in the URL from OAuth redirect

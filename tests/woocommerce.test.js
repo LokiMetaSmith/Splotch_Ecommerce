@@ -206,6 +206,49 @@ describe('WooCommerce REST API v3 Emulation (Pirate Ship Integration)', () => {
       expect(res.status).toBe(404);
       expect(res.body.code).toBe('woocommerce_rest_shop_order_invalid_id');
     });
+
+    it('should filter orders when autoSync is false unless exportToPirateship or labelRequested is true', async () => {
+      mockDb.data.config.woocommerce.autoSync = false;
+
+      // order-uuid-1 has status ACCEPTED, but exportToPirateship is false
+      let res = await request(app)
+        .get('/wp-json/wc/v3/orders?status=processing')
+        .auth(testConsumerKey, testConsumerSecret);
+
+      expect(res.status).toBe(200);
+      expect(res.body.length).toBe(0);
+
+      // Now set exportToPirateship: true on order-uuid-1
+      mockOrders['order-uuid-1'].exportToPirateship = true;
+
+      res = await request(app)
+        .get('/wp-json/wc/v3/orders?status=processing')
+        .auth(testConsumerKey, testConsumerSecret);
+
+      expect(res.status).toBe(200);
+      expect(res.body.length).toBe(1);
+      expect(res.body[0].id).toBe(1001);
+
+      // Restore autoSync
+      mockDb.data.config.woocommerce.autoSync = true;
+    });
+
+    it('should include package dimensions and weight in order metadata and line item', async () => {
+      mockOrders['order-uuid-1'].packageWeightOz = 3.5;
+      mockOrders['order-uuid-1'].packageDimensions = { length: 7.5, width: 5.5, height: 1.2 };
+
+      const res = await request(app)
+        .get('/wp-json/wc/v3/orders/1001')
+        .auth(testConsumerKey, testConsumerSecret);
+
+      expect(res.status).toBe(200);
+      const meta = res.body.meta_data;
+      expect(meta.find(m => m.key === '_package_weight_oz')?.value).toBe('3.50');
+      expect(meta.find(m => m.key === '_package_length')?.value).toBe('7.5');
+      expect(meta.find(m => m.key === '_package_width')?.value).toBe('5.5');
+      expect(meta.find(m => m.key === '_package_height')?.value).toBe('1.2');
+      expect(res.body.line_items[0].weight).toBe('3.5');
+    });
   });
 
   describe('Order Status & Tracking Updates', () => {

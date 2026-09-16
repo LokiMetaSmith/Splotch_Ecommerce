@@ -119,6 +119,11 @@
         color: white;
         font-weight: bold;
       } /* Red-600 */
+      .filter-btn[data-status="ARCHIVED"].active {
+        background-color: #4b5563;
+        color: white;
+        font-weight: bold;
+      } /* Gray-600 */
     </style>
 
     <script src="/lib/clipper.js"></script>
@@ -361,6 +366,13 @@
             aria-pressed="false"
           >
             Canceled
+          </button>
+          <button
+            class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-600 focus-visible:ring-offset-2"
+            data-status="ARCHIVED"
+            aria-pressed="false"
+          >
+            Archived
           </button>
           <button
             class="filter-btn px-3 py-1 rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-700 focus-visible:ring-offset-2"
@@ -893,8 +905,30 @@
               </div>
             </div>
 
+            <!-- Pirate Ship Auto-Sync Setting -->
+            <div class="p-4 bg-purple-50 rounded-md border border-purple-200 mt-2">
+              <div class="flex items-start">
+                <div class="flex items-center h-5">
+                  <input
+                    id="pirateship-auto-sync-toggle"
+                    type="checkbox"
+                    checked
+                    class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                  />
+                </div>
+                <div class="ml-3 text-sm">
+                  <label for="pirateship-auto-sync-toggle" class="font-bold text-gray-800 cursor-pointer">
+                    Enable Automatic Pirate Ship Order Sync
+                  </label>
+                  <p class="text-gray-600 mt-0.5 text-xs sm:text-sm">
+                    When enabled, all orders in <strong>ACCEPTED</strong> and <strong>PRINTING</strong> status are automatically fetched by Pirate Ship. When disabled, Pirate Ship only receives orders you specifically queue by clicking <strong>Order Label</strong> with custom package weight &amp; dimensions on the job card.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div class="pt-2 flex flex-wrap justify-between items-center gap-2 text-xs text-gray-500 border-t border-gray-100">
-              <span>WooCommerce REST API v3 Compatible &bull; Status: Auto-Sync Active</span>
+              <span id="pirateship-sync-status-badge">WooCommerce REST API v3 Compatible &bull; Status: Auto-Sync Active</span>
               <button type="button" id="regenerate-pirateship-keys-btn" class="text-red-600 hover:text-red-800 font-medium underline">Regenerate Keys</button>
             </div>
           </div>
@@ -1002,10 +1036,10 @@
         <!-- Retention & File Cleanup -->
         <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto mt-8">
           <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">
-            Retention & File Cleanup
+            Retention & Order Archival
           </h2>
           <p class="text-sm text-gray-600 mb-6">
-            Configure order retention policies and customer artwork cleanup for canceled orders.
+            Configure order archival policies and disk storage cleanup. Orders and their non-critical metadata (specifications, dimensions, customer contact, pricing, and history) are permanently preserved.
           </p>
           <div class="space-y-4">
             <div class="flex items-start">
@@ -1018,25 +1052,31 @@
               </div>
               <div class="ml-3 text-sm">
                 <label for="purge-artwork-toggle" class="font-bold text-gray-800 cursor-pointer">
-                  Purge customer artwork from disk when canceled orders are flushed after 30 days
+                  Prune heavy customer artwork from disk when canceled orders are archived after 30 days
                 </label>
                 <p class="text-gray-500 mt-0.5">
-                  When checked, uploaded artwork files in <code>uploads/</code> are permanently unlinked and deleted when canceled orders pass their 30-day retention window. When unchecked, order metadata is flushed but original artwork files are preserved on disk.
+                  When checked, uploaded raster image files in <code>uploads/</code> are unlinked and cleaned up when orders are archived to reclaim disk storage. All order records, customer contact information, vector cutlines, and pricing remain permanently in the database.
                 </p>
               </div>
             </div>
 
             <div class="p-4 bg-gray-50 rounded-md border border-gray-200 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span class="text-sm font-medium text-gray-700">Canceled Orders in 30-Day Retention:</span>
-                <span id="retention-canceled-count" class="font-bold text-gray-900 ml-1">0</span>
+              <div class="flex items-center gap-6">
+                <div>
+                  <span class="text-sm font-medium text-gray-700">Canceled (Pending Archival):</span>
+                  <span id="retention-canceled-count" class="font-bold text-amber-700 ml-1">0</span>
+                </div>
+                <div>
+                  <span class="text-sm font-medium text-gray-700">Archived Orders:</span>
+                  <span id="retention-archived-count" class="font-bold text-gray-900 ml-1">0</span>
+                </div>
               </div>
               <button
                 id="run-retention-flush-btn"
                 type="button"
                 class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-md text-xs font-semibold shadow-sm transition-colors"
               >
-                Run 30-Day Cleanup Now
+                Run 30-Day Archival Now
               </button>
             </div>
 
@@ -1051,6 +1091,102 @@
               <span id="retention-config-status" class="text-sm text-gray-500"></span>
             </div>
           </div>
+        </div>
+
+        <!-- Telegram Bot & Alert Cadence Settings -->
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto mt-8">
+          <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-4">
+            Telegram Bot & Alert Cadence
+          </h2>
+          <p class="text-sm text-gray-600 mb-6">
+            Configure Telegram alert notifications for stalled orders and customize or disable the reminder cadence.
+          </p>
+          <form id="telegram-config-form" class="space-y-6">
+            <div class="flex items-start">
+              <div class="flex items-center h-5">
+                <input
+                  id="telegram-alerts-enabled"
+                  type="checkbox"
+                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+              </div>
+              <div class="ml-3 text-sm">
+                <label for="telegram-alerts-enabled" class="font-bold text-gray-800 cursor-pointer">
+                  Enable Stalled Order Telegram Reminders
+                </label>
+                <p class="text-gray-500 mt-0.5">
+                  When enabled, the bot will notify the Telegram channel whenever an active order has not changed status within the threshold window.
+                </p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label for="telegram-stalled-threshold" class="block text-sm font-semibold text-gray-700 mb-1">
+                  Stalled Threshold (Hours)
+                </label>
+                <input
+                  id="telegram-stalled-threshold"
+                  type="number"
+                  min="1"
+                  max="168"
+                  step="1"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="4"
+                />
+                <p class="text-xs text-gray-500 mt-1">
+                  Hours without status change before an order is flagged as stalled (default: 4).
+                </p>
+              </div>
+
+              <div>
+                <label for="telegram-check-interval" class="block text-sm font-semibold text-gray-700 mb-1">
+                  Check Cadence (Minutes)
+                </label>
+                <input
+                  id="telegram-check-interval"
+                  type="number"
+                  min="5"
+                  max="1440"
+                  step="5"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="60"
+                />
+                <p class="text-xs text-gray-500 mt-1">
+                  How often the background runner checks for stalled orders (default: 60).
+                </p>
+              </div>
+
+              <div>
+                <label for="telegram-repeat-hours" class="block text-sm font-semibold text-gray-700 mb-1">
+                  Repeat Nag Cadence (Hours)
+                </label>
+                <input
+                  id="telegram-repeat-hours"
+                  type="number"
+                  min="0"
+                  max="168"
+                  step="1"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+                <p class="text-xs text-gray-500 mt-1">
+                  Re-send alert every X hours if still stalled. Set to 0 to alert only once (default: 0).
+                </p>
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-gray-200 flex items-center gap-4">
+              <button
+                type="submit"
+                id="save-telegram-config-btn"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition-colors"
+              >
+                Save Telegram Settings
+              </button>
+              <span id="telegram-config-status" class="text-sm text-gray-500"></span>
+            </div>
+          </form>
         </div>
       </div>
 

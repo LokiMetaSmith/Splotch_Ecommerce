@@ -16,6 +16,7 @@ process.on('uncaughtException', (error) => {
 
 import { startServer, FINAL_STATUSES } from './server.js';
 import { initializeBot } from './bot.js';
+import { startTelegramReminderService } from './lib/telegramReminder.js';
 import { sendEmail } from './email.js';
 import { getSecret } from './secretManager.js';
 import { JSONFilePreset } from 'lowdb/node';
@@ -87,62 +88,8 @@ async function main() {
       logger.info('[SERVER] Web server disabled by ENABLE_WEB_SERVER environment variable. Running in background worker mode.');
   }
 
-  // Check for stalled orders every hour
-  setInterval(async () => {
-    const nowMs = Date.now();
-    const fourHoursMs = 4 * 60 * 60 * 1000;
-    const ordersToCheck = await db.getActiveOrders();
-
-    const stalledOrders = ordersToCheck.filter(order => {
-      // Skip orders that have already had a stalled notification sent
-      if (order.stalledMessageId) return false;
-      // db.getActiveOrders() already filters out FINAL_STATUSES
-      const lastUpdateStr = order.lastUpdatedAt || order.receivedAt;
-      const lastUpdateMs = typeof lastUpdateStr === 'number' ? lastUpdateStr : Date.parse(lastUpdateStr);
-      return (nowMs - lastUpdateMs) > fourHoursMs;
-    });
-
-    for (const order of stalledOrders) {
-      const message = `
-  ⚠️ Order Stalled: ${order.orderId}
-  Status: ${order.status}
-  Last Update: ${new Date(order.lastUpdatedAt || order.receivedAt).toLocaleString()}
-      `;
-      try {
-        let sentMessage;
-        try {
-          sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message, {
-            reply_to_message_id: order.telegramMessageId,
-          });
-        } catch (sendErr) {
-          if (sendErr.response && sendErr.response.error_code === 400 && sendErr.response.description.includes('message to be replied not found')) {
-            // The original message was likely deleted, send without replying
-            sentMessage = await bot.telegram.sendMessage(getSecret('TELEGRAM_CHANNEL_ID'), message);
-          } else {
-            throw sendErr;
-          }
-        }
-        // Store the message ID so we can delete it later
-        const orderInDb = await db.getOrder(order.orderId);
-        if (orderInDb) {
-            orderInDb.stalledMessageId = sentMessage.message_id;
-            await db.updateOrder(orderInDb);
-        }
-        
-        // Wait 3 seconds between messages to avoid Telegram rate limits (20 msgs/min in groups)
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      } catch (error) {
-        logger.error('[TELEGRAM] Failed to send stalled order notification:', error);
-        
-        // If we hit a rate limit, wait for the specified time before continuing the loop
-        if (error.response && error.response.error_code === 429) {
-          const retryAfter = (error.response.parameters && error.response.parameters.retry_after) || 35;
-          logger.info(`[TELEGRAM] Rate limited. Pausing notifications for ${retryAfter} seconds...`);
-          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-        }
-      }
-    }
-  }, 1000 * 60 * 60);
+  // Start dynamic stalled orders reminder service
+  const reminderService = startTelegramReminderService(db, bot, { getSecret, logger });
 }
 
 if (process.argv[1] && process.argv[1].toLowerCase() === __filename.toLowerCase()) {

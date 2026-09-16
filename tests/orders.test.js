@@ -1066,7 +1066,7 @@ describe("Order API Endpoints", () => {
       expect(checkRes.body.purgeArtworkOnFlush).toBe(true);
     });
 
-    it("should retain canceled orders < 30 days and purge canceled orders >= 30 days", async () => {
+    it("should archive expired canceled orders while preserving order records and non-critical metadata", async () => {
       const recentCanceledId = "550e8400-e29b-41d4-a716-446655440204";
       const expiredCanceledId = "550e8400-e29b-41d4-a716-446655440205";
 
@@ -1081,8 +1081,10 @@ describe("Order API Endpoints", () => {
         status: "CANCELED",
         shadowDeleted: true,
         shadowDeletedAt: tenDaysAgo,
-        billingContact: { email: "recent@example.com" },
+        billingContact: { email: "recent@example.com", givenName: "Recent", familyName: "Customer" },
+        shippingContact: { addressLine1: "123 Main St", city: "Austin", state: "TX", postalCode: "78701" },
         amount: 1200,
+        stickers: [{ width: 3, height: 3, quantity: 50, material: "vinyl" }],
       };
 
       db.data.orders[expiredCanceledId] = {
@@ -1090,8 +1092,10 @@ describe("Order API Endpoints", () => {
         status: "CANCELED",
         shadowDeleted: true,
         shadowDeletedAt: thirtyFiveDaysAgo,
-        billingContact: { email: "expired@example.com" },
+        billingContact: { email: "expired@example.com", givenName: "Expired", familyName: "Customer" },
+        shippingContact: { addressLine1: "456 Oak St", city: "Dallas", state: "TX", postalCode: "75001" },
         amount: 2500,
+        stickers: [{ width: 4, height: 2, quantity: 100, material: "holographic" }],
       };
       await db.write();
 
@@ -1108,10 +1112,39 @@ describe("Order API Endpoints", () => {
       expect(flushRes.body.flushedCount).toBe(1);
       expect(flushRes.body.flushedOrderIds).toContain(expiredCanceledId);
 
-      // Recent order remains
+      // Recent order remains active canceled (not archived)
       expect(db.data.orders[recentCanceledId]).toBeDefined();
-      // Expired order is deleted from DB
-      expect(db.data.orders[expiredCanceledId]).toBeUndefined();
+      expect(db.data.orders[recentCanceledId].isArchived).toBeFalsy();
+
+      // Expired order is NEVER completely erased: it is archived with all non-critical metadata preserved!
+      const archivedOrder = db.data.orders[expiredCanceledId];
+      expect(archivedOrder).toBeDefined();
+      expect(archivedOrder.isArchived).toBe(true);
+      expect(archivedOrder.archivedAt).toBeDefined();
+
+      // Non-critical specifications, customer information, pricing, and addresses persist
+      expect(archivedOrder.billingContact.email).toBe("expired@example.com");
+      expect(archivedOrder.shippingContact.city).toBe("Dallas");
+      expect(archivedOrder.amount).toBe(2500);
+      expect(archivedOrder.stickers[0].material).toBe("holographic");
+      expect(archivedOrder.stickers[0].quantity).toBe(100);
+
+      // Verify retention config endpoint reports archived orders count
+      const configRes = await agent
+        .get("/api/admin/retention/config")
+        .set("Authorization", `Bearer ${adminToken()}`);
+      expect(configRes.body.archivedOrdersCount).toBeGreaterThanOrEqual(1);
+
+      // Verify unarchiving / recovery back to ACCEPTED clears isArchived
+      const recoverRes = await agent
+        .post(`/api/orders/${expiredCanceledId}/status`)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .set("X-CSRF-Token", csrfRes.body.csrfToken)
+        .send({ status: "ACCEPTED" });
+
+      expect(recoverRes.statusCode).toBe(200);
+      expect(db.data.orders[expiredCanceledId].isArchived).toBe(false);
+      expect(db.data.orders[expiredCanceledId].status).toBe("ACCEPTED");
     });
   });
 });

@@ -5,7 +5,7 @@ export class MongoDbAdapter {
         this.client = new MongoClient(url);
         this.dbName = dbName;
         this.db = null;
-        this.FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED'];
+        this.FINAL_STATUSES = ['SHIPPED', 'CANCELED', 'COMPLETED', 'DELIVERED', 'ARCHIVED'];
     }
 
     async connect() {
@@ -29,6 +29,12 @@ export class MongoDbAdapter {
 
             await this.db.collection('credentials').createIndex({ credentialID: 1 }, { unique: true });
         }
+        return this;
+    }
+
+    async close() {
+        await this.client.close();
+        this.db = null;
     }
 
     async write() {
@@ -52,6 +58,16 @@ export class MongoDbAdapter {
         const { _id, ...doc } = order;
         await this.db.collection('orders').replaceOne({ orderId: order.orderId }, doc);
         return order;
+    }
+
+    async archiveOrder(id) {
+        const result = await this.db.collection('orders').findOneAndUpdate(
+            { orderId: id },
+            { $set: { isArchived: true, archivedAt: new Date().toISOString() } },
+            { returnDocument: 'after' }
+        );
+        if (result && result._id) delete result._id;
+        return result;
     }
 
     // --- Batches ---
@@ -78,7 +94,10 @@ export class MongoDbAdapter {
     }
 
     async getActiveOrders() {
-        const orders = await this.db.collection('orders').find({ status: { $nin: this.FINAL_STATUSES } }).toArray();
+        const orders = await this.db.collection('orders').find({ 
+            status: { $nin: this.FINAL_STATUSES },
+            isArchived: { $ne: true }
+        }).toArray();
         return orders.map(o => { delete o._id; return o; });
     }
 

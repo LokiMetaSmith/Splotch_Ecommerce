@@ -836,18 +836,23 @@ async function BootStrap() {
   }
 
   // Dynamically load the Square script if not already present
+  let squareScriptBlocked = false;
   if (!window.Square && !document.querySelector(`script[src*="square.js"]`)) {
     await new Promise((resolve) => {
       const script = document.createElement("script");
       script.src = scriptUrl;
       script.type = "text/javascript";
-      script.onload = resolve;
+      script.onload = () => {
+        squareScriptBlocked = false;
+        resolve();
+      };
       script.onerror = (e) => {
         console.error(
           "[CLIENT] Failed to load Square script from:",
           scriptUrl,
           e,
         );
+        squareScriptBlocked = true;
         resolve();
       };
       document.head.appendChild(script);
@@ -870,6 +875,7 @@ async function BootStrap() {
         }
         payments = window.Square.payments(appId, locationId);
         card = await initializeCard(payments);
+        hideAdBlockerWarning();
         break; // Success
       } catch (error) {
         retryCount++;
@@ -881,7 +887,8 @@ async function BootStrap() {
           let msg = `Failed to initialize payments: ${error.message}`;
           if (
             error.message.includes("Network") ||
-            typeof Square === "undefined"
+            !window.Square ||
+            squareScriptBlocked
           ) {
             msg += " (Check your AdBlocker)";
             showAdBlockerWarning();
@@ -1685,21 +1692,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   BootStrap();
-  // Check if the Square SDK was blocked after 2 seconds
-  setTimeout(() => {
-    if (typeof Square === "undefined") {
-      console.error("[CLIENT] Square SDK appears to be blocked.");
-      // Function to show a warning message to the user
-      showAdBlockerWarning();
-    }
-  }, 2000);
+  document
+    .getElementById("dismiss-adblock-warning-btn")
+    ?.addEventListener("click", () => {
+      hideAdBlockerWarning();
+    });
 });
 
 function showAdBlockerWarning() {
-  // For example, make a hidden div visible
+  const cardContainer = document.getElementById("card-container");
+  if (
+    cardContainer &&
+    (cardContainer.querySelector("iframe") || cardContainer.children.length > 0)
+  ) {
+    // Payment form is actually mounted and loaded, suppress false positive
+    return;
+  }
   const warningBanner = document.getElementById("adblock-warning");
   if (warningBanner) {
     warningBanner.style.display = "block";
+  }
+}
+
+function hideAdBlockerWarning() {
+  const warningBanner = document.getElementById("adblock-warning");
+  if (warningBanner) {
+    warningBanner.style.display = "none";
   }
 }
 

@@ -299,9 +299,25 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     }
     if (order.packageWeightOz != null) {
       metaData.push({ id: 5, key: '_package_weight_oz', value: String(order.packageWeightOz.toFixed(2)) });
+      metaData.push({ id: 51, key: '_package_weight', value: String(order.packageWeightOz.toFixed(2)) });
+      metaData.push({ id: 52, key: 'weight', value: String(order.packageWeightOz.toFixed(2)) });
     }
     if (order.packageAreaSqIn != null) {
       metaData.push({ id: 6, key: '_package_area_sq_in', value: String(order.packageAreaSqIn.toFixed(2)) });
+    }
+    if (order.packageDimensions) {
+      if (order.packageDimensions.length) {
+        metaData.push({ id: 7, key: '_package_length', value: String(order.packageDimensions.length) });
+        metaData.push({ id: 71, key: 'length', value: String(order.packageDimensions.length) });
+      }
+      if (order.packageDimensions.width) {
+        metaData.push({ id: 8, key: '_package_width', value: String(order.packageDimensions.width) });
+        metaData.push({ id: 81, key: 'width', value: String(order.packageDimensions.width) });
+      }
+      if (order.packageDimensions.height) {
+        metaData.push({ id: 9, key: '_package_height', value: String(order.packageDimensions.height) });
+        metaData.push({ id: 91, key: 'height', value: String(order.packageDimensions.height) });
+      }
     }
 
     return {
@@ -383,6 +399,7 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
           ],
           sku: `STK-${quantity}`,
           price: parseFloat(totalDollars) || 0,
+          weight: order.packageWeightOz != null ? String(order.packageWeightOz) : undefined,
           image: order.designImagePath ? {
             id: 1,
             src: `${baseUrl}${order.designImagePath}`
@@ -641,6 +658,17 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
         });
       }
 
+      // If automatic Pirate Ship sync is disabled, only export orders that were explicitly queued
+      const lowdb = db.db || db;
+      const isAutoSync = lowdb.data?.config?.woocommerce?.autoSync !== false;
+      if (!isAutoSync) {
+        filteredOrders = filteredOrders.filter(order => {
+          const s = (order.status || '').toUpperCase();
+          if (['SHIPPED', 'COMPLETED', 'DELIVERED', 'CANCELED'].includes(s)) return true;
+          return order.exportToPirateship === true || order.labelRequested === true;
+        });
+      }
+
       // Date filtering (after, before)
       if (req.query.after) {
         const afterDate = new Date(req.query.after);
@@ -730,10 +758,14 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
         if (incomingStatus === 'completed' || incomingStatus === 'shipped') {
           if (order.status !== 'SHIPPED' && order.status !== 'COMPLETED') {
             order.status = 'SHIPPED';
+            order.exportToPirateship = false;
+            order.labelRequested = false;
             updated = true;
           }
         } else if (incomingStatus === 'cancelled' || incomingStatus === 'canceled') {
           order.status = 'CANCELED';
+          order.exportToPirateship = false;
+          order.labelRequested = false;
           updated = true;
         } else if (incomingStatus === 'processing') {
           if (order.status === 'NEW') {
@@ -766,6 +798,8 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
           order.trackingNumber = metaTrackingNumber;
           order.courier = metaCourier || 'USPS';
           order.status = 'SHIPPED';
+          order.exportToPirateship = false;
+          order.labelRequested = false;
           updated = true;
           await sendShipmentNotification(order, order.trackingNumber, order.courier);
         }
