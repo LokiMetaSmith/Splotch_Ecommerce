@@ -1853,6 +1853,21 @@ function calculateAndUpdatePrice() {
         <td class="px-2 py-1">${tier.minQty}+</td>
         <td class="px-2 py-1 text-right text-indigo-700">-${tier.discountPercent}%</td>
       `;
+
+      // Update mobile sticky bar
+      const mobileStickyPrice = document.getElementById("mobileStickyPrice");
+      const mobileStickyBar = document.getElementById(
+        "mobile-sticky-conversion",
+      );
+      if (mobileStickyPrice && mobileStickyBar) {
+        mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
+        if (currentOrderAmountCents > 0) {
+          mobileStickyBar.classList.remove("translate-y-full");
+        } else {
+          mobileStickyBar.classList.add("translate-y-full");
+        }
+      }
+
       discountTableBody.appendChild(row);
     });
   }
@@ -1898,6 +1913,18 @@ function calculateAndUpdatePrice() {
             Complexity Modifier: x${priceResult.complexityMultiplier}
         </span>
     `;
+
+  // Update mobile sticky bar
+  const mobileStickyPrice = document.getElementById("mobileStickyPrice");
+  const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
+  if (mobileStickyPrice && mobileStickyBar) {
+    mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
+    if (currentOrderAmountCents > 0) {
+      mobileStickyBar.classList.remove("translate-y-full");
+    } else {
+      mobileStickyBar.classList.add("translate-y-full");
+    }
+  }
 
   // Refresh the order cost breakdown summary
   updateOrderSummary();
@@ -2278,6 +2305,18 @@ async function handlePaymentFormSubmit(event) {
             </svg>
             <span>Processing...</span>
         `;
+
+    // Update mobile sticky bar
+    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
+    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
+    if (mobileStickyPrice && mobileStickyBar) {
+      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
+      if (currentOrderAmountCents > 0) {
+        mobileStickyBar.classList.remove("translate-y-full");
+      } else {
+        mobileStickyBar.classList.add("translate-y-full");
+      }
+    }
   }
 
   showPaymentStatus("Processing order...", "info");
@@ -3591,6 +3630,18 @@ function updateLegend() {
         <span>Sheet Boundary (Die Cut)</span>
       </li>
     `;
+
+    // Update mobile sticky bar
+    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
+    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
+    if (mobileStickyPrice && mobileStickyBar) {
+      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
+      if (currentOrderAmountCents > 0) {
+        mobileStickyBar.classList.remove("translate-y-full");
+      } else {
+        mobileStickyBar.classList.add("translate-y-full");
+      }
+    }
   } else if (activeStickerIndex === "boundary") {
     html += `
       <li class="flex items-center gap-2">
@@ -3602,6 +3653,18 @@ function updateLegend() {
         <span>Sheet Boundary (Die Cut)</span>
       </li>
     `;
+
+    // Update mobile sticky bar
+    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
+    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
+    if (mobileStickyPrice && mobileStickyBar) {
+      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
+      if (currentOrderAmountCents > 0) {
+        mobileStickyBar.classList.remove("translate-y-full");
+      } else {
+        mobileStickyBar.classList.add("translate-y-full");
+      }
+    }
   } else {
     html += `
       <li class="flex items-center gap-2">
@@ -3617,6 +3680,18 @@ function updateLegend() {
         <span>Sheet Boundary (Die Cut)</span>
       </li>
     `;
+
+    // Update mobile sticky bar
+    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
+    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
+    if (mobileStickyPrice && mobileStickyBar) {
+      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
+      if (currentOrderAmountCents > 0) {
+        mobileStickyBar.classList.remove("translate-y-full");
+      } else {
+        mobileStickyBar.classList.add("translate-y-full");
+      }
+    }
   }
 
   legendList.innerHTML = html;
@@ -5773,6 +5848,18 @@ function handleGenerateCutline(skipPrompt = false) {
             </svg>
             <span>Generating...</span>
         `;
+
+    // Update mobile sticky bar
+    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
+    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
+    if (mobileStickyPrice && mobileStickyBar) {
+      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
+      if (currentOrderAmountCents > 0) {
+        mobileStickyBar.classList.remove("translate-y-full");
+      } else {
+        mobileStickyBar.classList.add("translate-y-full");
+      }
+    }
   }
 
   // Save the current canvas state so we can restore it if tracing fails.

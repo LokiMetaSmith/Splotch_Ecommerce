@@ -50,3 +50,29 @@ export function initMobileTabs() {
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", initMobileTabs);
 }
+
+// Setup Mobile Sticky Bar Checkout button
+if (typeof document !== "undefined") {
+  document.addEventListener("DOMContentLoaded", () => {
+    const stickyCheckoutBtn = document.getElementById(
+      "mobileStickyCheckoutBtn",
+    );
+    if (stickyCheckoutBtn) {
+      stickyCheckoutBtn.addEventListener("click", () => {
+        // Switch to specs tab
+        const specsTabBtn = document.querySelector(
+          '.mobile-tab-btn[data-tab="specs"]',
+        );
+        if (specsTabBtn) {
+          specsTabBtn.click();
+        }
+
+        // Scroll to payment form
+        const paymentForm = document.getElementById("payment-details-section");
+        if (paymentForm) {
+          paymentForm.scrollIntoView({ behavior: "smooth" });
+        }
+      });
+    }
+  });
+}
