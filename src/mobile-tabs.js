@@ -1,4 +1,4 @@
-export function initMobileTabs() {
+export function switchTab(tabId) {
   const tabs = document.querySelectorAll(".mobile-tab-btn");
   const sections = {
     art: document.getElementById("tab-art"),
@@ -6,36 +6,67 @@ export function initMobileTabs() {
     specs: document.getElementById("tab-specs"),
   };
 
-  if (tabs.length === 0) return;
+  Object.values(sections).forEach((section) => {
+    if (section) {
+      section.classList.add("hidden", "lg:block");
+    }
+  });
 
-  function switchTab(tabId) {
-    Object.values(sections).forEach((section) => {
-      if (section) {
-        section.classList.add("hidden", "lg:block");
+  tabs.forEach((t) => {
+    t.classList.remove("bg-indigo-600", "text-white");
+    t.classList.add("bg-white", "text-gray-600", "hover:bg-gray-50");
+  });
+
+  if (sections[tabId]) {
+    sections[tabId].classList.remove("hidden");
+  }
+
+  const activeTab = document.querySelector(
+    `.mobile-tab-btn[data-tab="${tabId}"]`,
+  );
+  if (activeTab) {
+    activeTab.classList.remove(
+      "bg-white",
+      "text-gray-600",
+      "hover:bg-gray-50",
+    );
+    activeTab.classList.add("bg-indigo-600", "text-white");
+  }
+}
+
+export function setupJumpToEditor() {
+  const jumpLinks = document.querySelectorAll('a[href="#sticker-design-box"]');
+  jumpLinks.forEach((link) => {
+    link.addEventListener("click", () => {
+      const artTabBtn = document.querySelector('.mobile-tab-btn[data-tab="art"]');
+      if (artTabBtn) {
+        artTabBtn.click();
+      } else {
+        switchTab("art");
       }
     });
+  });
 
-    tabs.forEach((t) => {
-      t.classList.remove("bg-indigo-600", "text-white");
-      t.classList.add("bg-white", "text-gray-600", "hover:bg-gray-50");
-    });
-
-    if (sections[tabId]) {
-      sections[tabId].classList.remove("hidden");
+  const checkHash = () => {
+    if (typeof window !== "undefined" && window.location && window.location.hash === "#sticker-design-box") {
+      const artTabBtn = document.querySelector('.mobile-tab-btn[data-tab="art"]');
+      if (artTabBtn) {
+        artTabBtn.click();
+      } else {
+        switchTab("art");
+      }
     }
+  };
 
-    const activeTab = document.querySelector(
-      `.mobile-tab-btn[data-tab="${tabId}"]`,
-    );
-    if (activeTab) {
-      activeTab.classList.remove(
-        "bg-white",
-        "text-gray-600",
-        "hover:bg-gray-50",
-      );
-      activeTab.classList.add("bg-indigo-600", "text-white");
-    }
+  if (typeof window !== "undefined") {
+    window.addEventListener("hashchange", checkHash);
+    checkHash();
   }
+}
+
+export function initMobileTabs() {
+  const tabs = document.querySelectorAll(".mobile-tab-btn");
+  if (tabs.length === 0) return;
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -45,15 +76,20 @@ export function initMobileTabs() {
   });
 
   switchTab("art");
+  setupJumpToEditor();
 }
 
 if (typeof document !== "undefined") {
-  document.addEventListener("DOMContentLoaded", initMobileTabs);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initMobileTabs);
+  } else {
+    initMobileTabs();
+  }
 }
 
 // Setup Mobile Sticky Bar Checkout button
 if (typeof document !== "undefined") {
-  document.addEventListener("DOMContentLoaded", () => {
+  const setupStickyCheckout = () => {
     const stickyCheckoutBtn = document.getElementById(
       "mobileStickyCheckoutBtn",
     );
@@ -65,6 +101,8 @@ if (typeof document !== "undefined") {
         );
         if (specsTabBtn) {
           specsTabBtn.click();
+        } else {
+          switchTab("specs");
         }
 
         // Scroll to payment form
@@ -74,5 +112,11 @@ if (typeof document !== "undefined") {
         }
       });
     }
-  });
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupStickyCheckout);
+  } else {
+    setupStickyCheckout();
+  }
 }
