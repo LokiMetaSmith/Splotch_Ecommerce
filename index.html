@@ -158,7 +158,7 @@
             <label class="label text-sm font-medium text-gray-700 block mb-2"
               >Starter Templates:</label
             >
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 justify-center sm:justify-start">
               <button
                 type="button"
                 id="templateBlankBtn"
@@ -251,12 +251,12 @@
               class="w-full lg:w-64 bg-white p-4 rounded-lg shadow border border-gray-200 flex flex-col"
               style="display: none"
             >
-              <div class="flex justify-between items-center mb-4">
+              <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
                 <h3 class="font-bold text-gray-700">Stickers</h3>
                 <button
                   type="button"
                   id="add-sticker-btn"
-                  class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-1 rounded text-sm font-semibold transition-colors"
+                  class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-1 rounded text-sm font-semibold transition-colors flex-grow text-center"
                   data-tooltip="Add another sticker to create a pack"
                 >
                   + Add
@@ -518,14 +518,14 @@
           >
             <!-- Base Layer Controls -->
             <div
-              class="control-group-base flex flex-wrap justify-center items-center gap-4"
+              class="control-group-base flex flex-wrap justify-center items-center gap-4 w-full"
             >
               <button
                 type="button"
                 id="rotateLeftBtn"
                 data-tooltip="Rotate Left 90°"
                 aria-label="Rotate Left"
-                class="justify-self-center flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy"
+                class="flex-shrink-0 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy"
                 style="
                   width: 3rem !important;
                   height: 3rem !important;
@@ -554,7 +554,7 @@
                 id="resetBtn"
                 data-tooltip="Reset Image to Original"
                 aria-label="Reset Image"
-                class="justify-self-center flex flex-col items-center justify-center text-red-600 hover:text-red-800 font-medium text-xs rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-600 px-2 py-1 transition-all"
+                class="justify-self-center flex flex-col items-center justify-center text-red-600 hover:text-red-800 font-medium text-xs rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-600 px-2 py-1 transition-all w-full sm:w-auto"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -578,7 +578,7 @@
                 id="rotateRightBtn"
                 data-tooltip="Rotate Right 90°"
                 aria-label="Rotate Right"
-                class="justify-self-center flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy"
+                class="flex-shrink-0 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-navy"
                 style="
                   width: 3rem !important;
                   height: 3rem !important;
@@ -662,7 +662,7 @@
                 >
                 <button
                   type="button"
-                  class="size-btn"
+                  class="size-btn flex-grow"
                   data-size="1"
                   aria-label="Set max dimension to 1 inch"
                   data-tooltip="Set max dimension to 1 inch"
@@ -672,7 +672,7 @@
                 </button>
                 <button
                   type="button"
-                  class="size-btn"
+                  class="size-btn flex-grow"
                   data-size="2"
                   aria-label="Set max dimension to 2 inches"
                   data-tooltip="Set max dimension to 2 inches"
@@ -682,7 +682,7 @@
                 </button>
                 <button
                   type="button"
-                  class="size-btn"
+                  class="size-btn flex-grow"
                   data-size="3"
                   aria-label="Set max dimension to 3 inches"
                   data-tooltip="Set max dimension to 3 inches"
@@ -736,7 +736,7 @@
                     <span class="text-xs text-gray-500 mb-1">Cut Shape</span>
                     <select
                       id="cutShapeSelect"
-                      class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-[200px]"
+                      class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full "
                     >
                       <option value="trace">Custom Contour</option>
                       <option value="circle">Standard Circle</option>
@@ -777,7 +777,7 @@
                     >
                     <select
                       id="cutTypeSelect"
-                      class="input px-2 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm w-full max-w-[200px]"
+                      class="input px-2 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm w-full "
                     >
                       <option value="die_cut">Die Cut (Through backer)</option>
                       <option value="kiss_cut">Kiss Cut (Sticker only)</option>
@@ -1010,7 +1010,7 @@
               <button
                 type="button"
                 id="generateFromBaseBtn"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors w-full sm:w-auto"
                 data-tooltip="Generate mask from the Base Design shape"
               >
                 Generate Mask from Base
@@ -1164,7 +1164,7 @@
                 <button
                   type="button"
                   id="addTextBtn"
-                  class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2.5 px-4 rounded-full shadow-md transition duration-150 ease-in-out transform hover:scale-105 self-end focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red"
+                  class="bg-splotch-red hover:brightness-110 text-white font-semibold py-2.5 px-4 rounded-full shadow-md transition duration-150 ease-in-out transform hover:scale-105 self-end focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-splotch-red w-full md:w-auto"
                   style="
                     font-family: var(--font-baumans);
                     text-transform: uppercase;
@@ -2192,16 +2192,16 @@
               />
             </div>
           </div>
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
             <button
               id="cancelProductBtn"
-              class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400"
+              class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400 w-full sm:w-auto"
             >
               Cancel
             </button>
             <button
               id="createProductBtn"
-              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-600"
+              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-600 w-full sm:w-auto"
             >
               Create Link
             </button>
@@ -2210,7 +2210,7 @@
             <p class="text-sm font-bold text-green-600 mb-2">
               Success! Share this link:
             </p>
-            <div class="flex">
+            <div class="flex gap-2">
               <input
                 id="productLinkInput"
                 class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
@@ -2219,7 +2219,7 @@
               />
               <button
                 id="copyLinkBtn"
-                class="ml-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+                class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 shrink-0"
               >
                 Copy
               </button>
