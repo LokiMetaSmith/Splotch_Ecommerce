@@ -960,6 +960,55 @@ async function BootStrap() {
     addTextBtn.addEventListener("click", handleAddText);
   }
 
+  const textBtns = document.querySelectorAll(".text-align-btn");
+  textBtns.forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      // Remove active state from all
+      textBtns.forEach((b) => {
+        b.classList.remove(
+          "bg-indigo-100",
+          "border-indigo-300",
+          "text-indigo-700",
+        );
+        b.classList.add("bg-white", "border-gray-300", "text-gray-600");
+        const svg = b.querySelector("svg");
+        if (svg) {
+          svg.classList.remove("text-indigo-700");
+          svg.classList.add("text-gray-600");
+        }
+      });
+
+      // Add active state to clicked
+      const clickedBtn = e.currentTarget;
+      clickedBtn.classList.remove(
+        "bg-white",
+        "border-gray-300",
+        "text-gray-600",
+      );
+      clickedBtn.classList.add("bg-indigo-100", "border-indigo-300");
+      const svg = clickedBtn.querySelector("svg");
+      if (svg) {
+        svg.classList.remove("text-gray-600");
+        svg.classList.add("text-indigo-700");
+      }
+
+      textAlignment = clickedBtn.dataset.align;
+      // Optionally auto-update text if a text layer is selected
+      if (activeBase && activeBase.customLayers) {
+        const activeTabId = getActiveLineId();
+        const layer = activeBase.customLayers.find((l) => l.id === activeTabId);
+        if (
+          layer &&
+          layer.type === "text" &&
+          textInput &&
+          textInput.value.trim() !== ""
+        ) {
+          handleAddText();
+        }
+      }
+    });
+  });
+
   // Sync text size slider and input
   if (textSizeSlider && textSizeInput) {
     textSizeSlider.addEventListener("input", (e) => {
@@ -5028,9 +5077,52 @@ function handleAddText() {
 
   textCtx.font = `${size}px ${font}`;
   textCtx.fillStyle = color;
-  textCtx.textAlign = "center";
-  textCtx.textBaseline = "middle";
-  textCtx.fillText(text, textCanvas.width / 2, textCanvas.height / 2);
+
+  // Setup bounds for text
+  // We use the activeBase bounds if available, otherwise fallback to canvas size
+  let targetWidth = canvas.width;
+  let targetHeight = canvas.height;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  if (currentBounds) {
+    targetWidth = currentBounds.maxX - currentBounds.minX;
+    targetHeight = currentBounds.maxY - currentBounds.minY;
+    offsetX = currentBounds.minX;
+    offsetY = currentBounds.minY;
+  }
+
+  // Padding from the edge of bounds
+  const padding = 10;
+
+  let x = offsetX + targetWidth / 2;
+  let y = offsetY + targetHeight / 2;
+
+  // Set horizontal alignment
+  if (textAlignment.includes("left")) {
+    textCtx.textAlign = "left";
+    x = offsetX + padding;
+  } else if (textAlignment.includes("right")) {
+    textCtx.textAlign = "right";
+    x = offsetX + targetWidth - padding;
+  } else {
+    textCtx.textAlign = "center";
+    x = offsetX + targetWidth / 2;
+  }
+
+  // Set vertical alignment
+  if (textAlignment.includes("top")) {
+    textCtx.textBaseline = "top";
+    y = offsetY + padding;
+  } else if (textAlignment.includes("bottom")) {
+    textCtx.textBaseline = "bottom";
+    y = offsetY + targetHeight - padding;
+  } else {
+    textCtx.textBaseline = "middle";
+    y = offsetY + targetHeight / 2;
+  }
+
+  textCtx.fillText(text, x, y);
 
   // Set the text canvas as the image for the current text layer
   const image = new Image();
