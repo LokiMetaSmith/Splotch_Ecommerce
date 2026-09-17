@@ -1703,11 +1703,18 @@ document.addEventListener("DOMContentLoaded", () => {
         10,
       );
     }
-    if (tuneOrderOverlay) tuneOrderOverlay.classList.remove("hidden");
+    if (tuneOrderOverlay) {
+      tuneOrderOverlay.classList.remove("hidden");
+      tuneOrderOverlay.style.opacity = "0";
+      setTimeout(() => {
+        tuneOrderOverlay.style.opacity = "1";
+      }, 10);
+    }
   }
 
   function closeTuneDrawer() {
     if (tuneOrderDrawer) tuneOrderDrawer.classList.add("translate-x-full");
+    if (tuneOrderOverlay) tuneOrderOverlay.style.opacity = "0";
     setTimeout(() => {
       if (tuneOrderDrawer) tuneOrderDrawer.classList.add("hidden");
       if (tuneOrderOverlay) tuneOrderOverlay.classList.add("hidden");

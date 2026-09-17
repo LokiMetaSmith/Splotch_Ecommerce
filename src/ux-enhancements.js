@@ -272,7 +272,9 @@ export function setupShortcutsHelp() {
   const modal = document.createElement("div");
   modal.id = "shortcutsModal";
   modal.className =
-    "fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden transition-opacity duration-200";
+    "fixed inset-0 z-50 flex items-center justify-center hidden transition-opacity duration-200";
+  modal.style.backgroundColor = "rgba(0, 0, 0, 0.4)";
+  modal.style.backdropFilter = "blur(2px)";
   modal.setAttribute("role", "dialog");
   modal.setAttribute("aria-modal", "true");
   modal.setAttribute("aria-labelledby", "shortcutsModalTitle");
