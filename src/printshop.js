@@ -20,8 +20,12 @@ let authToken;
 let csrfToken;
 let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
-const svgCache = new Map(); // Cache for SVG strings to avoid redundant fetches
-let currentViewMode = localStorage.getItem('splotchViewMode') || 'card';
+let currentViewMode = 'card';
+try {
+  currentViewMode = localStorage.getItem('splotchViewMode') || 'card';
+} catch {
+  // Storage restricted
+}
 let currentPricingConfig = {};
 let pirateShipAutoSync = true;
 

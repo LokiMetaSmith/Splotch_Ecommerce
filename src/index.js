@@ -6343,16 +6343,21 @@ function handleGenerateCutline(skipPrompt = false) {
 }
 
 // --- Creator / Product Functions ---
+function getStoredAuthToken() {
+  try {
+    return (
+      localStorage.getItem("authToken") ||
+      localStorage.getItem("splotch_token") ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function checkAuthStatus() {
   try {
-    let token = null;
-    try {
-      token =
-        localStorage.getItem("authToken") ||
-        localStorage.getItem("splotch_token");
-    } catch {
-      // Storage access may be restricted by browser privacy settings
-    }
+    const token = getStoredAuthToken();
 
     if (token) {
       const verifyRes = await fetch(`${serverUrl}/api/auth/verify-token`, {
@@ -6382,14 +6387,8 @@ async function handleCreateProduct() {
     return;
   }
 
-  // We need to upload the file first if it's not already on the server?
-  // Actually, handlePaymentFormSubmit uploads it. We need a similar flow here.
-  // OR we reuse the upload endpoint.
-  // But `handleFileChange` just reads locally.
-
   // 1. Get auth token
-  const token =
-    localStorage.getItem("authToken") || localStorage.getItem("splotch_token");
+  const token = getStoredAuthToken();
   if (!token) {
     showNotification("You must be logged in to sell designs.", "error");
     return;

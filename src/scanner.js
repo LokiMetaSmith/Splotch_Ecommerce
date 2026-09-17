@@ -6,7 +6,12 @@ const serverUrl =
     ? "http://localhost:3000"
     : window.location.origin;
 
-let authToken = localStorage.getItem("authToken");
+let authToken = null;
+try {
+  authToken = localStorage.getItem("authToken");
+} catch {
+  // Storage restricted
+}
 let currentEntityId = null;
 let currentEntityType = null; // 'order' or 'batch'
 
