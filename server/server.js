@@ -1463,6 +1463,7 @@ async function startServer(
             areaInSqIn,
             destinationState,
             deliveryMethod,
+            tradeoffs,
           } = req.body;
           const shippingCfg = {
             ...DEFAULT_SHIPPING_CONFIG,
@@ -1474,6 +1475,8 @@ async function startServer(
             config: shippingCfg,
             destinationState,
             deliveryMethod,
+            tradeoffs: Array.isArray(tradeoffs) ? tradeoffs : [],
+            pricingConfig: db.data?.config?.pricing || null,
           });
           return res.json({ success: true, ...breakdown });
         } catch (err) {
@@ -2531,6 +2534,8 @@ async function startServer(
             size: orderDetails.size || null,
             cutType: orderDetails.cutType || "die_cut",
             stickerName: orderDetails.stickerName || null,
+            tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
+            standbyBidCents: typeof orderDetails.standbyBidCents === "number" ? orderDetails.standbyBidCents : null,
           };
 
           // --- Product / Creator Payout Logic ---
@@ -2678,6 +2683,8 @@ async function startServer(
                 config: shippingCfg,
                 destinationState,
                 deliveryMethod,
+                tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
+                pricingConfig: pricingConfig || db.data?.config?.pricing || null,
               });
 
               const expectedGrandTotal = orderBreakdown.totalCents;

@@ -1744,8 +1744,12 @@ document.addEventListener("DOMContentLoaded", () => {
         currentStandbyBidCents = null;
       }
       closeTuneDrawer();
-      checkCost();
+      updateOrderSummary();
     });
+  }
+
+  function checkCost() {
+    updateOrderSummary();
   }
   BootStrap();
   document
@@ -2059,6 +2063,8 @@ async function updateOrderSummary() {
         areaInSqIn,
         destinationState,
         deliveryMethod,
+        tradeoffs: currentTradeoffs,
+        standbyBidCents: currentStandbyBidCents,
         ...(csrfToken ? { _csrf: csrfToken } : {}),
       }),
     });
