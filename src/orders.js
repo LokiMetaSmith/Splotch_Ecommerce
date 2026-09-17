@@ -351,7 +351,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (response.ok) {
           success = true;
-          loginStatus.textContent = "Magic link sent! Please check your email.";
+          loginStatus.textContent =
+            "Magic link sent! Please check your email (link is valid for 15 minutes).";
           loginStatus.style.color = "green";
         } else {
           throw new Error(data.error || "Failed to send magic link.");

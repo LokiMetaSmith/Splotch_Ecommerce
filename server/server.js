@@ -4709,8 +4709,28 @@ async function startServer(
             await scheduleEmail("send-magic-link", {
               to: email,
               subject: "Your Magic Link for Splotch",
-              text: `Click here to log in: ${magicLink}`,
-              html: `<p>Click here to log in: <a href="${magicLink}">${magicLink}</a></p>`,
+              text: `Click here to log in: ${magicLink}\n\nThis magic link is valid for 15 minutes.\n\nIf this link is expired or out of date, you can request a new one at: ${getSecret("BASE_URL")}/orders.html`,
+              html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+  <h2 style="color: #1e293b; margin-top: 0; font-size: 22px; font-weight: bold;">Your Magic Link for Splotch</h2>
+  <p style="color: #475569; font-size: 15px; line-height: 1.5; margin-bottom: 20px;">Click the button below to log in and view your past orders:</p>
+  <div style="margin: 28px 0; text-align: center;">
+    <a href="${magicLink}" style="background-color: #e11d48; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 9999px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.2);">
+      ✨ Access Your Orders
+    </a>
+  </div>
+  <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-top: 24px;">
+    <p style="color: #334155; font-size: 14px; margin: 0; font-weight: 500;">
+      ⏱️ <strong>This link is valid for 15 minutes.</strong>
+    </p>
+    <p style="color: #64748b; font-size: 13px; margin: 6px 0 0 0; line-height: 1.4;">
+      If you click an expired or out-of-date link, you can easily request a new one at <a href="${getSecret("BASE_URL")}/orders.html" style="color: #2563eb; text-decoration: underline;">${getSecret("BASE_URL")}/orders.html</a>.
+    </p>
+  </div>
+  <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0 16px;" />
+  <p style="color: #94a3b8; font-size: 12px; line-height: 1.4; word-break: break-all; margin: 0;">
+    Click here to log in: <a href="${magicLink}" style="color: #64748b;">${magicLink}</a>
+  </p>
+</div>`,
             });
           }
           res.json({
@@ -4746,11 +4766,20 @@ async function startServer(
           !decodedHeader.header ||
           !decodedHeader.header.kid
         ) {
-          return res.status(401).json({ error: "Invalid token structure" });
+          return res.status(401).json({
+            error: "Invalid token structure",
+            message:
+              "This magic link is invalid or corrupted. Please request a new one.",
+          });
         }
         const key = getKey(decodedHeader.header.kid);
         if (!key) {
-          return res.status(401).json({ error: "Key not found" });
+          return res.status(401).json({
+            error: "Key not found",
+            expired: true,
+            message:
+              "This magic link is out of date. Please request a new one.",
+          });
         }
 
         jwt.verify(
@@ -4759,9 +4788,14 @@ async function startServer(
           { algorithms: ["RS256"] },
           async (err, decoded) => {
             if (err) {
-              return res
-                .status(401)
-                .json({ error: "Invalid or expired token" });
+              const isExpired = err.name === "TokenExpiredError";
+              return res.status(401).json({
+                error: "Invalid or expired token",
+                expired: isExpired,
+                message: isExpired
+                  ? "This magic link has expired (links are valid for 15 minutes). Please request a new one."
+                  : "This magic link is invalid or out of date. Please request a new one.",
+              });
             }
             let user = await getUserByEmail(decoded.email);
             if (!user) {

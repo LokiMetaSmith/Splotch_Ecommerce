@@ -15,6 +15,38 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
+function renderErrorState(title, message, isExpired = false) {
+  loginStatus.className = "max-w-md mx-auto my-8";
+  loginStatus.innerHTML = `
+    <div class="text-center p-6 sm:p-8 bg-white rounded-2xl shadow-sm border border-gray-100">
+      <div class="w-16 h-16 ${isExpired ? "bg-amber-100 text-amber-600" : "bg-red-100 text-red-600"} rounded-full flex items-center justify-center mx-auto mb-4">
+        ${
+          isExpired
+            ? `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+            : `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`
+        }
+      </div>
+      <h2 class="text-2xl font-bold text-splotch-navy mb-2" style="letter-spacing: 0.5px;">
+        ${escapeHtml(title)}
+      </h2>
+      <p class="text-gray-600 mb-6 text-sm sm:text-base leading-relaxed">
+        ${escapeHtml(message)}
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/orders.html" class="inline-flex items-center justify-center gap-2 bg-splotch-red hover:brightness-110 text-white font-semibold py-3 px-6 rounded-full shadow-md transition duration-200 text-sm sm:text-base">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          Send a New Magic Link
+        </a>
+        <a href="/" class="inline-flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-full transition duration-200 text-sm sm:text-base">
+          Back to Home
+        </a>
+      </div>
+    </div>
+  `;
+}
+
 async function fetchCsrfToken() {
   try {
     const response = await fetch(`${serverUrl}/api/csrf-token`, {
@@ -30,8 +62,11 @@ async function fetchCsrfToken() {
     csrfToken = data.csrfToken;
   } catch (error) {
     console.error("Error fetching CSRF token:", error);
-    loginStatus.innerHTML =
-      "<p>A security token could not be loaded. Please refresh the page.</p>";
+    renderErrorState(
+      "Connection Error",
+      "A security token could not be loaded. Please refresh the page or try sending a new magic link.",
+      false,
+    );
   }
 }
 
@@ -41,7 +76,11 @@ window.addEventListener("load", async () => {
   const token = params.get("token");
 
   if (!token) {
-    loginStatus.innerHTML = "<p>No login token found.</p>";
+    renderErrorState(
+      "Missing Login Token",
+      "No login token was found in this link. Please send a new magic link to access your orders.",
+      false,
+    );
     return;
   }
 
@@ -63,11 +102,24 @@ window.addEventListener("load", async () => {
       orderHistory.classList.remove("hidden");
       fetchOrderHistory(data.token);
     } else {
-      loginStatus.innerHTML = `<p>Error logging in: ${escapeHtml(data.error)}</p>`;
+      const isExpired =
+        data.expired ||
+        (data.error && data.error.toLowerCase().includes("expired"));
+      const title = isExpired ? "Magic Link Expired" : "Invalid Magic Link";
+      const message =
+        data.message ||
+        (isExpired
+          ? "This magic link has expired. Magic links are only good for 15 minutes. Please send a new one to access your orders."
+          : "This magic link is out of date or invalid. Please send a new one to access your orders.");
+      renderErrorState(title, message, isExpired);
     }
   } catch (error) {
     console.error("Error verifying magic link:", error);
-    loginStatus.innerHTML = `<p>Error logging in: ${escapeHtml(error.message)}</p>`;
+    renderErrorState(
+      "Verification Failed",
+      "We were unable to verify your login link. If your link is out of date, please send a new one.",
+      false,
+    );
   }
 });
 
