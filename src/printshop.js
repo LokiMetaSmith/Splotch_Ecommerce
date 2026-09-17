@@ -28,6 +28,7 @@ try {
 }
 let currentPricingConfig = {};
 let pirateShipAutoSync = true;
+const svgCache = new Map();
 
 // Pagination state
 let currentPage = 1;
