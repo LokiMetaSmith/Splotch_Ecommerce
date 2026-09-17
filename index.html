@@ -202,9 +202,18 @@
               id="starterTemplatesSection"
               style="display: none"
             >
-              <label class="label text-sm font-medium text-gray-700 block mb-2"
-                >Starter Templates:</label
-              >
+              <div class="flex justify-between items-center mb-2">
+                <label class="label text-sm font-medium text-gray-700 block"
+                  >Starter Templates & Tools:</label
+                >
+                <button
+                  type="button"
+                  id="secret-tradeoffs-btn"
+                  class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline focus:outline-none"
+                >
+                  Production Tradeoffs ⚙️
+                </button>
+              </div>
               <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -2114,7 +2123,7 @@
             </div>
             <!-- Square Card Payment Element -->
             <!-- Order Cost Summary -->
-            <div class="flex justify-end mb-1">
+            <div class="flex justify-end mb-1" id="tune-order-btn-container" style="display: none">
               <button
                 type="button"
                 id="tune-order-btn"

@@ -1634,6 +1634,13 @@ async function BootStrap() {
         starterTemplatesSection.style.display = "block";
       }
 
+      const tuneOrderBtnContainer = document.getElementById(
+        "tune-order-btn-container",
+      );
+      if (tuneOrderBtnContainer) {
+        tuneOrderBtnContainer.style.display = "flex";
+      }
+
       updateEditingButtonsState(isDisabled);
 
       showNotification("Secret features unlocked! 🎨", "success");
@@ -1690,6 +1697,7 @@ async function BootStrap() {
 document.addEventListener("DOMContentLoaded", () => {
   // Tune Your Order Logic
   const tuneOrderBtn = document.getElementById("tune-order-btn");
+  const secretTradeoffsBtn = document.getElementById("secret-tradeoffs-btn");
   const tuneOrderDrawer = document.getElementById("tune-order-drawer");
   const tuneOrderOverlay = document.getElementById("tune-order-overlay");
   const closeTuneOrderBtn = document.getElementById("close-tune-order-btn");
@@ -1722,6 +1730,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (tuneOrderBtn) tuneOrderBtn.addEventListener("click", openTuneDrawer);
+  if (secretTradeoffsBtn)
+    secretTradeoffsBtn.addEventListener("click", openTuneDrawer);
   if (closeTuneOrderBtn)
     closeTuneOrderBtn.addEventListener("click", closeTuneDrawer);
   if (tuneOrderOverlay)
