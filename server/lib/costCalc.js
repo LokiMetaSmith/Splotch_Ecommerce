@@ -131,6 +131,7 @@ export const DEFAULT_SHIPPING_CONFIG = {
   gramsPerSqIn: 0.05, // 3 mil vinyl
   packageTareGrams: 28, // ~1 oz envelope + backing
   pickupDiscountCents: 300, // $3.00 local pickup discount
+  handlingFeePerItemCents: 0, // $0.00 per item
 };
 
 /**
@@ -153,6 +154,7 @@ export function calcOrderBreakdown({
   deliveryMethod = "ship",
   tradeoffs = [],
   pricingConfig = null,
+  quantity = 1,
 }) {
   const cfg = { ...DEFAULT_SHIPPING_CONFIG, ...config };
   const isPickup = deliveryMethod === "pickup";
@@ -238,7 +240,7 @@ export function calcOrderBreakdown({
         taxRate: cfg.taxRate,
       })
     : 0;
-  const handlingCents = cfg.handlingFeeCents;
+  const handlingCents = cfg.handlingFeeCents + (cfg.handlingFeePerItemCents || 0) * (quantity || 1);
 
   const preTotalCents =
     discountedSubtotal + shippingCents + taxCents + handlingCents;

@@ -3202,6 +3202,8 @@ async function loadShippingConfig() {
     setVal("shipping-tax-rate",      ((c.taxRate || 0) * 100).toFixed(2));
     // Handling fee stored in cents, display as dollars
     setVal("shipping-handling-fee",  ((c.handlingFeeCents || 0) / 100).toFixed(2));
+    // Per-sticker handling fee stored in cents, display as dollars
+    setVal("shipping-handling-fee-per-item", ((c.handlingFeePerItemCents || 0) / 100).toFixed(2));
     // Square % stored as decimal (0.029), display as percentage (2.9)
     setVal("shipping-square-pct",    ((c.squareFeePercent || 0) * 100).toFixed(3));
     // Square fixed stored in cents, display as dollars
@@ -3228,6 +3230,7 @@ function initShippingConfigListeners() {
       taxRate:            getNum("shipping-tax-rate") / 100,
       // Input is $, convert to cents
       handlingFeeCents:   Math.round(getNum("shipping-handling-fee") * 100),
+      handlingFeePerItemCents: Math.round(getNum("shipping-handling-fee-per-item") * 100),
       // Input is %, convert back to decimal
       squareFeePercent:   getNum("shipping-square-pct") / 100,
       // Input is $, convert to cents

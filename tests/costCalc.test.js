@@ -174,6 +174,19 @@ describe('costCalc - calcOrderBreakdown', () => {
     expect(result.handlingCents).toBe(500);
   });
 
+  it('should calculate handling fee with per-item fee based on quantity', () => {
+    const customConfig = { ...DEFAULT_SHIPPING_CONFIG, handlingFeeCents: 500, handlingFeePerItemCents: 10 };
+    const result = calcOrderBreakdown({ areaInSqIn: 4, subtotalCents: 1000, config: customConfig, quantity: 50 });
+    expect(result.handlingCents).toBe(500 + 10 * 50); // 1000
+  });
+
+  it('should calculate handling fee correctly when quantity is missing or invalid', () => {
+    const customConfig = { ...DEFAULT_SHIPPING_CONFIG, handlingFeeCents: 500, handlingFeePerItemCents: 10 };
+    // If quantity is missing, it should default to 1
+    const result = calcOrderBreakdown({ areaInSqIn: 4, subtotalCents: 1000, config: customConfig });
+    expect(result.handlingCents).toBe(500 + 10 * 1); // 510
+  });
+
   it('should not charge sales tax for out-of-state shipping destinations', () => {
     const outOfState = calcOrderBreakdown({
       areaInSqIn: 4,

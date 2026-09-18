@@ -1464,6 +1464,7 @@ async function startServer(
             destinationState,
             deliveryMethod,
             tradeoffs,
+            quantity,
           } = req.body;
           const shippingCfg = {
             ...DEFAULT_SHIPPING_CONFIG,
@@ -1477,6 +1478,7 @@ async function startServer(
             deliveryMethod,
             tradeoffs: Array.isArray(tradeoffs) ? tradeoffs : [],
             pricingConfig: db.data?.config?.pricing || null,
+            quantity: quantity ? Number(quantity) : 1,
           });
           return res.json({ success: true, ...breakdown });
         } catch (err) {
@@ -1513,6 +1515,10 @@ async function startServer(
         body("handlingFeeCents")
           .isInt({ min: 0 })
           .withMessage("handlingFeeCents must be a non-negative integer"),
+        body("handlingFeePerItemCents")
+          .optional()
+          .isInt({ min: 0 })
+          .withMessage("handlingFeePerItemCents must be a non-negative integer"),
         body("squareFeePercent")
           .isFloat({ min: 0, max: 1 })
           .withMessage("squareFeePercent must be between 0 and 1"),
@@ -1540,6 +1546,10 @@ async function startServer(
         const newConfig = {
           taxRate: Number(req.body.taxRate),
           handlingFeeCents: Number(req.body.handlingFeeCents),
+          handlingFeePerItemCents:
+            req.body.handlingFeePerItemCents !== undefined
+              ? Number(req.body.handlingFeePerItemCents)
+              : 0,
           squareFeePercent: Number(req.body.squareFeePercent),
           squareFeeFixedCents: Number(req.body.squareFeeFixedCents),
           gramsPerSqIn: Number(req.body.gramsPerSqIn),
@@ -2685,6 +2695,7 @@ async function startServer(
                 deliveryMethod,
                 tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
                 pricingConfig: pricingConfig || db.data?.config?.pricing || null,
+                quantity: orderDetails.quantity || 1,
               });
 
               const expectedGrandTotal = orderBreakdown.totalCents;
