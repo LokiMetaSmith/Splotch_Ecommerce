@@ -91,7 +91,9 @@
   <body class="bg-gray-100 pt-28">
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <nav class="top-menu-bar">
-      <a href="#sticker-design-box" class="menu-item" id="jump-to-editor-btn">Jump to Sticker Editor</a>
+      <a href="#sticker-design-box" class="menu-item" id="jump-to-editor-btn"
+        >Jump to Sticker Editor</a
+      >
       <a href="/orders.html" class="menu-item">View Order History</a>
     </nav>
     <div
@@ -124,7 +126,9 @@
           cursor: pointer;
         "
         aria-label="Dismiss payment blocker warning"
-      >&times;</button>
+      >
+        &times;
+      </button>
       <p style="font-weight: bold">Payment Form Blocked 🛡️</p>
       <p>
         It looks like an ad blocker is preventing our secure payment form from
@@ -1512,6 +1516,36 @@
                 </label>
               </div>
 
+              <div
+                class="field mt-4 border-t border-gray-200 pt-4 hidden"
+                id="promo-code-section"
+              >
+                <label
+                  for="checkoutPromoCode"
+                  class="block text-sm font-medium text-gray-700 mb-1"
+                  >Promo Code</label
+                >
+                <div class="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    id="checkoutPromoCode"
+                    class="flex-grow p-2 border border-gray-300 rounded-md uppercase"
+                    placeholder="Enter code"
+                  />
+                  <button
+                    type="button"
+                    id="applyPromoBtn"
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+                <p
+                  id="promoStatusMessage"
+                  class="text-sm font-medium mb-4 h-5"
+                ></p>
+              </div>
+
               <div class="field mt-4 border-t border-gray-200 pt-4">
                 <div class="flex justify-between items-end mb-2">
                   <span class="label text-sm font-medium text-gray-700"
@@ -2123,7 +2157,11 @@
             </div>
             <!-- Square Card Payment Element -->
             <!-- Order Cost Summary -->
-            <div class="flex justify-end mb-1" id="tune-order-btn-container" style="display: none">
+            <div
+              class="flex justify-end mb-1"
+              id="tune-order-btn-container"
+              style="display: none"
+            >
               <button
                 type="button"
                 id="tune-order-btn"
@@ -2263,7 +2301,7 @@
       <div
         id="productModal"
         class="fixed inset-0 z-50 flex items-center justify-center hidden"
-        style="background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(2px);"
+        style="background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(2px)"
         role="dialog"
         aria-modal="true"
         aria-labelledby="productModalTitle"
@@ -2519,7 +2557,7 @@
     <div
       id="tune-order-overlay"
       class="fixed inset-0 z-40 hidden transition-opacity duration-300"
-      style="background-color: rgba(0, 0, 0, 0.35); backdrop-filter: blur(2px);"
+      style="background-color: rgba(0, 0, 0, 0.35); backdrop-filter: blur(2px)"
     ></div>
 
     <div

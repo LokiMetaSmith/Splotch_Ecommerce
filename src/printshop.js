@@ -20,9 +20,9 @@ let authToken;
 let csrfToken;
 let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
-let currentViewMode = 'card';
+let currentViewMode = "card";
 try {
-  currentViewMode = localStorage.getItem('splotchViewMode') || 'card';
+  currentViewMode = localStorage.getItem("splotchViewMode") || "card";
 } catch {
   // Storage restricted
 }
@@ -40,10 +40,38 @@ export const ui = {};
 
 // --- Printer & Media Configuration ---
 export const PrinterProfiles = {
-  custom: { name: "Custom (Manual Entry)", width: 12, height: 12, dpi: 96, isCustom: true, margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 } },
-  roland_bn20: { name: "Roland BN-20", width: 20, height: 20, dpi: 1440, isCustom: false, margins: { top: 1.0, bottom: 1.0, left: 0.5, right: 0.5 } },
-  hp_latex_115: { name: "HP Latex 115", width: 54, height: 54, dpi: 1200, isCustom: false, margins: { top: 0.5, bottom: 0.5, left: 0.2, right: 0.2 } },
-  epson_surecolor: { name: "Epson SureColor", width: 60, height: 60, dpi: 600, isCustom: false, margins: { top: 0.5, bottom: 0.5, left: 0.1, right: 0.1 } }
+  custom: {
+    name: "Custom (Manual Entry)",
+    width: 12,
+    height: 12,
+    dpi: 96,
+    isCustom: true,
+    margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 },
+  },
+  roland_bn20: {
+    name: "Roland BN-20",
+    width: 20,
+    height: 20,
+    dpi: 1440,
+    isCustom: false,
+    margins: { top: 1.0, bottom: 1.0, left: 0.5, right: 0.5 },
+  },
+  hp_latex_115: {
+    name: "HP Latex 115",
+    width: 54,
+    height: 54,
+    dpi: 1200,
+    isCustom: false,
+    margins: { top: 0.5, bottom: 0.5, left: 0.2, right: 0.2 },
+  },
+  epson_surecolor: {
+    name: "Epson SureColor",
+    width: 60,
+    height: 60,
+    dpi: 600,
+    isCustom: false,
+    margins: { top: 0.5, bottom: 0.5, left: 0.1, right: 0.1 },
+  },
 };
 
 class ToastManager {
@@ -427,7 +455,9 @@ async function handleWebAuthnLogin(e) {
     }
   } catch (error) {
     if (error.name === "NotAllowedError") {
-      showErrorToast("Authentication cancelled or timed out. Please try again.");
+      showErrorToast(
+        "Authentication cancelled or timed out. Please try again.",
+      );
     } else {
       showErrorToast(`WebAuthn Login Failed: ${error.message}`);
     }
@@ -616,10 +646,10 @@ async function fetchAndDisplayOrders(query = "") {
     let endpoint = query
       ? `${serverUrl}/api/orders/search?q=${encodeURIComponent(query)}`
       : `${serverUrl}/api/orders`;
-    
+
     if (activePrintshop && activePrintshop !== "") {
-       const sep = endpoint.includes("?") ? "&" : "?";
-       endpoint += `${sep}printshopId=${activePrintshop}`;
+      const sep = endpoint.includes("?") ? "&" : "?";
+      endpoint += `${sep}printshopId=${activePrintshop}`;
     }
     allOrders = await fetchWithAuth(endpoint);
     if (!Array.isArray(allOrders)) allOrders = [];
@@ -628,7 +658,6 @@ async function fetchAndDisplayOrders(query = "") {
       document.querySelector("#filter-container .filter-btn.active")?.dataset
         .status || "ACTIVE";
     filterAndDisplayOrders(activeFilter);
-
 
     updateConnectionStatus("connected");
 
@@ -716,13 +745,24 @@ function filterAndDisplayOrders(status) {
     status === "ALL"
       ? allOrders
       : status === "ACTIVE"
-      ? allOrders.filter((order) => order.status !== "COMPLETED" && order.status !== "CANCELED" && order.status !== "ARCHIVED" && !order.isArchived)
-      : status === "ARCHIVED"
-      ? allOrders.filter((order) => order.isArchived || order.status === "ARCHIVED")
-      : status === "CANCELED"
-      ? allOrders.filter((order) => order.status === "CANCELED" && !order.isArchived)
-      : allOrders.filter((order) => order.status === status && !order.isArchived);
-
+        ? allOrders.filter(
+            (order) =>
+              order.status !== "COMPLETED" &&
+              order.status !== "CANCELED" &&
+              order.status !== "ARCHIVED" &&
+              !order.isArchived,
+          )
+        : status === "ARCHIVED"
+          ? allOrders.filter(
+              (order) => order.isArchived || order.status === "ARCHIVED",
+            )
+          : status === "CANCELED"
+            ? allOrders.filter(
+                (order) => order.status === "CANCELED" && !order.isArchived,
+              )
+            : allOrders.filter(
+                (order) => order.status === status && !order.isArchived,
+              );
 
   const noOrdersText = document.getElementById("no-orders-text");
 
@@ -740,12 +780,15 @@ function filterAndDisplayOrders(status) {
 
     // Sort newest first
     const sortedOrders = ordersToDisplay.slice().reverse();
-    
+
     // Pagination
     const totalPages = Math.ceil(sortedOrders.length / itemsPerPage);
     if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedOrders = sortedOrders.slice(startIndex, startIndex + itemsPerPage);
+    const paginatedOrders = sortedOrders.slice(
+      startIndex,
+      startIndex + itemsPerPage,
+    );
 
     let html = "";
     if (currentViewMode === "list") {
@@ -764,24 +807,20 @@ function filterAndDisplayOrders(status) {
             </thead>
             <tbody>
       `;
-      html += paginatedOrders
-        .map((order) => displayOrderRow(order))
-        .join("");
+      html += paginatedOrders.map((order) => displayOrderRow(order)).join("");
       html += `
             </tbody>
           </table>
         </div>
       `;
     } else {
-      html = paginatedOrders
-        .map((order) => displayOrder(order))
-        .join("");
+      html = paginatedOrders.map((order) => displayOrder(order)).join("");
     }
 
     // Update innerHTML and restore the message element (hidden)
     ui.ordersList.innerHTML = html;
     ui.ordersList.appendChild(ui.noOrdersMessage);
-    
+
     renderPagination(sortedOrders.length);
 
     // Render QR codes for all displayed orders
@@ -805,12 +844,16 @@ function filterAndDisplayOrders(status) {
 
 // Helper to resolve PPI for an order
 export function getResolutionPpi(resolutionId) {
-  if (typeof resolutionId === "number" && !isNaN(resolutionId) && resolutionId > 0) {
+  if (
+    typeof resolutionId === "number" &&
+    !isNaN(resolutionId) &&
+    resolutionId > 0
+  ) {
     return resolutionId;
   }
   if (currentPricingConfig && currentPricingConfig.resolutions) {
     const found = currentPricingConfig.resolutions.find(
-      (r) => r.id === resolutionId || r.ppi === resolutionId
+      (r) => r.id === resolutionId || r.ppi === resolutionId,
     );
     if (found && found.ppi) return Number(found.ppi);
   }
@@ -826,12 +869,12 @@ function displayOrderRow(order) {
   const orderId = order.orderId;
   const receivedAt = new Date(order.receivedAt).toLocaleString();
   const quantity = order.orderDetails?.quantity || order.quantity || 0;
-  const ppi = getResolutionPpi(order.orderDetails?.resolution || order.resolution);
+  const ppi = getResolutionPpi(
+    order.orderDetails?.resolution || order.resolution,
+  );
   const price = (order.amount / 100).toFixed(2);
 
-  const billingName = escapeHtml(
-    order.customerDetails?.billing?.name || "N/A",
-  );
+  const billingName = escapeHtml(order.customerDetails?.billing?.name || "N/A");
   const billingEmail = escapeHtml(
     order.customerDetails?.billing?.email || order.customerEmail || "N/A",
   );
@@ -866,21 +909,28 @@ function displayOrderRow(order) {
     ARCHIVED: "bg-gray-200 text-gray-800",
   };
   const alert = getOrderAlert(order);
-  const alertHtml = alert ? `<div class="inline-flex items-center gap-1 mt-1 text-[10px] px-1.5 py-0.5 rounded border ${alert.classes}">${alert.icon} ${alert.text}</div>` : "";
-  
+  const alertHtml = alert
+    ? `<div class="inline-flex items-center gap-1 mt-1 text-[10px] px-1.5 py-0.5 rounded border ${alert.classes}">${alert.icon} ${alert.text}</div>`
+    : "";
+
   const statusClass =
     statusColors[order.status?.toUpperCase()] || "bg-gray-500 text-white";
 
-  const formatStatusLabel = (s) => s === "HOLD_FOR_PICKUP" ? "Hold for Pickup" : (s.charAt(0) + s.slice(1).toLowerCase());
+  const formatStatusLabel = (s) =>
+    s === "HOLD_FOR_PICKUP"
+      ? "Hold for Pickup"
+      : s.charAt(0) + s.slice(1).toLowerCase();
 
   let retentionBadge = "";
   if (order.isArchived || order.status === "ARCHIVED") {
-    retentionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-300" title="Order is archived. All order metadata, specifications, and history are preserved.${order.artworkPruned ? ' Artwork files pruned.' : ''}">Archived${order.artworkPruned ? ' (Pruned)' : ''}</span>`;
+    retentionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-300" title="Order is archived. All order metadata, specifications, and history are preserved.${order.artworkPruned ? " Artwork files pruned." : ""}">Archived${order.artworkPruned ? " (Pruned)" : ""}</span>`;
   } else if (order.status === "CANCELED") {
     const canceledTime = order.shadowDeletedAt
       ? new Date(order.shadowDeletedAt).getTime()
       : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
-    const elapsedDays = Math.floor((Date.now() - canceledTime) / (24 * 60 * 60 * 1000));
+    const elapsedDays = Math.floor(
+      (Date.now() - canceledTime) / (24 * 60 * 60 * 1000),
+    );
     const remainingDays = Math.max(0, 30 - elapsedDays);
     retentionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200" title="Canceled orders are automatically archived after 30 days. Order metadata is permanently preserved.">Archives in ${remainingDays}d</span>`;
   }
@@ -919,9 +969,13 @@ function displayOrderRow(order) {
       </td>
       <td class="px-4 py-3">
         <div class="flex items-center gap-2">
-            ${designImagePath && order.designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
+            ${
+              designImagePath && order.designImagePath
+                ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
                 <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
-            </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[10px] text-gray-500 font-semibold text-center leading-tight p-1">${order.artworkPruned ? 'Pruned' : 'N/A'}</div>`}
+            </a>`
+                : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[10px] text-gray-500 font-semibold text-center leading-tight p-1">${order.artworkPruned ? "Pruned" : "N/A"}</div>`
+            }
             <div>
                 <div class="text-xs font-semibold">Qty: ${quantity}</div>
                 ${cutFilePath ? `<a href="${serverPrefix}${cutFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block mt-1">Download SVG</a>` : ""}
@@ -939,21 +993,25 @@ function displayOrderRow(order) {
                     History
                 </button>
             </div>
-            ${order.exportToPirateship || order.labelRequested ? `
+            ${
+              order.exportToPirateship || order.labelRequested
+                ? `
               <div class="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-1 w-fit">
                 <span class="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
                 Queued for Pirate Ship
               </div>
-            ` : ""}
+            `
+                : ""
+            }
 
-            <div class="mt-2 text-xs flex flex-col gap-1 tracking-inputs" style="display: ${order.status === 'SHIPPED' || order.status === 'DELIVERED' || order.status === 'COMPLETED' ? 'flex' : 'none'};" data-order-id="${orderId}">
+            <div class="mt-2 text-xs flex flex-col gap-1 tracking-inputs" style="display: ${order.status === "SHIPPED" || order.status === "DELIVERED" || order.status === "COMPLETED" ? "flex" : "none"};" data-order-id="${orderId}">
                <select class="border rounded p-1 tracking-courier bg-white" data-order-id="${orderId}">
-                   <option value="USPS" ${order.courier === 'USPS' ? 'selected' : ''}>USPS</option>
-                   <option value="UPS" ${order.courier === 'UPS' ? 'selected' : ''}>UPS</option>
-                   <option value="FedEx" ${order.courier === 'FedEx' ? 'selected' : ''}>FedEx</option>
-                   <option value="DHL" ${order.courier === 'DHL' ? 'selected' : ''}>DHL</option>
+                   <option value="USPS" ${order.courier === "USPS" ? "selected" : ""}>USPS</option>
+                   <option value="UPS" ${order.courier === "UPS" ? "selected" : ""}>UPS</option>
+                   <option value="FedEx" ${order.courier === "FedEx" ? "selected" : ""}>FedEx</option>
+                   <option value="DHL" ${order.courier === "DHL" ? "selected" : ""}>DHL</option>
                </select>
-               <input type="text" placeholder="Tracking #" value="${escapeHtml(order.trackingNumber || '')}" class="border rounded p-1 tracking-number bg-white" data-order-id="${orderId}">
+               <input type="text" placeholder="Tracking #" value="${escapeHtml(order.trackingNumber || "")}" class="border rounded p-1 tracking-number bg-white" data-order-id="${orderId}">
             </div>
         </div>
       </td>
@@ -987,16 +1045,29 @@ export function displayOrder(order) {
 
   const formatAddress = (contact) => {
     if (!contact) return "";
-    const lines = Array.isArray(contact.addressLines) ? contact.addressLines.filter(Boolean).join(", ") : (contact.addressLines || "");
-    const cityStateZip = [contact.locality || contact.city, contact.administrativeDistrictLevel1 || contact.state, contact.postalCode].filter(Boolean).join(" ");
+    const lines = Array.isArray(contact.addressLines)
+      ? contact.addressLines.filter(Boolean).join(", ")
+      : contact.addressLines || "";
+    const cityStateZip = [
+      contact.locality || contact.city,
+      contact.administrativeDistrictLevel1 || contact.state,
+      contact.postalCode,
+    ]
+      .filter(Boolean)
+      .join(" ");
     return [lines, cityStateZip].filter(Boolean).join(", ");
   };
   const shippingAddrStr = escapeHtml(formatAddress(order.shippingContact));
   const billingAddrStr = escapeHtml(formatAddress(order.billingContact));
-  const hasDistinctBilling = billingAddrStr && shippingAddrStr && (billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase());
+  const hasDistinctBilling =
+    billingAddrStr &&
+    shippingAddrStr &&
+    billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase();
 
   const quantity = escapeHtml(order.orderDetails?.quantity || "N/A");
-  const ppi = getResolutionPpi(order.orderDetails?.resolution || order.resolution);
+  const ppi = getResolutionPpi(
+    order.orderDetails?.resolution || order.resolution,
+  );
   const status = escapeHtml(order.status);
   const orderId = escapeHtml(order.orderId);
   // Truncate BEFORE escaping would be safer for logic, but since orderId is UUID (safe chars),
@@ -1016,7 +1087,9 @@ export function displayOrder(order) {
     ARCHIVED: "bg-gray-200 text-gray-800",
   };
   const alert = getOrderAlert(order);
-  const alertHtml = alert ? `<span class="inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded border ${alert.classes}">${alert.icon} ${alert.text}</span>` : "";
+  const alertHtml = alert
+    ? `<span class="inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded border ${alert.classes}">${alert.icon} ${alert.text}</span>`
+    : "";
 
   const statusClass =
     statusColors[status.toUpperCase()] || "bg-gray-500 text-white";
@@ -1030,6 +1103,8 @@ export function displayOrder(order) {
     order.orderDetails?.stickerName || "Custom Sticker",
   );
   const material = escapeHtml(order.orderDetails?.material || "unknown");
+  const promoCode = escapeHtml(order.orderDetails?.promoCode || "");
+  const promoDiscount = order.orderDetails?.promoDiscount || 0;
 
   // Action Dropdown
   const statuses = [
@@ -1042,7 +1117,10 @@ export function displayOrder(order) {
     "CANCELED",
     "ARCHIVED",
   ];
-  const formatStatusLabel = (s) => s === "HOLD_FOR_PICKUP" ? "Hold for Pickup" : (s.charAt(0) + s.slice(1).toLowerCase());
+  const formatStatusLabel = (s) =>
+    s === "HOLD_FOR_PICKUP"
+      ? "Hold for Pickup"
+      : s.charAt(0) + s.slice(1).toLowerCase();
   const dropdownHtml = `
         <select class="action-dropdown border rounded p-1 text-sm font-bold ${statusClass} mt-4" data-order-id="${orderId}">
             ${statuses.map((s) => `<option value="${s}" ${status === s ? "selected" : ""}>${formatStatusLabel(s)}</option>`).join("")}
@@ -1055,7 +1133,9 @@ export function displayOrder(order) {
     .map((c) => `<option value="${c}">${c.toUpperCase()}</option>`)
     .join("");
 
-  const isLocalPickup = order.deliveryMethod === 'pickup' || order.orderDetails?.deliveryMethod === 'pickup';
+  const isLocalPickup =
+    order.deliveryMethod === "pickup" ||
+    order.orderDetails?.deliveryMethod === "pickup";
   const deliveryBadge = isLocalPickup
     ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Local Pickup</span>`
     : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">Ship to Address</span>`;
@@ -1063,41 +1143,62 @@ export function displayOrder(order) {
   let retentionBadge = "";
 
   if (order.isArchived || status === "ARCHIVED") {
-    retentionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-300 shadow-sm" title="Order is archived. All order specifications, pricing, and history are preserved.${order.artworkPruned ? ' Artwork files pruned.' : ''}">Archived${order.artworkPruned ? ' (Pruned)' : ''}</span>`;
+    retentionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-300 shadow-sm" title="Order is archived. All order specifications, pricing, and history are preserved.${order.artworkPruned ? " Artwork files pruned." : ""}">Archived${order.artworkPruned ? " (Pruned)" : ""}</span>`;
   } else if (status === "CANCELED") {
     const canceledTime = order.shadowDeletedAt
       ? new Date(order.shadowDeletedAt).getTime()
       : new Date(order.lastUpdatedAt || order.receivedAt).getTime();
-    const elapsedDays = Math.floor((Date.now() - canceledTime) / (24 * 60 * 60 * 1000));
+    const elapsedDays = Math.floor(
+      (Date.now() - canceledTime) / (24 * 60 * 60 * 1000),
+    );
     const remainingDays = Math.max(0, 30 - elapsedDays);
     retentionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 shadow-sm" title="Canceled orders are automatically archived after 30 days. Order metadata is permanently preserved.">Archives in ${remainingDays}d</span>`;
   }
 
-  const isShippable = !isLocalPickup && status !== "CANCELED" && status !== "COMPLETED" && status !== "DELIVERED" && status !== "ARCHIVED" && !order.isArchived;
-  const defaultWeight = order.packageWeightOz ?? (order.orderDetails?.quantity ? Math.max(1, Math.round(order.orderDetails.quantity * 0.05 * 10) / 10) : 1);
+  const isShippable =
+    !isLocalPickup &&
+    status !== "CANCELED" &&
+    status !== "COMPLETED" &&
+    status !== "DELIVERED" &&
+    status !== "ARCHIVED" &&
+    !order.isArchived;
+  const defaultWeight =
+    order.packageWeightOz ??
+    (order.orderDetails?.quantity
+      ? Math.max(1, Math.round(order.orderDetails.quantity * 0.05 * 10) / 10)
+      : 1);
   const defaultLength = order.packageDimensions?.length ?? 6;
   const defaultWidth = order.packageDimensions?.width ?? 4;
   const defaultHeight = order.packageDimensions?.height ?? 0.5;
 
-  const packageControlsHtml = isShippable ? `
+  const packageControlsHtml = isShippable
+    ? `
     <div class="mt-4 p-3 bg-purple-50/60 rounded-md border border-purple-200 package-panel" data-order-id="${orderId}">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
         <span class="text-xs font-bold text-purple-900 flex items-center gap-1">
           <span>📦</span> Package &amp; Shipping Label
-          ${!pirateShipAutoSync ? '<span class="ml-1 text-[10px] font-normal bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">Manual Queue</span>' : ''}
+          ${!pirateShipAutoSync ? '<span class="ml-1 text-[10px] font-normal bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">Manual Queue</span>' : ""}
         </span>
         <div class="flex items-center gap-2">
-          ${order.exportToPirateship || order.labelRequested ? `
+          ${
+            order.exportToPirateship || order.labelRequested
+              ? `
             <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-100 px-2 py-0.5 rounded border border-purple-300">
               <span class="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
               Queued for Pirate Ship
             </span>
-          ` : ''}
-          ${order.labelUrl ? `
+          `
+              : ""
+          }
+          ${
+            order.labelUrl
+              ? `
             <a href="${escapeHtml(order.labelUrl)}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1">
               📄 View Label
             </a>
-          ` : ''}
+          `
+              : ""
+          }
         </div>
       </div>
 
@@ -1122,17 +1223,20 @@ export function displayOrder(order) {
 
       <div class="mt-2.5 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-purple-100">
         <p class="text-[11px] text-gray-500">
-          ${pirateShipAutoSync
-            ? 'Package specifications will be synced with Pirate Ship upon order import.'
-            : 'Click <strong>Order Label</strong> to queue this order for Pirate Ship with these dimensions.'}
+          ${
+            pirateShipAutoSync
+              ? "Package specifications will be synced with Pirate Ship upon order import."
+              : "Click <strong>Order Label</strong> to queue this order for Pirate Ship with these dimensions."
+          }
         </p>
         <button type="button" class="order-label-btn px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors cursor-pointer" data-order-id="${orderId}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
-          ${order.labelRequested || order.exportToPirateship ? 'Update / Order Label' : 'Order Label'}
+          ${order.labelRequested || order.exportToPirateship ? "Update / Order Label" : "Order Label"}
         </button>
       </div>
     </div>
-  ` : '';
+  `
+    : "";
 
   const html = `
     <div class="order-card border-l-4 ${statusClass.split(" ")[0].replace("bg-", "border-")}" id="order-card-${orderId}">
@@ -1154,7 +1258,7 @@ export function displayOrder(order) {
                     <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     History
                 </button>
-                <div class="${statusClass} font-bold py-1 px-3 rounded-full text-sm" id="status-badge-${orderId}">${status === 'HOLD_FOR_PICKUP' ? 'HOLD FOR PICKUP' : status}</div>
+                <div class="${statusClass} font-bold py-1 px-3 rounded-full text-sm" id="status-badge-${orderId}">${status === "HOLD_FOR_PICKUP" ? "HOLD FOR PICKUP" : status}</div>
             </div>
         </div>
 
@@ -1168,17 +1272,25 @@ export function displayOrder(order) {
             <div>
                 <dt>Shipping Name:</dt><dd>${shippingName}</dd>
                 <dt>Shipping Email:</dt><dd>${shippingEmail}</dd>
-                ${shippingAddrStr ? `
+                ${
+                  shippingAddrStr
+                    ? `
                   <dt class="mt-1 font-semibold text-blue-800 flex items-center justify-between">
-                    <span>${isLocalPickup ? 'Pickup Location:' : 'Shipping Address:'}</span>
-                    ${!isLocalPickup ? `
+                    <span>${isLocalPickup ? "Pickup Location:" : "Shipping Address:"}</span>
+                    ${
+                      !isLocalPickup
+                        ? `
                       <button type="button" class="copy-address-btn text-xs text-blue-600 hover:text-blue-800 font-normal hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy formatted shipping address">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                         Copy Address
-                      </button>` : ''}
+                      </button>`
+                        : ""
+                    }
                   </dt>
                   <dd class="text-xs text-gray-700 bg-blue-50/50 p-1.5 rounded border border-blue-100 mt-0.5">${shippingAddrStr}</dd>
-                ` : ""}
+                `
+                    : ""
+                }
             </div>
             <div>
                 <dt>Sticker Name:</dt><dd>${stickerName}</dd>
@@ -1192,9 +1304,13 @@ export function displayOrder(order) {
 
         <div class="mt-4">
             <dt>Sticker Design:</dt>
-            ${designImagePath && order.designImagePath ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank">
+            ${
+              designImagePath && order.designImagePath
+                ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank">
                 <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
-            </a>` : `<div class="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 font-semibold p-2 text-center">${order.artworkPruned ? 'Artwork Pruned' : 'No Preview'}</div>`}
+            </a>`
+                : `<div class="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 font-semibold p-2 text-center">${order.artworkPruned ? "Artwork Pruned" : "No Preview"}</div>`
+            }
             ${cutFilePath ? `<div class="mt-2"><dt>Cut File:</dt><dd><a href="${serverUrl}${cutFilePath}" class="text-blue-500 underline text-sm" target="_blank" download>Download SVG / XML</a></dd></div>` : ""}
         </div>
 
@@ -1298,7 +1414,9 @@ async function openOrderHistoryModal(orderId) {
   modal.classList.remove("hidden");
 
   try {
-    const data = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/history`);
+    const data = await fetchWithAuth(
+      `${serverUrl}/api/orders/${orderId}/history`,
+    );
     const history = data?.history || [];
 
     if (history.length === 0) {
@@ -1310,7 +1428,12 @@ async function openOrderHistoryModal(orderId) {
       return;
     }
 
-    const formatSt = (s) => s === "HOLD_FOR_PICKUP" ? "Hold for Pickup" : (s ? s.charAt(0) + s.slice(1).toLowerCase() : "Initial Creation");
+    const formatSt = (s) =>
+      s === "HOLD_FOR_PICKUP"
+        ? "Hold for Pickup"
+        : s
+          ? s.charAt(0) + s.slice(1).toLowerCase()
+          : "Initial Creation";
 
     // Sort newest first
     const sorted = history.slice().reverse();
@@ -1318,16 +1441,25 @@ async function openOrderHistoryModal(orderId) {
     let html = `<div class="relative border-l-2 border-blue-200 ml-4 space-y-6">`;
     for (const evt of sorted) {
       const dateStr = new Date(evt.timestamp).toLocaleString();
-      const fromSt = evt.fromStatus ? formatSt(evt.fromStatus) : "Initial Creation";
+      const fromSt = evt.fromStatus
+        ? formatSt(evt.fromStatus)
+        : "Initial Creation";
       const toSt = formatSt(evt.toStatus);
-      const actorLabel = evt.actor ? `${evt.actor.type.toUpperCase()}: ${evt.actor.id}` : "Unknown";
+      const actorLabel = evt.actor
+        ? `${evt.actor.type.toUpperCase()}: ${evt.actor.id}`
+        : "Unknown";
 
       let statusColor = "bg-blue-100 text-blue-800 border-blue-300";
-      if (evt.toStatus === "CANCELED" || evt.toStatus === "PURGED") statusColor = "bg-red-100 text-red-800 border-red-300";
-      else if (evt.toStatus === "ARCHIVED") statusColor = "bg-gray-200 text-gray-800 border-gray-400";
-      else if (evt.toStatus === "COMPLETED" || evt.toStatus === "DELIVERED") statusColor = "bg-green-100 text-green-800 border-green-300";
-      else if (evt.toStatus === "SHIPPED") statusColor = "bg-emerald-100 text-emerald-800 border-emerald-300";
-      else if (evt.toStatus === "HOLD_FOR_PICKUP") statusColor = "bg-orange-100 text-orange-800 border-orange-300";
+      if (evt.toStatus === "CANCELED" || evt.toStatus === "PURGED")
+        statusColor = "bg-red-100 text-red-800 border-red-300";
+      else if (evt.toStatus === "ARCHIVED")
+        statusColor = "bg-gray-200 text-gray-800 border-gray-400";
+      else if (evt.toStatus === "COMPLETED" || evt.toStatus === "DELIVERED")
+        statusColor = "bg-green-100 text-green-800 border-green-300";
+      else if (evt.toStatus === "SHIPPED")
+        statusColor = "bg-emerald-100 text-emerald-800 border-emerald-300";
+      else if (evt.toStatus === "HOLD_FOR_PICKUP")
+        statusColor = "bg-orange-100 text-orange-800 border-orange-300";
 
       html += `
         <div class="relative pl-6">
@@ -1380,7 +1512,6 @@ function closeOrderHistoryModal() {
   if (modal) modal.classList.add("hidden");
 }
 
-
 function handleOrderListChange(e) {
   const actionDropdown = e.target.closest(".action-dropdown");
   if (actionDropdown) {
@@ -1403,15 +1534,19 @@ function handleOrderListChange(e) {
 
     const payload = { status };
 
-    if (status === 'SHIPPED') {
-        const trackingInput = document.querySelector(`.tracking-number[data-order-id="${orderId}"]`);
-        const courierInput = document.querySelector(`.tracking-courier[data-order-id="${orderId}"]`);
-        if (trackingInput && trackingInput.value.trim()) {
-            payload.trackingNumber = trackingInput.value.trim();
-        }
-        if (courierInput && courierInput.value) {
-            payload.courier = courierInput.value;
-        }
+    if (status === "SHIPPED") {
+      const trackingInput = document.querySelector(
+        `.tracking-number[data-order-id="${orderId}"]`,
+      );
+      const courierInput = document.querySelector(
+        `.tracking-courier[data-order-id="${orderId}"]`,
+      );
+      if (trackingInput && trackingInput.value.trim()) {
+        payload.trackingNumber = trackingInput.value.trim();
+      }
+      if (courierInput && courierInput.value) {
+        payload.courier = courierInput.value;
+      }
     }
 
     updateOrderStatus(orderId, payload, actionDropdown);
@@ -1463,7 +1598,7 @@ async function handleTimeLog(orderId, btn) {
  */
 async function updateOrderStatus(orderId, payload, btn) {
   setButtonLoading(btn, true, "Updating...");
-  const body = typeof payload === 'string' ? { status: payload } : payload;
+  const body = typeof payload === "string" ? { status: payload } : payload;
   const newStatus = body.status;
 
   try {
@@ -1476,7 +1611,8 @@ async function updateOrderStatus(orderId, payload, btn) {
     const orderIndex = allOrders.findIndex((o) => o.orderId === orderId);
     if (orderIndex !== -1) {
       allOrders[orderIndex].status = newStatus;
-      if (body.trackingNumber) allOrders[orderIndex].trackingNumber = body.trackingNumber;
+      if (body.trackingNumber)
+        allOrders[orderIndex].trackingNumber = body.trackingNumber;
       if (body.courier) allOrders[orderIndex].courier = body.courier;
     }
 
@@ -1496,36 +1632,47 @@ async function updateOrderStatus(orderId, payload, btn) {
 }
 
 async function handleBulkStatusUpdate(newStatus) {
-  const checkboxes = document.querySelectorAll('.order-select-checkbox:checked');
+  const checkboxes = document.querySelectorAll(
+    ".order-select-checkbox:checked",
+  );
   if (checkboxes.length === 0) {
     showErrorToast("No orders selected for bulk update.");
     return;
   }
-  
-  const orderIds = Array.from(checkboxes).map(cb => cb.dataset.orderId || cb.value);
+
+  const orderIds = Array.from(checkboxes).map(
+    (cb) => cb.dataset.orderId || cb.value,
+  );
   const selectElement = document.getElementById("bulk-status-select");
   setButtonLoading(selectElement, true, "Updating...");
-  
+
   try {
-    const res = await fetchWithAuth(`${serverUrl}/api/admin/orders/bulk-status`, {
-      method: "POST",
-      body: JSON.stringify({ orderIds, status: newStatus }),
-    });
-    
+    const res = await fetchWithAuth(
+      `${serverUrl}/api/admin/orders/bulk-status`,
+      {
+        method: "POST",
+        body: JSON.stringify({ orderIds, status: newStatus }),
+      },
+    );
+
     // Update the local cache
-    orderIds.forEach(id => {
-      const orderIndex = allOrders.findIndex(o => o.orderId === id);
+    orderIds.forEach((id) => {
+      const orderIndex = allOrders.findIndex((o) => o.orderId === id);
       if (orderIndex !== -1) {
         allOrders[orderIndex].status = newStatus;
       }
     });
-    
-    showSuccessToast(`Successfully updated ${res.updatedCount} orders to ${newStatus}.`);
-    
+
+    showSuccessToast(
+      `Successfully updated ${res.updatedCount} orders to ${newStatus}.`,
+    );
+
     // Uncheck all after bulk action
-    document.querySelectorAll('.order-select-checkbox').forEach(cb => cb.checked = false);
+    document
+      .querySelectorAll(".order-select-checkbox")
+      .forEach((cb) => (cb.checked = false));
     selectElement.value = "";
-    
+
     // Re-filter the list to reflect the changes
     const activeFilter =
       document.querySelector("#filter-container .filter-btn.active")?.dataset
@@ -1641,8 +1788,8 @@ async function processScannedCode(rawText) {
 
       // Refresh display
       const activeFilter =
-        document.querySelector("#filter-container .filter-btn.active")
-          ?.dataset.status || "ALL";
+        document.querySelector("#filter-container .filter-btn.active")?.dataset
+          .status || "ALL";
       filterAndDisplayOrders(activeFilter);
 
       if (ui.searchInput) {
@@ -1795,7 +1942,9 @@ async function handleNesting(e) {
   const svgElements = checkedCheckboxes
     .map((cb) => {
       const orderContainer = cb.closest(".order-card, .order-row");
-      return orderContainer ? orderContainer.querySelector(".sticker-design") : null;
+      return orderContainer
+        ? orderContainer.querySelector(".sticker-design")
+        : null;
     })
     .filter((img) => img !== null);
 
@@ -1809,17 +1958,21 @@ async function handleNesting(e) {
   try {
     // Get the current measurement unit and determine the conversion factor to inches
     const unit = document.getElementById("measurement-unit")?.value || "inches";
-    const toInches = unit === "mm" ? (1 / 25.4) : 1;
+    const toInches = unit === "mm" ? 1 / 25.4 : 1;
 
     // 1. Generate the complex bin polygon
     const isRollMedia = document.getElementById("rollMedia")?.checked || false;
-    const sheetWidthInches = (parseFloat(document.getElementById("sheetWidth")?.value) || 12) * toInches;
-    let sheetHeightInches = (parseFloat(document.getElementById("sheetHeight")?.value) || 12) * toInches;
+    const sheetWidthInches =
+      (parseFloat(document.getElementById("sheetWidth")?.value) || 12) *
+      toInches;
+    let sheetHeightInches =
+      (parseFloat(document.getElementById("sheetHeight")?.value) || 12) *
+      toInches;
     if (isRollMedia) {
-        sheetHeightInches = 1200; // 100 feet virtual canvas for roll packing
+      sheetHeightInches = 1200; // 100 feet virtual canvas for roll packing
     }
-    const binWidth = sheetWidthInches * 96; 
-    let binHeight = sheetHeightInches * 96; 
+    const binWidth = sheetWidthInches * 96;
+    let binHeight = sheetHeightInches * 96;
     const scale = 10000; // Use a high scale for precision
 
     const cpr = new ClipperLib.Clipper();
@@ -1834,13 +1987,21 @@ async function handleNesting(e) {
     const clip = [];
     // Add edge margins (convert to inches, then to pixels at 96 DPI)
     const marginTop =
-      (parseFloat(document.getElementById("marginTop").value) || 0) * toInches * 96;
+      (parseFloat(document.getElementById("marginTop").value) || 0) *
+      toInches *
+      96;
     const marginBottom =
-      (parseFloat(document.getElementById("marginBottom").value) || 0) * toInches * 96;
+      (parseFloat(document.getElementById("marginBottom").value) || 0) *
+      toInches *
+      96;
     const marginLeft =
-      (parseFloat(document.getElementById("marginLeft").value) || 0) * toInches * 96;
+      (parseFloat(document.getElementById("marginLeft").value) || 0) *
+      toInches *
+      96;
     const marginRight =
-      (parseFloat(document.getElementById("marginRight").value) || 0) * toInches * 96;
+      (parseFloat(document.getElementById("marginRight").value) || 0) *
+      toInches *
+      96;
 
     // Top margin as a keep-out
     clip.push([
@@ -1871,10 +2032,12 @@ async function handleNesting(e) {
       { X: (binWidth - marginRight) * scale, Y: (binHeight + 10) * scale },
     ]);
 
-    const addPrintingMarks = document.getElementById("addPrintingMarks")?.checked || false;
+    const addPrintingMarks =
+      document.getElementById("addPrintingMarks")?.checked || false;
 
     // Add internal keep-outs
-    const keepoutAreasText = document.getElementById("keepoutAreas")?.value || "[]";
+    const keepoutAreasText =
+      document.getElementById("keepoutAreas")?.value || "[]";
     let keepoutAreas = [];
     try {
       keepoutAreas = JSON.parse(keepoutAreasText);
@@ -1989,20 +2152,27 @@ async function handleNesting(e) {
           viewBox = `0 0 ${rawWidth} ${rawHeight}`;
         }
 
-        const ppi = parseFloat(img.dataset.ppi) || parseFloat(cutlineRoot.getAttribute("data-ppi")) || 300;
+        const ppi =
+          parseFloat(img.dataset.ppi) ||
+          parseFloat(cutlineRoot.getAttribute("data-ppi")) ||
+          300;
         const scaleFactor = 96 / ppi;
         const scaledW = rawWidth * scaleFactor;
         const scaledH = rawHeight * scaleFactor;
 
         const availW = binWidth - marginLeft - marginRight;
         const availH = binHeight - marginTop - marginBottom;
-        
+
         if (!isNaN(scaledW) && !isNaN(scaledH)) {
           const fitsNormal = scaledW <= availW && scaledH <= availH;
           const fitsRotated = scaledW <= availH && scaledH <= availW;
           if (!fitsNormal && !fitsRotated) {
-            const orderId = img.closest('.order-row, .order-card')?.dataset?.orderId || "unknown";
-            throw new Error(`Sticker for order ${orderId.substring(0, 8)} (${(scaledW/96).toFixed(2)}x${(scaledH/96).toFixed(2)}in) is too large for the printable area (${(availW/96).toFixed(2)}x${(availH/96).toFixed(2)}in). Please reduce margins or use a larger sheet.`);
+            const orderId =
+              img.closest(".order-row, .order-card")?.dataset?.orderId ||
+              "unknown";
+            throw new Error(
+              `Sticker for order ${orderId.substring(0, 8)} (${(scaledW / 96).toFixed(2)}x${(scaledH / 96).toFixed(2)}in) is too large for the printable area (${(availW / 96).toFixed(2)}x${(availH / 96).toFixed(2)}in). Please reduce margins or use a larger sheet.`,
+            );
           }
         }
 
@@ -2021,13 +2191,18 @@ async function handleNesting(e) {
         group.setAttribute("class", "nest-group");
         group.setAttribute("data-scale", String(scaleFactor));
 
-        const childNodes = Array.from(cutlineRoot.children || cutlineRoot.childNodes)
-          .filter((node) => node.nodeType === 1); // ELEMENT_NODE
+        const childNodes = Array.from(
+          cutlineRoot.children || cutlineRoot.childNodes,
+        ).filter((node) => node.nodeType === 1); // ELEMENT_NODE
 
         let hasCmykOrImage = false;
         childNodes.forEach((child) => {
           const id = child.getAttribute("id") || "";
-          if (id === "Cmyk_art_Layer" || child.tagName.toLowerCase() === "image" || child.querySelector("image")) {
+          if (
+            id === "Cmyk_art_Layer" ||
+            child.tagName.toLowerCase() === "image" ||
+            child.querySelector("image")
+          ) {
             hasCmykOrImage = true;
           }
         });
@@ -2037,7 +2212,12 @@ async function handleNesting(e) {
           const tag = el.tagName.toLowerCase();
           if (id.includes("white")) return 1;
           if (id.includes("inlay")) return 2;
-          if (id.includes("cmyk") || tag === "image" || el.querySelector("image")) return 3;
+          if (
+            id.includes("cmyk") ||
+            tag === "image" ||
+            el.querySelector("image")
+          )
+            return 3;
           if (id.includes("clear")) return 4;
           if (id.includes("kiss")) return 10;
           if (id.includes("die")) return 11;
@@ -2070,9 +2250,15 @@ async function handleNesting(e) {
         childNodes.forEach((child) => {
           const clone = child.cloneNode(true);
           const priority = getLayerPriority(clone);
-          const isCutline = priority >= 10 || (!clone.getAttribute("id") && clone.tagName.toLowerCase() === "path");
+          const isCutline =
+            priority >= 10 ||
+            (!clone.getAttribute("id") &&
+              clone.tagName.toLowerCase() === "path");
           if (isCutline) {
-            clone.setAttribute("class", (clone.getAttribute("class") || "") + " cut-line-element");
+            clone.setAttribute(
+              "class",
+              (clone.getAttribute("class") || "") + " cut-line-element",
+            );
           }
           elementsToAppend.push({ el: clone, priority });
         });
@@ -2107,13 +2293,13 @@ async function handleNesting(e) {
     }
 
     const spacing = parseInt(ui.spacingInput.value, 10) || 0;
-    const options = { 
-      spacing, 
-      rotations: 4, 
+    const options = {
+      spacing,
+      rotations: 4,
       addPrintingMarks, // Generates corner crop marks around placed stickers
       onProgress: (msg) => {
         ui.nestedSvgContainer.innerHTML = `<p>${msg}</p>`;
-      }
+      },
     };
 
     const nest = new SvgNest(null, svgs, options); // Pass null for binElement
@@ -2122,11 +2308,13 @@ async function handleNesting(e) {
     const resultSvgs = await nest.start();
 
     if (!resultSvgs || resultSvgs.length === 0) {
-        throw new Error("No nested SVG sheets were generated.");
+      throw new Error("No nested SVG sheets were generated.");
     }
 
     // Create a batch on the backend to link these orders
-    const orderIdsToBatch = Array.from(new Set(checkedCheckboxes.map(cb => cb.dataset.orderId || cb.value)));
+    const orderIdsToBatch = Array.from(
+      new Set(checkedCheckboxes.map((cb) => cb.dataset.orderId || cb.value)),
+    );
     let batchId = Math.floor(100000 + Math.random() * 900000).toString(); // Fallback if API fails
 
     try {
@@ -2138,162 +2326,174 @@ async function handleNesting(e) {
         batchId = res.batch.batchId;
       }
     } catch (e) {
-      console.error("Failed to create batch on backend, falling back to local ID.", e);
+      console.error(
+        "Failed to create batch on backend, falling back to local ID.",
+        e,
+      );
     }
 
     window.currentCutFileId = batchId; // Save for download button
     window.nestedSvgs = [];
-    ui.nestedSvgContainer.innerHTML = '';
+    ui.nestedSvgContainer.innerHTML = "";
 
     for (let sheetIndex = 0; sheetIndex < resultSvgs.length; sheetIndex++) {
-        const resultSvg = resultSvgs[sheetIndex];
-        const trackingCode = `${batchId}-${sheetIndex + 1}~`;
+      const resultSvg = resultSvgs[sheetIndex];
+      const trackingCode = `${batchId}-${sheetIndex + 1}~`;
 
-        // 4. Inject Printing Marks & QR Codes into SVG
-        const domParser = new DOMParser();
-        const svgDoc = domParser.parseFromString(resultSvg, "image/svg+xml");
-        const rootSvg = svgDoc.documentElement;
+      // 4. Inject Printing Marks & QR Codes into SVG
+      const domParser = new DOMParser();
+      const svgDoc = domParser.parseFromString(resultSvg, "image/svg+xml");
+      const rootSvg = svgDoc.documentElement;
 
-        // Auto-shrink length for roll media
-        if (isRollMedia) {
-            let maxPlacedY = 0;
-            const groups = svgDoc.querySelectorAll('.nest-group');
-            groups.forEach(group => {
-                const transform = group.getAttribute('transform') || '';
-                const match = transform.match(/translate\(([^,]+),\s*([^)]+)\)/);
-                let y = 0;
-                if (match) {
-                    y = parseFloat(match[2]);
-                }
-                const img = group.querySelector('image');
-                const h = img ? parseFloat(img.getAttribute('height')) : 0;
-                if (y + h > maxPlacedY) {
-                    maxPlacedY = y + h;
-                }
+      // Auto-shrink length for roll media
+      if (isRollMedia) {
+        let maxPlacedY = 0;
+        const groups = svgDoc.querySelectorAll(".nest-group");
+        groups.forEach((group) => {
+          const transform = group.getAttribute("transform") || "";
+          const match = transform.match(/translate\(([^,]+),\s*([^)]+)\)/);
+          let y = 0;
+          if (match) {
+            y = parseFloat(match[2]);
+          }
+          const img = group.querySelector("image");
+          const h = img ? parseFloat(img.getAttribute("height")) : 0;
+          if (y + h > maxPlacedY) {
+            maxPlacedY = y + h;
+          }
+        });
+        // Bottom margin and extra padding for fiducials so we don't clip them
+        binHeight = maxPlacedY + marginBottom + 100;
+      }
+
+      // Force the SVG to be the size of the bin so fiducials and QRs aren't clipped
+      rootSvg.setAttribute("width", String(binWidth));
+      rootSvg.setAttribute("height", String(binHeight));
+      rootSvg.setAttribute("viewBox", `0 0 ${binWidth} ${binHeight}`);
+
+      const addPrintingMarks =
+        document.getElementById("addPrintingMarks")?.checked || false;
+
+      if (addPrintingMarks) {
+        const markShape =
+          document.getElementById("alignmentMarkShape").value || "circle";
+
+        // Helper to create alignment mark
+        const createMark = (cx, cy) => {
+          if (markShape === "square") {
+            const rect = svgDoc.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "rect",
+            );
+            rect.setAttribute("x", String(cx - 12));
+            rect.setAttribute("y", String(cy - 12));
+            rect.setAttribute("width", "24");
+            rect.setAttribute("height", "24");
+            rect.setAttribute("fill", "black");
+            return rect;
+          } else {
+            const circle = svgDoc.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "circle",
+            );
+            circle.setAttribute("cx", String(cx));
+            circle.setAttribute("cy", String(cy));
+            circle.setAttribute("r", "12");
+            circle.setAttribute("fill", "black");
+            return circle;
+          }
+        };
+
+        // Add 4 corner marks
+        // Top-Left
+        rootSvg.appendChild(createMark(60, 60));
+        // Top-Right
+        rootSvg.appendChild(createMark(binWidth - 60, 60));
+        // Bottom-Left
+        rootSvg.appendChild(createMark(60, binHeight - 60));
+        // Bottom-Right
+        rootSvg.appendChild(createMark(binWidth - 60, binHeight - 60));
+
+        if (window.QRCode) {
+          try {
+            const qrCanvas = document.createElement("canvas");
+            await QRCode.toCanvas(qrCanvas, trackingCode, {
+              width: 80,
+              margin: 1,
             });
-            // Bottom margin and extra padding for fiducials so we don't clip them
-            binHeight = maxPlacedY + marginBottom + 100; 
-        }
+            const qrDataUri = qrCanvas.toDataURL("image/png");
 
-        // Force the SVG to be the size of the bin so fiducials and QRs aren't clipped
-        rootSvg.setAttribute("width", String(binWidth));
-        rootSvg.setAttribute("height", String(binHeight));
-        rootSvg.setAttribute("viewBox", `0 0 ${binWidth} ${binHeight}`);
-
-        const addPrintingMarks = document.getElementById("addPrintingMarks")?.checked || false;
-
-        if (addPrintingMarks) {
-            const markShape =
-            document.getElementById("alignmentMarkShape").value || "circle";
-
-            // Helper to create alignment mark
-            const createMark = (cx, cy) => {
-            if (markShape === "square") {
-                const rect = svgDoc.createElementNS(
+            // Helper to add QR and label
+            const addQR = (qrX, qrY, textX, textY, textAnchor = "start") => {
+              const qrImg = svgDoc.createElementNS(
                 "http://www.w3.org/2000/svg",
-                "rect",
-                );
-                rect.setAttribute("x", String(cx - 12));
-                rect.setAttribute("y", String(cy - 12));
-                rect.setAttribute("width", "24");
-                rect.setAttribute("height", "24");
-                rect.setAttribute("fill", "black");
-                return rect;
-            } else {
-                const circle = svgDoc.createElementNS(
+                "image",
+              );
+              qrImg.setAttribute("href", qrDataUri);
+              qrImg.setAttribute("x", String(qrX));
+              qrImg.setAttribute("y", String(qrY));
+              qrImg.setAttribute("width", "80");
+              qrImg.setAttribute("height", "80");
+
+              const textNode = svgDoc.createElementNS(
                 "http://www.w3.org/2000/svg",
-                "circle",
-                );
-                circle.setAttribute("cx", String(cx));
-                circle.setAttribute("cy", String(cy));
-                circle.setAttribute("r", "12");
-                circle.setAttribute("fill", "black");
-                return circle;
-            }
+                "text",
+              );
+              textNode.setAttribute("x", String(textX));
+              textNode.setAttribute("y", String(textY));
+              textNode.setAttribute("font-family", "sans-serif");
+              textNode.setAttribute("font-size", "14");
+              textNode.setAttribute("font-weight", "bold");
+              textNode.setAttribute("fill", "black");
+              textNode.setAttribute("text-anchor", textAnchor);
+              textNode.textContent = trackingCode;
+
+              rootSvg.appendChild(qrImg);
+              rootSvg.appendChild(textNode);
             };
 
-            // Add 4 corner marks
-            // Top-Left
-            rootSvg.appendChild(createMark(60, 60));
-            // Top-Right
-            rootSvg.appendChild(createMark(binWidth - 60, 60));
-            // Bottom-Left
-            rootSvg.appendChild(createMark(60, binHeight - 60));
-            // Bottom-Right
-            rootSvg.appendChild(createMark(binWidth - 60, binHeight - 60));
+            // Top-Left: Fiducial cx=60, cy=60. QR x=90, y=20. Text x=185, y=65 ("start").
+            addQR(90, 20, 185, 65, "start");
 
-            if (window.QRCode) {
-            try {
-                const qrCanvas = document.createElement("canvas");
-                await QRCode.toCanvas(qrCanvas, trackingCode, {
-                width: 80,
-                margin: 1,
-                });
-                const qrDataUri = qrCanvas.toDataURL("image/png");
-
-                // Helper to add QR and label
-                const addQR = (qrX, qrY, textX, textY, textAnchor = "start") => {
-                const qrImg = svgDoc.createElementNS(
-                    "http://www.w3.org/2000/svg",
-                    "image",
-                );
-                qrImg.setAttribute("href", qrDataUri);
-                qrImg.setAttribute("x", String(qrX));
-                qrImg.setAttribute("y", String(qrY));
-                qrImg.setAttribute("width", "80");
-                qrImg.setAttribute("height", "80");
-
-                const textNode = svgDoc.createElementNS(
-                    "http://www.w3.org/2000/svg",
-                    "text",
-                );
-                textNode.setAttribute("x", String(textX));
-                textNode.setAttribute("y", String(textY));
-                textNode.setAttribute("font-family", "sans-serif");
-                textNode.setAttribute("font-size", "14");
-                textNode.setAttribute("font-weight", "bold");
-                textNode.setAttribute("fill", "black");
-                textNode.setAttribute("text-anchor", textAnchor);
-                textNode.textContent = trackingCode;
-
-                rootSvg.appendChild(qrImg);
-                rootSvg.appendChild(textNode);
-                };
-
-                // Top-Left: Fiducial cx=60, cy=60. QR x=90, y=20. Text x=185, y=65 ("start").
-                addQR(90, 20, 185, 65, "start");
-                
-                // Bottom-Right: Fiducial cx=binWidth-60, cy=binHeight-60. QR x=binWidth-170, y=binHeight-100. Text x=binWidth-185, y=binHeight-55 ("end").
-                addQR(binWidth - 170, binHeight - 100, binWidth - 185, binHeight - 55, "end");
-            } catch (qrErr) {
-                console.error("Failed to inject QR code into SVG", qrErr);
-            }
-            }
+            // Bottom-Right: Fiducial cx=binWidth-60, cy=binHeight-60. QR x=binWidth-170, y=binHeight-100. Text x=binWidth-185, y=binHeight-55 ("end").
+            addQR(
+              binWidth - 170,
+              binHeight - 100,
+              binWidth - 185,
+              binHeight - 55,
+              "end",
+            );
+          } catch (qrErr) {
+            console.error("Failed to inject QR code into SVG", qrErr);
+          }
         }
+      }
 
-        // Serialize back to string
-        let finalSvg = new XMLSerializer().serializeToString(svgDoc);
+      // Serialize back to string
+      let finalSvg = new XMLSerializer().serializeToString(svgDoc);
 
-        // 5. Display result
-        const sanitizedSvg = DOMPurify.sanitize(finalSvg, {
-          USE_PROFILES: { svg: true },
-          ADD_TAGS: ['image'],
-          ADD_ATTR: ['href', 'xlink:href', 'class'],
-          ADD_DATA_URI_TAGS: ['image']
-        });
-        
-        window.nestedSvgs.push(sanitizedSvg);
+      // 5. Display result
+      const sanitizedSvg = DOMPurify.sanitize(finalSvg, {
+        USE_PROFILES: { svg: true },
+        ADD_TAGS: ["image"],
+        ADD_ATTR: ["href", "xlink:href", "class"],
+        ADD_DATA_URI_TAGS: ["image"],
+      });
 
-        const sheetWrapper = document.createElement("div");
-        sheetWrapper.className = "mb-8";
-        sheetWrapper.innerHTML = `
+      window.nestedSvgs.push(sanitizedSvg);
+
+      const sheetWrapper = document.createElement("div");
+      sheetWrapper.className = "mb-8";
+      sheetWrapper.innerHTML = `
             <h3 class="text-lg font-bold mb-2">Sheet ${sheetIndex + 1}</h3>
             ${sanitizedSvg}
         `;
-        ui.nestedSvgContainer.appendChild(sheetWrapper);
+      ui.nestedSvgContainer.appendChild(sheetWrapper);
     }
-    
-    showSuccessToast(`Nesting complete. Generated ${resultSvgs.length} sheet(s).`);
+
+    showSuccessToast(
+      `Nesting complete. Generated ${resultSvgs.length} sheet(s).`,
+    );
   } catch (error) {
     showErrorToast(`Nesting failed: ${error.message}`);
     console.error(error);
@@ -2309,20 +2509,22 @@ function handleDownloadCutFile() {
   }
 
   window.nestedSvgs.forEach((nestedSvg, index) => {
-      const cutFileString = generateCutFile(nestedSvg);
-      const blob = new Blob([cutFileString], { type: "image/svg+xml" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
+    const cutFileString = generateCutFile(nestedSvg);
+    const blob = new Blob([cutFileString], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
 
-      // Use the generated ID or fallback to 'cut-file'
-      const baseName = window.currentCutFileId ? window.currentCutFileId : "cut-file";
-      a.download = `${baseName}-sheet${index + 1}.svg`;
+    // Use the generated ID or fallback to 'cut-file'
+    const baseName = window.currentCutFileId
+      ? window.currentCutFileId
+      : "cut-file";
+    a.download = `${baseName}-sheet${index + 1}.svg`;
 
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 }
 
@@ -2334,25 +2536,28 @@ function handleDownloadCutFilePlt() {
 
   const cutOptions = {
     mediaType: document.getElementById("mediaType")?.value || "vinyl",
-    thickness: parseFloat(document.getElementById("mediaThickness")?.value) || 0.1,
+    thickness:
+      parseFloat(document.getElementById("mediaThickness")?.value) || 0.1,
     cutPressure: parseInt(document.getElementById("cutPressure")?.value) || 10,
-    cutType: document.getElementById("cutType")?.value || "normal_cut"
+    cutType: document.getElementById("cutType")?.value || "normal_cut",
   };
 
   window.nestedSvgs.forEach((nestedSvg, index) => {
-      const pltFileString = generatePltFile(nestedSvg, cutOptions);
-      const blob = new Blob([pltFileString], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
+    const pltFileString = generatePltFile(nestedSvg, cutOptions);
+    const blob = new Blob([pltFileString], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
 
-      const baseName = window.currentCutFileId ? window.currentCutFileId : "cut-file";
-      a.download = `${baseName}-sheet${index + 1}.plt`;
+    const baseName = window.currentCutFileId
+      ? window.currentCutFileId
+      : "cut-file";
+    a.download = `${baseName}-sheet${index + 1}.plt`;
 
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 }
 
@@ -2365,149 +2570,172 @@ async function handleExportPdf() {
   try {
     let doc = null;
     const zip = new JSZip();
-    const baseName = window.currentCutFileId ? window.currentCutFileId : "nested-stickers";
+    const baseName = window.currentCutFileId
+      ? window.currentCutFileId
+      : "nested-stickers";
 
     for (let i = 0; i < window.nestedSvgs.length; i++) {
-        const svgElement = new DOMParser().parseFromString(
-          window.nestedSvgs[i],
-          "image/svg+xml",
-        ).documentElement;
-        let width = parseFloat(svgElement.getAttribute("width"));
-        let height = parseFloat(svgElement.getAttribute("height"));
+      const svgElement = new DOMParser().parseFromString(
+        window.nestedSvgs[i],
+        "image/svg+xml",
+      ).documentElement;
+      let width = parseFloat(svgElement.getAttribute("width"));
+      let height = parseFloat(svgElement.getAttribute("height"));
 
-        if (isNaN(width) || isNaN(height)) {
-          const viewBox = svgElement.getAttribute("viewBox");
-          if (viewBox) {
-            const parts = viewBox.split(/[\s,]+/);
-            if (parts.length === 4) {
-              width = parseFloat(parts[2]);
-              height = parseFloat(parts[3]);
-            }
+      if (isNaN(width) || isNaN(height)) {
+        const viewBox = svgElement.getAttribute("viewBox");
+        if (viewBox) {
+          const parts = viewBox.split(/[\s,]+/);
+          if (parts.length === 4) {
+            width = parseFloat(parts[2]);
+            height = parseFloat(parts[3]);
           }
         }
+      }
 
-        if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
-          showErrorToast("Invalid SVG dimensions for PDF export on sheet " + (i+1));
-          return;
-        }
+      if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+        showErrorToast(
+          "Invalid SVG dimensions for PDF export on sheet " + (i + 1),
+        );
+        return;
+      }
 
-        // Remove cut lines and bin outlines for PDF export so we only print the image layer
-        // Stickers are PNG <image> tags, fiducials are <circle>/<rect>, QRs are <image>/<text>.
-        svgElement.querySelectorAll('path, polygon, polyline, line').forEach(el => el.remove());
+      // Remove cut lines and bin outlines for PDF export so we only print the image layer
+      // Stickers are PNG <image> tags, fiducials are <circle>/<rect>, QRs are <image>/<text>.
+      svgElement
+        .querySelectorAll("path, polygon, polyline, line")
+        .forEach((el) => el.remove());
 
-        // Target 300 DPI (Default SVG scale is usually 96 DPI)
-        const scale = 300 / 96;
-        const targetWidth = Math.round(width * scale);
-        const targetHeight = Math.round(height * scale);
+      // Target 300 DPI (Default SVG scale is usually 96 DPI)
+      const scale = 300 / 96;
+      const targetWidth = Math.round(width * scale);
+      const targetHeight = Math.round(height * scale);
 
-        // Update SVG dimensions for crisp rendering onto canvas
-        svgElement.setAttribute("width", targetWidth);
-        svgElement.setAttribute("height", targetHeight);
+      // Update SVG dimensions for crisp rendering onto canvas
+      svgElement.setAttribute("width", targetWidth);
+      svgElement.setAttribute("height", targetHeight);
 
-        // Serialize back to string
-        const svgString = new XMLSerializer().serializeToString(svgElement);
-        const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-        const url = URL.createObjectURL(svgBlob);
+      // Serialize back to string
+      const svgString = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgString], {
+        type: "image/svg+xml;charset=utf-8",
+      });
+      const url = URL.createObjectURL(svgBlob);
 
-        // Load into an Image
-        const img = new Image();
-        await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = url;
+      // Load into an Image
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+
+      // Draw to a scaled Canvas with white background
+      const canvas = document.createElement("canvas");
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+      URL.revokeObjectURL(url);
+
+      // Get JPEG for PDF
+      const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.95);
+
+      // Add to PDF
+      if (i === 0) {
+        // Create the PDF with the correct original dimensions
+        doc = new jsPDF({
+          unit: "px",
+          format: [width, height],
+        });
+      } else {
+        doc.addPage([width, height]);
+      }
+
+      doc.addImage(jpegDataUrl, "JPEG", 0, 0, width, height);
+
+      // Get PNG Blob and add to zip
+      const pngBlob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/png"),
+      );
+      const sheetSuffix = window.nestedSvgs.length > 1 ? `-sheet${i + 1}` : "";
+      zip.file(`${baseName}${sheetSuffix}-300dpi.png`, pngBlob);
+
+      // --- NEW: Generate Vector Print & Cut PDF using svg2pdf ---
+      // Clone the original nested SVG (which still has cutlines)
+      const vectorSvgElement = new DOMParser().parseFromString(
+        window.nestedSvgs[i],
+        "image/svg+xml",
+      ).documentElement;
+
+      // Ensure proper dimensions
+      vectorSvgElement.setAttribute("width", width);
+      vectorSvgElement.setAttribute("height", height);
+
+      // Fetch the selected printer's layer config
+      let layerName = "CutContour";
+      let cutColor = "#FF00FF";
+
+      // Grab from UI if available
+      const layerNameInput = document.getElementById("cutLayerName");
+      const cutColorInput = document.getElementById("cutColor");
+      if (layerNameInput) layerName = layerNameInput.value || layerName;
+      if (cutColorInput) cutColor = cutColorInput.value || cutColor;
+
+      // Group cutlines for the specific layer name (useful for RIPs that use layer names)
+      const cutGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g",
+      );
+      cutGroup.setAttribute("id", layerName);
+      cutGroup.setAttribute("data-name", layerName);
+
+      // Standardize the cutlines for the RIP software
+      vectorSvgElement
+        .querySelectorAll("path, polygon, polyline")
+        .forEach((el) => {
+          el.setAttribute("stroke", cutColor);
+          el.setAttribute("stroke-width", "1"); // 1px stroke
+          el.setAttribute("fill", "none");
+          // Remove any classes that might interfere
+          el.removeAttribute("class");
+
+          // Move into our specific layer group
+          cutGroup.appendChild(el);
         });
 
-        // Draw to a scaled Canvas with white background
-        const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, targetWidth, targetHeight);
-        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-        URL.revokeObjectURL(url);
+      vectorSvgElement.appendChild(cutGroup);
 
-        // Get JPEG for PDF
-        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      // Initialize a new PDF document for this sheet
+      const vectorDoc = new jsPDF({
+        unit: "px",
+        format: [width, height],
+      });
 
-        // Add to PDF
-        if (i === 0) {
-            // Create the PDF with the correct original dimensions
-            doc = new jsPDF({
-              unit: "px",
-              format: [width, height],
-            });
-        } else {
-            doc.addPage([width, height]);
-        }
+      // Render the SVG into the PDF document natively (preserves vectors!)
+      await vectorDoc.svg(vectorSvgElement, {
+        x: 0,
+        y: 0,
+        width: width,
+        height: height,
+      });
 
-        doc.addImage(jpegDataUrl, 'JPEG', 0, 0, width, height);
-
-        // Get PNG Blob and add to zip
-        const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        const sheetSuffix = window.nestedSvgs.length > 1 ? `-sheet${i + 1}` : '';
-        zip.file(`${baseName}${sheetSuffix}-300dpi.png`, pngBlob);
-
-        // --- NEW: Generate Vector Print & Cut PDF using svg2pdf ---
-        // Clone the original nested SVG (which still has cutlines)
-        const vectorSvgElement = new DOMParser().parseFromString(
-          window.nestedSvgs[i],
-          "image/svg+xml"
-        ).documentElement;
-        
-        // Ensure proper dimensions
-        vectorSvgElement.setAttribute("width", width);
-        vectorSvgElement.setAttribute("height", height);
-
-        // Fetch the selected printer's layer config
-        let layerName = 'CutContour';
-        let cutColor = '#FF00FF';
-        
-        // Grab from UI if available
-        const layerNameInput = document.getElementById('cutLayerName');
-        const cutColorInput = document.getElementById('cutColor');
-        if (layerNameInput) layerName = layerNameInput.value || layerName;
-        if (cutColorInput) cutColor = cutColorInput.value || cutColor;
-
-        // Group cutlines for the specific layer name (useful for RIPs that use layer names)
-        const cutGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        cutGroup.setAttribute("id", layerName);
-        cutGroup.setAttribute("data-name", layerName);
-        
-        // Standardize the cutlines for the RIP software
-        vectorSvgElement.querySelectorAll('path, polygon, polyline').forEach(el => {
-            el.setAttribute('stroke', cutColor);
-            el.setAttribute('stroke-width', '1'); // 1px stroke
-            el.setAttribute('fill', 'none');
-            // Remove any classes that might interfere
-            el.removeAttribute('class');
-            
-            // Move into our specific layer group
-            cutGroup.appendChild(el);
-        });
-        
-        vectorSvgElement.appendChild(cutGroup);
-
-        // Initialize a new PDF document for this sheet
-        const vectorDoc = new jsPDF({
-            unit: "px",
-            format: [width, height],
-        });
-
-        // Render the SVG into the PDF document natively (preserves vectors!)
-        await vectorDoc.svg(vectorSvgElement, { x: 0, y: 0, width: width, height: height });
-
-        // Add the Vector PDF to the ZIP
-        const vectorPdfBlob = vectorDoc.output('blob');
-        zip.file(`${baseName}${sheetSuffix}-VinylMaster-PrintCut.pdf`, vectorPdfBlob);
+      // Add the Vector PDF to the ZIP
+      const vectorPdfBlob = vectorDoc.output("blob");
+      zip.file(
+        `${baseName}${sheetSuffix}-VinylMaster-PrintCut.pdf`,
+        vectorPdfBlob,
+      );
     }
 
     // Add Flattened Print-Only PDF to zip
-    const pdfBlob = doc.output('blob');
+    const pdfBlob = doc.output("blob");
     zip.file(`${baseName}-PrintOnly.pdf`, pdfBlob);
 
     // Generate zip and trigger download
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipBlob = await zip.generateAsync({ type: "blob" });
     const a = document.createElement("a");
     const zipUrl = URL.createObjectURL(zipBlob);
     a.href = zipUrl;
@@ -2582,7 +2810,9 @@ let printshops = [];
 async function loadPrintshops() {
   try {
     if (!currentPricingConfig || !currentPricingConfig.materials) {
-        currentPricingConfig = await fetchWithAuth(`${serverUrl}/api/pricing-info`);
+      currentPricingConfig = await fetchWithAuth(
+        `${serverUrl}/api/pricing-info`,
+      );
     }
     printshops = await fetchWithAuth(`${serverUrl}/api/admin/printshops`);
     populatePrintshopSelectors();
@@ -2600,9 +2830,10 @@ function populatePrintshopSelectors() {
   const currentConfig = configSelector.value;
 
   activeSelector.innerHTML = '<option value="">All Printshops</option>';
-  configSelector.innerHTML = '<option value="new">+ Create New Printshop</option>';
+  configSelector.innerHTML =
+    '<option value="new">+ Create New Printshop</option>';
 
-  printshops.forEach(shop => {
+  printshops.forEach((shop) => {
     const optActive = document.createElement("option");
     optActive.value = shop.id;
     optActive.textContent = shop.name;
@@ -2615,15 +2846,19 @@ function populatePrintshopSelectors() {
   });
 
   activeSelector.value = currentActive || "";
-  if (currentConfig && currentConfig !== "new" && printshops.find(s => s.id === currentConfig)) {
-      configSelector.value = currentConfig;
-      loadPrintshopForm(currentConfig);
+  if (
+    currentConfig &&
+    currentConfig !== "new" &&
+    printshops.find((s) => s.id === currentConfig)
+  ) {
+    configSelector.value = currentConfig;
+    loadPrintshopForm(currentConfig);
   } else if (printshops.length > 0) {
-      configSelector.value = printshops[0].id;
-      loadPrintshopForm(printshops[0].id);
+    configSelector.value = printshops[0].id;
+    loadPrintshopForm(printshops[0].id);
   } else {
-      configSelector.value = "new";
-      resetPrintshopForm();
+    configSelector.value = "new";
+    resetPrintshopForm();
   }
 }
 
@@ -2637,118 +2872,138 @@ function resetPrintshopForm() {
 }
 
 function loadPrintshopForm(id) {
-  const shop = printshops.find(s => s.id === id);
+  const shop = printshops.find((s) => s.id === id);
   if (!shop) return resetPrintshopForm();
 
   document.getElementById("printshop-id").value = shop.id;
   document.getElementById("printshop-name").value = shop.name || "";
   document.getElementById("printshop-address").value = shop.address || "";
-  document.getElementById("printshop-users").value = (shop.assigned_users || []).join(", ");
-  
+  document.getElementById("printshop-users").value = (
+    shop.assigned_users || []
+  ).join(", ");
+
   const machinesList = document.getElementById("printshop-machines-list");
   machinesList.innerHTML = "";
   if (shop.machines && Array.isArray(shop.machines)) {
-      shop.machines.forEach(m => addMachineCard(m));
+    shop.machines.forEach((m) => addMachineCard(m));
   }
-  
+
   document.getElementById("delete-printshop-btn").classList.remove("hidden");
 }
 
 function addMachineCard(machineData = null) {
-    const template = document.getElementById("machine-template");
-    const container = document.getElementById("printshop-machines-list");
-    const clone = template.content.cloneNode(true);
-    
-    const card = clone.querySelector(".machine-card");
-    // Generate unique ID for this card
-    const cardId = 'machine-' + Math.random().toString(36).substr(2, 9);
-    card.dataset.id = cardId;
-    
-    // Inject pricing checkboxes dynamically
-    if (currentPricingConfig) {
-        const matContainer = card.querySelector(".machine-materials-container");
-        (currentPricingConfig.materials || []).forEach(mat => {
-            matContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-mat-cb mr-1" value="${mat.id}"> ${mat.name}</label>`;
-        });
-        
-        const layContainer = card.querySelector(".machine-layers-container");
-        (currentPricingConfig.layers || []).forEach(lay => {
-            layContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-lay-cb mr-1" value="${lay.id}"> ${lay.name}</label>`;
-        });
-        
-        const resContainer = card.querySelector(".machine-resolutions-container");
-        (currentPricingConfig.resolutions || []).forEach(res => {
-            resContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-res-cb mr-1" value="${res.id}"> ${res.name}</label>`;
-        });
-        
-        const cxSelect = card.querySelector(".machine-complexity-select");
-        if (currentPricingConfig.complexity && currentPricingConfig.complexity.tiers) {
-            currentPricingConfig.complexity.tiers.forEach(tier => {
-                cxSelect.innerHTML += `<option value="${tier.thresholdInches}">Up to ${tier.thresholdInches} inches</option>`;
-            });
-        }
+  const template = document.getElementById("machine-template");
+  const container = document.getElementById("printshop-machines-list");
+  const clone = template.content.cloneNode(true);
+
+  const card = clone.querySelector(".machine-card");
+  // Generate unique ID for this card
+  const cardId = "machine-" + Math.random().toString(36).substr(2, 9);
+  card.dataset.id = cardId;
+
+  // Inject pricing checkboxes dynamically
+  if (currentPricingConfig) {
+    const matContainer = card.querySelector(".machine-materials-container");
+    (currentPricingConfig.materials || []).forEach((mat) => {
+      matContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-mat-cb mr-1" value="${mat.id}"> ${mat.name}</label>`;
+    });
+
+    const layContainer = card.querySelector(".machine-layers-container");
+    (currentPricingConfig.layers || []).forEach((lay) => {
+      layContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-lay-cb mr-1" value="${lay.id}"> ${lay.name}</label>`;
+    });
+
+    const resContainer = card.querySelector(".machine-resolutions-container");
+    (currentPricingConfig.resolutions || []).forEach((res) => {
+      resContainer.innerHTML += `<label class="block"><input type="checkbox" class="machine-res-cb mr-1" value="${res.id}"> ${res.name}</label>`;
+    });
+
+    const cxSelect = card.querySelector(".machine-complexity-select");
+    if (
+      currentPricingConfig.complexity &&
+      currentPricingConfig.complexity.tiers
+    ) {
+      currentPricingConfig.complexity.tiers.forEach((tier) => {
+        cxSelect.innerHTML += `<option value="${tier.thresholdInches}">Up to ${tier.thresholdInches} inches</option>`;
+      });
     }
-    
-    // Bind remove button
-    card.querySelector(".remove-machine-btn").addEventListener("click", () => card.remove());
-    
-    // Bind add discount button
-    card.querySelector(".add-discount-btn").addEventListener("click", () => {
-        const list = card.querySelector(".machine-discounts-list");
-        const div = document.createElement("div");
-        div.className = "flex items-center space-x-2 discount-tier";
-        div.innerHTML = `
+  }
+
+  // Bind remove button
+  card
+    .querySelector(".remove-machine-btn")
+    .addEventListener("click", () => card.remove());
+
+  // Bind add discount button
+  card.querySelector(".add-discount-btn").addEventListener("click", () => {
+    const list = card.querySelector(".machine-discounts-list");
+    const div = document.createElement("div");
+    div.className = "flex items-center space-x-2 discount-tier";
+    div.innerHTML = `
             <span>Qty:</span>
             <input type="number" class="discount-qty p-1 border rounded w-20" min="1" placeholder="e.g. 1000">
             <span>Discount:</span>
             <input type="number" step="0.01" class="discount-val p-1 border rounded w-20" placeholder="e.g. 0.2">
             <button type="button" class="text-red-500 font-bold ml-2" onclick="this.parentElement.remove()">X</button>
         `;
-        list.appendChild(div);
-    });
-    
-    // Populate data if editing
-    if (machineData) {
-        if(machineData.id) card.dataset.machineId = machineData.id;
-        card.querySelector(".machine-type").value = machineData.type || "printer";
-        card.querySelector(".machine-model").value = machineData.modelNumber || "";
-        card.querySelector(".machine-serial").value = machineData.serialNumber || "";
-        card.querySelector(".machine-status").value = machineData.status || "working";
-        card.querySelector(".machine-complexity-select").value = machineData.maxCutlineTier || "";
-        
-        const media = machineData.supportedMedia || [];
-        card.querySelectorAll(".machine-media-type").forEach(cb => cb.checked = media.includes(cb.value));
-        
-        const mats = machineData.supportedMaterials || [];
-        card.querySelectorAll(".machine-mat-cb").forEach(cb => cb.checked = mats.includes(cb.value));
-        
-        const lays = machineData.supportedLayers || [];
-        card.querySelectorAll(".machine-lay-cb").forEach(cb => cb.checked = lays.includes(cb.value));
-        
-        const res = machineData.supportedResolutions || [];
-        card.querySelectorAll(".machine-res-cb").forEach(cb => cb.checked = res.includes(cb.value));
-        
-        if (machineData.bulkDiscounts) {
-            const list = card.querySelector(".machine-discounts-list");
-            machineData.bulkDiscounts.forEach(d => {
-                const div = document.createElement("div");
-                div.className = "flex items-center space-x-2 discount-tier";
-                div.innerHTML = `
+    list.appendChild(div);
+  });
+
+  // Populate data if editing
+  if (machineData) {
+    if (machineData.id) card.dataset.machineId = machineData.id;
+    card.querySelector(".machine-type").value = machineData.type || "printer";
+    card.querySelector(".machine-model").value = machineData.modelNumber || "";
+    card.querySelector(".machine-serial").value =
+      machineData.serialNumber || "";
+    card.querySelector(".machine-status").value =
+      machineData.status || "working";
+    card.querySelector(".machine-complexity-select").value =
+      machineData.maxCutlineTier || "";
+
+    const media = machineData.supportedMedia || [];
+    card
+      .querySelectorAll(".machine-media-type")
+      .forEach((cb) => (cb.checked = media.includes(cb.value)));
+
+    const mats = machineData.supportedMaterials || [];
+    card
+      .querySelectorAll(".machine-mat-cb")
+      .forEach((cb) => (cb.checked = mats.includes(cb.value)));
+
+    const lays = machineData.supportedLayers || [];
+    card
+      .querySelectorAll(".machine-lay-cb")
+      .forEach((cb) => (cb.checked = lays.includes(cb.value)));
+
+    const res = machineData.supportedResolutions || [];
+    card
+      .querySelectorAll(".machine-res-cb")
+      .forEach((cb) => (cb.checked = res.includes(cb.value)));
+
+    if (machineData.bulkDiscounts) {
+      const list = card.querySelector(".machine-discounts-list");
+      machineData.bulkDiscounts.forEach((d) => {
+        const div = document.createElement("div");
+        div.className = "flex items-center space-x-2 discount-tier";
+        div.innerHTML = `
                     <span>Qty:</span>
                     <input type="number" class="discount-qty p-1 border rounded w-20" value="${d.quantity}">
                     <span>Discount:</span>
                     <input type="number" step="0.01" class="discount-val p-1 border rounded w-20" value="${d.discount}">
                     <button type="button" class="text-red-500 font-bold ml-2" onclick="this.parentElement.remove()">X</button>
                 `;
-                list.appendChild(div);
-            });
-        }
+        list.appendChild(div);
+      });
     }
-    
-    container.appendChild(card);
+  }
+
+  container.appendChild(card);
 }
 
-document.getElementById("add-machine-btn")?.addEventListener("click", () => addMachineCard());
+document
+  .getElementById("add-machine-btn")
+  ?.addEventListener("click", () => addMachineCard());
 
 async function savePrintshopConfig(e) {
   e.preventDefault();
@@ -2759,50 +3014,64 @@ async function savePrintshopConfig(e) {
   const name = document.getElementById("printshop-name").value;
   const address = document.getElementById("printshop-address").value;
   const usersStr = document.getElementById("printshop-users").value;
-  
-  const assigned_users = usersStr.split(",").map(s => s.trim()).filter(s => s);
-  
+
+  const assigned_users = usersStr
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s);
+
   const machines = [];
-  document.querySelectorAll(".machine-card").forEach(card => {
-      const type = card.querySelector(".machine-type").value;
-      const modelNumber = card.querySelector(".machine-model").value;
-      const serialNumber = card.querySelector(".machine-serial").value;
-      const status = card.querySelector(".machine-status").value;
-      const maxCutlineTier = card.querySelector(".machine-complexity-select").value;
-      
-      const supportedMedia = Array.from(card.querySelectorAll(".machine-media-type:checked")).map(cb => cb.value);
-      const supportedMaterials = Array.from(card.querySelectorAll(".machine-mat-cb:checked")).map(cb => cb.value);
-      const supportedLayers = Array.from(card.querySelectorAll(".machine-lay-cb:checked")).map(cb => cb.value);
-      const supportedResolutions = Array.from(card.querySelectorAll(".machine-res-cb:checked")).map(cb => cb.value);
-      
-      const bulkDiscounts = [];
-      card.querySelectorAll(".discount-tier").forEach(div => {
-          const q = parseInt(div.querySelector(".discount-qty").value);
-          const v = parseFloat(div.querySelector(".discount-val").value);
-          if (!isNaN(q) && !isNaN(v)) bulkDiscounts.push({ quantity: q, discount: v });
-      });
-      
-      machines.push({
-          id: card.dataset.machineId || undefined,
-          type,
-          modelNumber,
-          serialNumber,
-          status,
-          supportedMedia,
-          supportedMaterials,
-          supportedLayers,
-          supportedResolutions,
-          maxCutlineTier: maxCutlineTier || undefined,
-          bulkDiscounts
-      });
+  document.querySelectorAll(".machine-card").forEach((card) => {
+    const type = card.querySelector(".machine-type").value;
+    const modelNumber = card.querySelector(".machine-model").value;
+    const serialNumber = card.querySelector(".machine-serial").value;
+    const status = card.querySelector(".machine-status").value;
+    const maxCutlineTier = card.querySelector(
+      ".machine-complexity-select",
+    ).value;
+
+    const supportedMedia = Array.from(
+      card.querySelectorAll(".machine-media-type:checked"),
+    ).map((cb) => cb.value);
+    const supportedMaterials = Array.from(
+      card.querySelectorAll(".machine-mat-cb:checked"),
+    ).map((cb) => cb.value);
+    const supportedLayers = Array.from(
+      card.querySelectorAll(".machine-lay-cb:checked"),
+    ).map((cb) => cb.value);
+    const supportedResolutions = Array.from(
+      card.querySelectorAll(".machine-res-cb:checked"),
+    ).map((cb) => cb.value);
+
+    const bulkDiscounts = [];
+    card.querySelectorAll(".discount-tier").forEach((div) => {
+      const q = parseInt(div.querySelector(".discount-qty").value);
+      const v = parseFloat(div.querySelector(".discount-val").value);
+      if (!isNaN(q) && !isNaN(v))
+        bulkDiscounts.push({ quantity: q, discount: v });
+    });
+
+    machines.push({
+      id: card.dataset.machineId || undefined,
+      type,
+      modelNumber,
+      serialNumber,
+      status,
+      supportedMedia,
+      supportedMaterials,
+      supportedLayers,
+      supportedResolutions,
+      maxCutlineTier: maxCutlineTier || undefined,
+      bulkDiscounts,
+    });
   });
-  
+
   const shop = {
-      id: id || undefined,
-      name,
-      address,
-      assigned_users,
-      machines
+    id: id || undefined,
+    name,
+    address,
+    assigned_users,
+    machines,
   };
 
   try {
@@ -2812,10 +3081,11 @@ async function savePrintshopConfig(e) {
     });
     showSuccessToast("Printshop saved.");
     await loadPrintshops();
-    
+
     if (!id && printshops.length > 0) {
-       document.getElementById("printshop-selector").value = printshops[printshops.length - 1].id;
-       loadPrintshopForm(printshops[printshops.length - 1].id);
+      document.getElementById("printshop-selector").value =
+        printshops[printshops.length - 1].id;
+      loadPrintshopForm(printshops[printshops.length - 1].id);
     }
   } catch (error) {
     showErrorToast(`Failed to save printshop: ${error.message}`);
@@ -2824,15 +3094,14 @@ async function savePrintshopConfig(e) {
   }
 }
 
-
 async function deletePrintshop() {
   if (!confirm("Are you sure you want to delete this printshop?")) return;
   const id = document.getElementById("printshop-id").value;
   if (!id) return;
-  
+
   try {
     await fetchWithAuth(`${serverUrl}/api/admin/printshops/${id}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     showSuccessToast("Printshop deleted.");
     await loadPrintshops();
@@ -2840,7 +3109,6 @@ async function deletePrintshop() {
     showErrorToast(`Failed to delete: ${err.message}`);
   }
 }
-
 
 async function saveOdooConfig(e) {
   e.preventDefault();
@@ -2917,15 +3185,22 @@ async function testOdooConnection(e) {
 // --- Pirate Ship Integration Logic ---
 async function loadPirateShipConfig() {
   try {
-    const data = await fetchWithAuth(`${serverUrl}/api/admin/integrations/pirateship`);
+    const data = await fetchWithAuth(
+      `${serverUrl}/api/admin/integrations/pirateship`,
+    );
     if (data && data.success) {
       const storeUrlInput = document.getElementById("pirateship-store-url");
       const keyInput = document.getElementById("pirateship-consumer-key");
       const secretInput = document.getElementById("pirateship-consumer-secret");
-      const autoSyncToggle = document.getElementById("pirateship-auto-sync-toggle");
-      const statusBadge = document.getElementById("pirateship-sync-status-badge");
+      const autoSyncToggle = document.getElementById(
+        "pirateship-auto-sync-toggle",
+      );
+      const statusBadge = document.getElementById(
+        "pirateship-sync-status-badge",
+      );
 
-      if (storeUrlInput) storeUrlInput.value = data.storeUrl || window.location.origin;
+      if (storeUrlInput)
+        storeUrlInput.value = data.storeUrl || window.location.origin;
       if (keyInput) keyInput.value = data.consumerKey || "";
       if (secretInput) secretInput.value = data.consumerSecret || "";
 
@@ -2943,106 +3218,143 @@ async function loadPirateShipConfig() {
 }
 
 function initPirateShipListeners() {
-  document.getElementById("copy-pirateship-url-btn")?.addEventListener("click", () => {
-    const url = document.getElementById("pirateship-store-url")?.value;
-    if (url) {
-      navigator.clipboard.writeText(url);
-      showSuccessToast("Store URL copied to clipboard!");
-    }
-  });
-
-  document.getElementById("copy-pirateship-key-btn")?.addEventListener("click", () => {
-    const key = document.getElementById("pirateship-consumer-key")?.value;
-    if (key) {
-      navigator.clipboard.writeText(key);
-      showSuccessToast("Consumer Key copied to clipboard!");
-    }
-  });
-
-  document.getElementById("toggle-pirateship-secret-btn")?.addEventListener("click", () => {
-    const secretInput = document.getElementById("pirateship-consumer-secret");
-    const toggleBtn = document.getElementById("toggle-pirateship-secret-btn");
-    if (secretInput) {
-      if (secretInput.type === "password") {
-        secretInput.type = "text";
-        if (toggleBtn) toggleBtn.textContent = "Hide";
-      } else {
-        secretInput.type = "password";
-        if (toggleBtn) toggleBtn.textContent = "Show";
+  document
+    .getElementById("copy-pirateship-url-btn")
+    ?.addEventListener("click", () => {
+      const url = document.getElementById("pirateship-store-url")?.value;
+      if (url) {
+        navigator.clipboard.writeText(url);
+        showSuccessToast("Store URL copied to clipboard!");
       }
-    }
-  });
+    });
 
-  document.getElementById("copy-pirateship-secret-btn")?.addEventListener("click", () => {
-    const secret = document.getElementById("pirateship-consumer-secret")?.value;
-    if (secret) {
-      navigator.clipboard.writeText(secret);
-      showSuccessToast("Consumer Secret copied to clipboard!");
-    }
-  });
-
-  document.getElementById("regenerate-pirateship-keys-btn")?.addEventListener("click", async () => {
-    if (!confirm("Are you sure you want to regenerate Pirate Ship keys? You will need to update the keys in your Pirate Ship account.")) {
-      return;
-    }
-    try {
-      const result = await fetchWithAuth(`${serverUrl}/api/admin/integrations/pirateship/regenerate`, {
-        method: "POST"
-      });
-      if (result && result.success) {
-        const keyInput = document.getElementById("pirateship-consumer-key");
-        const secretInput = document.getElementById("pirateship-consumer-secret");
-        if (keyInput) keyInput.value = result.consumerKey;
-        if (secretInput) secretInput.value = result.consumerSecret;
-        showSuccessToast("New Pirate Ship keys generated successfully!");
-      } else {
-        showErrorToast("Failed to regenerate keys.");
+  document
+    .getElementById("copy-pirateship-key-btn")
+    ?.addEventListener("click", () => {
+      const key = document.getElementById("pirateship-consumer-key")?.value;
+      if (key) {
+        navigator.clipboard.writeText(key);
+        showSuccessToast("Consumer Key copied to clipboard!");
       }
-    } catch (err) {
-      showErrorToast(`Error regenerating keys: ${err.message}`);
-    }
-  });
+    });
 
-  document.getElementById("pirateship-auto-sync-toggle")?.addEventListener("change", async (e) => {
-    const isChecked = e.target.checked;
-    const statusBadge = document.getElementById("pirateship-sync-status-badge");
-    try {
-      const res = await fetchWithAuth(`${serverUrl}/api/admin/integrations/pirateship/config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ autoSync: isChecked })
-      });
-      if (res && res.success) {
-        pirateShipAutoSync = isChecked;
-        if (statusBadge) {
-          statusBadge.textContent = `WooCommerce REST API v3 Compatible • Status: ${pirateShipAutoSync ? "Auto-Sync Active" : "Manual Queue Mode"}`;
+  document
+    .getElementById("toggle-pirateship-secret-btn")
+    ?.addEventListener("click", () => {
+      const secretInput = document.getElementById("pirateship-consumer-secret");
+      const toggleBtn = document.getElementById("toggle-pirateship-secret-btn");
+      if (secretInput) {
+        if (secretInput.type === "password") {
+          secretInput.type = "text";
+          if (toggleBtn) toggleBtn.textContent = "Hide";
+        } else {
+          secretInput.type = "password";
+          if (toggleBtn) toggleBtn.textContent = "Show";
         }
-        showSuccessToast(`Pirate Ship Auto-Sync ${isChecked ? "enabled" : "disabled"}.`);
-
-        // Invalidate cached order HTML to update panels immediately
-        for (const ord of allOrders) {
-          ord._cachedHtml = null;
-        }
-        const activeFilterBtn = document.querySelector(".filter-btn.active");
-        const currentFilter = activeFilterBtn?.dataset?.status || "ALL";
-        filterAndDisplayOrders(currentFilter);
-      } else {
-        throw new Error(res?.error || "Failed to update Pirate Ship auto-sync");
       }
-    } catch (err) {
-      showErrorToast(`Failed to update setting: ${err.message}`);
-      e.target.checked = !isChecked;
-    }
-  });
+    });
+
+  document
+    .getElementById("copy-pirateship-secret-btn")
+    ?.addEventListener("click", () => {
+      const secret = document.getElementById(
+        "pirateship-consumer-secret",
+      )?.value;
+      if (secret) {
+        navigator.clipboard.writeText(secret);
+        showSuccessToast("Consumer Secret copied to clipboard!");
+      }
+    });
+
+  document
+    .getElementById("regenerate-pirateship-keys-btn")
+    ?.addEventListener("click", async () => {
+      if (
+        !confirm(
+          "Are you sure you want to regenerate Pirate Ship keys? You will need to update the keys in your Pirate Ship account.",
+        )
+      ) {
+        return;
+      }
+      try {
+        const result = await fetchWithAuth(
+          `${serverUrl}/api/admin/integrations/pirateship/regenerate`,
+          {
+            method: "POST",
+          },
+        );
+        if (result && result.success) {
+          const keyInput = document.getElementById("pirateship-consumer-key");
+          const secretInput = document.getElementById(
+            "pirateship-consumer-secret",
+          );
+          if (keyInput) keyInput.value = result.consumerKey;
+          if (secretInput) secretInput.value = result.consumerSecret;
+          showSuccessToast("New Pirate Ship keys generated successfully!");
+        } else {
+          showErrorToast("Failed to regenerate keys.");
+        }
+      } catch (err) {
+        showErrorToast(`Error regenerating keys: ${err.message}`);
+      }
+    });
+
+  document
+    .getElementById("pirateship-auto-sync-toggle")
+    ?.addEventListener("change", async (e) => {
+      const isChecked = e.target.checked;
+      const statusBadge = document.getElementById(
+        "pirateship-sync-status-badge",
+      );
+      try {
+        const res = await fetchWithAuth(
+          `${serverUrl}/api/admin/integrations/pirateship/config`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ autoSync: isChecked }),
+          },
+        );
+        if (res && res.success) {
+          pirateShipAutoSync = isChecked;
+          if (statusBadge) {
+            statusBadge.textContent = `WooCommerce REST API v3 Compatible • Status: ${pirateShipAutoSync ? "Auto-Sync Active" : "Manual Queue Mode"}`;
+          }
+          showSuccessToast(
+            `Pirate Ship Auto-Sync ${isChecked ? "enabled" : "disabled"}.`,
+          );
+
+          // Invalidate cached order HTML to update panels immediately
+          for (const ord of allOrders) {
+            ord._cachedHtml = null;
+          }
+          const activeFilterBtn = document.querySelector(".filter-btn.active");
+          const currentFilter = activeFilterBtn?.dataset?.status || "ALL";
+          filterAndDisplayOrders(currentFilter);
+        } else {
+          throw new Error(
+            res?.error || "Failed to update Pirate Ship auto-sync",
+          );
+        }
+      } catch (err) {
+        showErrorToast(`Failed to update setting: ${err.message}`);
+        e.target.checked = !isChecked;
+      }
+    });
 }
 
 // --- Address Formatting & Copying ---
 export function formatFullShippingAddress(order) {
   if (!order) return "";
-  const contact = order.shippingContact || order.customerDetails?.shipping || order.billingContact || order.customerDetails?.billing;
+  const contact =
+    order.shippingContact ||
+    order.customerDetails?.shipping ||
+    order.billingContact ||
+    order.customerDetails?.billing;
   if (!contact) return "";
 
-  const name = [contact.givenName, contact.familyName].filter(Boolean).join(" ") ||
+  const name =
+    [contact.givenName, contact.familyName].filter(Boolean).join(" ") ||
     contact.name ||
     order.customerDetails?.name ||
     order.customerName ||
@@ -3054,14 +3366,20 @@ export function formatFullShippingAddress(order) {
   } else if (typeof contact.addressLines === "string" && contact.addressLines) {
     lines = [contact.addressLines];
   } else if (contact.street1 || contact.address1) {
-    lines = [contact.street1 || contact.address1, contact.street2 || contact.address2].filter(Boolean);
+    lines = [
+      contact.street1 || contact.address1,
+      contact.street2 || contact.address2,
+    ].filter(Boolean);
   }
 
   const city = contact.locality || contact.city || "";
   const state = contact.administrativeDistrictLevel1 || contact.state || "";
   const zip = contact.postalCode || contact.zip || "";
-  const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-  const country = contact.country && contact.country !== "US" ? contact.country : "";
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
+  const country =
+    contact.country && contact.country !== "US" ? contact.country : "";
 
   return [name, ...lines, cityStateZip, country].filter(Boolean).join("\n");
 }
@@ -3113,22 +3431,36 @@ export async function orderShippingLabel(orderId, btnEl) {
   const order = allOrders.find((o) => o.orderId === orderId);
   if (!order) return;
 
-  const card = document.getElementById(`order-card-${orderId}`) || btnEl?.closest(".order-card") || btnEl?.closest("tr");
+  const card =
+    document.getElementById(`order-card-${orderId}`) ||
+    btnEl?.closest(".order-card") ||
+    btnEl?.closest("tr");
   let weightOz = order.packageWeightOz;
   let length = order.packageDimensions?.length;
   let width = order.packageDimensions?.width;
   let height = order.packageDimensions?.height;
 
   if (card) {
-    const weightInput = card.querySelector(`.package-weight-input[data-order-id="${orderId}"]`) || card.querySelector(`.package-weight-input`);
-    const lengthInput = card.querySelector(`.package-length-input[data-order-id="${orderId}"]`) || card.querySelector(`.package-length-input`);
-    const widthInput = card.querySelector(`.package-width-input[data-order-id="${orderId}"]`) || card.querySelector(`.package-width-input`);
-    const heightInput = card.querySelector(`.package-height-input[data-order-id="${orderId}"]`) || card.querySelector(`.package-height-input`);
+    const weightInput =
+      card.querySelector(`.package-weight-input[data-order-id="${orderId}"]`) ||
+      card.querySelector(`.package-weight-input`);
+    const lengthInput =
+      card.querySelector(`.package-length-input[data-order-id="${orderId}"]`) ||
+      card.querySelector(`.package-length-input`);
+    const widthInput =
+      card.querySelector(`.package-width-input[data-order-id="${orderId}"]`) ||
+      card.querySelector(`.package-width-input`);
+    const heightInput =
+      card.querySelector(`.package-height-input[data-order-id="${orderId}"]`) ||
+      card.querySelector(`.package-height-input`);
 
-    if (weightInput && weightInput.value) weightOz = parseFloat(weightInput.value);
-    if (lengthInput && lengthInput.value) length = parseFloat(lengthInput.value);
+    if (weightInput && weightInput.value)
+      weightOz = parseFloat(weightInput.value);
+    if (lengthInput && lengthInput.value)
+      length = parseFloat(lengthInput.value);
     if (widthInput && widthInput.value) width = parseFloat(widthInput.value);
-    if (heightInput && heightInput.value) height = parseFloat(heightInput.value);
+    if (heightInput && heightInput.value)
+      height = parseFloat(heightInput.value);
   }
 
   weightOz = Number(weightOz) || 1.0;
@@ -3143,15 +3475,22 @@ export async function orderShippingLabel(orderId, btnEl) {
   }
 
   try {
-    const res = await fetchWithAuth(`${serverUrl}/api/orders/${encodeURIComponent(orderId)}/order-label`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weightOz, length, width, height })
-    });
+    const res = await fetchWithAuth(
+      `${serverUrl}/api/orders/${encodeURIComponent(orderId)}/order-label`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weightOz, length, width, height }),
+      },
+    );
 
     if (res && res.success) {
       order.packageWeightOz = res.packageWeightOz ?? weightOz;
-      order.packageDimensions = res.packageDimensions ?? { length, width, height };
+      order.packageDimensions = res.packageDimensions ?? {
+        length,
+        width,
+        height,
+      };
       order.exportToPirateship = true;
       order.labelRequested = true;
       order._cachedHtml = null; // Invalidate cache
@@ -3167,7 +3506,9 @@ export async function orderShippingLabel(orderId, btnEl) {
       if (res.easyPostGenerated) {
         showSuccessToast(`Label generated! Tracking: ${res.trackingNumber}`);
       } else {
-        showSuccessToast(`Order queued for Pirate Ship! (${order.packageWeightOz} oz, ${order.packageDimensions.length}×${order.packageDimensions.width}×${order.packageDimensions.height}")`);
+        showSuccessToast(
+          `Order queued for Pirate Ship! (${order.packageWeightOz} oz, ${order.packageDimensions.length}×${order.packageDimensions.width}×${order.packageDimensions.height}")`,
+        );
       }
 
       // Re-render
@@ -3199,15 +3540,21 @@ async function loadShippingConfig() {
     };
 
     // Tax rate stored as decimal (0.085), display as percentage (8.5)
-    setVal("shipping-tax-rate",      ((c.taxRate || 0) * 100).toFixed(2));
+    setVal("shipping-tax-rate", ((c.taxRate || 0) * 100).toFixed(2));
     // Handling fee stored in cents, display as dollars
-    setVal("shipping-handling-fee",  ((c.handlingFeeCents || 0) / 100).toFixed(2));
+    setVal(
+      "shipping-handling-fee",
+      ((c.handlingFeeCents || 0) / 100).toFixed(2),
+    );
     // Square % stored as decimal (0.029), display as percentage (2.9)
-    setVal("shipping-square-pct",    ((c.squareFeePercent || 0) * 100).toFixed(3));
+    setVal("shipping-square-pct", ((c.squareFeePercent || 0) * 100).toFixed(3));
     // Square fixed stored in cents, display as dollars
-    setVal("shipping-square-fixed",  ((c.squareFeeFixedCents || 0) / 100).toFixed(2));
+    setVal(
+      "shipping-square-fixed",
+      ((c.squareFeeFixedCents || 0) / 100).toFixed(2),
+    );
     setVal("shipping-grams-per-sqin", (c.gramsPerSqIn || 0).toFixed(3));
-    setVal("shipping-tare-grams",     (c.packageTareGrams || 0).toFixed(0));
+    setVal("shipping-tare-grams", (c.packageTareGrams || 0).toFixed(0));
   } catch (err) {
     console.warn("[PRINTSHOP] Failed to load shipping config:", err);
   }
@@ -3221,32 +3568,38 @@ function initShippingConfigListeners() {
     e.preventDefault();
     const statusEl = document.getElementById("shipping-config-status");
 
-    const getNum = (id) => parseFloat(document.getElementById(id)?.value || "0");
+    const getNum = (id) =>
+      parseFloat(document.getElementById(id)?.value || "0");
 
     const payload = {
       // Input is %, convert back to decimal for storage
-      taxRate:            getNum("shipping-tax-rate") / 100,
+      taxRate: getNum("shipping-tax-rate") / 100,
       // Input is $, convert to cents
-      handlingFeeCents:   Math.round(getNum("shipping-handling-fee") * 100),
+      handlingFeeCents: Math.round(getNum("shipping-handling-fee") * 100),
       // Input is %, convert back to decimal
-      squareFeePercent:   getNum("shipping-square-pct") / 100,
+      squareFeePercent: getNum("shipping-square-pct") / 100,
       // Input is $, convert to cents
       squareFeeFixedCents: Math.round(getNum("shipping-square-fixed") * 100),
-      gramsPerSqIn:       getNum("shipping-grams-per-sqin"),
-      packageTareGrams:   getNum("shipping-tare-grams"),
+      gramsPerSqIn: getNum("shipping-grams-per-sqin"),
+      packageTareGrams: getNum("shipping-tare-grams"),
     };
 
     try {
-      const result = await fetchWithAuth(`${serverUrl}/api/admin/shipping/config`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const result = await fetchWithAuth(
+        `${serverUrl}/api/admin/shipping/config`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
       if (result && result.success) {
         showSuccessToast("Shipping settings saved!");
         if (statusEl) {
           statusEl.textContent = "Saved ✓";
           statusEl.className = "text-sm text-green-600";
-          setTimeout(() => { statusEl.textContent = ""; }, 3000);
+          setTimeout(() => {
+            statusEl.textContent = "";
+          }, 3000);
         }
       } else {
         throw new Error("Server returned failure");
@@ -3272,7 +3625,8 @@ async function loadRetentionConfig() {
 
     if (toggle) toggle.checked = !!data.purgeArtworkOnFlush;
     if (countEl) countEl.textContent = data.canceledOrdersCount ?? 0;
-    if (archivedCountEl) archivedCountEl.textContent = data.archivedOrdersCount ?? 0;
+    if (archivedCountEl)
+      archivedCountEl.textContent = data.archivedOrdersCount ?? 0;
   } catch (err) {
     console.error("[SHOP] Error loading retention config:", err);
   }
@@ -3292,13 +3646,15 @@ async function saveRetentionConfig() {
     const res = await fetchWithAuth(`${serverUrl}/api/admin/retention/config`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ purgeArtworkOnFlush: toggle.checked })
+      body: JSON.stringify({ purgeArtworkOnFlush: toggle.checked }),
     });
     if (res && res.success) {
       if (statusEl) {
         statusEl.textContent = "Retention settings saved!";
         statusEl.className = "text-sm text-green-600 font-semibold";
-        setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+        setTimeout(() => {
+          if (statusEl) statusEl.textContent = "";
+        }, 3000);
       }
     } else {
       throw new Error("Failed to save");
@@ -3312,7 +3668,9 @@ async function saveRetentionConfig() {
 }
 
 async function runRetentionFlushManual() {
-  const confirmed = window.confirm("Run the 30-day retention archival now? Orders canceled more than 30 days ago will be archived. All order records, customer contact info, and pricing are permanently preserved.");
+  const confirmed = window.confirm(
+    "Run the 30-day retention archival now? Orders canceled more than 30 days ago will be archived. All order records, customer contact info, and pricing are permanently preserved.",
+  );
   if (!confirmed) return;
 
   const btn = document.getElementById("run-retention-flush-btn");
@@ -3322,9 +3680,11 @@ async function runRetentionFlushManual() {
     const res = await fetchWithAuth(`${serverUrl}/api/admin/retention/flush`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ retentionDays: 30 })
+      body: JSON.stringify({ retentionDays: 30 }),
     });
-    alert(`Retention archival completed. Archived ${res.flushedCount || 0} orders.`);
+    alert(
+      `Retention archival completed. Archived ${res.flushedCount || 0} orders.`,
+    );
     await loadRetentionConfig();
     await fetchAndDisplayOrders();
   } catch (err) {
@@ -3335,20 +3695,165 @@ async function runRetentionFlushManual() {
 }
 
 function initRetentionListeners() {
-  document.getElementById("save-retention-config-btn")?.addEventListener("click", saveRetentionConfig);
-  document.getElementById("run-retention-flush-btn")?.addEventListener("click", runRetentionFlushManual);
-  document.getElementById("close-history-modal-btn")?.addEventListener("click", closeOrderHistoryModal);
-  document.getElementById("close-history-modal-footer-btn")?.addEventListener("click", closeOrderHistoryModal);
+  document
+    .getElementById("save-retention-config-btn")
+    ?.addEventListener("click", saveRetentionConfig);
+  document
+    .getElementById("run-retention-flush-btn")
+    ?.addEventListener("click", runRetentionFlushManual);
+  document
+    .getElementById("close-history-modal-btn")
+    ?.addEventListener("click", closeOrderHistoryModal);
+  document
+    .getElementById("close-history-modal-footer-btn")
+    ?.addEventListener("click", closeOrderHistoryModal);
 }
 
 // --- Telegram Bot & Alert Cadence Configuration ---
+
+// --- Promo Code Settings ---
+async function loadPromoConfig() {
+  try {
+    const data = await fetchWithAuth(`${serverUrl}/api/admin/promo/config`);
+    if (!data) return;
+
+    const enabledToggle = document.getElementById("promo-enabled");
+    const codeInput = document.getElementById("promo-code");
+    const typeSelect = document.getElementById("promo-type");
+    const amountInput = document.getElementById("promo-amount");
+    const maxUsesInput = document.getElementById("promo-max-uses");
+    const timesUsedDiv = document.getElementById("promo-times-used");
+
+    if (enabledToggle) {
+      enabledToggle.checked = !!data.enabled;
+      const dot = enabledToggle.parentElement.querySelector(".dot");
+      const bg = enabledToggle.parentElement.querySelector(".block");
+      if (data.enabled) {
+        dot?.classList.add("translate-x-full");
+        bg?.classList.add("bg-blue-600");
+        bg?.classList.remove("bg-gray-400");
+      } else {
+        dot?.classList.remove("translate-x-full");
+        bg?.classList.remove("bg-blue-600");
+        bg?.classList.add("bg-gray-400");
+      }
+    }
+    if (codeInput) codeInput.value = data.code || "";
+    if (typeSelect) typeSelect.value = data.type || "percentage";
+    if (amountInput) amountInput.value = data.amount || 0;
+    if (maxUsesInput) maxUsesInput.value = data.maxUses || 0;
+    if (timesUsedDiv) timesUsedDiv.textContent = data.timesUsed || 0;
+  } catch (err) {
+    console.warn("[PRINTSHOP] Failed to load promo config:", err);
+  }
+}
+
+async function savePromoConfig(e) {
+  e.preventDefault();
+  const enabledToggle = document.getElementById("promo-enabled");
+  const codeInput = document.getElementById("promo-code");
+  const typeSelect = document.getElementById("promo-type");
+  const amountInput = document.getElementById("promo-amount");
+  const maxUsesInput = document.getElementById("promo-max-uses");
+  const statusEl = document.getElementById("promo-config-status");
+  const saveBtn = document.getElementById("save-promo-config-btn");
+
+  const payload = {
+    enabled: enabledToggle?.checked || false,
+    code: codeInput?.value.toUpperCase().trim() || "",
+    type: typeSelect?.value || "percentage",
+    amount: parseFloat(amountInput?.value || "0"),
+    maxUses: parseInt(maxUsesInput?.value || "0", 10),
+  };
+
+  try {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    const res = await fetchWithAuth(`${serverUrl}/api/admin/promo/config`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    if (res.success && statusEl) {
+      statusEl.textContent = "Saved successfully!";
+      statusEl.classList.add("text-green-600");
+      setTimeout(() => {
+        statusEl.textContent = "";
+        statusEl.classList.remove("text-green-600");
+      }, 3000);
+
+      // refresh config to see timesUsed reset if code changed
+      loadPromoConfig();
+    }
+  } catch (err) {
+    console.error("Failed to save promo config:", err);
+    if (statusEl) {
+      statusEl.textContent = "Failed to save.";
+      statusEl.classList.add("text-red-600");
+    }
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save Promo Settings";
+  }
+}
+
+function initPromoConfigListeners() {
+  const form = document.getElementById("promo-config-form");
+  if (form) {
+    form.addEventListener("submit", savePromoConfig);
+  }
+
+  const genBtn = document.getElementById("generate-promo-btn");
+  if (genBtn) {
+    genBtn.addEventListener("click", () => {
+      const words = [
+        "FAST",
+        "COOL",
+        "EPIC",
+        "MEGA",
+        "WILD",
+        "FREE",
+        "RAD",
+        "GIFT",
+        "NICE",
+        "NEAT",
+      ];
+      const num = Math.floor(Math.random() * 900) + 100; // 100-999
+      const word = words[Math.floor(Math.random() * words.length)];
+      const codeInput = document.getElementById("promo-code");
+      if (codeInput) {
+        codeInput.value = `${word}${num}`;
+      }
+    });
+  }
+
+  const enabledToggle = document.getElementById("promo-enabled");
+  if (enabledToggle) {
+    enabledToggle.addEventListener("change", (e) => {
+      const dot = e.target.parentElement.querySelector(".dot");
+      const bg = e.target.parentElement.querySelector(".block");
+      if (e.target.checked) {
+        dot.classList.add("translate-x-full");
+        bg.classList.add("bg-blue-600");
+        bg.classList.remove("bg-gray-400");
+      } else {
+        dot.classList.remove("translate-x-full");
+        bg.classList.remove("bg-blue-600");
+        bg.classList.add("bg-gray-400");
+      }
+    });
+  }
+}
+
 async function loadTelegramConfig() {
   try {
     const data = await fetchWithAuth(`${serverUrl}/api/admin/telegram/config`);
     if (!data) return;
 
     const enabledToggle = document.getElementById("telegram-alerts-enabled");
-    const thresholdInput = document.getElementById("telegram-stalled-threshold");
+    const thresholdInput = document.getElementById(
+      "telegram-stalled-threshold",
+    );
     const intervalInput = document.getElementById("telegram-check-interval");
     const repeatInput = document.getElementById("telegram-repeat-hours");
 
@@ -3373,23 +3878,36 @@ async function saveTelegramConfig(e) {
   const statusEl = document.getElementById("telegram-config-status");
   const saveBtn = document.getElementById("save-telegram-config-btn");
 
-  if (!enabledToggle || !thresholdInput || !intervalInput || !repeatInput) return;
+  if (!enabledToggle || !thresholdInput || !intervalInput || !repeatInput)
+    return;
 
   const stalledThresholdHours = Number(thresholdInput.value);
   const checkIntervalMinutes = Number(intervalInput.value);
   const repeatReminderHours = Number(repeatInput.value);
 
-  if (isNaN(stalledThresholdHours) || stalledThresholdHours <= 0 || stalledThresholdHours > 168) {
+  if (
+    isNaN(stalledThresholdHours) ||
+    stalledThresholdHours <= 0 ||
+    stalledThresholdHours > 168
+  ) {
     alert("Stalled threshold must be a number between 1 and 168 hours.");
     return;
   }
 
-  if (isNaN(checkIntervalMinutes) || checkIntervalMinutes < 1 || checkIntervalMinutes > 1440) {
+  if (
+    isNaN(checkIntervalMinutes) ||
+    checkIntervalMinutes < 1 ||
+    checkIntervalMinutes > 1440
+  ) {
     alert("Check cadence must be a number between 1 and 1440 minutes.");
     return;
   }
 
-  if (isNaN(repeatReminderHours) || repeatReminderHours < 0 || repeatReminderHours > 168) {
+  if (
+    isNaN(repeatReminderHours) ||
+    repeatReminderHours < 0 ||
+    repeatReminderHours > 168
+  ) {
     alert("Repeat nag cadence must be a number between 0 and 168 hours.");
     return;
   }
@@ -3408,15 +3926,17 @@ async function saveTelegramConfig(e) {
         enabled: enabledToggle.checked,
         stalledThresholdHours,
         checkIntervalMinutes,
-        repeatReminderHours
-      })
+        repeatReminderHours,
+      }),
     });
 
     if (res && res.success) {
       if (statusEl) {
         statusEl.textContent = "Telegram settings saved!";
         statusEl.className = "text-sm text-green-600 font-semibold";
-        setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+        setTimeout(() => {
+          if (statusEl) statusEl.textContent = "";
+        }, 3000);
       }
     } else {
       throw new Error(res?.error || "Failed to save Telegram settings");
@@ -3432,11 +3952,10 @@ async function saveTelegramConfig(e) {
 }
 
 function initTelegramConfigListeners() {
-  document.getElementById("telegram-config-form")?.addEventListener("submit", saveTelegramConfig);
+  document
+    .getElementById("telegram-config-form")
+    ?.addEventListener("submit", saveTelegramConfig);
 }
-
-
-
 
 // --- Initialization ---
 async function getServerSessionToken() {
@@ -3571,7 +4090,7 @@ export async function init() {
     "marginLeft",
     "marginRight",
     "measurement-unit",
-    "save-general-settings-btn"
+    "save-general-settings-btn",
   ];
   ids.forEach((id) => {
     // Convert kebab-case to camelCase for keys
@@ -3594,10 +4113,20 @@ export async function init() {
   // Attach event listeners immediately so UI is responsive
   ui.ordersList?.addEventListener("click", handleOrderListClick);
   ui.ordersList?.addEventListener("change", handleOrderListChange);
-    document.getElementById("active-printshop")?.addEventListener("change", () => fetchAndDisplayOrders(ui.searchInput?.value || ""));
-  document.getElementById("printshop-selector")?.addEventListener("change", (e) => loadPrintshopForm(e.target.value));
-  document.getElementById("printshop-config-form")?.addEventListener("submit", savePrintshopConfig);
-  document.getElementById("delete-printshop-btn")?.addEventListener("click", deletePrintshop);
+  document
+    .getElementById("active-printshop")
+    ?.addEventListener("change", () =>
+      fetchAndDisplayOrders(ui.searchInput?.value || ""),
+    );
+  document
+    .getElementById("printshop-selector")
+    ?.addEventListener("change", (e) => loadPrintshopForm(e.target.value));
+  document
+    .getElementById("printshop-config-form")
+    ?.addEventListener("submit", savePrintshopConfig);
+  document
+    .getElementById("delete-printshop-btn")
+    ?.addEventListener("click", deletePrintshop);
 
   ui.refreshOrdersBtn?.addEventListener("click", () => fetchAndDisplayOrders());
   ui.registerBtn?.addEventListener("click", handleRegistration);
@@ -3615,7 +4144,9 @@ export async function init() {
   });
   ui.copyPricingBtn?.addEventListener("click", () => {
     if (currentPricingConfig) {
-      navigator.clipboard?.writeText(JSON.stringify(currentPricingConfig, null, 2));
+      navigator.clipboard?.writeText(
+        JSON.stringify(currentPricingConfig, null, 2),
+      );
       showSuccessToast("Pricing JSON copied to clipboard!");
     }
   });
@@ -3639,7 +4170,10 @@ export async function init() {
   });
 
   ui.saveGeneralSettingsBtn?.addEventListener("click", () => {
-    localStorage.setItem("splotchMeasurementUnit", ui["measurement-unit"].value);
+    localStorage.setItem(
+      "splotchMeasurementUnit",
+      ui["measurement-unit"].value,
+    );
     showSuccessToast("General Settings saved.");
   });
 
@@ -3647,7 +4181,7 @@ export async function init() {
   const savedUnit = localStorage.getItem("splotchMeasurementUnit");
   if (savedUnit && ui["measurement-unit"]) {
     ui["measurement-unit"].value = savedUnit;
-    document.querySelectorAll("h3").forEach(h3 => {
+    document.querySelectorAll("h3").forEach((h3) => {
       if (h3.textContent.includes("Sheet Dimensions")) {
         h3.textContent = `Sheet Dimensions (${savedUnit === "mm" ? "mm" : "Inches"})`;
       }
@@ -3655,11 +4189,18 @@ export async function init() {
         h3.textContent = `Media Margins (${savedUnit === "mm" ? "mm" : "Inches"})`;
       }
     });
-    
+
     // The HTML defaults are in inches. If we loaded "mm", we should convert the inputs.
     if (savedUnit === "mm") {
-      const inputsToConvert = [ui.sheetWidth, ui.sheetHeight, ui.marginTop, ui.marginBottom, ui.marginLeft, ui.marginRight];
-      inputsToConvert.forEach(input => {
+      const inputsToConvert = [
+        ui.sheetWidth,
+        ui.sheetHeight,
+        ui.marginTop,
+        ui.marginBottom,
+        ui.marginLeft,
+        ui.marginRight,
+      ];
+      inputsToConvert.forEach((input) => {
         if (input && input.value) {
           input.value = parseFloat((parseFloat(input.value) * 25.4).toFixed(2));
         }
@@ -3671,18 +4212,25 @@ export async function init() {
   ui["measurement-unit"]?.addEventListener("change", (e) => {
     const newUnit = e.target.value;
     if (newUnit === lastUnit) return;
-    const factor = newUnit === "mm" ? 25.4 : (1 / 25.4);
-    
+    const factor = newUnit === "mm" ? 25.4 : 1 / 25.4;
+
     // Convert inputs
-    const inputsToConvert = [ui.sheetWidth, ui.sheetHeight, ui.marginTop, ui.marginBottom, ui.marginLeft, ui.marginRight];
-    inputsToConvert.forEach(input => {
+    const inputsToConvert = [
+      ui.sheetWidth,
+      ui.sheetHeight,
+      ui.marginTop,
+      ui.marginBottom,
+      ui.marginLeft,
+      ui.marginRight,
+    ];
+    inputsToConvert.forEach((input) => {
       if (input && input.value) {
         input.value = parseFloat((parseFloat(input.value) * factor).toFixed(2));
       }
     });
-    
+
     // Update labels in HTML
-    document.querySelectorAll("h3").forEach(h3 => {
+    document.querySelectorAll("h3").forEach((h3) => {
       if (h3.textContent.includes("Sheet Dimensions")) {
         h3.textContent = `Sheet Dimensions (${newUnit === "mm" ? "mm" : "Inches"})`;
       }
@@ -3710,13 +4258,23 @@ export async function init() {
         ui.marginRight.classList.remove("bg-gray-200");
       } else {
         const toCurrentUnit = ui["measurement-unit"]?.value === "mm" ? 25.4 : 1;
-        ui.sheetWidth.value = parseFloat((profile.width * toCurrentUnit).toFixed(2));
+        ui.sheetWidth.value = parseFloat(
+          (profile.width * toCurrentUnit).toFixed(2),
+        );
         // Keep height user configurable unless it's roll media
-        
-        ui.marginTop.value = parseFloat((profile.margins.top * toCurrentUnit).toFixed(2));
-        ui.marginBottom.value = parseFloat((profile.margins.bottom * toCurrentUnit).toFixed(2));
-        ui.marginLeft.value = parseFloat((profile.margins.left * toCurrentUnit).toFixed(2));
-        ui.marginRight.value = parseFloat((profile.margins.right * toCurrentUnit).toFixed(2));
+
+        ui.marginTop.value = parseFloat(
+          (profile.margins.top * toCurrentUnit).toFixed(2),
+        );
+        ui.marginBottom.value = parseFloat(
+          (profile.margins.bottom * toCurrentUnit).toFixed(2),
+        );
+        ui.marginLeft.value = parseFloat(
+          (profile.margins.left * toCurrentUnit).toFixed(2),
+        );
+        ui.marginRight.value = parseFloat(
+          (profile.margins.right * toCurrentUnit).toFixed(2),
+        );
 
         // Disable the inputs so they are read-only for standard profiles
         ui.sheetWidth.disabled = true;
@@ -3833,26 +4391,28 @@ export async function init() {
     toggleViewBtn.addEventListener("click", () => {
       currentViewMode = currentViewMode === "card" ? "list" : "card";
       localStorage.setItem("splotchViewMode", currentViewMode);
-      
+
       const activeFilter =
         document.querySelector("#filter-container .filter-btn.active")?.dataset
           .status || "ALL";
       filterAndDisplayOrders(activeFilter);
     });
   }
-  
+
   const bulkStatusSelect = document.getElementById("bulk-status-select");
   if (bulkStatusSelect) {
     bulkStatusSelect.addEventListener("change", (e) => {
-        const newStatus = e.target.value;
-        if (newStatus) {
-            const confirmed = window.confirm(`Are you sure you want to change all selected orders to ${newStatus}?`);
-            if (confirmed) {
-                handleBulkStatusUpdate(newStatus);
-            } else {
-                e.target.value = "";
-            }
+      const newStatus = e.target.value;
+      if (newStatus) {
+        const confirmed = window.confirm(
+          `Are you sure you want to change all selected orders to ${newStatus}?`,
+        );
+        if (confirmed) {
+          handleBulkStatusUpdate(newStatus);
+        } else {
+          e.target.value = "";
         }
+      }
     });
   }
 
@@ -3906,6 +4466,7 @@ export async function init() {
       loadShippingConfig();
       loadRetentionConfig();
       loadTelegramConfig();
+      loadPromoConfig();
     });
   }
 
@@ -3925,7 +4486,7 @@ export async function init() {
   initRetentionListeners();
   // Telegram Bot & Alert Cadence listeners
   initTelegramConfigListeners();
-
+  initPromoConfigListeners();
 
   // Check for a token in the URL from OAuth redirect
   const urlParams = new URLSearchParams(window.location.search);
@@ -3979,7 +4540,10 @@ function renderPricingEditor(config) {
   const resolutions = config.resolutions || [];
   const materials = config.materials || [];
   const layers = config.layers || [];
-  const complexity = config.complexity || { perLayerMultiplier: 0.1, tiers: [] };
+  const complexity = config.complexity || {
+    perLayerMultiplier: 0.1,
+    tiers: [],
+  };
   const quantityDiscounts = config.quantityDiscounts || [];
 
   let html = `
@@ -4003,7 +4567,9 @@ function renderPricingEditor(config) {
           <button type="button" id="add-res-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Resolution</button>
         </div>
         <div id="pricing-resolutions-list" class="space-y-2">
-          ${resolutions.map((r) => `
+          ${resolutions
+            .map(
+              (r) => `
             <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center resolution-row bg-gray-50 p-2 rounded border border-gray-200">
               <input type="text" placeholder="ID (e.g. dpi_300)" class="p-1.5 text-xs border rounded w-32 res-id font-mono" value="${escapeHtml(r.id)}">
               <input type="text" placeholder="Display Name" class="p-1.5 text-xs border rounded flex-grow res-name font-medium" value="${escapeHtml(r.name)}">
@@ -4017,7 +4583,9 @@ function renderPricingEditor(config) {
               </div>
               <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Resolution">&times;</button>
             </div>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </div>
       </div>
 
@@ -4031,7 +4599,9 @@ function renderPricingEditor(config) {
           <button type="button" id="add-mat-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Material</button>
         </div>
         <div id="pricing-materials-list" class="space-y-3">
-          ${materials.map((m) => `
+          ${materials
+            .map(
+              (m) => `
             <div class="border border-gray-200 p-3 bg-gray-50 rounded-lg material-row space-y-2">
               <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
                 <input type="text" placeholder="ID (e.g. pp_standard)" class="p-1.5 text-xs border rounded w-36 mat-id font-mono" value="${escapeHtml(m.id)}">
@@ -4051,7 +4621,9 @@ function renderPricingEditor(config) {
                 <input type="text" placeholder="Marketing description shown in tooltip" class="w-full p-1.5 border rounded text-xs mat-desc bg-white" value="${escapeHtml(m.description || "")}">
               </div>
             </div>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </div>
       </div>
 
@@ -4065,7 +4637,9 @@ function renderPricingEditor(config) {
           <button type="button" id="add-layer-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Layer</button>
         </div>
         <div id="pricing-layers-list" class="space-y-3">
-          ${layers.map((l) => `
+          ${layers
+            .map(
+              (l) => `
             <div class="border border-gray-200 p-3 bg-gray-50 rounded-lg layer-row space-y-2">
               <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
                 <input type="text" placeholder="ID (e.g. white)" class="p-1.5 text-xs border rounded w-32 layer-id font-mono" value="${escapeHtml(l.id)}">
@@ -4081,7 +4655,9 @@ function renderPricingEditor(config) {
                 <textarea class="w-full p-1.5 border rounded text-xs layer-subtypes font-mono bg-white" rows="2">${escapeHtml(l.subTypes ? JSON.stringify(l.subTypes) : "[]")}</textarea>
               </div>
             </div>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </div>
       </div>
 
@@ -4101,7 +4677,9 @@ function renderPricingEditor(config) {
         </div>
 
         <div id="pricing-complexity-list" class="space-y-2">
-          ${(complexity.tiers || []).map((t) => `
+          ${(complexity.tiers || [])
+            .map(
+              (t) => `
             <div class="flex gap-2 items-center complexity-row bg-gray-50 p-2 rounded border border-gray-200">
               <span class="text-xs text-gray-500 font-medium">Perimeter up to:</span>
               <input type="text" placeholder="Inches (e.g. 12 or Infinity)" class="p-1.5 text-xs border rounded w-32 comp-threshold font-mono" value="${t.thresholdInches}">
@@ -4109,7 +4687,9 @@ function renderPricingEditor(config) {
               <input type="number" step="0.05" min="0" class="p-1.5 text-xs border rounded w-24 comp-multiplier font-mono" value="${t.multiplier}">
               <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Tier">&times;</button>
             </div>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </div>
       </div>
 
@@ -4123,7 +4703,9 @@ function renderPricingEditor(config) {
           <button type="button" id="add-discount-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Discount Tier</button>
         </div>
         <div id="pricing-discounts-list" class="space-y-2">
-          ${quantityDiscounts.map((d) => `
+          ${quantityDiscounts
+            .map(
+              (d) => `
             <div class="flex gap-3 items-center discount-row bg-gray-50 p-2 rounded border border-gray-200">
               <span class="text-xs text-gray-500 font-medium">Min Quantity:</span>
               <input type="number" min="1" placeholder="Quantity" class="p-1.5 text-xs border rounded w-28 disc-qty font-mono font-bold" value="${d.quantity}">
@@ -4132,7 +4714,9 @@ function renderPricingEditor(config) {
               <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200 disc-badge">${Math.round((d.discount || 0) * 100)}% OFF</span>
               <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn ml-auto" title="Delete Discount Tier">&times;</button>
             </div>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </div>
       </div>
 
@@ -4293,13 +4877,11 @@ function renderPricingEditor(config) {
       runSimulator();
     });
 
-  document
-    .getElementById("add-discount-btn")
-    ?.addEventListener("click", () => {
-      const div = document.createElement("div");
-      div.className =
-        "flex gap-3 items-center discount-row bg-gray-50 p-2 rounded border border-gray-200";
-      div.innerHTML = `
+  document.getElementById("add-discount-btn")?.addEventListener("click", () => {
+    const div = document.createElement("div");
+    div.className =
+      "flex gap-3 items-center discount-row bg-gray-50 p-2 rounded border border-gray-200";
+    div.innerHTML = `
         <span class="text-xs text-gray-500 font-medium">Min Quantity:</span>
         <input type="number" min="1" placeholder="Quantity" class="p-1.5 text-xs border rounded w-28 disc-qty font-mono font-bold" value="1000">
         <span class="text-xs text-gray-500 font-medium">&rarr; Discount (%):</span>
@@ -4307,9 +4889,9 @@ function renderPricingEditor(config) {
         <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200 disc-badge">20% OFF</span>
         <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn ml-auto" title="Delete Discount Tier">&times;</button>
       `;
-      document.getElementById("pricing-discounts-list").appendChild(div);
-      runSimulator();
-    });
+    document.getElementById("pricing-discounts-list").appendChild(div);
+    runSimulator();
+  });
 
   // Delegate event for all remove buttons and dynamic badges
   ui.pricingEditorContainer.addEventListener("click", (e) => {
@@ -4340,12 +4922,18 @@ function renderPricingEditor(config) {
 
   // Simulator controls listener
   document.getElementById("sim-width")?.addEventListener("input", runSimulator);
-  document.getElementById("sim-height")?.addEventListener("input", runSimulator);
+  document
+    .getElementById("sim-height")
+    ?.addEventListener("input", runSimulator);
   document.getElementById("sim-qty")?.addEventListener("input", runSimulator);
-  document.getElementById("sim-perimeter")?.addEventListener("input", runSimulator);
+  document
+    .getElementById("sim-perimeter")
+    ?.addEventListener("input", runSimulator);
   document.getElementById("sim-mat")?.addEventListener("change", runSimulator);
   document.getElementById("sim-res")?.addEventListener("change", runSimulator);
-  document.getElementById("sim-layers")?.addEventListener("change", runSimulator);
+  document
+    .getElementById("sim-layers")
+    ?.addEventListener("change", runSimulator);
 
   updateSimulatorDropdowns();
   runSimulator();
@@ -4426,18 +5014,18 @@ function runSimulator() {
 
   // 3. Complexity Multiplier
   let compMult = 1.0;
-  const compRows = Array.from(
-    document.querySelectorAll(".complexity-row")
-  ).map((row) => {
-    const rawThresh = row.querySelector(".comp-threshold")?.value.trim();
-    const threshold =
-      rawThresh === "Infinity" || isNaN(parseFloat(rawThresh))
-        ? Infinity
-        : parseFloat(rawThresh);
-    const mult =
-      parseFloat(row.querySelector(".comp-multiplier")?.value) || 1.0;
-    return { threshold, mult };
-  });
+  const compRows = Array.from(document.querySelectorAll(".complexity-row")).map(
+    (row) => {
+      const rawThresh = row.querySelector(".comp-threshold")?.value.trim();
+      const threshold =
+        rawThresh === "Infinity" || isNaN(parseFloat(rawThresh))
+          ? Infinity
+          : parseFloat(rawThresh);
+      const mult =
+        parseFloat(row.querySelector(".comp-multiplier")?.value) || 1.0;
+      return { threshold, mult };
+    },
+  );
 
   compRows.sort((a, b) => a.threshold - b.threshold);
   for (const tier of compRows) {
@@ -4462,7 +5050,7 @@ function runSimulator() {
   // 5. Quantity Discount
   let discountPercent = 0;
   const discountRows = Array.from(
-    document.querySelectorAll(".discount-row")
+    document.querySelectorAll(".discount-row"),
   ).map((row) => {
     const q = parseInt(row.querySelector(".disc-qty")?.value, 10) || 0;
     const p = parseFloat(row.querySelector(".disc-percent")?.value) || 0;
@@ -4477,14 +5065,13 @@ function runSimulator() {
   }
 
   const baseCostCents = sqInches * basePriceCents;
-  const totalCentsBeforeDiscount =
-    baseCostCents * qty * combinedMultiplier;
+  const totalCentsBeforeDiscount = baseCostCents * qty * combinedMultiplier;
   const totalCents = Math.round(
-    totalCentsBeforeDiscount * (1 - discountPercent)
+    totalCentsBeforeDiscount * (1 - discountPercent),
   );
 
   const totalDollars = (totalCents / 100).toFixed(2);
-  const unitDollars = ((totalCents / qty) / 100).toFixed(2);
+  const unitDollars = (totalCents / qty / 100).toFixed(2);
 
   // Update simulator UI
   const outSqIn = document.getElementById("sim-out-sqin");
@@ -4522,7 +5109,7 @@ async function savePricingConfig() {
         description: "Multiplier based on the perimeter of the cut path.",
         perLayerMultiplier:
           parseFloat(
-            document.getElementById("pricing-per-layer-mult")?.value
+            document.getElementById("pricing-per-layer-mult")?.value,
           ) || 0.1,
         tiers: [],
       },
@@ -4602,10 +5189,8 @@ async function savePricingConfig() {
 
     // Gather Quantity Discounts
     document.querySelectorAll(".discount-row").forEach((row) => {
-      const quantity =
-        parseInt(row.querySelector(".disc-qty").value, 10) || 1;
-      const percent =
-        parseFloat(row.querySelector(".disc-percent").value) || 0;
+      const quantity = parseInt(row.querySelector(".disc-qty").value, 10) || 1;
+      const percent = parseFloat(row.querySelector(".disc-percent").value) || 0;
       config.quantityDiscounts.push({
         quantity,
         discount: +(percent / 100).toFixed(4),
@@ -4638,48 +5223,52 @@ function renderPagination(totalItems) {
   if (!container) return;
 
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  
+
   if (totalPages <= 1) {
     container.innerHTML = "";
     return;
   }
 
   let html = "";
-  
+
   // Previous button
-  html += `<button class="px-3 py-1 border rounded-md bg-white text-gray-600 hover:bg-gray-50 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}" 
-           ${currentPage === 1 ? 'disabled' : ''} data-page="${currentPage - 1}">Prev</button>`;
+  html += `<button class="px-3 py-1 border rounded-md bg-white text-gray-600 hover:bg-gray-50 ${currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""}"
+           ${currentPage === 1 ? "disabled" : ""} data-page="${currentPage - 1}">Prev</button>`;
 
   // Page numbers
   let startPage = Math.max(1, currentPage - 2);
   let endPage = Math.min(totalPages, startPage + 4);
   if (endPage - startPage < 4) {
-      startPage = Math.max(1, endPage - 4);
+    startPage = Math.max(1, endPage - 4);
   }
 
   for (let i = startPage; i <= endPage; i++) {
-    html += `<button class="px-3 py-1 border rounded-md ${currentPage === i ? 'bg-splotch-navy text-white font-bold' : 'bg-white text-gray-600 hover:bg-gray-50'}" 
+    html += `<button class="px-3 py-1 border rounded-md ${currentPage === i ? "bg-splotch-navy text-white font-bold" : "bg-white text-gray-600 hover:bg-gray-50"}"
              data-page="${i}">${i}</button>`;
   }
 
   // Next button
-  html += `<button class="px-3 py-1 border rounded-md bg-white text-gray-600 hover:bg-gray-50 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}" 
-           ${currentPage === totalPages ? 'disabled' : ''} data-page="${currentPage + 1}">Next</button>`;
-           
+  html += `<button class="px-3 py-1 border rounded-md bg-white text-gray-600 hover:bg-gray-50 ${currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""}"
+           ${currentPage === totalPages ? "disabled" : ""} data-page="${currentPage + 1}">Next</button>`;
+
   container.innerHTML = html;
 
   // Add event listeners
-  container.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-          const newPage = parseInt(e.target.dataset.page, 10);
-          if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
-              currentPage = newPage;
-              const activeFilter = document.querySelector("#filter-container .filter-btn.active")?.dataset.status || "ALL";
-              filterAndDisplayOrders(activeFilter);
-              // Scroll to top of list
-              document.getElementById("orders-list").scrollIntoView({ behavior: "smooth" });
-          }
-      });
+  container.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const newPage = parseInt(e.target.dataset.page, 10);
+      if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
+        currentPage = newPage;
+        const activeFilter =
+          document.querySelector("#filter-container .filter-btn.active")
+            ?.dataset.status || "ALL";
+        filterAndDisplayOrders(activeFilter);
+        // Scroll to top of list
+        document
+          .getElementById("orders-list")
+          .scrollIntoView({ behavior: "smooth" });
+      }
+    });
   });
 }
 
@@ -4687,94 +5276,112 @@ function renderPagination(totalItems) {
  * Returns an alert object if the order is critically late or untouched.
  */
 function getOrderAlert(order) {
-    if (!order.receivedAt) return null;
-    
-    const status = order.status;
-    const receivedAt = new Date(order.receivedAt).getTime();
-    const now = Date.now();
-    const hoursSince = (now - receivedAt) / (1000 * 60 * 60);
+  if (!order.receivedAt) return null;
 
-    // Untouched: NEW or PENDING for > 24h
-    if ((status === 'NEW' || status === 'PENDING') && hoursSince > 24) {
-        return { type: 'untouched', text: 'Untouched (24h+)', classes: 'bg-orange-500 text-white border-orange-600', icon: '⚠️' };
-    }
+  const status = order.status;
+  const receivedAt = new Date(order.receivedAt).getTime();
+  const now = Date.now();
+  const hoursSince = (now - receivedAt) / (1000 * 60 * 60);
 
-    // Critically Late: Not shipped/completed/delivered/canceled for > 5 days (120h)
-    if (!['SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELED'].includes(status) && hoursSince > 120) {
-        return { type: 'late', text: 'Critically Late (5d+)', classes: 'bg-red-600 text-white border-red-700 animate-pulse', icon: '🚨' };
-    }
-    
-    return null;
+  // Untouched: NEW or PENDING for > 24h
+  if ((status === "NEW" || status === "PENDING") && hoursSince > 24) {
+    return {
+      type: "untouched",
+      text: "Untouched (24h+)",
+      classes: "bg-orange-500 text-white border-orange-600",
+      icon: "⚠️",
+    };
+  }
+
+  // Critically Late: Not shipped/completed/delivered/canceled for > 5 days (120h)
+  if (
+    !["SHIPPED", "DELIVERED", "COMPLETED", "CANCELED"].includes(status) &&
+    hoursSince > 120
+  ) {
+    return {
+      type: "late",
+      text: "Critically Late (5d+)",
+      classes: "bg-red-600 text-white border-red-700 animate-pulse",
+      icon: "🚨",
+    };
+  }
+
+  return null;
 }
 
-
 // --- Customer Chat / Messaging ---
-window.toggleChat = function(orderId) {
-    const container = document.getElementById(`chat-container-${orderId}`);
-    if (container.classList.contains('hidden')) {
-        container.classList.remove('hidden');
-        window.fetchMessages(orderId);
-    } else {
-        container.classList.add('hidden');
-    }
+window.toggleChat = function (orderId) {
+  const container = document.getElementById(`chat-container-${orderId}`);
+  if (container.classList.contains("hidden")) {
+    container.classList.remove("hidden");
+    window.fetchMessages(orderId);
+  } else {
+    container.classList.add("hidden");
+  }
 };
 
-window.fetchMessages = async function(orderId) {
-    const historyContainer = document.getElementById(`chat-history-${orderId}`);
-    try {
-        const token = localStorage.getItem('splotchToken');
-        const res = await fetch(`/api/orders/${orderId}/messages`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!res.ok) throw new Error('Failed to fetch messages');
-        const messages = await res.json();
-        
-        if (messages.length === 0) {
-            historyContainer.innerHTML = '<em class="text-xs text-gray-400">No messages yet. Send an email to the customer to start a conversation.</em>';
-            return;
-        }
+window.fetchMessages = async function (orderId) {
+  const historyContainer = document.getElementById(`chat-history-${orderId}`);
+  try {
+    const token = localStorage.getItem("splotchToken");
+    const res = await fetch(`/api/orders/${orderId}/messages`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-        historyContainer.innerHTML = messages.map(msg => `
-            <div class="${msg.sender === 'printshop' ? 'bg-blue-100 self-end' : 'bg-gray-200 self-start'} rounded p-2 max-w-[80%]">
+    if (!res.ok) throw new Error("Failed to fetch messages");
+    const messages = await res.json();
+
+    if (messages.length === 0) {
+      historyContainer.innerHTML =
+        '<em class="text-xs text-gray-400">No messages yet. Send an email to the customer to start a conversation.</em>';
+      return;
+    }
+
+    historyContainer.innerHTML = messages
+      .map(
+        (msg) => `
+            <div class="${msg.sender === "printshop" ? "bg-blue-100 self-end" : "bg-gray-200 self-start"} rounded p-2 max-w-[80%]">
                 <div class="text-[10px] text-gray-500 mb-1">${new Date(msg.timestamp).toLocaleString()} (${msg.sender})</div>
                 <div>${escapeHtml(msg.content)}</div>
             </div>
-        `).join('');
-        
-        // Scroll to bottom
-        historyContainer.scrollTop = historyContainer.scrollHeight;
-    } catch (e) {
-        console.error(e);
-        historyContainer.innerHTML = '<em class="text-xs text-red-400">Error loading messages.</em>';
-    }
+        `,
+      )
+      .join("");
+
+    // Scroll to bottom
+    historyContainer.scrollTop = historyContainer.scrollHeight;
+  } catch (e) {
+    console.error(e);
+    historyContainer.innerHTML =
+      '<em class="text-xs text-red-400">Error loading messages.</em>';
+  }
 };
 
-window.sendMessage = async function(orderId) {
-    const input = document.getElementById(`chat-input-${orderId}`);
-    const message = input.value.trim();
-    if (!message) return;
+window.sendMessage = async function (orderId) {
+  const input = document.getElementById(`chat-input-${orderId}`);
+  const message = input.value.trim();
+  if (!message) return;
 
-    try {
-        const token = localStorage.getItem('splotchToken');
-        const res = await fetch(`/api/orders/${orderId}/messages`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ message })
-        });
-        
-        if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || 'Failed to send message');
-        }
+  try {
+    const token = localStorage.getItem("splotchToken");
+    const res = await fetch(`/api/orders/${orderId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ message }),
+    });
 
-        input.value = '';
-        window.fetchMessages(orderId);
-    } catch (e) {
-        console.error(e);
-        alert('Failed to send email: ' + e.message);
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Failed to send message");
     }
+
+    input.value = "";
+    window.fetchMessages(orderId);
+  } catch (e) {
+    console.error(e);
+    alert("Failed to send email: " + e.message);
+  }
 };

@@ -47,7 +47,10 @@ import { fileTypeFromFile } from "file-type";
 import { calculateStickerPrice, getDesignDimensions } from "./pricing.js";
 import { calcOrderBreakdown, DEFAULT_SHIPPING_CONFIG } from "./lib/costCalc.js";
 import { logOrderTransition, readAuditLogForOrder } from "./lib/auditLogger.js";
-import { getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from "./lib/telegramReminder.js";
+import {
+  getTelegramConfig,
+  DEFAULT_TELEGRAM_CONFIG,
+} from "./lib/telegramReminder.js";
 
 import { Markup } from "telegraf";
 import { getOrderStatusKeyboard } from "./telegramHelpers.js";
@@ -89,7 +92,13 @@ import util from "util";
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
 
-export const FINAL_STATUSES = ["SHIPPED", "CANCELED", "COMPLETED", "DELIVERED", "ARCHIVED"];
+export const FINAL_STATUSES = [
+  "SHIPPED",
+  "CANCELED",
+  "COMPLETED",
+  "DELIVERED",
+  "ARCHIVED",
+];
 export const VALID_STATUSES = [
   "NEW",
   "ACCEPTED",
@@ -399,7 +408,11 @@ export async function runRetentionFlush(dbInstance, options = {}) {
     }
   }
 
-  return { flushedCount: flushedOrderIds.length, flushedOrderIds, archivedCount: flushedOrderIds.length };
+  return {
+    flushedCount: flushedOrderIds.length,
+    flushedOrderIds,
+    archivedCount: flushedOrderIds.length,
+  };
 }
 
 // Define an async function to contain all server logic
@@ -548,7 +561,10 @@ async function startServer(
     logger.info("[SERVER] LowDB database initialized at:", dbPath);
 
     // Load the refresh token from the database if it exists
-    const config = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
+    const config =
+      typeof db.getConfig === "function"
+        ? await db.getConfig()
+        : db.data?.config || {};
     if (config?.google_refresh_token) {
       oauth2Client.setCredentials({
         refresh_token: config.google_refresh_token,
@@ -1202,6 +1218,45 @@ async function startServer(
       res.json({ csrfToken: res.locals._csrf });
     });
 
+    app.post("/api/validate-promo", async (req, res) => {
+      try {
+        const { code } = req.body;
+        if (!code) {
+          return res.status(400).json({ error: "Code is required" });
+        }
+
+        const promo = db.data?.config?.promo;
+
+        if (
+          !promo ||
+          !promo.enabled ||
+          !promo.code ||
+          promo.code.toLowerCase() !== code.toLowerCase()
+        ) {
+          return res.json({
+            valid: false,
+            message: "Invalid or inactive promo code.",
+          });
+        }
+
+        if (promo.maxUses > 0 && promo.timesUsed >= promo.maxUses) {
+          return res.json({
+            valid: false,
+            message: "This promo code has reached its usage limit.",
+          });
+        }
+
+        return res.json({
+          valid: true,
+          type: promo.type,
+          amount: promo.amount,
+        });
+      } catch (error) {
+        logger.error("[SERVER] Error validating promo code:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
     app.get("/api/config", (req, res) => {
       const nodeEnv = process.env.NODE_ENV || "development";
       res.json({
@@ -1672,11 +1727,9 @@ async function startServer(
           storageProvider.deleteFile(designImageFile.path).catch((err) => {
             if (err) logger.error("Error deleting invalid file:", err);
           });
-          return res
-            .status(400)
-            .json({
-              error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
-            });
+          return res.status(400).json({
+            error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
+          });
         }
 
         // --- SVG Sanitization for designImage ---
@@ -1686,12 +1739,10 @@ async function startServer(
         ) {
           const isSafe = await sanitizeSVGFile(designImageFile.path);
           if (!isSafe) {
-            return res
-              .status(400)
-              .json({
-                error:
-                  "The uploaded SVG file contains potentially malicious content and was rejected.",
-              });
+            return res.status(400).json({
+              error:
+                "The uploaded SVG file contains potentially malicious content and was rejected.",
+            });
           }
         }
 
@@ -1750,12 +1801,10 @@ async function startServer(
             storageProvider.deleteFile(edgecutLineFile.path).catch((err) => {
               if (err) logger.error("Error deleting invalid file:", err);
             });
-            return res
-              .status(400)
-              .json({
-                error:
-                  "Invalid file type. Only SVG files are allowed for the edgecut line.",
-              });
+            return res.status(400).json({
+              error:
+                "Invalid file type. Only SVG files are allowed for the edgecut line.",
+            });
           }
 
           // --- SVG Sanitization for cutLineFile ---
@@ -1766,12 +1815,10 @@ async function startServer(
               if (err)
                 logger.error("Error deleting orphaned design file:", err);
             });
-            return res
-              .status(400)
-              .json({
-                error:
-                  "The uploaded cut line file contains potentially malicious content and was rejected.",
-              });
+            return res.status(400).json({
+              error:
+                "The uploaded cut line file contains potentially malicious content and was rejected.",
+            });
           }
 
           // --- SECURITY: Enforce correct extension ---
@@ -1823,11 +1870,9 @@ async function startServer(
             "eps",
           ];
           if (!allowedExtensions.includes(ext)) {
-            return res
-              .status(400)
-              .json({
-                error: `Unsupported file extension .${ext}. Allowed extensions: ${allowedExtensions.join(", ")}`,
-              });
+            return res.status(400).json({
+              error: `Unsupported file extension .${ext}. Allowed extensions: ${allowedExtensions.join(", ")}`,
+            });
           }
 
           const session = chunkedUploadManager.initSession({
@@ -1968,11 +2013,9 @@ async function startServer(
             try {
               await fs.promises.unlink(tempAssembledPath);
             } catch (e) {}
-            return res
-              .status(400)
-              .json({
-                error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
-              });
+            return res.status(400).json({
+              error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
+            });
           }
 
           // SVG Sanitization
@@ -1985,12 +2028,10 @@ async function startServer(
               try {
                 await fs.promises.unlink(tempAssembledPath);
               } catch (e) {}
-              return res
-                .status(400)
-                .json({
-                  error:
-                    "The uploaded SVG file contains potentially malicious content and was rejected.",
-                });
+              return res.status(400).json({
+                error:
+                  "The uploaded SVG file contains potentially malicious content and was rejected.",
+              });
             }
           }
 
@@ -2005,12 +2046,10 @@ async function startServer(
               try {
                 await fs.promises.unlink(tempAssembledPath);
               } catch (e) {}
-              return res
-                .status(400)
-                .json({
-                  error:
-                    "Invalid file type. Only SVG files are allowed for cutline.",
-                });
+              return res.status(400).json({
+                error:
+                  "Invalid file type. Only SVG files are allowed for cutline.",
+              });
             }
           } else {
             // Pixel bomb / dimension check for raster images
@@ -2022,11 +2061,9 @@ async function startServer(
                   try {
                     await fs.promises.unlink(tempAssembledPath);
                   } catch (e) {}
-                  return res
-                    .status(400)
-                    .json({
-                      error: "Image dimensions too large (exceeds 50MP limit).",
-                    });
+                  return res.status(400).json({
+                    error: "Image dimensions too large (exceeds 50MP limit).",
+                  });
                 }
               }
             } catch (e) {
@@ -2065,11 +2102,9 @@ async function startServer(
             `[CHUNKED] Assembly/finalization error for session ${uploadId}:`,
             err,
           );
-          res
-            .status(500)
-            .json({
-              error: err.message || "Failed to assemble and finalize upload",
-            });
+          res.status(500).json({
+            error: err.message || "Failed to assemble and finalize upload",
+          });
         }
       },
     );
@@ -2473,12 +2508,10 @@ async function startServer(
         try {
           // --- Guard: Confirmation Checkbox ---
           if (!req.body.orderReadyConfirmed) {
-            return res
-              .status(400)
-              .json({
-                error:
-                  "Order confirmation required. Please check the confirmation box before submitting.",
-              });
+            return res.status(400).json({
+              error:
+                "Order confirmation required. Please check the confirmation box before submitting.",
+            });
           }
 
           const {
@@ -2534,8 +2567,13 @@ async function startServer(
             size: orderDetails.size || null,
             cutType: orderDetails.cutType || "die_cut",
             stickerName: orderDetails.stickerName || null,
-            tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
-            standbyBidCents: typeof orderDetails.standbyBidCents === "number" ? orderDetails.standbyBidCents : null,
+            tradeoffs: Array.isArray(orderDetails.tradeoffs)
+              ? orderDetails.tradeoffs
+              : [],
+            standbyBidCents:
+              typeof orderDetails.standbyBidCents === "number"
+                ? orderDetails.standbyBidCents
+                : null,
           };
 
           // --- Product / Creator Payout Logic ---
@@ -2683,8 +2721,11 @@ async function startServer(
                 config: shippingCfg,
                 destinationState,
                 deliveryMethod,
-                tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
-                pricingConfig: pricingConfig || db.data?.config?.pricing || null,
+                tradeoffs: Array.isArray(orderDetails.tradeoffs)
+                  ? orderDetails.tradeoffs
+                  : [],
+                pricingConfig:
+                  pricingConfig || db.data?.config?.pricing || null,
               });
 
               const expectedGrandTotal = orderBreakdown.totalCents;
@@ -2701,12 +2742,10 @@ async function startServer(
                 logger.warn(
                   `[SECURITY] Inputs: q=${quantity}, mat=${material}, res=${resolution.id}, layers=${JSON.stringify(orderDetails.customLayers)}, bounds=${JSON.stringify(dimensions.bounds)}`,
                 );
-                return res
-                  .status(400)
-                  .json({
-                    error:
-                      "Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.",
-                  });
+                return res.status(400).json({
+                  error:
+                    "Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.",
+                });
               } else {
                 logger.info(
                   `[SECURITY] Price validated. Expected Grand Total: ${expectedGrandTotal}, Received: ${submittedTotal}`,
@@ -2818,10 +2857,50 @@ async function startServer(
 
           const promoAmountCents =
             orderDetails.promoAddon && quantity < 50 ? 200 : 0;
-          const stickerSubtotal = Math.max(
+          let stickerSubtotal = Math.max(
             0,
             expectedSubtotal - promoAmountCents,
           );
+
+          let promoDiscountApplied = 0;
+          let appliedPromoCodeStr = null;
+          if (orderDetails.promoCode) {
+            const promoConfig = db.data?.config?.promo;
+            if (
+              promoConfig &&
+              promoConfig.enabled &&
+              promoConfig.code &&
+              promoConfig.code.toLowerCase() ===
+                orderDetails.promoCode.toLowerCase()
+            ) {
+              if (
+                promoConfig.maxUses === 0 ||
+                promoConfig.timesUsed < promoConfig.maxUses
+              ) {
+                appliedPromoCodeStr = promoConfig.code;
+                // Calculate discount based on sticker subtotal
+                if (promoConfig.type === "percentage") {
+                  promoDiscountApplied = Math.round(
+                    stickerSubtotal * (promoConfig.amount / 100),
+                  );
+                } else {
+                  promoDiscountApplied = Math.round(promoConfig.amount * 100); // flat dollar amount to cents
+                }
+
+                // Ensure discount doesn't exceed subtotal
+                promoDiscountApplied = Math.min(
+                  promoDiscountApplied,
+                  stickerSubtotal,
+                );
+                stickerSubtotal -= promoDiscountApplied;
+
+                // Increment usage counter
+                promoConfig.timesUsed = (promoConfig.timesUsed || 0) + 1;
+                inputSafeOrderDetails.promoDiscount = promoDiscountApplied;
+                inputSafeOrderDetails.promoCode = appliedPromoCodeStr;
+              }
+            }
+          }
           const isDivisible = quantity > 0 && stickerSubtotal % quantity === 0;
 
           let sizeNote = "";
@@ -2856,6 +2935,17 @@ async function startServer(
               },
             },
           ];
+
+          if (promoDiscountApplied > 0) {
+            squareLineItems.push({
+              name: `Promo Discount (${appliedPromoCodeStr})`,
+              quantity: "1",
+              basePriceMoney: {
+                amount: -promoDiscountApplied,
+                currency: "USD",
+              },
+            });
+          }
 
           if (orderDetails.promoAddon) {
             squareLineItems.push({
@@ -3073,12 +3163,10 @@ async function startServer(
               "[SERVER] Square API returned an error:",
               JSON.stringify(paymentResult.errors),
             );
-            return res
-              .status(400)
-              .json({
-                error: "Square API Error",
-                details: paymentResult.errors,
-              });
+            return res.status(400).json({
+              error: "Square API Error",
+              details: paymentResult.errors,
+            });
           }
           logger.info(
             "[SERVER] Square payment successful. Payment ID:",
@@ -3188,35 +3276,30 @@ async function startServer(
           // Handle mocked Square errors or real Square errors that expose status code directly
           // Also handle explicit "Card declined" error from tests as 400 if statusCode is missing/invalid
           if (
-            (error instanceof SquareError && error.statusCode &&
+            (error instanceof SquareError &&
+              error.statusCode &&
               Number(error.statusCode) >= 400 &&
               Number(error.statusCode) < 500) ||
             error.message === "Card declined"
           ) {
             const status =
               (error.statusCode && Number(error.statusCode)) || 400;
-            return res
-              .status(status)
-              .json({
-                error: "Square API Error",
-                details: error.result ? error.result.errors : error.message,
-              });
+            return res.status(status).json({
+              error: "Square API Error",
+              details: error.result ? error.result.errors : error.message,
+            });
           }
           if (error.result && error.result.errors) {
-            return res
-              .status(error.statusCode || 500)
-              .json({
-                error: "Square API Error",
-                details: error.result.errors,
-              });
+            return res.status(error.statusCode || 500).json({
+              error: "Square API Error",
+              details: error.result.errors,
+            });
           }
           // SECURITY: Do not leak error details to the client
-          return res
-            .status(500)
-            .json({
-              error: "Internal Server Error",
-              message: "An unexpected error occurred.",
-            });
+          return res.status(500).json({
+            error: "Internal Server Error",
+            message: "An unexpected error occurred.",
+          });
         }
       },
     );
@@ -3242,12 +3325,10 @@ async function startServer(
     app.get("/api/orders", authenticateToken, async (req, res) => {
       // This endpoint is for the print shop dashboard and should only be accessible by admins.
       if (!(await isAdmin(req.user))) {
-        return res
-          .status(403)
-          .json({
-            error:
-              "Forbidden: You do not have permission to access this resource.",
-          });
+        return res.status(403).json({
+          error:
+            "Forbidden: You do not have permission to access this resource.",
+        });
       }
       let allOrders = await db.getAllOrders();
 
@@ -3331,12 +3412,10 @@ async function startServer(
 
     app.get("/api/admin/sales-metrics", authenticateToken, async (req, res) => {
       if (!(await isAdmin(req.user))) {
-        return res
-          .status(403)
-          .json({
-            error:
-              "Forbidden: You do not have permission to access this resource.",
-          });
+        return res.status(403).json({
+          error:
+            "Forbidden: You do not have permission to access this resource.",
+        });
       }
       const allOrders = await db.getAllOrders();
       let totalOrders = 0;
@@ -3945,13 +4024,11 @@ async function startServer(
             }),
           );
 
-          res
-            .status(200)
-            .json({
-              success: true,
-              batch,
-              updatedOrdersCount: updatedOrders.length,
-            });
+          res.status(200).json({
+            success: true,
+            batch,
+            updatedOrdersCount: updatedOrders.length,
+          });
         } catch (error) {
           await logAndEmailError(error, "Error updating batch status");
           res.status(500).json({ error: "Internal Server Error" });
@@ -4256,19 +4333,33 @@ async function startServer(
         if (weightOz !== undefined && weightOz !== null && weightOz !== "") {
           const parsedWeight = Number(weightOz);
           if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
-            return res.status(400).json({ error: "weightOz must be a positive number." });
+            return res
+              .status(400)
+              .json({ error: "weightOz must be a positive number." });
           }
           order.packageWeightOz = parsedWeight;
         }
 
-        if (length !== undefined || width !== undefined || height !== undefined) {
-          const parsedL = Number(length) || order.packageDimensions?.length || 6;
+        if (
+          length !== undefined ||
+          width !== undefined ||
+          height !== undefined
+        ) {
+          const parsedL =
+            Number(length) || order.packageDimensions?.length || 6;
           const parsedW = Number(width) || order.packageDimensions?.width || 4;
-          const parsedH = Number(height) || order.packageDimensions?.height || 0.5;
+          const parsedH =
+            Number(height) || order.packageDimensions?.height || 0.5;
           if (parsedL <= 0 || parsedW <= 0 || parsedH <= 0) {
-            return res.status(400).json({ error: "Package dimensions must be positive numbers." });
+            return res
+              .status(400)
+              .json({ error: "Package dimensions must be positive numbers." });
           }
-          order.packageDimensions = { length: parsedL, width: parsedW, height: parsedH };
+          order.packageDimensions = {
+            length: parsedL,
+            width: parsedW,
+            height: parsedH,
+          };
         }
 
         order.exportToPirateship = true;
@@ -4281,15 +4372,26 @@ async function startServer(
         if (easyPostKey) {
           try {
             const EasyPostPkg = await import("@easypost/api");
-            const EasyPost = EasyPostPkg.default?.default || EasyPostPkg.default || EasyPostPkg;
+            const EasyPost =
+              EasyPostPkg.default?.default ||
+              EasyPostPkg.default ||
+              EasyPostPkg;
             const client = new EasyPost(easyPostKey);
 
             const toAddress = {
-              name: `${order.shippingContact?.givenName || ""} ${order.shippingContact?.familyName || ""}`.trim() || "Customer",
+              name:
+                `${order.shippingContact?.givenName || ""} ${order.shippingContact?.familyName || ""}`.trim() ||
+                "Customer",
               street1: order.shippingContact?.addressLines?.[0] || "",
               street2: order.shippingContact?.addressLines?.[1] || undefined,
-              city: order.shippingContact?.locality || order.shippingContact?.city || "",
-              state: order.shippingContact?.administrativeDistrictLevel1 || order.shippingContact?.state || "",
+              city:
+                order.shippingContact?.locality ||
+                order.shippingContact?.city ||
+                "",
+              state:
+                order.shippingContact?.administrativeDistrictLevel1 ||
+                order.shippingContact?.state ||
+                "",
               zip: order.shippingContact?.postalCode || "",
               country: order.shippingContact?.country || "US",
             };
@@ -4318,17 +4420,25 @@ async function startServer(
 
             if (shipment.rates && shipment.rates.length > 0) {
               const lowestRate = client.Utils.getLowestRate(shipment.rates);
-              const boughtShipment = await client.Shipment.buy(shipment.id, lowestRate.id);
+              const boughtShipment = await client.Shipment.buy(
+                shipment.id,
+                lowestRate.id,
+              );
               if (boughtShipment.tracking_code) {
                 order.trackingNumber = boughtShipment.tracking_code;
                 order.courier = boughtShipment.selected_rate?.carrier || "USPS";
-                order.labelUrl = boughtShipment.postage_label?.label_url || null;
+                order.labelUrl =
+                  boughtShipment.postage_label?.label_url || null;
                 easyPostGenerated = true;
-                logger.info(`[SHIPPING] Purchased EasyPost label for order ${orderId}: ${order.trackingNumber}`);
+                logger.info(
+                  `[SHIPPING] Purchased EasyPost label for order ${orderId}: ${order.trackingNumber}`,
+                );
               }
             }
           } catch (epError) {
-            logger.warn(`[SHIPPING] EasyPost label generation skipped/failed: ${epError.message}`);
+            logger.warn(
+              `[SHIPPING] EasyPost label generation skipped/failed: ${epError.message}`,
+            );
           }
         }
 
@@ -4398,8 +4508,12 @@ async function startServer(
           purgeArtworkOnFlush: false,
         };
         const allOrders = Object.values(lowdb?.data?.orders || {});
-        const canceledOrders = allOrders.filter((o) => o.status === "CANCELED" && !o.isArchived);
-        const archivedOrders = allOrders.filter((o) => o.isArchived || o.status === "ARCHIVED");
+        const canceledOrders = allOrders.filter(
+          (o) => o.status === "CANCELED" && !o.isArchived,
+        );
+        const archivedOrders = allOrders.filter(
+          (o) => o.isArchived || o.status === "ARCHIVED",
+        );
 
         res.json({
           purgeArtworkOnFlush: !!retentionConfig.purgeArtworkOnFlush,
@@ -4459,6 +4573,53 @@ async function startServer(
       },
     );
 
+    // --- Promo Code Configuration ---
+    app.get("/api/admin/promo/config", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const config = db.data?.config?.promo || {
+        enabled: false,
+        code: "",
+        type: "percentage",
+        amount: 0,
+        maxUses: 0,
+        timesUsed: 0,
+      };
+      res.json(config);
+    });
+
+    app.post("/api/admin/promo/config", authenticateToken, async (req, res) => {
+      if (!(await isAdmin(req.user))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const { enabled, code, type, amount, maxUses } = req.body;
+
+      if (!db.data.config) db.data.config = {};
+      if (!db.data.config.promo) {
+        db.data.config.promo = { timesUsed: 0 };
+      }
+
+      // Keep timesUsed intact, only update if the code changed
+      let timesUsed = db.data.config.promo.timesUsed || 0;
+      if (db.data.config.promo.code !== code) {
+        timesUsed = 0; // Reset usage counter for a new code
+      }
+
+      db.data.config.promo = {
+        enabled: Boolean(enabled),
+        code: code || "",
+        type: type === "flat" ? "flat" : "percentage",
+        amount: Number(amount) || 0,
+        maxUses: Number(maxUses) || 0,
+        timesUsed: timesUsed,
+      };
+
+      db.write();
+      res.json({ success: true, config: db.data.config.promo });
+    });
+
     // --- Telegram Alert / Reminder Configuration ---
     app.get(
       "/api/admin/telegram/config",
@@ -4497,32 +4658,46 @@ async function startServer(
         }
 
         const parsedThreshold =
-          stalledThresholdHours !== undefined ? Number(stalledThresholdHours) : undefined;
+          stalledThresholdHours !== undefined
+            ? Number(stalledThresholdHours)
+            : undefined;
         if (
           parsedThreshold !== undefined &&
-          (!Number.isFinite(parsedThreshold) || parsedThreshold <= 0 || parsedThreshold > 168)
+          (!Number.isFinite(parsedThreshold) ||
+            parsedThreshold <= 0 ||
+            parsedThreshold > 168)
         ) {
           return res.status(400).json({
-            error: "stalledThresholdHours must be a positive number up to 168 (1 week).",
+            error:
+              "stalledThresholdHours must be a positive number up to 168 (1 week).",
           });
         }
 
         const parsedInterval =
-          checkIntervalMinutes !== undefined ? Number(checkIntervalMinutes) : undefined;
+          checkIntervalMinutes !== undefined
+            ? Number(checkIntervalMinutes)
+            : undefined;
         if (
           parsedInterval !== undefined &&
-          (!Number.isFinite(parsedInterval) || parsedInterval < 1 || parsedInterval > 1440)
+          (!Number.isFinite(parsedInterval) ||
+            parsedInterval < 1 ||
+            parsedInterval > 1440)
         ) {
           return res.status(400).json({
-            error: "checkIntervalMinutes must be between 1 and 1440 (24 hours).",
+            error:
+              "checkIntervalMinutes must be between 1 and 1440 (24 hours).",
           });
         }
 
         const parsedRepeat =
-          repeatReminderHours !== undefined ? Number(repeatReminderHours) : undefined;
+          repeatReminderHours !== undefined
+            ? Number(repeatReminderHours)
+            : undefined;
         if (
           parsedRepeat !== undefined &&
-          (!Number.isFinite(parsedRepeat) || parsedRepeat < 0 || parsedRepeat > 168)
+          (!Number.isFinite(parsedRepeat) ||
+            parsedRepeat < 0 ||
+            parsedRepeat > 168)
         ) {
           return res.status(400).json({
             error: "repeatReminderHours must be a number between 0 and 168.",
@@ -4537,11 +4712,17 @@ async function startServer(
         lowdb.data.config.telegram = {
           enabled: enabled !== undefined ? enabled : currentConfig.enabled,
           stalledThresholdHours:
-            parsedThreshold !== undefined ? parsedThreshold : currentConfig.stalledThresholdHours,
+            parsedThreshold !== undefined
+              ? parsedThreshold
+              : currentConfig.stalledThresholdHours,
           checkIntervalMinutes:
-            parsedInterval !== undefined ? parsedInterval : currentConfig.checkIntervalMinutes,
+            parsedInterval !== undefined
+              ? parsedInterval
+              : currentConfig.checkIntervalMinutes,
           repeatReminderHours:
-            parsedRepeat !== undefined ? parsedRepeat : currentConfig.repeatReminderHours,
+            parsedRepeat !== undefined
+              ? parsedRepeat
+              : currentConfig.repeatReminderHours,
         };
 
         if (typeof db.write === "function") await db.write();
@@ -5582,7 +5763,7 @@ async function startServer(
       // Hide stack trace in production (and generally in API responses)
       const response = {
         error: "Internal Server Error",
-        message: "An unexpected error occurred."
+        message: "An unexpected error occurred.",
       };
 
       // SECURITY FIX: Never leak error details to the client in any environment
