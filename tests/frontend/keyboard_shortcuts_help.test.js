@@ -101,4 +101,25 @@ describe('Keyboard Shortcuts Help Modal', () => {
 
     expect(modal.classList.contains('hidden')).toBe(true);
   });
+
+  test('hides grayscale and sepia shortcuts initially, but shows them on easterEggUnlocked', () => {
+    setupShortcutsHelp();
+
+    const grayscaleShortcut = document.getElementById('help-shortcut-grayscale');
+    const sepiaShortcut = document.getElementById('help-shortcut-sepia');
+
+    expect(grayscaleShortcut).not.toBeNull();
+    expect(sepiaShortcut).not.toBeNull();
+
+    // Initially hidden
+    expect(grayscaleShortcut.classList.contains('hidden')).toBe(true);
+    expect(sepiaShortcut.classList.contains('hidden')).toBe(true);
+
+    // Dispatch easterEggUnlocked event
+    document.dispatchEvent(new CustomEvent('easterEggUnlocked'));
+
+    // Should no longer be hidden
+    expect(grayscaleShortcut.classList.contains('hidden')).toBe(false);
+    expect(sepiaShortcut.classList.contains('hidden')).toBe(false);
+  });
 });

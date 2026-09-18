@@ -297,11 +297,11 @@ export function setupShortcutsHelp() {
           <span class="text-gray-700 font-medium">Rotate Right</span>
           <kbd class="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-sm font-mono text-gray-600 shadow-sm">]</kbd>
         </div>
-        <div class="flex justify-between items-center">
+        <div id="help-shortcut-grayscale" class="hidden flex justify-between items-center">
           <span class="text-gray-700 font-medium">Grayscale Toggle</span>
           <kbd class="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-sm font-mono text-gray-600 shadow-sm">G</kbd>
         </div>
-        <div class="flex justify-between items-center">
+        <div id="help-shortcut-sepia" class="hidden flex justify-between items-center">
           <span class="text-gray-700 font-medium">Sepia Toggle</span>
           <kbd class="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-sm font-mono text-gray-600 shadow-sm">S</kbd>
         </div>
@@ -355,6 +355,20 @@ export function setupShortcutsHelp() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !modal.classList.contains("hidden")) {
       closeModal();
+    }
+  });
+
+  // Reveal hidden shortcuts when easter egg is unlocked
+  document.addEventListener("easterEggUnlocked", () => {
+    const grayscaleShortcut = document.getElementById(
+      "help-shortcut-grayscale",
+    );
+    const sepiaShortcut = document.getElementById("help-shortcut-sepia");
+    if (grayscaleShortcut) {
+      grayscaleShortcut.classList.remove("hidden");
+    }
+    if (sepiaShortcut) {
+      sepiaShortcut.classList.remove("hidden");
     }
   });
 }
