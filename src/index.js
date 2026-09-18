@@ -2061,6 +2061,7 @@ async function updateOrderSummary() {
   const destinationState = deliveryMethod === "pickup" ? "OK" : stateInputVal;
 
   try {
+    const quantity = stickerQuantityInput ? parseInt(stickerQuantityInput.value, 10) || 1 : 1;
     const resp = await fetch(`${serverUrl}/api/order/estimate`, {
       method: "POST",
       credentials: "include",
@@ -2075,6 +2076,7 @@ async function updateOrderSummary() {
         deliveryMethod,
         tradeoffs: currentTradeoffs,
         standbyBidCents: currentStandbyBidCents,
+        quantity,
         ...(csrfToken ? { _csrf: csrfToken } : {}),
       }),
     });
