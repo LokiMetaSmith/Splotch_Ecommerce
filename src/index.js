@@ -3061,7 +3061,7 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   canvas.style.height = `${cssHeight}px`;
   canvas.style.maxWidth = "100%";
   canvas.style.maxHeight = "none";
-  canvas.style.objectFit = "fill";
+  canvas.style.objectFit = "contain";
 }
 
 function saveCleanState() {
