@@ -3188,7 +3188,7 @@ async function startServer(
           // Handle mocked Square errors or real Square errors that expose status code directly
           // Also handle explicit "Card declined" error from tests as 400 if statusCode is missing/invalid
           if (
-            (error.statusCode &&
+            (error instanceof SquareError && error.statusCode &&
               Number(error.statusCode) >= 400 &&
               Number(error.statusCode) < 500) ||
             error.message === "Card declined"
@@ -5582,13 +5582,11 @@ async function startServer(
       // Hide stack trace in production (and generally in API responses)
       const response = {
         error: "Internal Server Error",
+        message: "An unexpected error occurred."
       };
 
-      // Only include error details in non-production environments if needed for debugging,
-      // but be careful not to leak sensitive info.
-      if (process.env.NODE_ENV !== "production") {
-        response.message = err.message;
-      }
+      // SECURITY FIX: Never leak error details to the client in any environment
+      // to prevent Information Exposure via Error Messages (e.g., leaking database connection strings)
 
       res.status(500).json(response);
     });
