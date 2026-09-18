@@ -2950,6 +2950,7 @@ function updateEditingButtonsState(disabled) {
   const elements = [
     rotateLeftBtnEl,
     rotateRightBtnEl,
+    resetBtnEl,
     grayscaleBtnEl,
     sepiaBtnEl,
     document.getElementById("resizeSlider"),
