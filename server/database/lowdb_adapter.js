@@ -114,6 +114,7 @@ export class LowDbAdapter {
         if (!this.db.data.emailIndex) {
             if (this.db.data.users) {
                 logger.info('[LowDbAdapter] Backfilling emailIndex...');
+                this.db.data.emailIndex = this.db.data.emailIndex || {};
                 for (const [key, user] of Object.entries(this.db.data.users)) {
                     if (user.email) {
                         this.db.data.emailIndex[user.email] = key;
