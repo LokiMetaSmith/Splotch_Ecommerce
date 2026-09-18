@@ -919,25 +919,100 @@ async function BootStrap() {
     const decreaseQuantityBtn = document.getElementById("decreaseQuantityBtn");
     const increaseQuantityBtn = document.getElementById("increaseQuantityBtn");
 
-    if (decreaseQuantityBtn) {
-      decreaseQuantityBtn.addEventListener("click", () => {
-        let currentVal = parseInt(stickerQuantityInput.value) || 0;
-        if (currentVal > 1) {
-          stickerQuantityInput.value = currentVal - 1;
-          stickerQuantityInput.dispatchEvent(new Event("input"));
-          stickerQuantityInput.dispatchEvent(new Event("change"));
-        }
-      });
+    const INITIAL_DELAY = 500;
+    const BASE_SPEED = 100;
+    const MAX_SPEED = 20;
+
+    let delayTimer = null;
+    let loopTimer = null;
+    let currentSpeed = BASE_SPEED;
+
+    function triggerVibration() {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate(10);
+      }
     }
 
-    if (increaseQuantityBtn) {
-      increaseQuantityBtn.addEventListener("click", () => {
-        let currentVal = parseInt(stickerQuantityInput.value) || 0;
+    function incrementQuantityValue(direction) {
+      let currentVal = parseInt(stickerQuantityInput.value) || 0;
+      if (direction === "decrease") {
+        if (currentVal > 1) {
+          stickerQuantityInput.value = currentVal - 1;
+        } else {
+          return false; // Reached minimum
+        }
+      } else {
         stickerQuantityInput.value = currentVal + 1;
-        stickerQuantityInput.dispatchEvent(new Event("input"));
-        stickerQuantityInput.dispatchEvent(new Event("change"));
-      });
+      }
+      stickerQuantityInput.dispatchEvent(new Event("input"));
+      stickerQuantityInput.dispatchEvent(new Event("change"));
+      return true;
     }
+
+    function runLoop(direction, btn) {
+      if (!incrementQuantityValue(direction)) {
+        stopHold(btn);
+        return;
+      }
+
+      triggerVibration();
+
+      currentSpeed = Math.max(MAX_SPEED, currentSpeed * 0.85);
+      loopTimer = setTimeout(() => runLoop(direction, btn), currentSpeed);
+    }
+
+    function startHold(direction, btn) {
+      // Visual and Haptic Feedback
+      btn.classList.add("scale-95", "bg-gray-300");
+      triggerVibration();
+
+      if (incrementQuantityValue(direction)) {
+        delayTimer = setTimeout(() => {
+          runLoop(direction, btn);
+        }, INITIAL_DELAY);
+      }
+    }
+
+    function stopHold(btn) {
+      btn.classList.remove("scale-95", "bg-gray-300");
+      clearTimeout(delayTimer);
+      clearTimeout(loopTimer);
+      currentSpeed = BASE_SPEED;
+    }
+
+    function attachHoldEvents(btn, direction) {
+      if (!btn) return;
+
+      // Mouse events
+      btn.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return; // Only left click
+        startHold(direction, btn);
+      });
+      btn.addEventListener("mouseup", () => stopHold(btn));
+      btn.addEventListener("mouseleave", () => stopHold(btn));
+
+      // Touch events
+      btn.addEventListener(
+        "touchstart",
+        (e) => {
+          e.preventDefault(); // Prevents simulated mouse events
+          startHold(direction, btn);
+        },
+        { passive: false },
+      );
+      btn.addEventListener(
+        "touchend",
+        (e) => {
+          e.preventDefault();
+          stopHold(btn);
+        },
+        { passive: false },
+      );
+      btn.addEventListener("touchcancel", () => stopHold(btn));
+    }
+
+    attachHoldEvents(decreaseQuantityBtn, "decrease");
+    attachHoldEvents(increaseQuantityBtn, "increase");
   }
   if (stickerMaterialSelect) {
     stickerMaterialSelect.addEventListener("change", (e) => {
