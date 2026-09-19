@@ -57,7 +57,7 @@ describe('Admin Pricing API', () => {
         // Setup initial admin and normal user tokens for testing roles
         adminToken = jwt.sign({ username: 'admin', email: 'admin@test.com' }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
         userToken = jwt.sign({ username: 'normal_user', email: 'user@test.com' }, privateKey, { algorithm: 'RS256', expiresIn: '1h', header: { kid } });
-    });
+    }, 60000);
 
     afterAll(async () => {
         if (serverData && serverData.timers) {

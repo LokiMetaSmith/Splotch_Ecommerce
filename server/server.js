@@ -1509,7 +1509,7 @@ async function startServer(
             destinationState,
             deliveryMethod,
             tradeoffs: Array.isArray(tradeoffs) ? tradeoffs : [],
-            pricingConfig: db.data?.config?.pricing || null,
+            pricingConfig: pricingConfig || fullConfig?.pricing || null,
             quantity: quantity ? Number(quantity) : 1,
             promoConfig: fullConfig?.promo || null,
             promoCode: promoCode || null,

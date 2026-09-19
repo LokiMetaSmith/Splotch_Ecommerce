@@ -165,4 +165,72 @@ describe('Print Shop Live Pricing Sandbox & Fulfillment Simulator', () => {
     const ecoSubtotal = parseFloat(document.getElementById('sim-out-subtotal').textContent.replace('$', ''));
     expect(ecoSubtotal).toBeCloseTo(standardSubtotal * 0.9, 1);
   });
+
+  test('renders Turnaround & Production Tradeoffs section in settings editor', () => {
+    expect(document.getElementById('add-tradeoff-btn')).not.toBeNull();
+    expect(document.getElementById('pricing-tradeoffs-list')).not.toBeNull();
+    const rows = document.querySelectorAll('.tradeoff-row');
+    expect(rows.length).toBeGreaterThan(0);
+
+    // Verify rush and eco rows exist in editor
+    const ids = Array.from(document.querySelectorAll('.tradeoff-id')).map(el => el.value);
+    expect(ids).toContain('rush');
+    expect(ids).toContain('eco');
+  });
+
+  test('dynamically adds custom turnaround option and updates simulator dropdown and calculation', () => {
+    // Click add-tradeoff-btn
+    document.getElementById('add-tradeoff-btn').click();
+
+    const rows = document.querySelectorAll('.tradeoff-row');
+    const newRow = rows[rows.length - 1];
+    expect(newRow).not.toBeNull();
+
+    // Customize the new row: Weekend Expedited (+50%)
+    newRow.querySelector('.tradeoff-id').value = 'weekend_expedited';
+    newRow.querySelector('.tradeoff-name').value = 'Weekend Expedited (+50%)';
+    newRow.querySelector('.tradeoff-type').value = 'percentage';
+    newRow.querySelector('.tradeoff-val').value = '50';
+
+    // Trigger input event to simulate user typing
+    newRow.querySelector('.tradeoff-val').dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Check that sim-tradeoffs select now contains the new option
+    const tradeoffSelect = document.getElementById('sim-tradeoffs');
+    const newOption = tradeoffSelect.querySelector('option[value="weekend_expedited"]');
+    expect(newOption).not.toBeNull();
+    expect(newOption.textContent).toContain('Weekend Expedited');
+
+    // Select the new option and run simulator
+    tradeoffSelect.value = 'weekend_expedited';
+    runSimulator();
+
+    // Baseline subtotal (0% tradeoff)
+    tradeoffSelect.value = 'none';
+    runSimulator();
+    const baseSubtotal = parseFloat(document.getElementById('sim-out-subtotal').textContent.replace('$', ''));
+
+    // 50% surcharge subtotal
+    tradeoffSelect.value = 'weekend_expedited';
+    runSimulator();
+    const expeditedSubtotal = parseFloat(document.getElementById('sim-out-subtotal').textContent.replace('$', ''));
+    expect(expeditedSubtotal).toBeCloseTo(baseSubtotal * 1.5, 1);
+  });
+
+  test('handles flat amount tradeoffs (e.g. -$10 Print-Ready Verification)', () => {
+    const tradeoffSelect = document.getElementById('sim-tradeoffs');
+    const printReadyOption = tradeoffSelect.querySelector('option[value="print_ready"]');
+    expect(printReadyOption).not.toBeNull();
+
+    // Baseline
+    tradeoffSelect.value = 'none';
+    runSimulator();
+    const baseSubtotal = parseFloat(document.getElementById('sim-out-subtotal').textContent.replace('$', ''));
+
+    // Print-ready (-$10)
+    tradeoffSelect.value = 'print_ready';
+    runSimulator();
+    const printReadySubtotal = parseFloat(document.getElementById('sim-out-subtotal').textContent.replace('$', ''));
+    expect(printReadySubtotal).toBeCloseTo(baseSubtotal - 10.00, 1);
+  });
 });

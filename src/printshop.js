@@ -4576,6 +4576,34 @@ export function renderPricingEditor(config) {
   const layers = config.layers || [];
   const complexity = config.complexity || { perLayerMultiplier: 0.1, tiers: [] };
   const quantityDiscounts = config.quantityDiscounts || [];
+  const rawTradeoffs = config.tradeoffs || {};
+  const defaultTradeoffsList = [
+    { id: "rush", name: "Rush Production (+20%)", type: "percentage", value: 0.2, valueCents: 0, description: "Priority queue bump (24-48 hours)" },
+    { id: "eco", name: "Economy / Flexible (-10%)", type: "percentage", value: -0.1, valueCents: 0, description: "Flexible filler window (5-7 business days)" },
+    { id: "no_reprints", name: "No Reprints / Final Sale (-8%)", type: "percentage", value: -0.08, valueCents: 0, description: "Customer waives reprint requests" },
+    { id: "flexible_window", name: "Flexible Filler Window (-6%)", type: "percentage", value: -0.06, valueCents: 0, description: "Permits printing during machine downtime filler runs" },
+    { id: "print_ready", name: "Print-Ready Verification (-$10)", type: "flat", value: 0, valueCents: -1000, description: "Verified vector artwork with embedded cutline" },
+    { id: "consolidated_shipping", name: "Consolidated Shipping (-$5)", type: "flat", value: 0, valueCents: -500, description: "Combines with pending batch orders" },
+    { id: "rush_queue", name: "Rush Queue Jump (+25%)", type: "percentage", value: 0.25, valueCents: 0, description: "Guaranteed same-day printing queue bump" }
+  ];
+
+  let tradeoffsList = [];
+  if (Array.isArray(rawTradeoffs)) {
+    tradeoffsList = rawTradeoffs;
+  } else if (typeof rawTradeoffs === "object" && Object.keys(rawTradeoffs).length > 0) {
+    tradeoffsList = Object.entries(rawTradeoffs)
+      .filter(([id]) => id !== "standard" && id !== "none")
+      .map(([id, t]) => ({
+        id,
+        name: t.name || id,
+        type: t.type || "percentage",
+        value: typeof t.value === "number" ? t.value : 0,
+        valueCents: typeof t.valueCents === "number" ? t.valueCents : 0,
+        description: t.description || ""
+      }));
+  } else {
+    tradeoffsList = defaultTradeoffsList;
+  }
 
   let html = `
     <div class="space-y-6 text-gray-800">
@@ -4731,6 +4759,38 @@ export function renderPricingEditor(config) {
         </div>
       </div>
 
+      <!-- Turnaround & Production Tradeoffs Section -->
+      <div class="border border-gray-200 p-4 rounded-lg bg-white shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h4 class="font-bold text-base text-splotch-navy">Turnaround &amp; Production Tradeoffs</h4>
+            <p class="text-xs text-gray-500">Configure production turnaround modifiers (Rush surcharges, Economy discounts) and customer tradeoffs.</p>
+          </div>
+          <button type="button" id="add-tradeoff-btn" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-100 border border-indigo-200 transition-colors">+ Add Turnaround / Tradeoff</button>
+        </div>
+        <div id="pricing-tradeoffs-list" class="space-y-2">
+          ${tradeoffsList.map((t) => {
+            const isPct = t.type === "percentage";
+            const displayVal = isPct ? Math.round((t.value || 0) * 100) : ((t.valueCents || 0) / 100).toFixed(2);
+            return `
+              <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center tradeoff-row bg-gray-50 p-2 rounded border border-gray-200">
+                <input type="text" placeholder="ID (e.g. rush)" class="p-1.5 text-xs border rounded w-32 tradeoff-id font-mono font-medium" value="${escapeHtml(t.id)}">
+                <input type="text" placeholder="Display Name (e.g. Rush Production)" class="p-1.5 text-xs border rounded flex-grow tradeoff-name font-medium" value="${escapeHtml(t.name)}">
+                <select class="p-1.5 text-xs border rounded w-28 tradeoff-type font-medium bg-white">
+                  <option value="percentage" ${isPct ? "selected" : ""}>Percent (%)</option>
+                  <option value="flat" ${!isPct ? "selected" : ""}>Flat ($)</option>
+                </select>
+                <div class="flex items-center gap-1">
+                  <span class="text-xs text-gray-400 font-mono tradeoff-unit-label">${isPct ? "%:" : "$:"}</span>
+                  <input type="number" step="${isPct ? "1" : "0.5"}" placeholder="${isPct ? "e.g. 20" : "e.g. -10"}" class="p-1.5 text-xs border rounded w-24 tradeoff-val font-mono font-bold ${displayVal > 0 ? "text-indigo-600" : displayVal < 0 ? "text-green-700" : "text-gray-700"}" value="${displayVal}">
+                </div>
+                <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Tradeoff">&times;</button>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+
       <!-- Live Pricing Calculator / Sandbox -->
       <div class="border-2 border-indigo-300 p-5 rounded-lg bg-indigo-50/50 shadow-md">
         <div class="flex items-center gap-2 mb-4">
@@ -4809,8 +4869,6 @@ export function renderPricingEditor(config) {
               <label class="block text-[11px] font-bold text-indigo-800">Turnaround / Tradeoffs:</label>
               <select id="sim-tradeoffs" class="w-full p-1.5 text-xs border rounded bg-white font-medium">
                 <option value="none">Standard Production (0%)</option>
-                <option value="rush">Rush Production (+20%)</option>
-                <option value="eco">Economy / Flexible (-10%)</option>
               </select>
             </div>
           </div>
@@ -4997,6 +5055,30 @@ export function renderPricingEditor(config) {
       runSimulator();
     });
 
+  document
+    .getElementById("add-tradeoff-btn")
+    ?.addEventListener("click", () => {
+      const div = document.createElement("div");
+      div.className =
+        "flex flex-wrap sm:flex-nowrap gap-2 items-center tradeoff-row bg-gray-50 p-2 rounded border border-gray-200";
+      div.innerHTML = `
+        <input type="text" placeholder="ID (e.g. rush_expedited)" class="p-1.5 text-xs border rounded w-32 tradeoff-id font-mono font-medium" value="rush_expedited">
+        <input type="text" placeholder="Display Name" class="p-1.5 text-xs border rounded flex-grow tradeoff-name font-medium" value="Expedited Rush (+35%)">
+        <select class="p-1.5 text-xs border rounded w-28 tradeoff-type font-medium bg-white">
+          <option value="percentage" selected>Percent (%)</option>
+          <option value="flat">Flat ($)</option>
+        </select>
+        <div class="flex items-center gap-1">
+          <span class="text-xs text-gray-400 font-mono tradeoff-unit-label">%:</span>
+          <input type="number" step="1" placeholder="e.g. 20" class="p-1.5 text-xs border rounded w-24 tradeoff-val font-mono font-bold text-indigo-600" value="35">
+        </div>
+        <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Tradeoff">&times;</button>
+      `;
+      document.getElementById("pricing-tradeoffs-list")?.appendChild(div);
+      updateSimulatorDropdowns();
+      runSimulator();
+    });
+
   // Delegate event for all remove buttons and dynamic badges
   ui.pricingEditorContainer.addEventListener("click", (e) => {
     if (e.target.classList.contains("remove-row-btn")) {
@@ -5006,8 +5088,25 @@ export function renderPricingEditor(config) {
         e.target.closest(".resolution-row") ||
         e.target.closest(".complexity-row") ||
         e.target.closest(".discount-row") ||
+        e.target.closest(".tradeoff-row") ||
         e.target.parentElement;
       if (row) row.remove();
+      updateSimulatorDropdowns();
+      runSimulator();
+    }
+  });
+
+  ui.pricingEditorContainer.addEventListener("change", (e) => {
+    if (e.target.classList.contains("tradeoff-type")) {
+      const row = e.target.closest(".tradeoff-row");
+      const isPct = e.target.value === "percentage";
+      const label = row?.querySelector(".tradeoff-unit-label");
+      const input = row?.querySelector(".tradeoff-val");
+      if (label) label.textContent = isPct ? "%:" : "$:";
+      if (input) {
+        input.step = isPct ? "1" : "0.5";
+        input.placeholder = isPct ? "e.g. 20" : "e.g. -10";
+      }
       updateSimulatorDropdowns();
       runSimulator();
     }
@@ -5020,6 +5119,9 @@ export function renderPricingEditor(config) {
       if (badge) {
         badge.textContent = `${e.target.value || 0}% OFF`;
       }
+    }
+    if (e.target.closest(".tradeoff-row")) {
+      updateSimulatorDropdowns();
     }
     runSimulator();
   });
@@ -5044,39 +5146,80 @@ export function renderPricingEditor(config) {
 function updateSimulatorDropdowns() {
   const matSelect = document.getElementById("sim-mat");
   const resSelect = document.getElementById("sim-res");
-  if (!matSelect || !resSelect) return;
+  const tradeoffSelect = document.getElementById("sim-tradeoffs");
 
-  const currentMat = matSelect.value;
-  const currentRes = resSelect.value;
-
-  matSelect.innerHTML = "";
-  document.querySelectorAll(".material-row").forEach((row) => {
-    const id = row.querySelector(".mat-id")?.value.trim();
-    const name = row.querySelector(".mat-name")?.value.trim();
-    if (id) {
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = name || id;
-      matSelect.appendChild(opt);
+  if (matSelect) {
+    const currentMat = matSelect.value;
+    matSelect.innerHTML = "";
+    document.querySelectorAll(".material-row").forEach((row) => {
+      const id = row.querySelector(".mat-id")?.value.trim();
+      const name = row.querySelector(".mat-name")?.value.trim();
+      if (id) {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = name || id;
+        matSelect.appendChild(opt);
+      }
+    });
+    if (currentMat && matSelect.querySelector(`option[value="${currentMat}"]`)) {
+      matSelect.value = currentMat;
     }
-  });
-  if (currentMat && matSelect.querySelector(`option[value="${currentMat}"]`)) {
-    matSelect.value = currentMat;
   }
 
-  resSelect.innerHTML = "";
-  document.querySelectorAll(".resolution-row").forEach((row) => {
-    const id = row.querySelector(".res-id")?.value.trim();
-    const name = row.querySelector(".res-name")?.value.trim();
-    if (id) {
+  if (resSelect) {
+    const currentRes = resSelect.value;
+    resSelect.innerHTML = "";
+    document.querySelectorAll(".resolution-row").forEach((row) => {
+      const id = row.querySelector(".res-id")?.value.trim();
+      const name = row.querySelector(".res-name")?.value.trim();
+      if (id) {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = name || id;
+        resSelect.appendChild(opt);
+      }
+    });
+    if (currentRes && resSelect.querySelector(`option[value="${currentRes}"]`)) {
+      resSelect.value = currentRes;
+    }
+  }
+
+  if (tradeoffSelect) {
+    const currentTradeoff = tradeoffSelect.value;
+    tradeoffSelect.innerHTML = "";
+
+    // Always provide Standard Production (0%)
+    const standardOpt = document.createElement("option");
+    standardOpt.value = "none";
+    standardOpt.textContent = "Standard Production (0%)";
+    tradeoffSelect.appendChild(standardOpt);
+
+    document.querySelectorAll(".tradeoff-row").forEach((row) => {
+      const id = row.querySelector(".tradeoff-id")?.value.trim();
+      const name = row.querySelector(".tradeoff-name")?.value.trim();
+      const type = row.querySelector(".tradeoff-type")?.value || "percentage";
+      const val = parseFloat(row.querySelector(".tradeoff-val")?.value) || 0;
+
+      if (!id || id === "none" || id === "standard") return;
+
+      let suffix = "";
+      if (type === "percentage") {
+        const sign = val > 0 ? "+" : "";
+        suffix = ` (${sign}${val}%)`;
+      } else {
+        const sign = val > 0 ? "+$" : "-$";
+        suffix = ` (${sign}${Math.abs(val).toFixed(2)})`;
+      }
+
       const opt = document.createElement("option");
       opt.value = id;
-      opt.textContent = name || id;
-      resSelect.appendChild(opt);
+      opt.textContent = `${name || id}${name?.includes("(") ? "" : suffix}`;
+      tradeoffSelect.appendChild(opt);
+    });
+
+    if (currentTradeoff && tradeoffSelect.querySelector(`option[value="${currentTradeoff}"]`)) {
+      tradeoffSelect.value = currentTradeoff;
     }
-  });
-  if (currentRes && resSelect.querySelector(`option[value="${currentRes}"]`)) {
-    resSelect.value = currentRes;
   }
 }
 
@@ -5190,12 +5333,43 @@ export function runSimulator() {
   }
 
   // 6. Tradeoffs / Turnaround Modifier
-  const tradeoffMode =
+  const selectedTradeoffId =
     document.getElementById("sim-tradeoffs")?.value || "none";
-  let tradeoffRate = 0;
-  if (tradeoffMode === "rush") tradeoffRate = 0.2; // +20%
-  else if (tradeoffMode === "eco") tradeoffRate = -0.1; // -10%
-  const tradeoffCents = Math.round(stickerTotalCents * tradeoffRate);
+  let tradeoffCents = 0;
+
+  if (
+    selectedTradeoffId &&
+    selectedTradeoffId !== "none" &&
+    selectedTradeoffId !== "standard"
+  ) {
+    let matchedRow = null;
+    document.querySelectorAll(".tradeoff-row").forEach((row) => {
+      if (row.querySelector(".tradeoff-id")?.value.trim() === selectedTradeoffId) {
+        matchedRow = row;
+      }
+    });
+
+    if (matchedRow) {
+      const type = matchedRow.querySelector(".tradeoff-type")?.value || "percentage";
+      const val = parseFloat(matchedRow.querySelector(".tradeoff-val")?.value) || 0;
+      if (type === "percentage") {
+        tradeoffCents = Math.round(stickerTotalCents * (val / 100));
+      } else {
+        tradeoffCents = Math.round(val * 100);
+      }
+    } else if (currentPricingConfig?.tradeoffs?.[selectedTradeoffId]) {
+      const def = currentPricingConfig.tradeoffs[selectedTradeoffId];
+      if (def.type === "percentage") {
+        tradeoffCents = Math.round(stickerTotalCents * (def.value || 0));
+      } else if (def.type === "flat") {
+        tradeoffCents = def.valueCents || 0;
+      }
+    } else {
+      if (selectedTradeoffId === "rush") tradeoffCents = Math.round(stickerTotalCents * 0.2);
+      else if (selectedTradeoffId === "eco") tradeoffCents = Math.round(stickerTotalCents * -0.1);
+    }
+  }
+
   const adjustedStickerSubtotalCents = Math.max(
     0,
     stickerTotalCents + tradeoffCents
@@ -5476,6 +5650,41 @@ async function savePricingConfig() {
 
     // Sort discounts by quantity ascending
     config.quantityDiscounts.sort((a, b) => a.quantity - b.quantity);
+
+    // Gather Turnaround / Tradeoffs
+    config.tradeoffs = {
+      standard: {
+        name: "Standard Production",
+        type: "percentage",
+        value: 0,
+        description: "Standard 3-5 business day production turnaround."
+      }
+    };
+
+    document.querySelectorAll(".tradeoff-row").forEach((row) => {
+      const id = row.querySelector(".tradeoff-id")?.value.trim();
+      const name = row.querySelector(".tradeoff-name")?.value.trim();
+      const type = row.querySelector(".tradeoff-type")?.value || "percentage";
+      const val = parseFloat(row.querySelector(".tradeoff-val")?.value) || 0;
+
+      if (!id || id === "standard" || id === "none") return;
+
+      if (type === "percentage") {
+        config.tradeoffs[id] = {
+          name: name || id,
+          type: "percentage",
+          value: +(val / 100).toFixed(4),
+          description: name || id
+        };
+      } else {
+        config.tradeoffs[id] = {
+          name: name || id,
+          type: "flat",
+          valueCents: Math.round(val * 100),
+          description: name || id
+        };
+      }
+    });
 
     // Save via Authenticated API
     await fetchWithAuth(`${serverUrl}/api/admin/pricing`, {

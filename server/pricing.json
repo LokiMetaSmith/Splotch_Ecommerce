@@ -105,5 +105,55 @@
       "quantity": 10000,
       "discount": 0.87
     }
-  ]
+  ],
+  "tradeoffs": {
+    "standard": {
+      "name": "Standard Production",
+      "type": "percentage",
+      "value": 0,
+      "description": "Standard 3-5 business day production turnaround."
+    },
+    "rush": {
+      "name": "Rush Production (+20%)",
+      "type": "percentage",
+      "value": 0.2,
+      "description": "Priority queue bump. 24-48 hour turnaround."
+    },
+    "eco": {
+      "name": "Economy / Flexible (-10%)",
+      "type": "percentage",
+      "value": -0.1,
+      "description": "Flexible filler window (5-7 business days)."
+    },
+    "no_reprints": {
+      "name": "No Reprints / Final Sale (-8%)",
+      "type": "percentage",
+      "value": -0.08,
+      "description": "Customer waives reprint requests for slight cosmetic variances."
+    },
+    "flexible_window": {
+      "name": "Flexible Filler Window (-6%)",
+      "type": "percentage",
+      "value": -0.06,
+      "description": "Permits printing during machine downtime filler runs."
+    },
+    "print_ready": {
+      "name": "Print-Ready Verification (-$10)",
+      "type": "flat",
+      "valueCents": -1000,
+      "description": "Verified vector artwork with embedded cutline provided."
+    },
+    "consolidated_shipping": {
+      "name": "Consolidated Shipping (-$5)",
+      "type": "flat",
+      "valueCents": -500,
+      "description": "Combines with pending batch orders to save packaging."
+    },
+    "rush_queue": {
+      "name": "Rush Queue Jump (+25%)",
+      "type": "percentage",
+      "value": 0.25,
+      "description": "Guaranteed same-day printing queue bump."
+    }
+  }
 }
