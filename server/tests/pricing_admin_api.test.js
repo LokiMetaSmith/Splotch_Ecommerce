@@ -5,6 +5,8 @@ import { getCurrentSigningKey } from '../keyManager.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { JSONFilePreset } from 'lowdb/node';
+import { LowDbAdapter } from '../database/lowdb_adapter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,11 +48,9 @@ describe('Admin Pricing API', () => {
         const serverModule = await import('../server.js');
         startServer = serverModule.startServer;
 
-        const { JSONFilePreset } = require("lowdb/node");
-const { LowDbAdapter } = require("../database/lowdb_adapter.js");
-const lowDbInstance = await JSONFilePreset(testDbPath, { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} });
-const testDb = new LowDbAdapter(lowDbInstance);
-serverData = await startServer(testDb, null, undefined, testDbPath);
+        const lowDbInstance = await JSONFilePreset(testDbPath, { orders: {}, batches: {}, users: {}, emailIndex: {}, credentials: {}, config: {}, products: {} });
+        const testDb = new LowDbAdapter(lowDbInstance);
+        serverData = await startServer(testDb, null, undefined, testDbPath);
 
         const { privateKey, kid } = getCurrentSigningKey();
 

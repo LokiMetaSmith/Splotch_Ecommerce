@@ -4746,6 +4746,7 @@ function renderPricingEditor(config) {
             <div class="text-xs text-gray-500">Square Inches: <span id="sim-out-sqin" class="font-bold text-gray-800">9.0</span> sq in</div>
             <div class="text-xs text-gray-500">Combined Multipliers: <span id="sim-out-mult" class="font-bold text-indigo-600">1.30x</span></div>
             <div class="text-xs text-gray-500">Volume Discount: <span id="sim-out-disc" class="font-bold text-green-600">0% OFF</span></div>
+            <div class="text-xs text-gray-500">Volume Savings: <span id="sim-out-save" class="font-bold text-green-600">$0.00</span></div>
           </div>
           <div class="text-right">
             <div class="text-xs text-gray-400 uppercase font-bold tracking-wide">Calculated Total:</div>
@@ -5036,10 +5037,30 @@ function runSimulator() {
   const baseCostCents = sqInches * basePriceCents;
   const totalCentsBeforeDiscount =
     baseCostCents * qty * combinedMultiplier;
-  const totalCents = Math.round(
+  let totalCents = Math.round(
     totalCentsBeforeDiscount * (1 - discountPercent)
   );
 
+  // Ceiling check matching client and server
+  for (const higherTier of discountRows) {
+    if (higherTier.q > qty) {
+      const higherTierTotal = Math.round(
+        baseCostCents * higherTier.q * combinedMultiplier * (1 - higherTier.discount)
+      );
+      if (totalCents > higherTierTotal) {
+        totalCents = higherTierTotal;
+        discountPercent =
+          totalCentsBeforeDiscount > 0
+            ? 1 - totalCents / totalCentsBeforeDiscount
+            : 0;
+      }
+    }
+  }
+
+  const savingsCents = Math.max(
+    0,
+    Math.round(totalCentsBeforeDiscount) - totalCents
+  );
   const totalDollars = (totalCents / 100).toFixed(2);
   const unitDollars = ((totalCents / qty) / 100).toFixed(2);
 
@@ -5047,6 +5068,7 @@ function runSimulator() {
   const outSqIn = document.getElementById("sim-out-sqin");
   const outMult = document.getElementById("sim-out-mult");
   const outDisc = document.getElementById("sim-out-disc");
+  const outSave = document.getElementById("sim-out-save");
   const outTotal = document.getElementById("sim-out-total");
   const outUnit = document.getElementById("sim-out-unit");
 
@@ -5054,6 +5076,8 @@ function runSimulator() {
   if (outMult) outMult.textContent = `${combinedMultiplier.toFixed(2)}x`;
   if (outDisc)
     outDisc.textContent = `${Math.round(discountPercent * 100)}% OFF`;
+  if (outSave)
+    outSave.textContent = `$${(savingsCents / 100).toFixed(2)}`;
   if (outTotal) outTotal.textContent = `$${totalDollars}`;
   if (outUnit) outUnit.textContent = `($${unitDollars} / sticker)`;
 }

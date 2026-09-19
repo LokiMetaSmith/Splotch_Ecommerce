@@ -1014,6 +1014,18 @@ async function BootStrap() {
 
     attachHoldEvents(decreaseQuantityBtn, "decrease");
     attachHoldEvents(increaseQuantityBtn, "increase");
+
+    // Quick quantity pills event listeners (Sticker Mule volume selector)
+    document.querySelectorAll(".quick-qty-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const qty = parseInt(btn.dataset.qty, 10);
+        if (qty && stickerQuantityInput) {
+          stickerQuantityInput.value = qty;
+          stickerQuantityInput.dispatchEvent(new Event("input"));
+          stickerQuantityInput.dispatchEvent(new Event("change"));
+        }
+      });
+    });
   }
   if (stickerMaterialSelect) {
     stickerMaterialSelect.addEventListener("change", (e) => {
@@ -1983,6 +1995,29 @@ function calculateAndUpdatePrice() {
   }
   // -------------------------
 
+  // Update quick quantity pill active state
+  document.querySelectorAll(".quick-qty-btn").forEach((btn) => {
+    const btnQty = parseInt(btn.dataset.qty, 10);
+    if (btnQty === quantity) {
+      btn.className =
+        "quick-qty-btn px-2 py-1.5 text-xs font-bold rounded border-2 border-indigo-600 bg-indigo-600 text-white shadow-sm transition-all text-center";
+    } else {
+      btn.className =
+        "quick-qty-btn px-2 py-1.5 text-xs font-semibold rounded border border-gray-300 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-colors text-center text-gray-700";
+    }
+  });
+
+  // Update quick savings badge next to Quantity label
+  const quickSavingsBadge = document.getElementById("quick-savings-badge");
+  if (quickSavingsBadge) {
+    if (priceResult.discountPercent > 0 && priceResult.savingsCents > 0) {
+      quickSavingsBadge.textContent = `Save ${priceResult.discountPercent}% (${formatPrice(priceResult.savingsCents)})`;
+      quickSavingsBadge.classList.remove("hidden");
+    } else {
+      quickSavingsBadge.classList.add("hidden");
+    }
+  }
+
   // --- Render Discount Table ---
   if (
     pricingConfig &&
@@ -2007,30 +2042,38 @@ function calculateAndUpdatePrice() {
         !discounts.find((t) => t.minQty > tier.minQty && quantity >= t.minQty);
 
       const row = document.createElement("tr");
-      if (isCurrentTier) {
-        row.className = "bg-indigo-100 font-semibold";
-      } else {
-        row.className = "border-t border-gray-100";
-      }
+      row.className = isCurrentTier
+        ? "bg-indigo-100 font-bold text-indigo-900 border-l-4 border-indigo-600 cursor-pointer transition-colors"
+        : "border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors";
+      row.title = `Click to select ${tier.minQty} stickers`;
+      row.onclick = () => {
+        if (stickerQuantityInput) {
+          stickerQuantityInput.value = tier.minQty;
+          stickerQuantityInput.dispatchEvent(new Event("input"));
+          stickerQuantityInput.dispatchEvent(new Event("change"));
+        }
+      };
+
+      // Calculate unit price at this tier for the current sticker dimensions
+      const tierPriceResult = calculateStickerPrice(
+        pricingConfig,
+        tier.minQty,
+        selectedMaterial,
+        bounds,
+        cutline,
+        selectedResolution,
+        lastCalculatedPerimeter,
+        allCustomLayers,
+        numImageLayers,
+      );
+      const tierEachCents =
+        tierPriceResult.unitPriceCents + (creatorProfitCents || 0);
 
       row.innerHTML = `
-        <td class="px-2 py-1">${tier.minQty}+</td>
-        <td class="px-2 py-1 text-right text-indigo-700">-${tier.discountPercent}%</td>
+        <td class="px-2 py-1.5 font-medium">${tier.minQty}+</td>
+        <td class="px-2 py-1.5 text-center text-green-700 font-semibold">${tier.discountPercent > 0 ? `-${tier.discountPercent}%` : "Base"}</td>
+        <td class="px-2 py-1.5 text-right font-mono text-gray-700">${formatPrice(tierEachCents)}</td>
       `;
-
-      // Update mobile sticky bar
-      const mobileStickyPrice = document.getElementById("mobileStickyPrice");
-      const mobileStickyBar = document.getElementById(
-        "mobile-sticky-conversion",
-      );
-      if (mobileStickyPrice && mobileStickyBar) {
-        mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
-        if (currentOrderAmountCents > 0) {
-          mobileStickyBar.classList.remove("translate-y-full");
-        } else {
-          mobileStickyBar.classList.add("translate-y-full");
-        }
-      }
 
       discountTableBody.appendChild(row);
     });
@@ -2059,15 +2102,37 @@ function calculateAndUpdatePrice() {
   }
 
   const unitPriceCents = quantity > 0 ? currentOrderAmountCents / quantity : 0;
-  const unitPriceDisplay =
-    quantity > 1 && unitPriceCents > 0
-      ? `<span class="text-sm text-gray-500 font-medium ml-2">(${formatPrice(unitPriceCents)} each)</span>`
-      : "";
+  const baseUnitPrice =
+    (priceResult.baseUnitPriceCents || 0) + (creatorProfitCents || 0);
+
+  let unitPriceDisplay = "";
+  if (quantity > 1 && unitPriceCents > 0) {
+    if (priceResult.discountPercent > 0 && baseUnitPrice > unitPriceCents) {
+      unitPriceDisplay = `
+        <span class="text-sm text-gray-500 font-medium ml-2">
+          <span class="line-through text-gray-400 mr-1">${formatPrice(baseUnitPrice)}</span>
+          <span class="text-gray-800 font-bold">${formatPrice(unitPriceCents)} each</span>
+        </span>
+      `;
+    } else {
+      unitPriceDisplay = `<span class="text-sm text-gray-500 font-medium ml-2">(${formatPrice(unitPriceCents)} each)</span>`;
+    }
+  }
+
+  let savingsBadgeHtml = "";
+  if (priceResult.discountPercent > 0 && priceResult.savingsCents > 0) {
+    savingsBadgeHtml = `
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-800 border border-green-200 ml-2">
+        Save ${priceResult.discountPercent}% (${formatPrice(priceResult.savingsCents)})
+      </span>
+    `;
+  }
 
   calculatedPriceDisplay.innerHTML = `
-        <div class="flex items-baseline">
-            <span class="font-bold text-lg">${formatPrice(currentOrderAmountCents)}</span>
+        <div class="flex flex-wrap items-baseline">
+            <span class="font-extrabold text-2xl text-splotch-navy">${formatPrice(currentOrderAmountCents)}</span>
             ${unitPriceDisplay}
+            ${savingsBadgeHtml}
         </div>
         ${markupHtml}
         <span class="text-sm text-gray-600 block mt-1">

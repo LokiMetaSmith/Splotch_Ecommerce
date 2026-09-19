@@ -114,26 +114,57 @@ export function calculateStickerPrice(
 
   // Get quantity discount
   let discount = 0;
-  // Bolt Optimization: Discounts are pre-sorted on load. Iterating directly.
-  for (const tier of pricingConfig.quantityDiscounts) {
-    if (quantity >= tier.quantity) {
-      discount = tier.discount;
-      break;
+  if (pricingConfig.quantityDiscounts && Array.isArray(pricingConfig.quantityDiscounts)) {
+    // Order-independent lookup for the highest matching quantity threshold
+    let maxTierQty = -1;
+    for (const tier of pricingConfig.quantityDiscounts) {
+      if (quantity >= tier.quantity && tier.quantity > maxTierQty) {
+        discount = tier.discount;
+        maxTierQty = tier.quantity;
+      }
     }
   }
 
-  const resolutionMultiplier = resolution.costMultiplier;
+  const resolutionMultiplier = resolution.costMultiplier || 1.0;
   const totalCents =
     basePriceCents *
     quantity *
     materialMultiplier *
     complexityMultiplier *
     resolutionMultiplier;
-  const discountedTotal = totalCents * (1 - discount);
+  const roundedUndiscounted = Math.round(totalCents);
+  let discountedTotal = totalCents * (1 - discount);
+
+  // Commercial pricing sanity: ordering N items should never cost more than ordering a larger tier
+  if (pricingConfig.quantityDiscounts && Array.isArray(pricingConfig.quantityDiscounts)) {
+    for (const higherTier of pricingConfig.quantityDiscounts) {
+      if (higherTier.quantity > quantity) {
+        const higherTierTotal =
+          basePriceCents *
+          higherTier.quantity *
+          materialMultiplier *
+          complexityMultiplier *
+          resolutionMultiplier *
+          (1 - higherTier.discount);
+        if (discountedTotal > higherTierTotal) {
+          discountedTotal = higherTierTotal;
+          discount = totalCents > 0 ? 1 - (discountedTotal / totalCents) : 0;
+        }
+      }
+    }
+  }
+
+  const roundedDiscounted = Math.round(discountedTotal);
 
   return {
-    total: Math.round(discountedTotal),
+    total: roundedDiscounted,
     complexityMultiplier: complexityMultiplier,
+    discount: discount,
+    discountPercent: Math.round(discount * 100),
+    undiscountedTotal: roundedUndiscounted,
+    savingsCents: Math.max(0, roundedUndiscounted - roundedDiscounted),
+    unitPriceCents: quantity > 0 ? Math.round(roundedDiscounted / quantity) : 0,
+    baseUnitPriceCents: quantity > 0 ? Math.round(roundedUndiscounted / quantity) : 0,
   };
 }
 

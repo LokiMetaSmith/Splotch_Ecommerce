@@ -70,12 +70,40 @@
       "discount": 0
     },
     {
+      "quantity": 50,
+      "discount": 0
+    },
+    {
+      "quantity": 100,
+      "discount": 0.37
+    },
+    {
       "quantity": 200,
-      "discount": 0.1
+      "discount": 0.55
+    },
+    {
+      "quantity": 300,
+      "discount": 0.63
     },
     {
       "quantity": 500,
-      "discount": 0.15
+      "discount": 0.71
+    },
+    {
+      "quantity": 1000,
+      "discount": 0.76
+    },
+    {
+      "quantity": 2000,
+      "discount": 0.81
+    },
+    {
+      "quantity": 5000,
+      "discount": 0.84
+    },
+    {
+      "quantity": 10000,
+      "discount": 0.87
     }
   ]
 }
