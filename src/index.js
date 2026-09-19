@@ -2866,12 +2866,25 @@ async function handlePaymentFormSubmit(event) {
       });
     }
 
+    const resolutionId = stickerResolutionSelect
+      ? stickerResolutionSelect.value
+      : "unknown";
+    const selectedResolution =
+      pricingConfig && pricingConfig.resolutions
+        ? pricingConfig.resolutions.find((r) => r.id === resolutionId)
+        : null;
+    const ppi = selectedResolution && selectedResolution.ppi ? selectedResolution.ppi : 300;
+    const widthInches = currentBounds && currentBounds.width ? Number((currentBounds.width / ppi).toFixed(2)) : null;
+    const heightInches = currentBounds && currentBounds.height ? Number((currentBounds.height / ppi).toFixed(2)) : null;
+    const sizeStr = (widthInches && heightInches) ? `${widthInches}" × ${heightInches}"` : null;
+
     // 4. Create JSON payload for the order
     const orderDetails = {
       dimensions: currentBounds,
-      resolution: stickerResolutionSelect
-        ? stickerResolutionSelect.value
-        : "unknown",
+      widthInches: widthInches,
+      heightInches: heightInches,
+      size: sizeStr,
+      resolution: resolutionId,
       quantity: stickerQuantityInput
         ? parseInt(stickerQuantityInput.value, 10)
         : 0,

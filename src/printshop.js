@@ -29,6 +29,7 @@ try {
 let currentPricingConfig = {};
 let pirateShipAutoSync = true;
 const svgCache = new Map();
+export const expandedOrderIds = new Set();
 
 // Pagination state
 let currentPage = 1;
@@ -821,20 +822,157 @@ export function getResolutionPpi(resolutionId) {
   return 300;
 }
 
+// --- Production & Dimension Specs Helper ---
+/**
+ * Resolves comprehensive production specifications for an order:
+ * Width, Height, Dimensions, Resolution/PPI, Material, Cut Type, Layers.
+ * @param {object} order - The order object.
+ * @returns {object} Formatted and raw specification values.
+ */
+export function getOrderSpecs(order) {
+  if (!order) return {};
+  const details = order.orderDetails || {};
+
+  // 1. Resolution & PPI
+  const rawRes = details.resolution || order.resolution;
+  let ppi = getResolutionPpi(rawRes);
+  let resolutionName = "";
+
+  if (currentPricingConfig && Array.isArray(currentPricingConfig.resolutions)) {
+    const found = currentPricingConfig.resolutions.find(
+      (r) => r.id === rawRes || r.ppi === rawRes || String(r.ppi) === String(rawRes)
+    );
+    if (found) {
+      resolutionName = found.name || `${found.ppi} DPI`;
+      if (found.ppi) ppi = Number(found.ppi);
+    }
+  }
+
+  if (!resolutionName) {
+    if (typeof rawRes === "string") {
+      const match = rawRes.match(/(\d+)/);
+      if (match) {
+        resolutionName = `${match[1]} DPI`;
+      } else {
+        resolutionName = rawRes || (ppi ? `${ppi} DPI` : "Standard (300 DPI)");
+      }
+    } else if (typeof rawRes === "number") {
+      resolutionName = `${rawRes} DPI`;
+    } else {
+      resolutionName = ppi ? `${ppi} DPI` : "300 DPI";
+    }
+  }
+
+  // 2. Width & Height (in inches)
+  let widthInches = null;
+  let heightInches = null;
+
+  if (typeof details.widthInches === "number" && !isNaN(details.widthInches)) {
+    widthInches = details.widthInches;
+  } else if (typeof order.widthInches === "number" && !isNaN(order.widthInches)) {
+    widthInches = order.widthInches;
+  }
+
+  if (typeof details.heightInches === "number" && !isNaN(details.heightInches)) {
+    heightInches = details.heightInches;
+  } else if (typeof order.heightInches === "number" && !isNaN(order.heightInches)) {
+    heightInches = order.heightInches;
+  }
+
+  // From dimensions object
+  const dim = details.dimensions || order.dimensions;
+  if ((widthInches === null || heightInches === null) && dim) {
+    const wPx = typeof dim.width === "number" ? dim.width : (typeof dim.maxX === "number" && typeof dim.minX === "number" ? dim.maxX - dim.minX : null);
+    const hPx = typeof dim.height === "number" ? dim.height : (typeof dim.maxY === "number" && typeof dim.minY === "number" ? dim.maxY - dim.minY : null);
+    if (wPx !== null && hPx !== null && wPx > 0 && hPx > 0) {
+      const effectivePpi = ppi > 0 ? ppi : 300;
+      widthInches = Number((wPx / effectivePpi).toFixed(2));
+      heightInches = Number((hPx / effectivePpi).toFixed(2));
+    }
+  }
+
+  // From size string e.g. "3.5\" × 4.2\"" or "3.5 x 4.2"
+  const rawSize = details.size || order.size;
+  if ((widthInches === null || heightInches === null) && typeof rawSize === "string") {
+    const parts = rawSize.replace(/[^\d.\s×x]/g, "").split(/[×x]/i);
+    if (parts.length === 2) {
+      const pW = parseFloat(parts[0].trim());
+      const pH = parseFloat(parts[1].trim());
+      if (!isNaN(pW) && !isNaN(pH) && pW > 0 && pH > 0) {
+        if (widthInches === null) widthInches = pW;
+        if (heightInches === null) heightInches = pH;
+      }
+    }
+  }
+
+  const formattedWidth = widthInches !== null ? `${widthInches}"` : "N/A";
+  const formattedHeight = heightInches !== null ? `${heightInches}"` : "N/A";
+  const formattedSize = (widthInches !== null && heightInches !== null)
+    ? `${widthInches}" × ${heightInches}"`
+    : (rawSize || "N/A");
+
+  const areaSqIn = (widthInches !== null && heightInches !== null)
+    ? Number((widthInches * heightInches).toFixed(2))
+    : null;
+
+  // Material
+  const rawMat = details.material || order.material || "Standard";
+  let materialName = rawMat;
+  if (currentPricingConfig && Array.isArray(currentPricingConfig.materials)) {
+    const foundMat = currentPricingConfig.materials.find((m) => m.id === rawMat);
+    if (foundMat && foundMat.name) materialName = foundMat.name;
+  }
+  if (materialName === "pp_standard") materialName = "Standard White Vinyl";
+  if (materialName === "vinyl_gloss") materialName = "Glossy Vinyl";
+  if (materialName === "vinyl_matte") materialName = "Matte Vinyl";
+
+  // Cut Type
+  const rawCut = details.cutType || order.cutType || "die_cut";
+  const cutTypeName = rawCut === "kiss_cut" ? "Kiss Cut" : "Die Cut";
+
+  // Custom Layers
+  const customLayers = Array.isArray(details.customLayers) ? details.customLayers : [];
+  const numLayers = details.numImageLayers || (customLayers.length > 0 ? customLayers.length : 1);
+
+  return {
+    widthInches,
+    heightInches,
+    formattedWidth,
+    formattedHeight,
+    formattedSize,
+    areaSqIn,
+    resolutionName,
+    ppi,
+    materialName,
+    cutTypeName,
+    customLayers,
+    numLayers,
+  };
+}
+
 // --- Start Table Row View ---
-function displayOrderRow(order) {
+export function displayOrderRow(order) {
   const orderId = order.orderId;
+  const isExpanded = expandedOrderIds.has(orderId);
+  const specs = getOrderSpecs(order);
   const receivedAt = new Date(order.receivedAt).toLocaleString();
   const quantity = order.orderDetails?.quantity || order.quantity || 0;
-  const ppi = getResolutionPpi(order.orderDetails?.resolution || order.resolution);
   const price = (order.amount / 100).toFixed(2);
 
-  const billingName = escapeHtml(
-    order.customerDetails?.billing?.name || "N/A",
-  );
-  const billingEmail = escapeHtml(
-    order.customerDetails?.billing?.email || order.customerEmail || "N/A",
-  );
+  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.billing?.name || "N/A");
+  const billingEmail = escapeHtml(order.billingContact?.email || order.customerDetails?.billing?.email || order.customerEmail || "N/A");
+  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.shipping?.name || billingName);
+  const shippingEmail = escapeHtml(order.shippingContact?.email || billingEmail);
+
+  const formatAddress = (contact) => {
+    if (!contact) return "";
+    const lines = Array.isArray(contact.addressLines) ? contact.addressLines.filter(Boolean).join(", ") : (contact.addressLines || "");
+    const cityStateZip = [contact.locality || contact.city, contact.administrativeDistrictLevel1 || contact.state, contact.postalCode].filter(Boolean).join(" ");
+    return [lines, cityStateZip].filter(Boolean).join(", ");
+  };
+  const shippingAddrStr = escapeHtml(formatAddress(order.shippingContact));
+  const billingAddrStr = escapeHtml(formatAddress(order.billingContact));
+  const hasDistinctBilling = billingAddrStr && shippingAddrStr && (billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase());
 
   const serverPrefix = serverUrl;
   const designImagePath = `${serverPrefix}${escapeHtml(order.designImagePath || "")}`;
@@ -842,6 +980,11 @@ function displayOrderRow(order) {
     order.orderDetails?.cutLinePath || order.cutLinePath || "",
   );
   const pltFilePath = order.pltFile ? `${serverPrefix}${order.pltFile}` : null;
+
+  const isLocalPickup = order.deliveryMethod === 'pickup' || order.orderDetails?.deliveryMethod === 'pickup';
+  const deliveryBadge = isLocalPickup
+    ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Local Pickup</span>`
+    : `<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700">Ship to Address</span>`;
 
   const statuses = [
     "NEW",
@@ -891,10 +1034,74 @@ function displayOrderRow(order) {
     </select>
   `;
 
+  const isShippable = !isLocalPickup && order.status !== "CANCELED" && order.status !== "COMPLETED" && order.status !== "DELIVERED" && order.status !== "ARCHIVED" && !order.isArchived;
+  const defaultWeight = order.packageWeightOz ?? (order.orderDetails?.quantity ? Math.max(1, Math.round(order.orderDetails.quantity * 0.05 * 10) / 10) : 1);
+  const defaultLength = order.packageDimensions?.length ?? 6;
+  const defaultWidth = order.packageDimensions?.width ?? 4;
+  const defaultHeight = order.packageDimensions?.height ?? 0.5;
+
+  const packageControlsHtml = isShippable ? `
+    <div class="p-3 bg-purple-50/60 rounded-md border border-purple-200 package-panel" data-order-id="${orderId}">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <span class="text-xs font-bold text-purple-900 flex items-center gap-1">
+          <span>📦</span> Package &amp; Shipping Label
+          ${!pirateShipAutoSync ? '<span class="ml-1 text-[10px] font-normal bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">Manual Queue</span>' : ''}
+        </span>
+        <div class="flex items-center gap-2">
+          ${order.exportToPirateship || order.labelRequested ? `
+            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-100 px-2 py-0.5 rounded border border-purple-300">
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
+              Queued for Pirate Ship
+            </span>
+          ` : ''}
+          ${order.labelUrl ? `
+            <a href="${escapeHtml(order.labelUrl)}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1">
+              📄 View Label
+            </a>
+          ` : ''}
+        </div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div>
+          <label class="block text-[11px] text-gray-600 font-medium mb-0.5">Weight (oz)</label>
+          <input type="number" step="0.1" min="0.1" max="1000" class="package-weight-input w-full p-1 border border-gray-300 rounded text-xs bg-white" data-order-id="${orderId}" value="${defaultWeight}">
+        </div>
+        <div>
+          <label class="block text-[11px] text-gray-600 font-medium mb-0.5">Length (in)</label>
+          <input type="number" step="0.1" min="0.1" max="100" class="package-length-input w-full p-1 border border-gray-300 rounded text-xs bg-white" data-order-id="${orderId}" value="${defaultLength}">
+        </div>
+        <div>
+          <label class="block text-[11px] text-gray-600 font-medium mb-0.5">Width (in)</label>
+          <input type="number" step="0.1" min="0.1" max="100" class="package-width-input w-full p-1 border border-gray-300 rounded text-xs bg-white" data-order-id="${orderId}" value="${defaultWidth}">
+        </div>
+        <div>
+          <label class="block text-[11px] text-gray-600 font-medium mb-0.5">Height (in)</label>
+          <input type="number" step="0.1" min="0.1" max="100" class="package-height-input w-full p-1 border border-gray-300 rounded text-xs bg-white" data-order-id="${orderId}" value="${defaultHeight}">
+        </div>
+      </div>
+      <div class="mt-2.5 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-purple-100">
+        <p class="text-[11px] text-gray-500">
+          ${pirateShipAutoSync
+            ? 'Package specifications will be synced with Pirate Ship upon order import.'
+            : 'Click <strong>Order Label</strong> to queue this order for Pirate Ship with these dimensions.'}
+        </p>
+        <button type="button" class="order-label-btn px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors cursor-pointer" data-order-id="${orderId}">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+          ${order.labelRequested || order.exportToPirateship ? 'Update / Order Label' : 'Order Label'}
+        </button>
+      </div>
+    </div>
+  ` : '';
+
   return `
-    <tr class="bg-white border-b hover:bg-gray-50 order-row" data-order-id="${orderId}">
+    <tr class="bg-white border-b hover:bg-blue-50/40 order-row cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50/60' : ''}" data-order-id="${orderId}" title="Click to ${isExpanded ? 'collapse' : 'expand'} order specifications">
       <td class="px-4 py-3">
-        <input type="checkbox" class="order-select-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" value="${orderId}">
+        <div class="flex items-center gap-1.5">
+          <button type="button" class="order-expand-toggle-btn p-1 text-gray-400 hover:text-blue-600 focus:outline-none rounded transition-transform duration-200 ${isExpanded ? 'rotate-90 text-blue-600' : ''}" data-order-id="${orderId}" title="${isExpanded ? 'Collapse order' : 'Expand order'}" aria-label="Toggle details for order ${orderId}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <input type="checkbox" class="order-select-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" value="${orderId}">
+        </div>
       </td>
       <td class="px-4 py-3">
         <div class="qr-code-container w-12 h-12" data-order-id="${orderId}">
@@ -902,9 +1109,14 @@ function displayOrderRow(order) {
         </div>
       </td>
       <td class="px-4 py-3">
-        <div class="font-bold text-gray-900">${orderId.substring(0, 8)}...</div>
+        <div class="font-bold text-gray-900 flex items-center gap-1">
+          <span>${orderId.substring(0, 8)}...</span>
+        </div>
         <div class="text-xs text-gray-500">${receivedAt}</div>
-        ${alertHtml}
+        <div class="flex items-center gap-1.5 mt-1">
+          ${deliveryBadge}
+          ${alertHtml}
+        </div>
         <div class="mt-1 font-semibold text-green-600">$${price}</div>
       </td>
       <td class="px-4 py-3">
@@ -920,10 +1132,11 @@ function displayOrderRow(order) {
       <td class="px-4 py-3">
         <div class="flex items-center gap-2">
             ${designImagePath && order.designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
-                <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
+                <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${specs.ppi}" loading="lazy" decoding="async">
             </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[10px] text-gray-500 font-semibold text-center leading-tight p-1">${order.artworkPruned ? 'Pruned' : 'N/A'}</div>`}
             <div>
                 <div class="text-xs font-semibold">Qty: ${quantity}</div>
+                <div class="text-[11px] text-gray-500 mt-0.5">${specs.formattedSize}</div>
                 ${cutFilePath ? `<a href="${serverPrefix}${cutFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block mt-1">Download SVG</a>` : ""}
                 ${pltFilePath ? `<a href="${pltFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block ml-1 mt-1">Download PLT</a>` : ""}
             </div>
@@ -955,6 +1168,119 @@ function displayOrderRow(order) {
                </select>
                <input type="text" placeholder="Tracking #" value="${escapeHtml(order.trackingNumber || '')}" class="border rounded p-1 tracking-number bg-white" data-order-id="${orderId}">
             </div>
+        </div>
+      </td>
+    </tr>
+
+    <!-- Expanded Row Details -->
+    <tr class="order-expanded-row bg-slate-50/90 border-b border-blue-100 ${isExpanded ? '' : 'hidden'}" id="order-expanded-${orderId}" data-order-id="${orderId}">
+      <td colspan="6" class="p-0">
+        <div class="p-4 sm:p-6 border-l-4 border-blue-500 bg-gradient-to-r from-blue-50/40 via-white to-white space-y-4 shadow-inner">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-gray-200">
+            <div class="flex items-center gap-3">
+              <h4 class="text-base font-bold text-gray-900">
+                Order <span class="font-mono text-splotch-red font-semibold">${orderId}</span>
+              </h4>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">${order.status === 'HOLD_FOR_PICKUP' ? 'Hold for Pickup' : order.status}</span>
+              ${deliveryBadge}
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500">Ordered: ${receivedAt}</span>
+              <button type="button" class="view-order-history-btn px-2.5 py-1 bg-white hover:bg-gray-100 text-gray-700 rounded text-xs font-semibold border border-gray-300 flex items-center gap-1 shadow-sm transition-colors" data-order-id="${orderId}">
+                <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                History
+              </button>
+            </div>
+          </div>
+
+          <!-- Production Specs Banner -->
+          <div>
+            <h5 class="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Production &amp; Sticker Specifications</h5>
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+              <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Width</span>
+                <span class="text-base font-bold text-gray-900 order-dim-width" data-order-id="${orderId}">${specs.formattedWidth}</span>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Height</span>
+                <span class="text-base font-bold text-gray-900 order-dim-height" data-order-id="${orderId}">${specs.formattedHeight}</span>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Dimensions</span>
+                <span class="text-sm font-bold text-gray-900 order-dim-size" data-order-id="${orderId}">${specs.formattedSize}</span>
+                ${specs.areaSqIn ? `<span class="text-[10px] text-gray-500 block order-dim-area" data-order-id="${orderId}">(${specs.areaSqIn} sq in)</span>` : ''}
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Resolution</span>
+                <span class="text-sm font-bold text-blue-700 block">${escapeHtml(specs.resolutionName)}</span>
+                <span class="text-[10px] text-gray-500 block">${specs.ppi} PPI</span>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Material</span>
+                <span class="text-xs font-semibold text-gray-800 block truncate" title="${escapeHtml(specs.materialName)}">${escapeHtml(specs.materialName)}</span>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Cut Type</span>
+                <span class="text-xs font-semibold text-gray-800 block">${escapeHtml(specs.cutTypeName)}</span>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Quantity</span>
+                <span class="text-base font-bold text-gray-900">${quantity}</span>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Total Amount</span>
+                <span class="text-base font-bold text-green-700">$${price}</span>
+              </div>
+            </div>
+            ${order.promoCode ? `
+              <div class="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded-md flex items-center gap-2 text-xs">
+                <span class="font-semibold text-indigo-900">Promo Code:</span>
+                <span class="font-mono font-bold text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-indigo-300">${escapeHtml(order.promoCode)}</span>
+                ${order.promoDiscountCents ? `<span class="text-indigo-600 font-medium">Discount applied: -$${(order.promoDiscountCents / 100).toFixed(2)}</span>` : ''}
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Customer and Delivery Info -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-white p-3.5 rounded-lg border border-gray-200">
+            <div>
+              <h6 class="font-bold text-gray-800 mb-1">Billing Details</h6>
+              <p><span class="text-gray-500">Name:</span> <strong>${billingName}</strong></p>
+              <p><span class="text-gray-500">Email:</span> <a href="mailto:${billingEmail}" class="text-blue-600 hover:underline">${billingEmail}</a></p>
+              ${hasDistinctBilling ? `<div class="mt-1 p-1.5 bg-amber-50 rounded border border-amber-200 text-gray-700"><span class="font-semibold text-amber-900">Billing Address:</span> ${billingAddrStr}</div>` : ''}
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <h6 class="font-bold text-gray-800">${isLocalPickup ? 'Pickup Details' : 'Shipping Details'}</h6>
+                ${!isLocalPickup && shippingAddrStr ? `
+                  <button type="button" class="copy-address-btn text-[11px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy formatted shipping address">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    Copy Address
+                  </button>
+                ` : ''}
+              </div>
+              <p><span class="text-gray-500">Name:</span> <strong>${shippingName}</strong></p>
+              <p><span class="text-gray-500">Email:</span> <a href="mailto:${shippingEmail}" class="text-blue-600 hover:underline">${shippingEmail}</a></p>
+              ${shippingAddrStr ? `<div class="mt-1 p-1.5 bg-blue-50/50 rounded border border-blue-100 text-gray-700"><span class="font-semibold text-blue-900">${isLocalPickup ? 'Pickup Location:' : 'Address:'}</span> ${shippingAddrStr}</div>` : ''}
+            </div>
+          </div>
+
+          <!-- Package & Shipping Controls -->
+          ${packageControlsHtml}
+
+          <!-- Footer / Actions / Logging -->
+          <div class="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-gray-200">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-gray-600">Status:</span>
+              ${dropdownHtml}
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="font-semibold text-gray-600">Log Time:</span>
+              <input type="text" class="border rounded p-1 text-xs time-log-desc" data-order-id="${orderId}" placeholder="Task Description">
+              <input type="number" class="border rounded p-1 text-xs w-16 time-log-duration" data-order-id="${orderId}" placeholder="Mins">
+              <button class="bg-gray-600 hover:bg-gray-700 text-white px-2.5 py-1 rounded text-xs log-time-btn" data-order-id="${orderId}">Log</button>
+            </div>
+          </div>
         </div>
       </td>
     </tr>
@@ -995,8 +1321,9 @@ export function displayOrder(order) {
   const billingAddrStr = escapeHtml(formatAddress(order.billingContact));
   const hasDistinctBilling = billingAddrStr && shippingAddrStr && (billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase());
 
+  const specs = getOrderSpecs(order);
   const quantity = escapeHtml(order.orderDetails?.quantity || "N/A");
-  const ppi = getResolutionPpi(order.orderDetails?.resolution || order.resolution);
+  const ppi = specs.ppi || getResolutionPpi(order.orderDetails?.resolution || order.resolution);
   const status = escapeHtml(order.status);
   const orderId = escapeHtml(order.orderId);
   // Truncate BEFORE escaping would be safer for logic, but since orderId is UUID (safe chars),
@@ -1182,11 +1509,17 @@ export function displayOrder(order) {
             </div>
             <div>
                 <dt>Sticker Name:</dt><dd>${stickerName}</dd>
-                <dt>Material:</dt><dd>${material}</dd>
+                <dt>Dimensions (W × H):</dt><dd class="font-semibold text-gray-900 order-dim-size" data-order-id="${orderId}">${specs.formattedSize}${specs.areaSqIn ? ` <span class="text-xs text-gray-500 font-normal order-dim-area" data-order-id="${orderId}">(${specs.areaSqIn} sq in)</span>` : ""}</dd>
+                <dt>Width:</dt><dd class="font-medium text-gray-800 order-dim-width" data-order-id="${orderId}">${specs.formattedWidth}</dd>
+                <dt>Height:</dt><dd class="font-medium text-gray-800 order-dim-height" data-order-id="${orderId}">${specs.formattedHeight}</dd>
+                <dt>Resolution:</dt><dd class="font-medium text-blue-700">${escapeHtml(specs.resolutionName)}${specs.ppi ? ` <span class="text-xs text-gray-500 font-normal">(${specs.ppi} PPI)</span>` : ""}</dd>
+                <dt>Material:</dt><dd>${escapeHtml(specs.materialName)}</dd>
             </div>
             <div>
-                <dt>Quantity:</dt><dd>${quantity}</dd>
-                <dt>Amount:</dt><dd>${escapeHtml(formattedAmount)}</dd>
+                <dt>Cut Type:</dt><dd class="font-medium text-gray-800">${escapeHtml(specs.cutTypeName)}</dd>
+                <dt>Quantity:</dt><dd class="font-bold text-gray-900">${quantity}</dd>
+                <dt>Amount:</dt><dd class="font-bold text-green-700">${escapeHtml(formattedAmount)}</dd>
+                ${specs.numLayers > 1 ? `<dt>Layers:</dt><dd class="text-gray-700">${specs.numLayers} layers</dd>` : ""}
                 ${order.promoCode ? `<dt class="text-indigo-700 font-semibold mt-1">Promo Code:</dt><dd class="text-xs text-indigo-800 font-mono font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 inline-block mt-0.5">${escapeHtml(order.promoCode)}${order.promoDiscountCents ? ` (-$${(order.promoDiscountCents / 100).toFixed(2)})` : ''}</dd>` : ""}
             </div>
         </div>
@@ -1279,6 +1612,67 @@ function handleOrderListClick(e) {
     const orderId = orderLabelBtn.dataset.orderId;
     orderShippingLabel(orderId, orderLabelBtn);
     return;
+  }
+
+  // Handle per-order expansion in list view
+  const toggleBtn = e.target.closest(".order-expand-toggle-btn");
+  const orderRow = e.target.closest(".order-row");
+  if (toggleBtn || orderRow) {
+    const isInteractive = e.target.closest(
+      "button:not(.order-expand-toggle-btn), a, input, select, textarea, label, .sticker-peel-container, .qr-code-container, .tracking-inputs"
+    );
+    if (!isInteractive) {
+      const orderId = (toggleBtn || orderRow).dataset.orderId;
+      if (orderId) {
+        toggleOrderExpansion(orderId);
+        return;
+      }
+    }
+  }
+}
+
+/**
+ * Toggles expanded details view for an order in list view.
+ * @param {string} orderId - The order ID to toggle.
+ */
+export function toggleOrderExpansion(orderId) {
+  if (!orderId) return;
+  const isExpanded = expandedOrderIds.has(orderId);
+  if (isExpanded) {
+    expandedOrderIds.delete(orderId);
+  } else {
+    expandedOrderIds.add(orderId);
+  }
+
+  const expandedRow = document.getElementById(`order-expanded-${orderId}`);
+  const parentRow = document.querySelector(`.order-row[data-order-id="${orderId}"]`);
+  const chevronBtn = parentRow?.querySelector(".order-expand-toggle-btn");
+
+  if (expandedRow) {
+    if (isExpanded) {
+      expandedRow.classList.add("hidden");
+      parentRow?.classList.remove("bg-blue-50/60");
+      chevronBtn?.classList.remove("rotate-90", "text-blue-600");
+    } else {
+      expandedRow.classList.remove("hidden");
+      parentRow?.classList.add("bg-blue-50/60");
+      chevronBtn?.classList.add("rotate-90", "text-blue-600");
+
+      // Render QR code inside expanded row if QRCode is available
+      if (window.QRCode) {
+        const canvas = document.getElementById(`qr-${orderId}`);
+        if (canvas) {
+          QRCode.toCanvas(
+            canvas,
+            orderId,
+            { width: 100, margin: 1 },
+            function (error) {
+              if (error) console.error("Error rendering QR Code:", error);
+            }
+          );
+        }
+      }
+    }
   }
 }
 

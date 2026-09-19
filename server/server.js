@@ -2743,6 +2743,8 @@ async function startServer(
             deliveryMethod: deliveryMethod,
             dimensions: orderDetails.dimensions || null,
             size: orderDetails.size || null,
+            widthInches: typeof orderDetails.widthInches === "number" ? orderDetails.widthInches : undefined,
+            heightInches: typeof orderDetails.heightInches === "number" ? orderDetails.heightInches : undefined,
             cutType: orderDetails.cutType || "die_cut",
             stickerName: orderDetails.stickerName || null,
             tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
@@ -3386,6 +3388,8 @@ async function startServer(
               ? Number(Number(effectiveAreaSqIn).toFixed(2))
               : null,
             packageWeightOz: orderBreakdown?.weightOz ?? null,
+            widthInches: inputSafeOrderDetails.widthInches || null,
+            heightInches: inputSafeOrderDetails.heightInches || null,
           };
 
           // --- Process Payout ---
