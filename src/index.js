@@ -6,6 +6,7 @@ import {
   generateSvgFromCutline,
   generateMultiLayerSvg,
 } from "./lib/pricing.js";
+import { calcOrderBreakdown } from "./lib/costCalc.js";
 import {
   drawRuler as drawCanvasRuler,
   drawImageWithFilters,
@@ -1884,6 +1885,20 @@ function updateCompositeImage() {
   // In a real multi-layer engine we would draw ALL layers here,
   // but for now, we just update the UI state.
 }
+
+function updateMobileStickyPrice(amountCents = (currentOrderTotalCents || currentOrderAmountCents)) {
+  const mobileStickyPrice = document.getElementById("mobileStickyPrice");
+  const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
+  if (mobileStickyPrice && mobileStickyBar) {
+    mobileStickyPrice.textContent = formatPrice(amountCents);
+    if (amountCents > 0) {
+      mobileStickyBar.classList.remove("translate-y-full");
+    } else {
+      mobileStickyBar.classList.add("translate-y-full");
+    }
+  }
+}
+
 function calculateAndUpdatePrice() {
   if (
     !pricingConfig ||
@@ -1918,16 +1933,20 @@ function calculateAndUpdatePrice() {
 
   if (isNaN(quantity) || quantity < 0) {
     currentOrderAmountCents = 0;
+    currentOrderTotalCents = 0;
     calculatedPriceDisplay.textContent =
       quantity < 0 ? "Invalid Quantity" : formatPrice(0);
+    updateMobileStickyPrice(0);
     return;
   }
 
   if (!bounds || !cutline || !selectedResolution) {
     currentOrderAmountCents = 0;
+    currentOrderTotalCents = 0;
     calculatedPriceDisplay.innerHTML = `Price: <span class="text-gray-500">---</span>`;
     if (widthInputEl) widthInputEl.value = "";
     if (heightInputEl) heightInputEl.value = "";
+    updateMobileStickyPrice(0);
     return;
   }
 
@@ -2128,9 +2147,41 @@ function calculateAndUpdatePrice() {
     `;
   }
 
+  const areaInSqIn = getEffectivePackageAreaSqIn();
+  const deliveryMethod =
+    document.querySelector('input[name="deliveryMethod"]:checked')?.value ||
+    "ship";
+  const stateInputVal = document.getElementById("state")?.value?.trim() || "";
+  const destinationState = deliveryMethod === "pickup" ? "OK" : stateInputVal;
+
+  let estimatedTotalCents = currentOrderAmountCents;
+  if (currentOrderAmountCents > 0) {
+    try {
+      const syncBreakdown = calcOrderBreakdown({
+        areaInSqIn,
+        subtotalCents: currentOrderAmountCents,
+        destinationState,
+        deliveryMethod,
+        tradeoffs: currentTradeoffs,
+        quantity,
+        promoCode: appliedPromoCode || null,
+        pricingConfig: pricingConfig || null,
+      });
+      if (syncBreakdown && typeof syncBreakdown.totalCents === "number") {
+        estimatedTotalCents = syncBreakdown.totalCents;
+        currentOrderTotalCents = estimatedTotalCents;
+        currentOrderBreakdown = syncBreakdown;
+      }
+    } catch (err) {
+      console.warn("Could not calculate sync breakdown:", err);
+    }
+  } else {
+    currentOrderTotalCents = 0;
+  }
+
   calculatedPriceDisplay.innerHTML = `
         <div class="flex flex-wrap items-baseline">
-            <span class="font-extrabold text-2xl text-splotch-navy">${formatPrice(currentOrderAmountCents)}</span>
+            <span id="calculatedPriceValue" class="font-extrabold text-2xl text-splotch-navy">${formatPrice(estimatedTotalCents)}</span>
             ${unitPriceDisplay}
             ${savingsBadgeHtml}
         </div>
@@ -2141,19 +2192,13 @@ function calculateAndUpdatePrice() {
         <span class="text-xs text-gray-500 block">
             Complexity Modifier: x${priceResult.complexityMultiplier}
         </span>
+        <span class="text-xs text-gray-500 block mt-1">
+            Includes sticker print (${formatPrice(currentOrderAmountCents)}), shipping, taxes & fees
+        </span>
     `;
 
   // Update mobile sticky bar
-  const mobileStickyPrice = document.getElementById("mobileStickyPrice");
-  const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
-  if (mobileStickyPrice && mobileStickyBar) {
-    mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
-    if (currentOrderAmountCents > 0) {
-      mobileStickyBar.classList.remove("translate-y-full");
-    } else {
-      mobileStickyBar.classList.add("translate-y-full");
-    }
-  }
+  updateMobileStickyPrice(estimatedTotalCents);
 
   // Refresh the order cost breakdown summary
   updateOrderSummary();
@@ -2301,13 +2346,18 @@ async function updateOrderSummary() {
     });
     if (!resp.ok) return;
     const data = await resp.json();
+    const $ = (id) => document.getElementById(id);
+    const fmt = (v) => `$${Number(v || 0).toFixed(2)}`;
+
     if (data && typeof data.totalCents === "number") {
       currentOrderTotalCents = data.totalCents;
       currentOrderBreakdown = data;
+      const calcPriceVal = $("calculatedPriceValue");
+      if (calcPriceVal) {
+        calcPriceVal.textContent = fmt(data.totalDollars);
+      }
+      updateMobileStickyPrice(data.totalCents);
     }
-
-    const $ = (id) => document.getElementById(id);
-    const fmt = (v) => `$${Number(v || 0).toFixed(2)}`;
 
     if ($("summary-subtotal")) {
       if (data.activeTradeoffs && data.activeTradeoffs.length > 0) {
@@ -2630,16 +2680,7 @@ async function handlePaymentFormSubmit(event) {
         `;
 
     // Update mobile sticky bar
-    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
-    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
-    if (mobileStickyPrice && mobileStickyBar) {
-      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
-      if (currentOrderAmountCents > 0) {
-        mobileStickyBar.classList.remove("translate-y-full");
-      } else {
-        mobileStickyBar.classList.add("translate-y-full");
-      }
-    }
+    updateMobileStickyPrice();
   }
 
   showPaymentStatus("Processing order...", "info");
@@ -3969,18 +4010,6 @@ function updateLegend() {
         <span>Sheet Boundary (Die Cut)</span>
       </li>
     `;
-
-    // Update mobile sticky bar
-    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
-    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
-    if (mobileStickyPrice && mobileStickyBar) {
-      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
-      if (currentOrderAmountCents > 0) {
-        mobileStickyBar.classList.remove("translate-y-full");
-      } else {
-        mobileStickyBar.classList.add("translate-y-full");
-      }
-    }
   } else if (activeStickerIndex === "boundary") {
     html += `
       <li class="flex items-center gap-2">
@@ -3992,18 +4021,6 @@ function updateLegend() {
         <span>Sheet Boundary (Die Cut)</span>
       </li>
     `;
-
-    // Update mobile sticky bar
-    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
-    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
-    if (mobileStickyPrice && mobileStickyBar) {
-      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
-      if (currentOrderAmountCents > 0) {
-        mobileStickyBar.classList.remove("translate-y-full");
-      } else {
-        mobileStickyBar.classList.add("translate-y-full");
-      }
-    }
   } else {
     html += `
       <li class="flex items-center gap-2">
@@ -4019,19 +4036,10 @@ function updateLegend() {
         <span>Sheet Boundary (Die Cut)</span>
       </li>
     `;
-
-    // Update mobile sticky bar
-    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
-    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
-    if (mobileStickyPrice && mobileStickyBar) {
-      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
-      if (currentOrderAmountCents > 0) {
-        mobileStickyBar.classList.remove("translate-y-full");
-      } else {
-        mobileStickyBar.classList.add("translate-y-full");
-      }
-    }
   }
+
+  // Update mobile sticky bar
+  updateMobileStickyPrice();
 
   legendList.innerHTML = html;
 }
@@ -6232,16 +6240,7 @@ function handleGenerateCutline(skipPrompt = false) {
         `;
 
     // Update mobile sticky bar
-    const mobileStickyPrice = document.getElementById("mobileStickyPrice");
-    const mobileStickyBar = document.getElementById("mobile-sticky-conversion");
-    if (mobileStickyPrice && mobileStickyBar) {
-      mobileStickyPrice.textContent = formatPrice(currentOrderAmountCents);
-      if (currentOrderAmountCents > 0) {
-        mobileStickyBar.classList.remove("translate-y-full");
-      } else {
-        mobileStickyBar.classList.add("translate-y-full");
-      }
-    }
+    updateMobileStickyPrice();
   }
 
   // Save the current canvas state so we can restore it if tracing fails.
