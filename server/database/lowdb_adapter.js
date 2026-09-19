@@ -110,6 +110,16 @@ export class LowDbAdapter {
         if (!this.db.data.config.retention) {
             this.db.data.config.retention = { purgeArtworkOnFlush: false };
         }
+        if (!this.db.data.config.promo) {
+            this.db.data.config.promo = {
+                enabled: false,
+                code: '',
+                type: 'percentage',
+                amount: 0,
+                maxUses: 0,
+                timesUsed: 0
+            };
+        }
 
         if (!this.db.data.emailIndex) {
             this.db.data.emailIndex = {};
@@ -125,6 +135,10 @@ export class LowDbAdapter {
         }
 
         if (!this.db.data.inventory_cache) this.db.data.inventory_cache = {};
+    }
+
+    get data() {
+        return this.db.data;
     }
 
     async connect() {

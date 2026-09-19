@@ -563,6 +563,7 @@ async function BootStrap() {
   if (orderConfirmCheckbox) {
     orderConfirmCheckbox.addEventListener("change", updateSubmitBtnState);
   }
+  initPromoCodeHandler();
 
   // Delivery Method & Pickup Handling
   const deliveryRadios = document.querySelectorAll(
@@ -2093,7 +2094,84 @@ function calculateAndUpdatePrice() {
   updateOrderSummary();
 }
 
-// --- Order Summary & Confirmation Gate ---
+// --- Order Summary, Promo Code & Confirmation Gate ---
+let appliedPromoCode = null;
+
+function initPromoCodeHandler() {
+  const promoInput = document.getElementById("checkout-promo-code");
+  const applyBtn = document.getElementById("apply-promo-btn");
+  const statusMsg = document.getElementById("promo-status-msg");
+
+  if (!applyBtn || !promoInput) return;
+
+  applyBtn.addEventListener("click", async () => {
+    const code = promoInput.value.trim().toUpperCase();
+    if (!code) {
+      if (statusMsg) {
+        statusMsg.textContent = "Please enter a promo code.";
+        statusMsg.className = "text-xs mt-1.5 text-red-600 font-medium block";
+      }
+      return;
+    }
+
+    applyBtn.disabled = true;
+    applyBtn.textContent = "Checking...";
+
+    try {
+      const resp = await fetch(`${serverUrl}/api/validate-promo`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        },
+        body: JSON.stringify({
+          code,
+          subtotalCents: currentOrderAmountCents || 0,
+        }),
+      });
+
+      const data = await resp.json();
+
+      if (resp.ok && data.valid) {
+        appliedPromoCode = data.code;
+        if (statusMsg) {
+          const discountDesc =
+            data.type === "percentage"
+              ? `${data.amount}% off`
+              : `$${Number(data.amount).toFixed(2)} off`;
+          statusMsg.textContent = `✓ Code ${data.code} applied (${discountDesc})!`;
+          statusMsg.className = "text-xs mt-1.5 text-green-600 font-medium block";
+        }
+        await updateOrderSummary();
+      } else {
+        appliedPromoCode = null;
+        if (statusMsg) {
+          statusMsg.textContent = data.error || "Invalid promo code.";
+          statusMsg.className = "text-xs mt-1.5 text-red-600 font-medium block";
+        }
+        await updateOrderSummary();
+      }
+    } catch (err) {
+      appliedPromoCode = null;
+      if (statusMsg) {
+        statusMsg.textContent = "Failed to validate promo code. Please try again.";
+        statusMsg.className = "text-xs mt-1.5 text-red-600 font-medium block";
+      }
+      await updateOrderSummary();
+    } finally {
+      applyBtn.disabled = false;
+      applyBtn.textContent = "Apply";
+    }
+  });
+
+  promoInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyBtn.click();
+    }
+  });
+}
+
 function updateSubmitBtnState() {
   const checkbox = document.getElementById("order-ready-confirm");
   if (submitPaymentBtn) {
@@ -2152,6 +2230,7 @@ async function updateOrderSummary() {
         tradeoffs: currentTradeoffs,
         standbyBidCents: currentStandbyBidCents,
         quantity,
+        promoCode: appliedPromoCode || null,
         ...(csrfToken ? { _csrf: csrfToken } : {}),
       }),
     });
@@ -2215,6 +2294,18 @@ async function updateOrderSummary() {
             `-$${Number(data.pickupDiscountDollars).toFixed(2)}`;
       } else {
         $("summary-discount-row").classList.add("hidden");
+      }
+    }
+
+    if ($("summary-promo-row")) {
+      if (data.promoDiscountCents > 0) {
+        $("summary-promo-row").classList.remove("hidden");
+        if ($("summary-promo-label"))
+          $("summary-promo-label").textContent = `Promo (${data.appliedPromoCode || appliedPromoCode})`;
+        if ($("summary-promo-discount"))
+          $("summary-promo-discount").textContent = `-$${Number(data.promoDiscountDollars).toFixed(2)}`;
+      } else {
+        $("summary-promo-row").classList.add("hidden");
       }
     }
 
@@ -2795,6 +2886,7 @@ async function handlePaymentFormSubmit(event) {
       destinationState: isPickup
         ? "OK"
         : shippingContact.administrativeDistrictLevel1 || "",
+      promoCode: appliedPromoCode || null,
     };
     if (cutLinePath) {
       orderDetails.cutLinePath = cutLinePath;
@@ -2875,6 +2967,7 @@ async function handlePaymentFormSubmit(event) {
     }
 
     console.log("[CLIENT] Order created successfully on server:", responseData);
+    appliedPromoCode = null;
     showPaymentStatus(
       `Order successfully placed! Redirecting to your order history...`,
       "success",

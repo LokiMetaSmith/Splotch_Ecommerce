@@ -799,6 +799,29 @@ async function startServer(
         : undefined,
     });
 
+    // Rate limiter for promo code validation (prevents brute-forcing codes)
+    const promoLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max:
+        process.env.ENABLE_RATE_LIMIT_TEST === "true"
+          ? 10
+          : process.env.NODE_ENV === "test"
+            ? 1000
+            : 30, // 30 attempts per 15 min in prod
+      message: {
+        error:
+          "Too many promo code validation attempts, please try again after 15 minutes.",
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      store: redisClient
+        ? new RateLimitRedisStore({
+            sendCommand: (...args) => redisClient.sendCommand(args),
+            prefix: "rl:promo:",
+          })
+        : undefined,
+    });
+
     const allowedOrigins = [
       "https://lokimetasmith.github.io",
       "https://www.splotch.page",
@@ -1002,6 +1025,7 @@ async function startServer(
             "/wc-auth",
             "/xmlrpc.php",
             "/api/order/estimate",
+            "/api/validate-promo",
           ],
         },
         xframe: "SAMEORIGIN",
@@ -1451,6 +1475,12 @@ async function startServer(
         body("areaInSqIn")
           .isFloat({ gt: 0 })
           .withMessage("areaInSqIn must be a positive number"),
+        body("promoCode")
+          .optional({ nullable: true })
+          .isString()
+          .trim()
+          .isLength({ max: 50 })
+          .withMessage("promoCode must be a string up to 50 characters"),
       ],
       async (req, res) => {
         const errors = validationResult(req);
@@ -1465,10 +1495,12 @@ async function startServer(
             deliveryMethod,
             tradeoffs,
             quantity,
+            promoCode,
           } = req.body;
+          const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
           const shippingCfg = {
             ...DEFAULT_SHIPPING_CONFIG,
-            ...(db.data?.config?.shipping || {}),
+            ...(fullConfig?.shipping || {}),
           };
           const breakdown = calcOrderBreakdown({
             areaInSqIn: Number(areaInSqIn),
@@ -1479,6 +1511,8 @@ async function startServer(
             tradeoffs: Array.isArray(tradeoffs) ? tradeoffs : [],
             pricingConfig: db.data?.config?.pricing || null,
             quantity: quantity ? Number(quantity) : 1,
+            promoConfig: fullConfig?.promo || null,
+            promoCode: promoCode || null,
           });
           return res.json({ success: true, ...breakdown });
         } catch (err) {
@@ -1486,6 +1520,75 @@ async function startServer(
           return res
             .status(500)
             .json({ error: "Failed to calculate estimate." });
+        }
+      },
+    );
+
+    // --- Promo Code Validation (public — called from checkout) ---
+    app.post(
+      "/api/validate-promo",
+      promoLimiter,
+      [
+        body("code")
+          .notEmpty()
+          .withMessage("Promo code is required")
+          .isString()
+          .trim()
+          .isLength({ max: 50 })
+          .withMessage("Promo code must be at most 50 characters"),
+        body("subtotalCents")
+          .optional()
+          .isInt({ min: 0 })
+          .withMessage("subtotalCents must be a non-negative integer"),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ valid: false, error: errors.array()[0].msg });
+        }
+
+        try {
+          const rawCode = String(req.body.code || "").trim();
+          const subtotalCents = req.body.subtotalCents !== undefined ? Number(req.body.subtotalCents) : null;
+          const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
+          const promoConfig = fullConfig?.promo;
+
+          if (!promoConfig || !promoConfig.enabled || !promoConfig.code) {
+            return res.status(400).json({ valid: false, error: "Promo code is inactive or invalid." });
+          }
+
+          if (rawCode.toUpperCase() !== String(promoConfig.code).trim().toUpperCase()) {
+            return res.status(400).json({ valid: false, error: "Invalid promo code." });
+          }
+
+          if (
+            typeof promoConfig.maxUses === "number" &&
+            promoConfig.maxUses !== null &&
+            (promoConfig.timesUsed || 0) >= promoConfig.maxUses
+          ) {
+            return res.status(400).json({ valid: false, error: "Promo code usage limit has been reached." });
+          }
+
+          let discountCents = 0;
+          if (subtotalCents !== null && subtotalCents > 0) {
+            if (promoConfig.type === "percentage") {
+              discountCents = Math.round((subtotalCents * (promoConfig.amount || 0)) / 100);
+            } else {
+              discountCents = Math.round((promoConfig.amount || 0) * 100);
+            }
+            discountCents = Math.min(discountCents, subtotalCents);
+          }
+
+          return res.json({
+            valid: true,
+            code: promoConfig.code,
+            type: promoConfig.type,
+            amount: promoConfig.amount,
+            discountCents,
+          });
+        } catch (err) {
+          logger.error("[PROMO] Error validating promo code:", err);
+          return res.status(500).json({ valid: false, error: "Failed to validate promo code." });
         }
       },
     );
@@ -1563,6 +1666,98 @@ async function startServer(
         await db.setConfig("shipping", newConfig);
         logger.info("[SHIPPING] Config updated:", newConfig);
         return res.json({ success: true, config: newConfig });
+      },
+    );
+
+    // --- Promo Code Config (admin) ---
+    app.get(
+      "/api/admin/promo/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
+        const defaultPromo = {
+          enabled: false,
+          code: "",
+          type: "percentage",
+          amount: 0,
+          maxUses: null,
+          timesUsed: 0,
+        };
+        const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
+        const saved = fullConfig?.promo || {};
+        res.json({
+          success: true,
+          config: { ...defaultPromo, ...saved },
+        });
+      },
+    );
+
+    app.post(
+      "/api/admin/promo/config",
+      authenticateToken,
+      [
+        body("enabled").isBoolean().withMessage("enabled must be a boolean"),
+        body("code")
+          .isString()
+          .trim()
+          .notEmpty()
+          .isLength({ max: 50 })
+          .withMessage("code must be non-empty and at most 50 characters"),
+        body("type")
+          .isIn(["percentage", "flat"])
+          .withMessage("type must be either 'percentage' or 'flat'"),
+        body("amount")
+          .isFloat({ min: 0 })
+          .withMessage("amount must be a non-negative number"),
+        body("maxUses")
+          .optional({ nullable: true })
+          .custom((val) => {
+            if (val === null || val === "" || val === undefined) return true;
+            const num = Number(val);
+            if (!Number.isInteger(num) || num < 1) {
+              throw new Error("maxUses must be a positive integer or null");
+            }
+            return true;
+          }),
+        body("resetTimesUsed")
+          .optional()
+          .isBoolean()
+          .withMessage("resetTimesUsed must be a boolean"),
+      ],
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
+        const errors = validationResult(req);
+        if (!errors.isEmpty())
+          return res.status(400).json({ errors: errors.array() });
+
+        const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
+        const current = fullConfig?.promo || {};
+        const isReset = Boolean(req.body.resetTimesUsed);
+        const parsedMaxUses =
+          req.body.maxUses !== null && req.body.maxUses !== undefined && req.body.maxUses !== ""
+            ? parseInt(req.body.maxUses, 10)
+            : null;
+
+        const newPromoConfig = {
+          enabled: Boolean(req.body.enabled),
+          code: String(req.body.code).trim().toUpperCase(),
+          type: req.body.type,
+          amount: Number(req.body.amount),
+          maxUses: parsedMaxUses,
+          timesUsed: isReset ? 0 : (current.timesUsed || 0),
+        };
+
+        if (typeof db.setConfig === "function") {
+          await db.setConfig("promo", newPromoConfig);
+        } else if (db.data?.config) {
+          db.data.config.promo = newPromoConfig;
+          await db.write?.();
+        }
+
+        logger.info("[PROMO] Config updated:", newPromoConfig);
+        return res.json({ success: true, config: newPromoConfig });
       },
     );
 
@@ -2268,6 +2463,12 @@ async function startServer(
           .optional()
           .isBoolean()
           .withMessage("Promo Addon must be a boolean"),
+        body("orderDetails.promoCode")
+          .optional({ nullable: true })
+          .isString()
+          .trim()
+          .isLength({ max: 50 })
+          .withMessage("promoCode must be a string up to 50 characters"),
         // Security: Validate material and resolution against allowed values to prevent injection
         body("orderDetails.material")
           .optional()
@@ -2546,6 +2747,7 @@ async function startServer(
             stickerName: orderDetails.stickerName || null,
             tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
             standbyBidCents: typeof orderDetails.standbyBidCents === "number" ? orderDetails.standbyBidCents : null,
+            promoCode: typeof orderDetails.promoCode === "string" ? orderDetails.promoCode.trim() : null,
           };
 
           // --- Product / Creator Payout Logic ---
@@ -2682,10 +2884,14 @@ async function startServer(
                       quantity
                     : 1;
 
-              // Fetch shipping config and calculate full breakdown (subtotal + shipping + tax + handling + square fee)
+              // Fetch shipping and promo config and calculate full breakdown (subtotal + shipping + tax + handling + square fee)
+              const fullDbConfig =
+                typeof db.getConfig === "function"
+                  ? await db.getConfig()
+                  : db.data?.config || {};
               const shippingCfg = {
                 ...DEFAULT_SHIPPING_CONFIG,
-                ...(db.data?.config?.shipping || {}),
+                ...(fullDbConfig?.shipping || {}),
               };
               orderBreakdown = calcOrderBreakdown({
                 areaInSqIn: effectiveAreaSqIn,
@@ -2694,8 +2900,10 @@ async function startServer(
                 destinationState,
                 deliveryMethod,
                 tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
-                pricingConfig: pricingConfig || db.data?.config?.pricing || null,
+                pricingConfig: pricingConfig || fullDbConfig?.pricing || null,
                 quantity: orderDetails.quantity || 1,
+                promoConfig: fullDbConfig?.promo || null,
+                promoCode: orderDetails?.promoCode || null,
               });
 
               const expectedGrandTotal = orderBreakdown.totalCents;
@@ -2951,6 +3159,17 @@ async function startServer(
             });
           }
 
+          if (orderBreakdown && orderBreakdown.promoDiscountCents > 0) {
+            squareDiscounts.push({
+              name: `Promo Code (${orderBreakdown.appliedPromoCode})`,
+              amountMoney: {
+                amount: BigInt(orderBreakdown.promoDiscountCents),
+                currency: currency || "USD",
+              },
+              scope: "ORDER",
+            });
+          }
+
           const squareFulfillments = [];
           if (isPickup) {
             squareFulfillments.push({
@@ -3096,6 +3315,42 @@ async function startServer(
             paymentResult.payment.id,
           );
 
+          // Increment promo code timesUsed if a promo code discount was applied
+          if (
+            orderBreakdown &&
+            orderBreakdown.promoDiscountCents > 0 &&
+            orderBreakdown.appliedPromoCode
+          ) {
+            try {
+              const fullDbConfig =
+                typeof db.getConfig === "function"
+                  ? await db.getConfig()
+                  : db.data?.config || {};
+              const currentPromo = fullDbConfig?.promo;
+              if (
+                currentPromo &&
+                String(currentPromo.code).trim().toUpperCase() ===
+                  String(orderBreakdown.appliedPromoCode).trim().toUpperCase()
+              ) {
+                const updatedPromo = {
+                  ...currentPromo,
+                  timesUsed: (currentPromo.timesUsed || 0) + 1,
+                };
+                if (typeof db.setConfig === "function") {
+                  await db.setConfig("promo", updatedPromo);
+                } else if (db.data?.config) {
+                  db.data.config.promo = updatedPromo;
+                  await db.write?.();
+                }
+                logger.info(
+                  `[PROMO] Incremented usage for code ${orderBreakdown.appliedPromoCode}. Times used: ${updatedPromo.timesUsed}`,
+                );
+              }
+            } catch (promoErr) {
+              logger.error("[PROMO] Failed to increment promo timesUsed:", promoErr);
+            }
+          }
+
           const newOrder = {
             orderId: randomUUID(),
             paymentId: paymentResult.payment.id,
@@ -3111,6 +3366,8 @@ async function startServer(
             deliveryMethod:
               orderBreakdown?.deliveryMethod || (isPickup ? "pickup" : "ship"),
             pickupDiscountCents: orderBreakdown?.pickupDiscountCents ?? 0,
+            promoCode: orderBreakdown?.appliedPromoCode || null,
+            promoDiscountCents: orderBreakdown?.promoDiscountCents ?? 0,
             destinationState: destinationState,
             isTaxable: orderBreakdown?.isTaxable ?? true,
             taxCents: orderBreakdown?.taxCents ?? 0,

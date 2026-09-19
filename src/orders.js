@@ -106,7 +106,7 @@ export function displayOrders(orders, container, noOrdersMessage) {
                             </button>
                         </h3>
                         <p class="text-sm text-gray-600">Ordered on: ${receivedDate}</p>
-                        <p class="text-sm text-gray-600">Amount: ${formattedAmount}</p>
+                        <p class="text-sm text-gray-600">Amount: ${formattedAmount}${order.promoCode ? ` <span class="text-xs text-indigo-800 font-mono font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 ml-1">Promo: ${escapeHtml(order.promoCode)}</span>` : ""}</p>
                         <p class="text-sm text-gray-600 flex items-center gap-2">
                             Status: <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${safeStatus.toLowerCase()}">${displayStatus}</span>
                         </p>

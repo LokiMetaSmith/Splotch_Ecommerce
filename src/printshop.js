@@ -1187,6 +1187,7 @@ export function displayOrder(order) {
             <div>
                 <dt>Quantity:</dt><dd>${quantity}</dd>
                 <dt>Amount:</dt><dd>${escapeHtml(formattedAmount)}</dd>
+                ${order.promoCode ? `<dt class="text-indigo-700 font-semibold mt-1">Promo Code:</dt><dd class="text-xs text-indigo-800 font-mono font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 inline-block mt-0.5">${escapeHtml(order.promoCode)}${order.promoDiscountCents ? ` (-$${(order.promoDiscountCents / 100).toFixed(2)})` : ''}</dd>` : ""}
             </div>
         </div>
 
@@ -3264,6 +3265,162 @@ function initShippingConfigListeners() {
   });
 }
 
+// --- Promo Code Configuration ---
+async function loadPromoConfig() {
+  try {
+    const data = await fetchWithAuth(`${serverUrl}/api/admin/promo/config`);
+    if (!data || !data.config) return;
+    const c = data.config;
+
+    const enabledCheckbox = document.getElementById("promo-enabled");
+    const statusLabel = document.getElementById("promo-status-label");
+    const codeInput = document.getElementById("promo-code");
+    const typeSelect = document.getElementById("promo-type");
+    const amountInput = document.getElementById("promo-amount");
+    const amountLabel = document.getElementById("promo-amount-label");
+    const maxUsesInput = document.getElementById("promo-max-uses");
+    const timesUsedSpan = document.getElementById("promo-times-used");
+    const usageLimitSpan = document.getElementById("promo-usage-limit-indicator");
+
+    if (enabledCheckbox) {
+      enabledCheckbox.checked = Boolean(c.enabled);
+    }
+    if (statusLabel) {
+      statusLabel.textContent = c.enabled ? "Active" : "Inactive";
+      statusLabel.className = `ml-3 text-sm font-medium ${c.enabled ? "text-green-600 font-bold" : "text-gray-900"}`;
+    }
+    if (codeInput) codeInput.value = c.code || "";
+    if (typeSelect) typeSelect.value = c.type || "percentage";
+    if (amountLabel) {
+      amountLabel.textContent = c.type === "flat" ? "Discount Amount ($)" : "Discount Amount (%)";
+    }
+    if (amountInput) amountInput.value = c.amount !== undefined ? c.amount : "";
+    if (maxUsesInput) maxUsesInput.value = (c.maxUses !== null && c.maxUses !== undefined) ? c.maxUses : "";
+    if (timesUsedSpan) timesUsedSpan.textContent = c.timesUsed || 0;
+    if (usageLimitSpan) {
+      if (c.maxUses !== null && c.maxUses !== undefined && c.maxUses > 0) {
+        const isExhausted = (c.timesUsed || 0) >= c.maxUses;
+        usageLimitSpan.textContent = isExhausted
+          ? `(Limit of ${c.maxUses} reached)`
+          : `(out of ${c.maxUses} max)`;
+        usageLimitSpan.className = `ml-2 text-xs font-semibold ${isExhausted ? "text-red-600" : "text-gray-500"}`;
+      } else {
+        usageLimitSpan.textContent = "(Unlimited uses)";
+        usageLimitSpan.className = "ml-2 text-xs text-gray-500";
+      }
+    }
+  } catch (err) {
+    console.warn("[PRINTSHOP] Failed to load promo config:", err);
+  }
+}
+
+function initPromoConfigListeners() {
+  const form = document.getElementById("promo-config-form");
+  const enabledCheckbox = document.getElementById("promo-enabled");
+  const statusLabel = document.getElementById("promo-status-label");
+  const typeSelect = document.getElementById("promo-type");
+  const amountLabel = document.getElementById("promo-amount-label");
+  const generateBtn = document.getElementById("generate-promo-btn");
+  const resetBtn = document.getElementById("reset-promo-uses-btn");
+  const codeInput = document.getElementById("promo-code");
+
+  if (enabledCheckbox && statusLabel) {
+    enabledCheckbox.addEventListener("change", () => {
+      statusLabel.textContent = enabledCheckbox.checked ? "Active" : "Inactive";
+      statusLabel.className = `ml-3 text-sm font-medium ${enabledCheckbox.checked ? "text-green-600 font-bold" : "text-gray-900"}`;
+    });
+  }
+
+  if (typeSelect && amountLabel) {
+    typeSelect.addEventListener("change", () => {
+      amountLabel.textContent = typeSelect.value === "flat" ? "Discount Amount ($)" : "Discount Amount (%)";
+    });
+  }
+
+  if (generateBtn && codeInput) {
+    generateBtn.addEventListener("click", () => {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < 8; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      codeInput.value = code;
+    });
+  }
+
+  let shouldResetUses = false;
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      if (confirm("Are you sure you want to reset the times used counter to 0?")) {
+        shouldResetUses = true;
+        const timesUsedSpan = document.getElementById("promo-times-used");
+        if (timesUsedSpan) timesUsedSpan.textContent = "0 (Pending Save)";
+        showSuccessToast("Uses counter will reset to 0 upon saving.");
+      }
+    });
+  }
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById("promo-config-status");
+      const isEnabled = Boolean(document.getElementById("promo-enabled")?.checked);
+      const code = String(document.getElementById("promo-code")?.value || "").trim().toUpperCase();
+      const type = document.getElementById("promo-type")?.value || "percentage";
+      const amount = parseFloat(document.getElementById("promo-amount")?.value || "0");
+      const maxUsesRaw = document.getElementById("promo-max-uses")?.value?.trim();
+      const maxUses = maxUsesRaw ? parseInt(maxUsesRaw, 10) : null;
+
+      if (isEnabled && !code) {
+        showErrorToast("Promo code cannot be empty when promo is enabled.");
+        return;
+      }
+      if (isNaN(amount) || amount < 0) {
+        showErrorToast("Discount amount must be a non-negative number.");
+        return;
+      }
+      if (type === "percentage" && amount > 100) {
+        showErrorToast("Percentage discount cannot exceed 100%.");
+        return;
+      }
+
+      const payload = {
+        enabled: isEnabled,
+        code,
+        type,
+        amount,
+        maxUses,
+        resetTimesUsed: shouldResetUses,
+      };
+
+      try {
+        const result = await fetchWithAuth(`${serverUrl}/api/admin/promo/config`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        if (result && result.success) {
+          shouldResetUses = false;
+          showSuccessToast("Promo settings saved!");
+          if (statusEl) {
+            statusEl.textContent = "Saved ✓";
+            statusEl.className = "text-sm text-green-600";
+            setTimeout(() => { statusEl.textContent = ""; }, 3000);
+          }
+          await loadPromoConfig();
+        } else {
+          throw new Error("Server returned failure");
+        }
+      } catch (err) {
+        showErrorToast(`Failed to save promo settings: ${err.message}`);
+        if (statusEl) {
+          statusEl.textContent = "Save failed";
+          statusEl.className = "text-sm text-red-600";
+        }
+      }
+    });
+  }
+}
+
 // --- Retention & Storage Configuration ---
 async function loadRetentionConfig() {
   try {
@@ -3906,6 +4063,7 @@ export async function init() {
       loadOdooConfig();
       loadPricingConfigEditor();
       loadPirateShipConfig();
+      loadPromoConfig();
       loadShippingConfig();
       loadRetentionConfig();
       loadTelegramConfig();
@@ -3922,6 +4080,8 @@ export async function init() {
 
   // Pirate Ship listeners
   initPirateShipListeners();
+  // Promo Code listeners
+  initPromoConfigListeners();
   // Shipping & Fee listeners
   initShippingConfigListeners();
   // Retention & Storage listeners

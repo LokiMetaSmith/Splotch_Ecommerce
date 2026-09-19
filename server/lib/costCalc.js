@@ -155,6 +155,8 @@ export function calcOrderBreakdown({
   tradeoffs = [],
   pricingConfig = null,
   quantity = 1,
+  promoConfig = null,
+  promoCode = null,
 }) {
   const cfg = { ...DEFAULT_SHIPPING_CONFIG, ...config };
   const isPickup = deliveryMethod === "pickup";
@@ -220,6 +222,37 @@ export function calcOrderBreakdown({
     shippingLabel = est.label;
   }
 
+  // Promo Code calculation against subtotal
+  let promoDiscountCents = 0;
+  let appliedPromoCode = null;
+
+  if (
+    promoCode &&
+    promoConfig &&
+    promoConfig.enabled &&
+    promoConfig.code &&
+    promoConfig.code.trim().toUpperCase() === String(promoCode).trim().toUpperCase()
+  ) {
+    const hasLimit =
+      typeof promoConfig.maxUses === "number" && promoConfig.maxUses > 0;
+    if (!hasLimit || (promoConfig.timesUsed || 0) < promoConfig.maxUses) {
+      appliedPromoCode = promoConfig.code.trim().toUpperCase();
+      if (promoConfig.type === "percentage") {
+        promoDiscountCents = Math.round(
+          adjustedSubtotalCents * (Number(promoConfig.amount) / 100),
+        );
+      } else {
+        promoDiscountCents = Math.round(Number(promoConfig.amount) * 100);
+      }
+      promoDiscountCents = Math.max(
+        0,
+        Math.min(promoDiscountCents, adjustedSubtotalCents),
+      );
+    }
+  }
+
+  const totalDiscountCents = pickupDiscountCents + promoDiscountCents;
+
   // Oklahoma sales tax nexus rule:
   // - Local Pickup: physical transfer occurs in OK -> taxable
   // - Shipping: taxable only if destination address is in Oklahoma ('OK' or 'Oklahoma')
@@ -231,7 +264,7 @@ export function calcOrderBreakdown({
 
   const discountedSubtotal = Math.max(
     0,
-    adjustedSubtotalCents - pickupDiscountCents,
+    adjustedSubtotalCents - totalDiscountCents,
   );
   const taxCents = isTaxable
     ? calcTax({
@@ -240,7 +273,9 @@ export function calcOrderBreakdown({
         taxRate: cfg.taxRate,
       })
     : 0;
-  const handlingCents = cfg.handlingFeeCents + (cfg.handlingFeePerItemCents || 0) * (quantity || 1);
+  const handlingCents =
+    cfg.handlingFeeCents +
+    (cfg.handlingFeePerItemCents || 0) * (quantity || 1);
 
   const preTotalCents =
     discountedSubtotal + shippingCents + taxCents + handlingCents;
@@ -252,7 +287,7 @@ export function calcOrderBreakdown({
 
   const totalCents = calcTotal({
     subtotalCents: adjustedSubtotalCents,
-    discountCents: pickupDiscountCents,
+    discountCents: totalDiscountCents,
     shippingCents,
     taxCents,
     handlingCents,
@@ -267,8 +302,12 @@ export function calcOrderBreakdown({
     tradeoffModifiersCents,
     activeTradeoffs: activeTradeoffDetails,
     subtotalCents: adjustedSubtotalCents,
-    discountCents: pickupDiscountCents,
+    discountedSubtotalCents: discountedSubtotal,
+    discountCents: totalDiscountCents,
     pickupDiscountCents,
+    promoDiscountCents,
+    appliedPromoCode,
+    isPromoApplied: promoDiscountCents > 0,
     shippingCents,
     shippingLabel,
     taxCents,
@@ -279,8 +318,10 @@ export function calcOrderBreakdown({
     totalCents,
     deliveryMethod: isPickup ? "pickup" : "ship",
     subtotalDollars: (subtotalCents / 100).toFixed(2),
-    discountDollars: (pickupDiscountCents / 100).toFixed(2),
+    discountedSubtotalDollars: (discountedSubtotal / 100).toFixed(2),
+    discountDollars: (totalDiscountCents / 100).toFixed(2),
     pickupDiscountDollars: (pickupDiscountCents / 100).toFixed(2),
+    promoDiscountDollars: (promoDiscountCents / 100).toFixed(2),
     shippingDollars: (shippingCents / 100).toFixed(2),
     taxDollars: (taxCents / 100).toFixed(2),
     handlingDollars: (handlingCents / 100).toFixed(2),
