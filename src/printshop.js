@@ -3582,11 +3582,38 @@ export async function orderShippingLabel(orderId, btnEl) {
 }
 
 // --- Shipping & Fee Configuration ---
+let cachedShippingConfig = null;
+
+const DEFAULT_SHIPPING_CONFIG = {
+  taxRate: 0.085,
+  handlingFeeCents: 300,
+  squareFeePercent: 0.029,
+  squareFeeFixedCents: 30,
+  gramsPerSqIn: 0.05,
+  packageTareGrams: 28,
+  pickupDiscountCents: 300,
+  handlingFeePerItemCents: 0,
+};
+
+const DEFAULT_USPS_TIERS = [
+  { maxOz: 1, rateCents: 430, label: "USPS First Class (~1 oz)" },
+  { maxOz: 2, rateCents: 470, label: "USPS First Class (~2 oz)" },
+  { maxOz: 3, rateCents: 510, label: "USPS First Class (~3 oz)" },
+  { maxOz: 4, rateCents: 550, label: "USPS First Class (~4 oz)" },
+  { maxOz: 8, rateCents: 680, label: "USPS First Class (~8 oz)" },
+  { maxOz: 16, rateCents: 855, label: "USPS Priority Mail (~1 lb)" },
+  { maxOz: 32, rateCents: 1050, label: "USPS Priority Mail (~2 lb)" },
+  { maxOz: 48, rateCents: 1250, label: "USPS Priority Mail (~3 lb)" },
+  { maxOz: 64, rateCents: 1450, label: "USPS Priority Mail (~4 lb)" },
+  { maxOz: Infinity, rateCents: 1900, label: "USPS Priority Mail (>4 lb)" },
+];
+
 async function loadShippingConfig() {
   try {
     const data = await fetchWithAuth(`${serverUrl}/api/admin/shipping/config`);
     if (!data || !data.config) return;
     const c = data.config;
+    cachedShippingConfig = c;
 
     const setVal = (id, val) => {
       const el = document.getElementById(id);
@@ -4522,6 +4549,11 @@ async function loadPricingConfigEditor() {
   ui.pricingEditorContainer.innerHTML =
     '<p class="text-gray-500 text-center py-4">Loading pricing configuration...</p>';
   try {
+    if (!cachedShippingConfig) {
+      await loadShippingConfig().catch((e) =>
+        console.warn("Could not load shipping config:", e)
+      );
+    }
     const config = await fetchWithAuth(`${serverUrl}/api/pricing-info`);
     currentPricingConfig = config;
     renderPricingEditor(currentPricingConfig);
@@ -4530,8 +4562,14 @@ async function loadPricingConfigEditor() {
   }
 }
 
-function renderPricingEditor(config) {
+export function renderPricingEditor(config) {
   if (!ui.pricingEditorContainer) return;
+
+  const defaultHandlingDollars =
+    cachedShippingConfig &&
+    typeof cachedShippingConfig.handlingFeeCents === "number"
+      ? (cachedShippingConfig.handlingFeeCents / 100).toFixed(2)
+      : "3.00";
 
   const resolutions = config.resolutions || [];
   const materials = config.materials || [];
@@ -4740,18 +4778,108 @@ function renderPricingEditor(config) {
           </div>
         </div>
 
-        <!-- Simulator Results Box -->
-        <div class="bg-white p-4 rounded-lg border border-indigo-200 flex flex-wrap justify-between items-center gap-4">
-          <div class="space-y-1">
-            <div class="text-xs text-gray-500">Square Inches: <span id="sim-out-sqin" class="font-bold text-gray-800">9.0</span> sq in</div>
-            <div class="text-xs text-gray-500">Combined Multipliers: <span id="sim-out-mult" class="font-bold text-indigo-600">1.30x</span></div>
-            <div class="text-xs text-gray-500">Volume Discount: <span id="sim-out-disc" class="font-bold text-green-600">0% OFF</span></div>
-            <div class="text-xs text-gray-500">Volume Savings: <span id="sim-out-save" class="font-bold text-green-600">$0.00</span></div>
+        <!-- Fulfillment, Shipping & Fees Simulator Controls -->
+        <div class="border-t border-indigo-200/70 pt-3 mt-3">
+          <div class="flex items-center gap-1.5 mb-2.5">
+            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            <h5 class="text-xs font-bold text-indigo-900 uppercase tracking-wide">Fulfillment, Shipping & Fees Simulation</h5>
           </div>
-          <div class="text-right">
-            <div class="text-xs text-gray-400 uppercase font-bold tracking-wide">Calculated Total:</div>
-            <div id="sim-out-total" class="text-2xl sm:text-3xl font-extrabold text-splotch-navy">$0.00</div>
-            <div id="sim-out-unit" class="text-xs text-gray-500">($0.00 / sticker)</div>
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+            <div>
+              <label class="block text-[11px] font-bold text-indigo-800">Fulfillment Method:</label>
+              <select id="sim-delivery" class="w-full p-1.5 text-xs border rounded bg-white font-medium">
+                <option value="ship">USPS Shipping (Tiered)</option>
+                <option value="pickup">Local Pickup (Free + $3 Off)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-indigo-800">Destination State:</label>
+              <select id="sim-state" class="w-full p-1.5 text-xs border rounded bg-white font-medium">
+                <option value="OK">Oklahoma (OK) [Taxable 8.5%]</option>
+                <option value="TX">Texas (TX) [Tax Exempt]</option>
+                <option value="CA">California (CA) [Tax Exempt]</option>
+                <option value="OTHER">Out-of-State / Exempt [0%]</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-indigo-800">Handling Fee ($):</label>
+              <input type="number" step="0.25" min="0" id="sim-handling-fee" class="w-full p-1.5 text-xs border rounded bg-white font-mono" value="${defaultHandlingDollars}" title="Base order handling fee">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-indigo-800">Turnaround / Tradeoffs:</label>
+              <select id="sim-tradeoffs" class="w-full p-1.5 text-xs border rounded bg-white font-medium">
+                <option value="none">Standard Production (0%)</option>
+                <option value="rush">Rush Production (+20%)</option>
+                <option value="eco">Economy / Flexible (-10%)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulator Results Box -->
+        <div class="bg-white p-4 rounded-lg border border-indigo-200 shadow-sm">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Left: Sticker Production & Volume Pricing -->
+            <div class="space-y-1.5 text-xs text-gray-600 border-b md:border-b-0 md:border-r border-gray-200 pb-3 md:pb-0 md:pr-4">
+              <div class="font-bold text-indigo-900 text-[11px] uppercase tracking-wider mb-2 flex items-center gap-1">
+                <span>Sticker Specs & Production</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>Single Sticker Area:</span>
+                <span class="font-semibold text-gray-800"><span id="sim-out-sqin">9.0</span> sq in</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>Estimated Package Weight:</span>
+                <span class="font-semibold text-gray-800" id="sim-out-weight">~1.2 oz</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>Combined Multipliers:</span>
+                <span id="sim-out-mult" class="font-bold text-indigo-600">1.30x</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>Base Sticker Cost:</span>
+                <span id="sim-out-undisc" class="font-mono text-gray-700">$0.00</span>
+              </div>
+              <div class="flex justify-between items-center text-green-700 font-semibold">
+                <span>Volume Discount (<span id="sim-out-disc">0% OFF</span>):</span>
+                <span id="sim-out-save" class="font-mono">-$0.00</span>
+              </div>
+              <div class="flex justify-between items-center font-bold text-gray-900 border-t border-gray-100 pt-1.5">
+                <span>Sticker Subtotal:</span>
+                <span class="font-mono text-splotch-navy text-sm font-extrabold"><span id="sim-out-subtotal">$0.00</span> <span id="sim-out-unit" class="text-xs text-gray-500 font-normal">($0.00 / ea)</span></span>
+              </div>
+            </div>
+
+            <!-- Right: Shipping, Handling, Taxes & Grand Total -->
+            <div class="space-y-1.5 text-xs text-gray-600">
+              <div class="font-bold text-indigo-900 text-[11px] uppercase tracking-wider mb-2 flex items-center gap-1">
+                <span>Shipping, Handling & Taxes</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span id="sim-out-ship-label">Shipping (USPS First Class):</span>
+                <span id="sim-out-shipping" class="font-mono font-semibold text-gray-800">+$0.00</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span id="sim-out-handling-label">Handling Fee:</span>
+                <span id="sim-out-handling" class="font-mono font-semibold text-gray-800">+$3.00</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span id="sim-out-tax-label">Sales Tax (8.5% OK):</span>
+                <span id="sim-out-tax" class="font-mono font-semibold text-gray-800">+$0.00</span>
+              </div>
+              <div class="flex justify-between items-center text-gray-500">
+                <span>Square Processing (2.9% + 30¢):</span>
+                <span id="sim-out-square" class="font-mono">+$0.00</span>
+              </div>
+              <div class="flex justify-between items-baseline border-t-2 border-indigo-200 pt-2 mt-1">
+                <span class="text-xs font-black text-splotch-navy uppercase tracking-wide">Customer Grand Total:</span>
+                <span id="sim-out-total" class="text-2xl font-black text-indigo-700 font-mono">$0.00</span>
+              </div>
+              <div class="flex justify-between items-center text-[11px] bg-green-50 p-2 rounded border border-green-200 mt-2">
+                <span class="text-green-800 font-medium">Est. Print Shop Net Payout:</span>
+                <span id="sim-out-net" class="font-mono font-bold text-green-900">$0.00</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -4904,6 +5032,10 @@ function renderPricingEditor(config) {
   document.getElementById("sim-mat")?.addEventListener("change", runSimulator);
   document.getElementById("sim-res")?.addEventListener("change", runSimulator);
   document.getElementById("sim-layers")?.addEventListener("change", runSimulator);
+  document.getElementById("sim-delivery")?.addEventListener("change", runSimulator);
+  document.getElementById("sim-state")?.addEventListener("change", runSimulator);
+  document.getElementById("sim-handling-fee")?.addEventListener("input", runSimulator);
+  document.getElementById("sim-tradeoffs")?.addEventListener("change", runSimulator);
 
   updateSimulatorDropdowns();
   runSimulator();
@@ -4948,7 +5080,7 @@ function updateSimulatorDropdowns() {
   }
 }
 
-function runSimulator() {
+export function runSimulator() {
   const basePriceCents =
     parseFloat(document.getElementById("pricing-base-price")?.value) || 0;
   const widthInches =
@@ -5037,7 +5169,7 @@ function runSimulator() {
   const baseCostCents = sqInches * basePriceCents;
   const totalCentsBeforeDiscount =
     baseCostCents * qty * combinedMultiplier;
-  let totalCents = Math.round(
+  let stickerTotalCents = Math.round(
     totalCentsBeforeDiscount * (1 - discountPercent)
   );
 
@@ -5047,39 +5179,188 @@ function runSimulator() {
       const higherTierTotal = Math.round(
         baseCostCents * higherTier.q * combinedMultiplier * (1 - higherTier.discount)
       );
-      if (totalCents > higherTierTotal) {
-        totalCents = higherTierTotal;
+      if (stickerTotalCents > higherTierTotal) {
+        stickerTotalCents = higherTierTotal;
         discountPercent =
           totalCentsBeforeDiscount > 0
-            ? 1 - totalCents / totalCentsBeforeDiscount
+            ? 1 - stickerTotalCents / totalCentsBeforeDiscount
             : 0;
       }
     }
   }
 
+  // 6. Tradeoffs / Turnaround Modifier
+  const tradeoffMode =
+    document.getElementById("sim-tradeoffs")?.value || "none";
+  let tradeoffRate = 0;
+  if (tradeoffMode === "rush") tradeoffRate = 0.2; // +20%
+  else if (tradeoffMode === "eco") tradeoffRate = -0.1; // -10%
+  const tradeoffCents = Math.round(stickerTotalCents * tradeoffRate);
+  const adjustedStickerSubtotalCents = Math.max(
+    0,
+    stickerTotalCents + tradeoffCents
+  );
+
   const savingsCents = Math.max(
     0,
-    Math.round(totalCentsBeforeDiscount) - totalCents
+    Math.round(totalCentsBeforeDiscount) - stickerTotalCents
   );
-  const totalDollars = (totalCents / 100).toFixed(2);
-  const unitDollars = ((totalCents / qty) / 100).toFixed(2);
+  const unitDollars = (adjustedStickerSubtotalCents / qty / 100).toFixed(2);
 
-  // Update simulator UI
-  const outSqIn = document.getElementById("sim-out-sqin");
-  const outMult = document.getElementById("sim-out-mult");
-  const outDisc = document.getElementById("sim-out-disc");
-  const outSave = document.getElementById("sim-out-save");
-  const outTotal = document.getElementById("sim-out-total");
-  const outUnit = document.getElementById("sim-out-unit");
+  // 7. Shipping & Package Weight Calculation
+  const shippingCfg = cachedShippingConfig || DEFAULT_SHIPPING_CONFIG;
+  const totalSqIn = sqInches * qty;
+  const gramsPerSqIn =
+    typeof shippingCfg.gramsPerSqIn === "number"
+      ? shippingCfg.gramsPerSqIn
+      : 0.05;
+  const tareGrams =
+    typeof shippingCfg.packageTareGrams === "number"
+      ? shippingCfg.packageTareGrams
+      : 28;
+  const totalWeightGrams = totalSqIn * gramsPerSqIn + tareGrams;
+  const weightOz = totalWeightGrams / 28.3495;
 
-  if (outSqIn) outSqIn.textContent = sqInches.toFixed(1);
-  if (outMult) outMult.textContent = `${combinedMultiplier.toFixed(2)}x`;
-  if (outDisc)
-    outDisc.textContent = `${Math.round(discountPercent * 100)}% OFF`;
-  if (outSave)
-    outSave.textContent = `$${(savingsCents / 100).toFixed(2)}`;
-  if (outTotal) outTotal.textContent = `$${totalDollars}`;
-  if (outUnit) outUnit.textContent = `($${unitDollars} / sticker)`;
+  const deliveryMethod =
+    document.getElementById("sim-delivery")?.value || "ship";
+  const destinationState =
+    document.getElementById("sim-state")?.value || "OK";
+  const isPickup = deliveryMethod === "pickup";
+
+  let shippingCents = 0;
+  let shippingLabel = "Shipping (USPS):";
+  let pickupDiscountCents = 0;
+
+  if (isPickup) {
+    shippingCents = 0;
+    shippingLabel = "Local Pickup (Free):";
+    const configuredPickupDiscount =
+      typeof shippingCfg.pickupDiscountCents === "number"
+        ? shippingCfg.pickupDiscountCents
+        : 300;
+    pickupDiscountCents = Math.min(
+      adjustedStickerSubtotalCents,
+      configuredPickupDiscount
+    );
+  } else {
+    const minWeight = Math.max(weightOz, 1);
+    const tier =
+      DEFAULT_USPS_TIERS.find((t) => minWeight <= t.maxOz) ||
+      DEFAULT_USPS_TIERS[DEFAULT_USPS_TIERS.length - 1];
+    shippingCents = tier.rateCents;
+    shippingLabel = `Shipping (${tier.label}):`;
+    pickupDiscountCents = 0;
+  }
+
+  const netStickerSubtotalCents = Math.max(
+    0,
+    adjustedStickerSubtotalCents - pickupDiscountCents
+  );
+
+  // 8. Handling Fee
+  const customHandlingVal = parseFloat(
+    document.getElementById("sim-handling-fee")?.value
+  );
+  const baseHandlingCents = !isNaN(customHandlingVal)
+    ? Math.round(customHandlingVal * 100)
+    : typeof shippingCfg.handlingFeeCents === "number"
+      ? shippingCfg.handlingFeeCents
+      : 300;
+  const perItemHandlingCents =
+    (typeof shippingCfg.handlingFeePerItemCents === "number"
+      ? shippingCfg.handlingFeePerItemCents
+      : 0) * qty;
+  const totalHandlingCents = baseHandlingCents + perItemHandlingCents;
+
+  // 9. Sales Tax
+  const isOkState = /^(ok|oklahoma)$/i.test(String(destinationState).trim());
+  const isTaxable = isPickup || isOkState;
+  const taxRate = isTaxable
+    ? typeof shippingCfg.taxRate === "number"
+      ? shippingCfg.taxRate
+      : 0.085
+    : 0;
+  const taxCents = isTaxable
+    ? Math.round((netStickerSubtotalCents + shippingCents) * taxRate)
+    : 0;
+
+  // 10. Square Processing Fee (2.9% + 30¢)
+  const squarePct =
+    typeof shippingCfg.squareFeePercent === "number"
+      ? shippingCfg.squareFeePercent
+      : 0.029;
+  const squareFixed =
+    typeof shippingCfg.squareFeeFixedCents === "number"
+      ? shippingCfg.squareFeeFixedCents
+      : 30;
+  const preTotalCents =
+    netStickerSubtotalCents + shippingCents + totalHandlingCents + taxCents;
+  const squareFeeCents = Math.ceil(preTotalCents * squarePct) + squareFixed;
+
+  // 11. Customer Grand Total
+  const grandTotalCents = preTotalCents + squareFeeCents;
+
+  // 12. Estimated Print Shop Net Payout (Grand Total - Square Fee - Tax - USPS Postage)
+  const netPayoutCents =
+    grandTotalCents - squareFeeCents - taxCents - (isPickup ? 0 : shippingCents);
+
+  // Format Weight for Display
+  let formattedWeight = "";
+  if (weightOz < 16) {
+    formattedWeight = `~${weightOz.toFixed(1)} oz`;
+  } else {
+    formattedWeight = `~${(weightOz / 16).toFixed(1)} lb (${weightOz.toFixed(0)} oz)`;
+  }
+
+  // Update simulator UI DOM elements
+  const setTxt = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+
+  setTxt("sim-out-sqin", sqInches.toFixed(1));
+  setTxt("sim-out-weight", formattedWeight);
+  setTxt("sim-out-mult", `${combinedMultiplier.toFixed(2)}x`);
+  setTxt(
+    "sim-out-undisc",
+    `$${(totalCentsBeforeDiscount / 100).toFixed(2)}`
+  );
+  setTxt("sim-out-disc", `${Math.round(discountPercent * 100)}% OFF`);
+  setTxt("sim-out-save", `-$${(savingsCents / 100).toFixed(2)}`);
+  setTxt(
+    "sim-out-subtotal",
+    `$${(adjustedStickerSubtotalCents / 100).toFixed(2)}`
+  );
+  setTxt("sim-out-unit", `($${unitDollars} / sticker)`);
+
+  setTxt("sim-out-ship-label", shippingLabel);
+  if (isPickup) {
+    setTxt(
+      "sim-out-shipping",
+      pickupDiscountCents > 0
+        ? `-$${(pickupDiscountCents / 100).toFixed(2)} (Pickup Disc)`
+        : "$0.00 (Pickup)"
+    );
+  } else {
+    setTxt("sim-out-shipping", `+$${(shippingCents / 100).toFixed(2)}`);
+  }
+
+  const handlingLabel =
+    perItemHandlingCents > 0
+      ? `Handling Fee ($${(baseHandlingCents / 100).toFixed(2)} + $${(perItemHandlingCents / 100).toFixed(2)} item fee):`
+      : "Handling Fee:";
+  setTxt("sim-out-handling-label", handlingLabel);
+  setTxt("sim-out-handling", `+$${(totalHandlingCents / 100).toFixed(2)}`);
+
+  const taxLabel = isTaxable
+    ? `Sales Tax (${(taxRate * 100).toFixed(1)}% OK):`
+    : "Sales Tax (Exempt):";
+  setTxt("sim-out-tax-label", taxLabel);
+  setTxt("sim-out-tax", `+$${(taxCents / 100).toFixed(2)}`);
+
+  setTxt("sim-out-square", `+$${(squareFeeCents / 100).toFixed(2)}`);
+  setTxt("sim-out-total", `$${(grandTotalCents / 100).toFixed(2)}`);
+  setTxt("sim-out-net", `$${(netPayoutCents / 100).toFixed(2)}`);
 }
 
 async function savePricingConfig() {
