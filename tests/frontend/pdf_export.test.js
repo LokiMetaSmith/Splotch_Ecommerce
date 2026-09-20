@@ -33,12 +33,19 @@ HTMLCanvasElement.prototype.toDataURL = jest.fn(() => 'data:image/jpeg;base64,mo
 HTMLCanvasElement.prototype.toBlob = jest.fn((cb) => cb(new Blob(['mocked'])));
 global.Text = dom.window.Text;
 
-// Mock localStorage
+// Mock localStorage with backing store
+let localStorageStore = {};
 const localStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
+  getItem: jest.fn((key) => localStorageStore[key] !== undefined ? localStorageStore[key] : null),
+  setItem: jest.fn((key, value) => {
+    localStorageStore[key] = String(value);
+  }),
+  removeItem: jest.fn((key) => {
+    delete localStorageStore[key];
+  }),
+  clear: jest.fn(() => {
+    localStorageStore = {};
+  }),
 };
 global.localStorage = localStorageMock;
 
@@ -252,6 +259,122 @@ describe('PDF Export Functionality', () => {
             expect(p.getAttribute('stroke-width')).toBe('1');
             expect(p.getAttribute('fill')).toBe('none');
         });
+    });
+
+    test('prepareVectorPrintCutSvg should separate kiss-cut and edge-cut into distinct layers with configured colors', () => {
+        const svgString = `
+            <svg width="800" height="600" viewBox="0 0 800 600">
+                <circle cx="60" cy="60" r="12" fill="black" />
+                <g class="nest-group" transform="translate(100 100)" data-scale="0.8">
+                    <image href="data:image/png;base64,mock" width="100" height="100" />
+                    <g id="Kiss-Cut" class="cut-line-element">
+                        <path d="M 0 0 L 100 0 L 100 100 Z" />
+                    </g>
+                    <g id="Die-Cut" class="cut-line-element">
+                        <path d="M -5 -5 L 105 -5 L 105 105 Z" />
+                    </g>
+                </g>
+            </svg>
+        `;
+        const parser = new DOMParser();
+        const svgEl = parser.parseFromString(svgString, 'image/svg+xml').documentElement;
+
+        const cutConfig = {
+            kissCutLayerName: 'Roland-Kiss',
+            kissCutColor: '#00FFFF',
+            edgeCutLayerName: 'Roland-Perf',
+            edgeCutColor: '#FF0000'
+        };
+
+        const prepared = printshop.prepareVectorPrintCutSvg(svgEl, cutConfig);
+
+        // Verify distinct layer groups
+        const kissLayer = prepared.querySelector('#Roland-Kiss');
+        const edgeLayer = prepared.querySelector('#Roland-Perf');
+        expect(kissLayer).toBeTruthy();
+        expect(edgeLayer).toBeTruthy();
+        expect(kissLayer.getAttribute('data-name')).toBe('Roland-Kiss');
+        expect(edgeLayer.getAttribute('data-name')).toBe('Roland-Perf');
+
+        // Verify transforms and data-scale preserved in both layers
+        const kissSubGroup = kissLayer.querySelector('g[transform="translate(100 100)"]');
+        const edgeSubGroup = edgeLayer.querySelector('g[transform="translate(100 100)"]');
+        expect(kissSubGroup).toBeTruthy();
+        expect(edgeSubGroup).toBeTruthy();
+        expect(kissSubGroup.getAttribute('data-scale')).toBe('0.8');
+        expect(edgeSubGroup.getAttribute('data-scale')).toBe('0.8');
+
+        // Verify kiss path color
+        const kissPath = kissSubGroup.querySelector('path');
+        expect(kissPath).toBeTruthy();
+        expect(kissPath.getAttribute('stroke')).toBe('#00FFFF');
+        expect(kissPath.getAttribute('fill')).toBe('none');
+
+        // Verify edge path color
+        const edgePath = edgeSubGroup.querySelector('path');
+        expect(edgePath).toBeTruthy();
+        expect(edgePath.getAttribute('stroke')).toBe('#FF0000');
+        expect(edgePath.getAttribute('fill')).toBe('none');
+    });
+
+    test('prepareVectorPrintCutSvg should coalesce into single layer when kiss and edge layer names are identical', () => {
+        const svgString = `
+            <svg width="800" height="600" viewBox="0 0 800 600">
+                <g class="nest-group" transform="translate(50 50)">
+                    <image href="data:image/png;base64,mock" width="100" height="100" />
+                    <g id="Kiss-Cut" class="cut-line-element">
+                        <path d="M 0 0 L 50 50 Z" />
+                    </g>
+                    <g id="Die-Cut" class="cut-line-element">
+                        <path d="M -5 -5 L 55 55 Z" />
+                    </g>
+                </g>
+            </svg>
+        `;
+        const parser = new DOMParser();
+        const svgEl = parser.parseFromString(svgString, 'image/svg+xml').documentElement;
+
+        const prepared = printshop.prepareVectorPrintCutSvg(svgEl, {
+            kissCutLayerName: 'CutContour',
+            kissCutColor: '#FF00FF',
+            edgeCutLayerName: 'CutContour',
+            edgeCutColor: '#00FFFF'
+        });
+
+        // Only one layer group
+        const layers = prepared.querySelectorAll('#CutContour');
+        expect(layers.length).toBe(1);
+
+        const subGroup = layers[0].querySelector('g[transform="translate(50 50)"]');
+        expect(subGroup).toBeTruthy();
+
+        const paths = subGroup.querySelectorAll('path');
+        expect(paths.length).toBe(2);
+
+        // One path has kiss cut color #FF00FF, the other has edge cut color #00FFFF
+        const strokes = Array.from(paths).map(p => p.getAttribute('stroke'));
+        expect(strokes).toContain('#FF00FF');
+        expect(strokes).toContain('#00FFFF');
+    });
+
+    test('cut settings management should persist to localStorage and sync', () => {
+        const initial = printshop.getCutSettings();
+        expect(initial.kissCutLayerName).toBeDefined();
+        expect(initial.edgeCutColor).toBeDefined();
+
+        const custom = {
+            kissCutLayerName: 'CustomKiss',
+            kissCutColor: '#123456',
+            edgeCutLayerName: 'CustomEdge',
+            edgeCutColor: '#654321'
+        };
+        printshop.saveCutSettings(custom);
+
+        const loaded = printshop.getCutSettings();
+        expect(loaded.kissCutLayerName).toBe('CustomKiss');
+        expect(loaded.kissCutColor).toBe('#123456');
+        expect(loaded.edgeCutLayerName).toBe('CustomEdge');
+        expect(loaded.edgeCutColor).toBe('#654321');
     });
 });
 

@@ -2359,7 +2359,7 @@ async function handleNesting(e) {
           const svgString = await (
             await fetch(img.src, { credentials: "include" })
           ).text();
-          cutlineSvgText = generateCutFile(svgString);
+          cutlineSvgText = generateCutFile(svgString, getCutSettings());
         }
 
         // Fetch the PNG and convert to base64
@@ -2703,8 +2703,9 @@ function handleDownloadCutFile() {
     return;
   }
 
+  const cutSettings = getCutSettings();
   window.nestedSvgs.forEach((nestedSvg, index) => {
-      const cutFileString = generateCutFile(nestedSvg);
+      const cutFileString = generateCutFile(nestedSvg, cutSettings);
       const blob = new Blob([cutFileString], { type: "image/svg+xml" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -2757,8 +2758,9 @@ function handleDownloadCutFileXml() {
     return;
   }
 
+  const cutSettings = getCutSettings();
   window.nestedSvgs.forEach((nestedSvg, index) => {
-    const cutFileString = generateCutFile(nestedSvg);
+    const cutFileString = generateCutFile(nestedSvg, cutSettings);
     const blob = new Blob([cutFileString], { type: "application/xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2775,7 +2777,190 @@ function handleDownloadCutFileXml() {
   showSuccessToast("XML cut file(s) downloaded.");
 }
 
-export function prepareVectorPrintCutSvg(svgElement, layerName = "CutContour", cutColor = "#FF00FF") {
+// --- Cut Line & Layer Settings ---
+export const DEFAULT_CUT_SETTINGS = {
+  kissCutLayerName: "Kiss-Cut",
+  kissCutColor: "#00FFFF",
+  edgeCutLayerName: "Die-Cut",
+  edgeCutColor: "#FF0000",
+};
+
+export function getCutSettings() {
+  let settings = { ...DEFAULT_CUT_SETTINGS };
+
+  // Fallback to DOM input values if present
+  const kissLayer = document.getElementById("kissCutLayerName") || document.getElementById("settings-kiss-cut-layer");
+  const kissColor = document.getElementById("kissCutColor") || document.getElementById("settings-kiss-cut-color");
+  const edgeLayer = document.getElementById("edgeCutLayerName") || document.getElementById("settings-edge-cut-layer");
+  const edgeColor = document.getElementById("edgeCutColor") || document.getElementById("settings-edge-cut-color");
+
+  if (kissLayer?.value) settings.kissCutLayerName = kissLayer.value.trim();
+  if (kissColor?.value) settings.kissCutColor = kissColor.value.trim();
+  if (edgeLayer?.value) settings.edgeCutLayerName = edgeLayer.value.trim();
+  if (edgeColor?.value) settings.edgeCutColor = edgeColor.value.trim();
+
+  // Saved localStorage settings take precedence over static HTML defaults
+  try {
+    const saved = localStorage.getItem("splotchCutSettings");
+    if (saved && typeof saved === "string" && saved.trim().startsWith("{")) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === "object") {
+        settings = { ...settings, ...parsed };
+      }
+    }
+  } catch (err) {
+    // Ignore invalid JSON in localStorage
+  }
+
+  return settings;
+}
+
+export function saveCutSettings(newSettings) {
+  const current = getCutSettings();
+  const updated = { ...current, ...newSettings };
+  try {
+    localStorage.setItem("splotchCutSettings", JSON.stringify(updated));
+  } catch (err) {
+    console.warn("[PRINTSHOP] Failed to save cut settings to localStorage:", err);
+  }
+  syncCutSettingsUI(updated);
+  return updated;
+}
+
+export function syncCutSettingsUI(settings) {
+  const s = settings || getCutSettings();
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val !== undefined) el.value = val;
+  };
+
+  // Sidebar controls
+  setVal("kissCutLayerName", s.kissCutLayerName);
+  setVal("kissCutColor", s.kissCutColor);
+  setVal("kissCutColorPicker", s.kissCutColor);
+  setVal("edgeCutLayerName", s.edgeCutLayerName);
+  setVal("edgeCutColor", s.edgeCutColor);
+  setVal("edgeCutColorPicker", s.edgeCutColor);
+
+  // Settings View controls
+  setVal("settings-kiss-cut-layer", s.kissCutLayerName);
+  setVal("settings-kiss-cut-color", s.kissCutColor);
+  setVal("settings-kiss-cut-color-picker", s.kissCutColor);
+  setVal("settings-edge-cut-layer", s.edgeCutLayerName);
+  setVal("settings-edge-cut-color", s.edgeCutColor);
+  setVal("settings-edge-cut-color-picker", s.edgeCutColor);
+
+  // Color Indicator Dots
+  const kissDot = document.getElementById("settings-kiss-cut-indicator");
+  if (kissDot) kissDot.style.backgroundColor = s.kissCutColor;
+  const edgeDot = document.getElementById("settings-edge-cut-indicator");
+  if (edgeDot) edgeDot.style.backgroundColor = s.edgeCutColor;
+}
+
+export function initCutSettingsListeners() {
+  syncCutSettingsUI();
+
+  // Helper for 2-way hex & color picker binding with storage update
+  const bindColorInputs = (textId, pickerId, settingKey, dotId) => {
+    const textEl = document.getElementById(textId);
+    const pickerEl = document.getElementById(pickerId);
+    const dotEl = dotId ? document.getElementById(dotId) : null;
+
+    if (pickerEl) {
+      pickerEl.addEventListener("input", (e) => {
+        const val = e.target.value.toUpperCase();
+        if (textEl) textEl.value = val;
+        if (dotEl) dotEl.style.backgroundColor = val;
+        saveCutSettings({ [settingKey]: val });
+      });
+    }
+
+    if (textEl) {
+      textEl.addEventListener("input", (e) => {
+        let val = e.target.value.trim().toUpperCase();
+        if (!val.startsWith("#") && /^[0-9A-F]{6}$/i.test(val)) {
+          val = "#" + val;
+        }
+        if (/^#[0-9A-F]{6}$/i.test(val)) {
+          if (pickerEl) pickerEl.value = val;
+          if (dotEl) dotEl.style.backgroundColor = val;
+          saveCutSettings({ [settingKey]: val });
+        }
+      });
+    }
+  };
+
+  // Helper for layer name inputs
+  const bindLayerInput = (id, settingKey) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        if (val) {
+          saveCutSettings({ [settingKey]: val });
+        }
+      });
+    }
+  };
+
+  // Bind Sidebar controls
+  bindColorInputs("kissCutColor", "kissCutColorPicker", "kissCutColor", "settings-kiss-cut-indicator");
+  bindColorInputs("edgeCutColor", "edgeCutColorPicker", "edgeCutColor", "settings-edge-cut-indicator");
+  bindLayerInput("kissCutLayerName", "kissCutLayerName");
+  bindLayerInput("edgeCutLayerName", "edgeCutLayerName");
+
+  // Bind Settings View controls
+  bindColorInputs("settings-kiss-cut-color", "settings-kiss-cut-color-picker", "kissCutColor", "settings-kiss-cut-indicator");
+  bindColorInputs("settings-edge-cut-color", "settings-edge-cut-color-picker", "edgeCutColor", "settings-edge-cut-indicator");
+  bindLayerInput("settings-kiss-cut-layer", "kissCutLayerName");
+  bindLayerInput("settings-edge-cut-layer", "edgeCutLayerName");
+
+  // Presets
+  document.getElementById("preset-roland-btn")?.addEventListener("click", () => {
+    const preset = {
+      kissCutLayerName: "CutContour",
+      kissCutColor: "#FF00FF",
+      edgeCutLayerName: "PerfCutContour",
+      edgeCutColor: "#00FFFF",
+    };
+    saveCutSettings(preset);
+    showSuccessToast("Roland VersaWorks cut preset applied.");
+  });
+
+  document.getElementById("preset-vinylmaster-btn")?.addEventListener("click", () => {
+    const preset = {
+      kissCutLayerName: "Kiss-Cut",
+      kissCutColor: "#00FFFF",
+      edgeCutLayerName: "Die-Cut",
+      edgeCutColor: "#FF0000",
+    };
+    saveCutSettings(preset);
+    showSuccessToast("VinylMaster cut preset applied.");
+  });
+
+  document.getElementById("preset-standard-btn")?.addEventListener("click", () => {
+    saveCutSettings(DEFAULT_CUT_SETTINGS);
+    showSuccessToast("Default cut preset applied.");
+  });
+
+  document.getElementById("save-cut-settings-btn")?.addEventListener("click", () => {
+    const kissLayer = document.getElementById("settings-kiss-cut-layer")?.value.trim() || "Kiss-Cut";
+    const kissColor = document.getElementById("settings-kiss-cut-color")?.value.trim() || "#00FFFF";
+    const edgeLayer = document.getElementById("settings-edge-cut-layer")?.value.trim() || "Die-Cut";
+    const edgeColor = document.getElementById("settings-edge-cut-color")?.value.trim() || "#FF0000";
+
+    saveCutSettings({
+      kissCutLayerName: kissLayer,
+      kissCutColor: kissColor,
+      edgeCutLayerName: edgeLayer,
+      edgeCutColor: edgeColor,
+    });
+    showSuccessToast("Cut Line & Layer settings saved.");
+  });
+}
+
+export function prepareVectorPrintCutSvg(svgElement, layerNameOrConfig = "CutContour", cutColor = "#FF00FF") {
   let width = parseFloat(svgElement.getAttribute("width"));
   let height = parseFloat(svgElement.getAttribute("height"));
 
@@ -2796,117 +2981,251 @@ export function prepareVectorPrintCutSvg(svgElement, layerName = "CutContour", c
     vectorSvgElement.setAttribute("height", String(height));
   }
 
+  let kissCutLayerName = "Kiss-Cut";
+  let kissCutColor = "#00FFFF";
+  let edgeCutLayerName = "Die-Cut";
+  let edgeCutColor = "#FF0000";
+
+  if (typeof layerNameOrConfig === "object" && layerNameOrConfig !== null) {
+    kissCutLayerName = layerNameOrConfig.kissCutLayerName || "Kiss-Cut";
+    kissCutColor = layerNameOrConfig.kissCutColor || "#00FFFF";
+    edgeCutLayerName = layerNameOrConfig.edgeCutLayerName || "Die-Cut";
+    edgeCutColor = layerNameOrConfig.edgeCutColor || "#FF0000";
+  } else if (typeof layerNameOrConfig === "string") {
+    // Backwards compatible single layer / single color call
+    kissCutLayerName = layerNameOrConfig;
+    edgeCutLayerName = layerNameOrConfig;
+    kissCutColor = cutColor || "#FF00FF";
+    edgeCutColor = cutColor || "#FF00FF";
+  }
+
+  const classifyCutElement = (el) => {
+    const id = (el.getAttribute("id") || "").toLowerCase();
+    const parentId = (el.parentElement?.getAttribute("id") || "").toLowerCase();
+    const cls = (el.getAttribute("class") || "").toLowerCase();
+    if (
+      id.includes("die") ||
+      id.includes("perf") ||
+      id.includes("edge") ||
+      parentId.includes("die") ||
+      parentId.includes("perf") ||
+      parentId.includes("edge") ||
+      cls.includes("die") ||
+      cls.includes("perf") ||
+      cls.includes("edge")
+    ) {
+      return "edge";
+    }
+    if (id.includes("kiss") || parentId.includes("kiss") || cls.includes("kiss")) {
+      return "kiss";
+    }
+    const cutTypeSelect = document.getElementById("cutType");
+    if (cutTypeSelect?.value === "normal_cut") {
+      return "edge";
+    }
+    return "kiss";
+  };
+
+  const styleCutElement = (el, strokeColor) => {
+    const paths =
+      el.tagName.toLowerCase() === "g"
+        ? el.querySelectorAll("path, polygon, polyline, rect, circle, ellipse")
+        : [el];
+
+    paths.forEach((p) => {
+      p.setAttribute("stroke", strokeColor);
+      p.setAttribute("stroke-width", "1");
+      p.setAttribute("fill", "none");
+      p.removeAttribute("class");
+    });
+  };
+
+  const isCutCandidate = (el) => {
+    if (el.tagName.toLowerCase() === "image") return false;
+    const parentId = (el.parentElement?.getAttribute("id") || "").toLowerCase();
+    if (
+      parentId.includes("cmyk") ||
+      parentId.includes("white") ||
+      parentId.includes("inlay") ||
+      parentId.includes("clear")
+    ) {
+      return false;
+    }
+    return true;
+  };
+
   const nestGroups = vectorSvgElement.querySelectorAll(".nest-group");
 
   if (nestGroups.length > 0) {
-    const cutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    cutLayer.setAttribute("id", layerName);
-    cutLayer.setAttribute("data-name", layerName);
+    if (kissCutLayerName === edgeCutLayerName) {
+      // Coalesced into a single layer
+      const cutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      cutLayer.setAttribute("id", kissCutLayerName);
+      cutLayer.setAttribute("data-name", kissCutLayerName);
 
-    nestGroups.forEach((nestGroup) => {
-      let cutEls = Array.from(
-        nestGroup.querySelectorAll(".cut-line-element, [id*='kiss' i], [id*='die' i]"),
-      );
-
-      if (cutEls.length === 0) {
-        cutEls = Array.from(nestGroup.querySelectorAll("path, polygon, polyline"));
-      }
-
-      const validCutEls = cutEls.filter((el) => {
-        if (el.tagName.toLowerCase() === "image") return false;
-        const parentId = (el.parentElement?.getAttribute("id") || "").toLowerCase();
-        if (
-          parentId.includes("cmyk") ||
-          parentId.includes("white") ||
-          parentId.includes("inlay") ||
-          parentId.includes("clear")
-        ) {
-          return false;
+      nestGroups.forEach((nestGroup) => {
+        let cutEls = Array.from(
+          nestGroup.querySelectorAll(".cut-line-element, [id*='kiss' i], [id*='die' i]"),
+        );
+        if (cutEls.length === 0) {
+          cutEls = Array.from(nestGroup.querySelectorAll("path, polygon, polyline"));
         }
-        return true;
-      });
+        const validCutEls = cutEls.filter(isCutCandidate);
+        const topCutEls = validCutEls.filter(
+          (el) => !validCutEls.some((other) => other !== el && other.contains(el)),
+        );
 
-      // Filter out elements that are already contained within another selected element
-      const topCutEls = validCutEls.filter((el) => {
-        return !validCutEls.some((other) => other !== el && other.contains(el));
-      });
+        if (topCutEls.length > 0) {
+          const cutSubGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          if (nestGroup.hasAttribute("transform")) {
+            cutSubGroup.setAttribute("transform", nestGroup.getAttribute("transform"));
+          }
+          if (nestGroup.hasAttribute("data-scale")) {
+            cutSubGroup.setAttribute("data-scale", nestGroup.getAttribute("data-scale"));
+          }
 
-      if (topCutEls.length > 0) {
-        const cutSubGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        if (nestGroup.hasAttribute("transform")) {
-          cutSubGroup.setAttribute("transform", nestGroup.getAttribute("transform"));
-        }
-        if (nestGroup.hasAttribute("data-scale")) {
-          cutSubGroup.setAttribute("data-scale", nestGroup.getAttribute("data-scale"));
-        }
-
-        topCutEls.forEach((el) => {
-          const paths =
-            el.tagName.toLowerCase() === "g"
-              ? el.querySelectorAll("path, polygon, polyline, rect, circle, ellipse")
-              : [el];
-
-          paths.forEach((p) => {
-            p.setAttribute("stroke", cutColor);
-            p.setAttribute("stroke-width", "1");
-            p.setAttribute("fill", "none");
-            p.removeAttribute("class");
+          topCutEls.forEach((el) => {
+            const type = classifyCutElement(el);
+            const color = type === "edge" ? edgeCutColor : kissCutColor;
+            styleCutElement(el, color);
+            cutSubGroup.appendChild(el);
           });
 
-          cutSubGroup.appendChild(el);
+          if (cutSubGroup.childNodes.length > 0) {
+            cutLayer.appendChild(cutSubGroup);
+          }
+        }
+      });
+
+      if (cutLayer.childNodes.length > 0) {
+        vectorSvgElement.appendChild(cutLayer);
+      }
+    } else {
+      // Distinct layers for Kiss Cut and Edge Cut
+      const kissCutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      kissCutLayer.setAttribute("id", kissCutLayerName);
+      kissCutLayer.setAttribute("data-name", kissCutLayerName);
+
+      const edgeCutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      edgeCutLayer.setAttribute("id", edgeCutLayerName);
+      edgeCutLayer.setAttribute("data-name", edgeCutLayerName);
+
+      nestGroups.forEach((nestGroup) => {
+        let cutEls = Array.from(
+          nestGroup.querySelectorAll(".cut-line-element, [id*='kiss' i], [id*='die' i]"),
+        );
+        if (cutEls.length === 0) {
+          cutEls = Array.from(nestGroup.querySelectorAll("path, polygon, polyline"));
+        }
+        const validCutEls = cutEls.filter(isCutCandidate);
+        const topCutEls = validCutEls.filter(
+          (el) => !validCutEls.some((other) => other !== el && other.contains(el)),
+        );
+
+        const kissEls = [];
+        const edgeEls = [];
+        topCutEls.forEach((el) => {
+          if (classifyCutElement(el) === "edge") {
+            edgeEls.push(el);
+          } else {
+            kissEls.push(el);
+          }
         });
 
-        if (cutSubGroup.childNodes.length > 0) {
-          cutLayer.appendChild(cutSubGroup);
+        if (kissEls.length > 0) {
+          const kissSubGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          if (nestGroup.hasAttribute("transform")) {
+            kissSubGroup.setAttribute("transform", nestGroup.getAttribute("transform"));
+          }
+          if (nestGroup.hasAttribute("data-scale")) {
+            kissSubGroup.setAttribute("data-scale", nestGroup.getAttribute("data-scale"));
+          }
+          kissEls.forEach((el) => {
+            styleCutElement(el, kissCutColor);
+            kissSubGroup.appendChild(el);
+          });
+          if (kissSubGroup.childNodes.length > 0) {
+            kissCutLayer.appendChild(kissSubGroup);
+          }
         }
-      }
-    });
 
-    vectorSvgElement.appendChild(cutLayer);
+        if (edgeEls.length > 0) {
+          const edgeSubGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          if (nestGroup.hasAttribute("transform")) {
+            edgeSubGroup.setAttribute("transform", nestGroup.getAttribute("transform"));
+          }
+          if (nestGroup.hasAttribute("data-scale")) {
+            edgeSubGroup.setAttribute("data-scale", nestGroup.getAttribute("data-scale"));
+          }
+          edgeEls.forEach((el) => {
+            styleCutElement(el, edgeCutColor);
+            edgeSubGroup.appendChild(el);
+          });
+          if (edgeSubGroup.childNodes.length > 0) {
+            edgeCutLayer.appendChild(edgeSubGroup);
+          }
+        }
+      });
+
+      if (kissCutLayer.childNodes.length > 0) {
+        vectorSvgElement.appendChild(kissCutLayer);
+      }
+      if (edgeCutLayer.childNodes.length > 0) {
+        vectorSvgElement.appendChild(edgeCutLayer);
+      }
+    }
   } else {
     // Flat un-nested SVG fallback
-    const cutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    cutLayer.setAttribute("id", layerName);
-    cutLayer.setAttribute("data-name", layerName);
-
     const cutEls = Array.from(
       vectorSvgElement.querySelectorAll(".cut-line-element, path, polygon, polyline"),
     );
-    const validCutEls = cutEls.filter((el) => {
-      if (el.tagName.toLowerCase() === "image") return false;
-      const parentId = (el.parentElement?.getAttribute("id") || "").toLowerCase();
-      if (
-        parentId.includes("cmyk") ||
-        parentId.includes("white") ||
-        parentId.includes("inlay") ||
-        parentId.includes("clear")
-      ) {
-        return false;
-      }
-      return true;
-    });
+    const validCutEls = cutEls.filter(isCutCandidate);
+    const topCutEls = validCutEls.filter(
+      (el) => !validCutEls.some((other) => other !== el && other.contains(el)),
+    );
 
-    const topCutEls = validCutEls.filter((el) => {
-      return !validCutEls.some((other) => other !== el && other.contains(el));
-    });
+    if (kissCutLayerName === edgeCutLayerName) {
+      const cutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      cutLayer.setAttribute("id", kissCutLayerName);
+      cutLayer.setAttribute("data-name", kissCutLayerName);
 
-    topCutEls.forEach((el) => {
-      const paths =
-        el.tagName.toLowerCase() === "g"
-          ? el.querySelectorAll("path, polygon, polyline, rect, circle, ellipse")
-          : [el];
-
-      paths.forEach((p) => {
-        p.setAttribute("stroke", cutColor);
-        p.setAttribute("stroke-width", "1");
-        p.setAttribute("fill", "none");
-        p.removeAttribute("class");
+      topCutEls.forEach((el) => {
+        const type = classifyCutElement(el);
+        const color = type === "edge" ? edgeCutColor : kissCutColor;
+        styleCutElement(el, color);
+        cutLayer.appendChild(el);
       });
 
-      cutLayer.appendChild(el);
-    });
+      if (cutLayer.childNodes.length > 0) {
+        vectorSvgElement.appendChild(cutLayer);
+      }
+    } else {
+      const kissCutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      kissCutLayer.setAttribute("id", kissCutLayerName);
+      kissCutLayer.setAttribute("data-name", kissCutLayerName);
 
-    vectorSvgElement.appendChild(cutLayer);
+      const edgeCutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      edgeCutLayer.setAttribute("id", edgeCutLayerName);
+      edgeCutLayer.setAttribute("data-name", edgeCutLayerName);
+
+      topCutEls.forEach((el) => {
+        const type = classifyCutElement(el);
+        if (type === "edge") {
+          styleCutElement(el, edgeCutColor);
+          edgeCutLayer.appendChild(el);
+        } else {
+          styleCutElement(el, kissCutColor);
+          kissCutLayer.appendChild(el);
+        }
+      });
+
+      if (kissCutLayer.childNodes.length > 0) {
+        vectorSvgElement.appendChild(kissCutLayer);
+      }
+      if (edgeCutLayer.childNodes.length > 0) {
+        vectorSvgElement.appendChild(edgeCutLayer);
+      }
+    }
   }
 
   return vectorSvgElement;
@@ -2923,12 +3242,7 @@ async function handleDownloadPdf() {
 
   try {
     const baseName = window.currentCutFileId ? window.currentCutFileId : "nested-stickers";
-    let layerName = "CutContour";
-    let cutColor = "#FF00FF";
-    const layerNameInput = document.getElementById("cutLayerName");
-    const cutColorInput = document.getElementById("cutColor");
-    if (layerNameInput?.value) layerName = layerNameInput.value;
-    if (cutColorInput?.value) cutColor = cutColorInput.value;
+    const cutSettings = getCutSettings();
 
     let pdfDoc = null;
 
@@ -2956,7 +3270,7 @@ async function handleDownloadPdf() {
         throw new Error(`Invalid SVG dimensions for sheet ${i + 1}`);
       }
 
-      const vectorSvgElement = prepareVectorPrintCutSvg(svgElement, layerName, cutColor);
+      const vectorSvgElement = prepareVectorPrintCutSvg(svgElement, cutSettings);
 
       const orientation = width > height ? "landscape" : "portrait";
 
@@ -3079,14 +3393,8 @@ async function handleExportPdf() {
         }
 
         // Generate Vector Print & Cut PDF using svg2pdf
-        let layerName = 'CutContour';
-        let cutColor = '#FF00FF';
-        const layerNameInput = document.getElementById('cutLayerName');
-        const cutColorInput = document.getElementById('cutColor');
-        if (layerNameInput?.value) layerName = layerNameInput.value;
-        if (cutColorInput?.value) cutColor = cutColorInput.value;
-
-        const vectorSvgElement = prepareVectorPrintCutSvg(svgElement, layerName, cutColor);
+        const cutSettings = getCutSettings();
+        const vectorSvgElement = prepareVectorPrintCutSvg(svgElement, cutSettings);
 
         const vectorDoc = new jsPDF({
             unit: "px",
@@ -4606,7 +4914,14 @@ export async function init() {
     "marginLeft",
     "marginRight",
     "measurement-unit",
-    "save-general-settings-btn"
+    "save-general-settings-btn",
+    "kissCutLayerName",
+    "kissCutColorPicker",
+    "kissCutColor",
+    "edgeCutLayerName",
+    "edgeCutColorPicker",
+    "edgeCutColor",
+    "save-cut-settings-btn"
   ];
   ids.forEach((id) => {
     // Convert kebab-case to camelCase for keys
@@ -4944,6 +5259,7 @@ export async function init() {
       loadShippingConfig();
       loadRetentionConfig();
       loadTelegramConfig();
+      syncCutSettingsUI();
     });
   }
 
@@ -4965,6 +5281,8 @@ export async function init() {
   initRetentionListeners();
   // Telegram Bot & Alert Cadence listeners
   initTelegramConfigListeners();
+  // Cut Line & Layer Settings listeners
+  initCutSettingsListeners();
 
 
   // Check for a token in the URL from OAuth redirect

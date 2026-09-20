@@ -101,5 +101,39 @@ describe('generateCutFile', () => {
         expect(path.getAttribute('stroke')).toBe('red');
         expect(path.getAttribute('fill')).toBe('none');
     });
+
+    test('should apply custom kissCutColor and edgeCutColor based on element classification', () => {
+        const nestedSvgString = `
+            <svg width="500" height="500" viewBox="0 0 500 500">
+                <g class="nest-group" transform="translate(100 100)">
+                    <image href="data:image/png;base64,mock" width="100" height="100" />
+                    <g id="Kiss-Cut" class="cut-line-element">
+                        <path d="M 10 10 L 90 90 Z" />
+                    </g>
+                    <g id="Die-Cut" class="cut-line-element">
+                        <path d="M 0 0 L 100 100 Z" />
+                    </g>
+                </g>
+            </svg>
+        `;
+        const result = generateCutFile(nestedSvgString, {
+            kissCutColor: '#00FFFF',
+            edgeCutColor: '#FF0000'
+        });
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(result, 'image/svg+xml');
+
+        const kissPath = doc.querySelector('#Kiss-Cut path');
+        const diePath = doc.querySelector('#Die-Cut path');
+
+        expect(kissPath).toBeTruthy();
+        expect(kissPath.getAttribute('stroke')).toBe('#00FFFF');
+        expect(kissPath.getAttribute('fill')).toBe('none');
+
+        expect(diePath).toBeTruthy();
+        expect(diePath.getAttribute('stroke')).toBe('#FF0000');
+        expect(diePath.getAttribute('fill')).toBe('none');
+    });
 });
 

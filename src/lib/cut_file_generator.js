@@ -1,4 +1,4 @@
-export function generateCutFile(svgString) {
+export function generateCutFile(svgString, options = {}) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgString, 'image/svg+xml');
     const svgElement = doc.documentElement;
@@ -6,6 +6,22 @@ export function generateCutFile(svgString) {
     if (svgElement.hasAttribute('width')) cutFileSvg.setAttribute('width', svgElement.getAttribute('width'));
     if (svgElement.hasAttribute('height')) cutFileSvg.setAttribute('height', svgElement.getAttribute('height'));
     if (svgElement.hasAttribute('viewBox')) cutFileSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox'));
+
+    const kissColor = options.kissCutColor || options.cutColor || "red";
+    const edgeColor = options.edgeCutColor || options.cutColor || "red";
+
+    const classifyType = (el) => {
+        const id = (el.getAttribute('id') || '').toLowerCase();
+        const pId = (el.parentElement?.getAttribute('id') || '').toLowerCase();
+        const cls = (el.getAttribute('class') || '').toLowerCase();
+        if (id.includes('die') || id.includes('perf') || id.includes('edge') || pId.includes('die') || pId.includes('perf') || pId.includes('edge') || cls.includes('die')) {
+            return 'edge';
+        }
+        if (id.includes('kiss') || pId.includes('kiss') || cls.includes('kiss')) {
+            return 'kiss';
+        }
+        return 'kiss';
+    };
 
     const nestGroups = svgElement.querySelectorAll('.nest-group');
     if (nestGroups.length > 0) {
@@ -32,12 +48,14 @@ export function generateCutFile(svgString) {
             const topCutEls = validCutEls.filter(el => !validCutEls.some(other => other !== el && other.contains(el)));
 
             topCutEls.forEach(el => {
+                const type = classifyType(el);
+                const strokeColor = type === 'edge' ? edgeColor : kissColor;
                 const clone = el.cloneNode(true);
                 const paths = clone.tagName.toLowerCase() === 'g'
                     ? clone.querySelectorAll('path, polygon, polyline, rect, circle, ellipse')
                     : [clone];
                 paths.forEach(p => {
-                    p.setAttribute('stroke', 'red');
+                    p.setAttribute('stroke', strokeColor);
                     p.setAttribute('fill', 'none');
                 });
                 cutSubGroup.appendChild(clone);
@@ -50,8 +68,10 @@ export function generateCutFile(svgString) {
     } else {
         // Flat SVG fallback
         svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline').forEach(el => {
+            const type = classifyType(el);
+            const strokeColor = type === 'edge' ? edgeColor : kissColor;
             const newEl = el.cloneNode(true);
-            newEl.setAttribute('stroke', 'red');
+            newEl.setAttribute('stroke', strokeColor);
             newEl.setAttribute('fill', 'none');
             cutFileSvg.appendChild(newEl);
         });
