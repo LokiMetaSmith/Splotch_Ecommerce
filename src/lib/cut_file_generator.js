@@ -7,13 +7,55 @@ export function generateCutFile(svgString) {
     if (svgElement.hasAttribute('height')) cutFileSvg.setAttribute('height', svgElement.getAttribute('height'));
     if (svgElement.hasAttribute('viewBox')) cutFileSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox'));
 
-    // Support multiple shapes
-    svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline').forEach(el => {
-        const newEl = el.cloneNode(true);
-        newEl.setAttribute('stroke', 'red');
-        newEl.setAttribute('fill', 'none');
-        cutFileSvg.appendChild(newEl);
-    });
+    const nestGroups = svgElement.querySelectorAll('.nest-group');
+    if (nestGroups.length > 0) {
+        nestGroups.forEach(nestGroup => {
+            const cutSubGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            if (nestGroup.hasAttribute('transform')) cutSubGroup.setAttribute('transform', nestGroup.getAttribute('transform'));
+            if (nestGroup.hasAttribute('data-scale')) cutSubGroup.setAttribute('data-scale', nestGroup.getAttribute('data-scale'));
+
+            let cutEls = Array.from(nestGroup.querySelectorAll('.cut-line-element, [id*="kiss" i], [id*="die" i]'));
+            if (cutEls.length === 0) {
+                cutEls = Array.from(nestGroup.querySelectorAll('path, polygon, polyline'));
+            }
+
+            const validCutEls = cutEls.filter(el => {
+                if (el.tagName.toLowerCase() === 'image') return false;
+                const parentId = (el.parentElement?.getAttribute('id') || '').toLowerCase();
+                if (parentId.includes('cmyk') || parentId.includes('white') || parentId.includes('inlay') || parentId.includes('clear')) {
+                    return false;
+                }
+                return true;
+            });
+
+            // Avoid double-selecting nested children
+            const topCutEls = validCutEls.filter(el => !validCutEls.some(other => other !== el && other.contains(el)));
+
+            topCutEls.forEach(el => {
+                const clone = el.cloneNode(true);
+                const paths = clone.tagName.toLowerCase() === 'g'
+                    ? clone.querySelectorAll('path, polygon, polyline, rect, circle, ellipse')
+                    : [clone];
+                paths.forEach(p => {
+                    p.setAttribute('stroke', 'red');
+                    p.setAttribute('fill', 'none');
+                });
+                cutSubGroup.appendChild(clone);
+            });
+
+            if (cutSubGroup.childNodes.length > 0) {
+                cutFileSvg.appendChild(cutSubGroup);
+            }
+        });
+    } else {
+        // Flat SVG fallback
+        svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline').forEach(el => {
+            const newEl = el.cloneNode(true);
+            newEl.setAttribute('stroke', 'red');
+            newEl.setAttribute('fill', 'none');
+            cutFileSvg.appendChild(newEl);
+        });
+    }
 
     return new XMLSerializer().serializeToString(cutFileSvg);
 }
@@ -56,7 +98,24 @@ export function generatePltFile(svgString, options = {}) {
         hpgl += `FS${options.cutPressure};\n`; // Force Select command
     }
     
-    const elements = svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline');
+    let elements = [];
+    const nestGroups = svgElement.querySelectorAll('.nest-group');
+    if (nestGroups.length > 0) {
+        nestGroups.forEach(nestGroup => {
+            let cutEls = Array.from(nestGroup.querySelectorAll('.cut-line-element, [id*="kiss" i] path, [id*="die" i] path'));
+            if (cutEls.length === 0) {
+                cutEls = Array.from(nestGroup.querySelectorAll('path, polygon, polyline'));
+            }
+            cutEls.forEach(el => {
+                const parentId = (el.parentElement?.getAttribute('id') || '').toLowerCase();
+                if (!parentId.includes('cmyk') && !parentId.includes('white') && !parentId.includes('inlay') && !parentId.includes('clear') && el.tagName.toLowerCase() !== 'image') {
+                    elements.push(el);
+                }
+            });
+        });
+    } else {
+        elements = Array.from(svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline'));
+    }
     
     elements.forEach(el => {
         let points = [];

@@ -69,4 +69,37 @@ describe('generateCutFile', () => {
             }
         });
     });
+
+    test('should preserve nested transforms and ignore fiducial marks on nested sheets', () => {
+        const nestedSvgString = `
+            <svg width="500" height="500" viewBox="0 0 500 500">
+                <circle cx="60" cy="60" r="12" fill="black" />
+                <g class="nest-group" transform="translate(150 200) rotate(15)" data-scale="0.5">
+                    <image href="data:image/png;base64,mock" width="100" height="100" />
+                    <g id="Kiss-Cut" class="cut-line-element">
+                        <path d="M 10 10 L 90 90 Z" />
+                    </g>
+                </g>
+            </svg>
+        `;
+        const result = generateCutFile(nestedSvgString);
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(result, 'image/svg+xml');
+
+        // Fiducial circle must NOT be present in cut file
+        expect(doc.querySelector('circle')).toBeNull();
+
+        // Transform must be preserved on the group
+        const group = doc.querySelector('g[transform="translate(150 200) rotate(15)"]');
+        expect(group).toBeTruthy();
+        expect(group.getAttribute('data-scale')).toBe('0.5');
+
+        // Cut path inside must have stroke red and fill none
+        const path = group.querySelector('path');
+        expect(path).toBeTruthy();
+        expect(path.getAttribute('stroke')).toBe('red');
+        expect(path.getAttribute('fill')).toBe('none');
+    });
 });
+

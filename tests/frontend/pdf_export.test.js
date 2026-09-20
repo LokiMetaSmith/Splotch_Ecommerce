@@ -207,4 +207,51 @@ describe('PDF Export Functionality', () => {
         expect(errorToast.classList.contains('opacity-0')).toBe(false);
         expect(document.getElementById('error-message').textContent).toBe('Invalid SVG dimensions for PDF export on sheet 1');
     });
+
+    test('prepareVectorPrintCutSvg should preserve transforms and data-scale for nested cutlines', () => {
+        const svgString = `
+            <svg width="800" height="600" viewBox="0 0 800 600">
+                <circle cx="60" cy="60" r="12" fill="black" />
+                <g class="nest-group" transform="translate(200 150) rotate(30)" data-scale="0.75">
+                    <image href="data:image/png;base64,mock" width="200" height="200" />
+                    <g id="Kiss-Cut" class="cut-line-element">
+                        <path d="M 0 0 L 200 0 L 200 200 Z" />
+                    </g>
+                    <g id="Die-Cut" class="cut-line-element">
+                        <path d="M -10 -10 L 210 -10 L 210 210 Z" />
+                    </g>
+                </g>
+            </svg>
+        `;
+        const parser = new DOMParser();
+        const svgEl = parser.parseFromString(svgString, 'image/svg+xml').documentElement;
+
+        const prepared = printshop.prepareVectorPrintCutSvg(svgEl, 'CutContour', '#FF00FF');
+
+        // Image remains inside nest-group with its transform
+        const nestGroup = prepared.querySelector('.nest-group');
+        expect(nestGroup).toBeTruthy();
+        expect(nestGroup.getAttribute('transform')).toBe('translate(200 150) rotate(30)');
+        expect(nestGroup.querySelector('image')).toBeTruthy();
+
+        // CutContour layer exists
+        const cutLayer = prepared.querySelector('#CutContour');
+        expect(cutLayer).toBeTruthy();
+        expect(cutLayer.getAttribute('data-name')).toBe('CutContour');
+
+        // Cut layer contains subgroup with exact same transform and data-scale
+        const cutSubGroup = cutLayer.querySelector('g[transform="translate(200 150) rotate(30)"]');
+        expect(cutSubGroup).toBeTruthy();
+        expect(cutSubGroup.getAttribute('data-scale')).toBe('0.75');
+
+        // All paths inside cut layer have #FF00FF stroke, fill none, stroke-width 1
+        const cutPaths = cutSubGroup.querySelectorAll('path');
+        expect(cutPaths.length).toBe(2);
+        cutPaths.forEach(p => {
+            expect(p.getAttribute('stroke')).toBe('#FF00FF');
+            expect(p.getAttribute('stroke-width')).toBe('1');
+            expect(p.getAttribute('fill')).toBe('none');
+        });
+    });
 });
+

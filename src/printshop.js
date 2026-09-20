@@ -2775,6 +2775,143 @@ function handleDownloadCutFileXml() {
   showSuccessToast("XML cut file(s) downloaded.");
 }
 
+export function prepareVectorPrintCutSvg(svgElement, layerName = "CutContour", cutColor = "#FF00FF") {
+  let width = parseFloat(svgElement.getAttribute("width"));
+  let height = parseFloat(svgElement.getAttribute("height"));
+
+  if (isNaN(width) || isNaN(height)) {
+    const viewBox = svgElement.getAttribute("viewBox");
+    if (viewBox) {
+      const parts = viewBox.split(/[\s,]+/);
+      if (parts.length === 4) {
+        width = parseFloat(parts[2]);
+        height = parseFloat(parts[3]);
+      }
+    }
+  }
+
+  const vectorSvgElement = svgElement.cloneNode(true);
+  if (!isNaN(width) && !isNaN(height) && width > 0 && height > 0) {
+    vectorSvgElement.setAttribute("width", String(width));
+    vectorSvgElement.setAttribute("height", String(height));
+  }
+
+  const nestGroups = vectorSvgElement.querySelectorAll(".nest-group");
+
+  if (nestGroups.length > 0) {
+    const cutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    cutLayer.setAttribute("id", layerName);
+    cutLayer.setAttribute("data-name", layerName);
+
+    nestGroups.forEach((nestGroup) => {
+      let cutEls = Array.from(
+        nestGroup.querySelectorAll(".cut-line-element, [id*='kiss' i], [id*='die' i]"),
+      );
+
+      if (cutEls.length === 0) {
+        cutEls = Array.from(nestGroup.querySelectorAll("path, polygon, polyline"));
+      }
+
+      const validCutEls = cutEls.filter((el) => {
+        if (el.tagName.toLowerCase() === "image") return false;
+        const parentId = (el.parentElement?.getAttribute("id") || "").toLowerCase();
+        if (
+          parentId.includes("cmyk") ||
+          parentId.includes("white") ||
+          parentId.includes("inlay") ||
+          parentId.includes("clear")
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      // Filter out elements that are already contained within another selected element
+      const topCutEls = validCutEls.filter((el) => {
+        return !validCutEls.some((other) => other !== el && other.contains(el));
+      });
+
+      if (topCutEls.length > 0) {
+        const cutSubGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        if (nestGroup.hasAttribute("transform")) {
+          cutSubGroup.setAttribute("transform", nestGroup.getAttribute("transform"));
+        }
+        if (nestGroup.hasAttribute("data-scale")) {
+          cutSubGroup.setAttribute("data-scale", nestGroup.getAttribute("data-scale"));
+        }
+
+        topCutEls.forEach((el) => {
+          const paths =
+            el.tagName.toLowerCase() === "g"
+              ? el.querySelectorAll("path, polygon, polyline, rect, circle, ellipse")
+              : [el];
+
+          paths.forEach((p) => {
+            p.setAttribute("stroke", cutColor);
+            p.setAttribute("stroke-width", "1");
+            p.setAttribute("fill", "none");
+            p.removeAttribute("class");
+          });
+
+          cutSubGroup.appendChild(el);
+        });
+
+        if (cutSubGroup.childNodes.length > 0) {
+          cutLayer.appendChild(cutSubGroup);
+        }
+      }
+    });
+
+    vectorSvgElement.appendChild(cutLayer);
+  } else {
+    // Flat un-nested SVG fallback
+    const cutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    cutLayer.setAttribute("id", layerName);
+    cutLayer.setAttribute("data-name", layerName);
+
+    const cutEls = Array.from(
+      vectorSvgElement.querySelectorAll(".cut-line-element, path, polygon, polyline"),
+    );
+    const validCutEls = cutEls.filter((el) => {
+      if (el.tagName.toLowerCase() === "image") return false;
+      const parentId = (el.parentElement?.getAttribute("id") || "").toLowerCase();
+      if (
+        parentId.includes("cmyk") ||
+        parentId.includes("white") ||
+        parentId.includes("inlay") ||
+        parentId.includes("clear")
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const topCutEls = validCutEls.filter((el) => {
+      return !validCutEls.some((other) => other !== el && other.contains(el));
+    });
+
+    topCutEls.forEach((el) => {
+      const paths =
+        el.tagName.toLowerCase() === "g"
+          ? el.querySelectorAll("path, polygon, polyline, rect, circle, ellipse")
+          : [el];
+
+      paths.forEach((p) => {
+        p.setAttribute("stroke", cutColor);
+        p.setAttribute("stroke-width", "1");
+        p.setAttribute("fill", "none");
+        p.removeAttribute("class");
+      });
+
+      cutLayer.appendChild(el);
+    });
+
+    vectorSvgElement.appendChild(cutLayer);
+  }
+
+  return vectorSvgElement;
+}
+
 async function handleDownloadPdf() {
   if (!window.nestedSvgs || window.nestedSvgs.length === 0) {
     showErrorToast("No nested SVG sheets to generate a PDF from.");
@@ -2819,37 +2956,7 @@ async function handleDownloadPdf() {
         throw new Error(`Invalid SVG dimensions for sheet ${i + 1}`);
       }
 
-      // Clone SVG and prepare vector cut contours
-      const vectorSvgElement = svgElement.cloneNode(true);
-      vectorSvgElement.setAttribute("width", String(width));
-      vectorSvgElement.setAttribute("height", String(height));
-
-      const cutGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      cutGroup.setAttribute("id", layerName);
-      cutGroup.setAttribute("data-name", layerName);
-
-      let hasCutElement = false;
-      vectorSvgElement.querySelectorAll("path.cut-line-element, .cut-line-element").forEach((el) => {
-        hasCutElement = true;
-        el.setAttribute("stroke", cutColor);
-        el.setAttribute("stroke-width", "1");
-        el.setAttribute("fill", "none");
-        el.removeAttribute("class");
-        cutGroup.appendChild(el);
-      });
-
-      // If no elements had cut-line-element class, fallback to cut paths
-      if (!hasCutElement) {
-        vectorSvgElement.querySelectorAll("path, polygon, polyline").forEach((el) => {
-          el.setAttribute("stroke", cutColor);
-          el.setAttribute("stroke-width", "1");
-          el.setAttribute("fill", "none");
-          el.removeAttribute("class");
-          cutGroup.appendChild(el);
-        });
-      }
-
-      vectorSvgElement.appendChild(cutGroup);
+      const vectorSvgElement = prepareVectorPrintCutSvg(svgElement, layerName, cutColor);
 
       const orientation = width > height ? "landscape" : "portrait";
 
@@ -2972,10 +3079,6 @@ async function handleExportPdf() {
         }
 
         // Generate Vector Print & Cut PDF using svg2pdf
-        const vectorSvgElement = svgElement.cloneNode(true);
-        vectorSvgElement.setAttribute("width", String(width));
-        vectorSvgElement.setAttribute("height", String(height));
-
         let layerName = 'CutContour';
         let cutColor = '#FF00FF';
         const layerNameInput = document.getElementById('cutLayerName');
@@ -2983,19 +3086,7 @@ async function handleExportPdf() {
         if (layerNameInput?.value) layerName = layerNameInput.value;
         if (cutColorInput?.value) cutColor = cutColorInput.value;
 
-        const cutGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        cutGroup.setAttribute("id", layerName);
-        cutGroup.setAttribute("data-name", layerName);
-        
-        vectorSvgElement.querySelectorAll('path, polygon, polyline').forEach(el => {
-            el.setAttribute('stroke', cutColor);
-            el.setAttribute('stroke-width', '1');
-            el.setAttribute('fill', 'none');
-            el.removeAttribute('class');
-            cutGroup.appendChild(el);
-        });
-        
-        vectorSvgElement.appendChild(cutGroup);
+        const vectorSvgElement = prepareVectorPrintCutSvg(svgElement, layerName, cutColor);
 
         const vectorDoc = new jsPDF({
             unit: "px",
