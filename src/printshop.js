@@ -2751,11 +2751,144 @@ function handleDownloadCutFilePlt() {
   });
 }
 
+function handleDownloadCutFileXml() {
+  if (!window.nestedSvgs || window.nestedSvgs.length === 0) {
+    showErrorToast("No nested SVG sheets to generate an XML cut file from.");
+    return;
+  }
+
+  window.nestedSvgs.forEach((nestedSvg, index) => {
+    const cutFileString = generateCutFile(nestedSvg);
+    const blob = new Blob([cutFileString], { type: "application/xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+
+    const baseName = window.currentCutFileId ? window.currentCutFileId : "cut-file";
+    a.download = `${baseName}-sheet${index + 1}.xml`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+  showSuccessToast("XML cut file(s) downloaded.");
+}
+
+async function handleDownloadPdf() {
+  if (!window.nestedSvgs || window.nestedSvgs.length === 0) {
+    showErrorToast("No nested SVG sheets to generate a PDF from.");
+    return;
+  }
+
+  const btn = ui.downloadPdfBtn || document.getElementById("downloadPdfBtn");
+  if (btn) setButtonLoading(btn, true, "Generating PDF...");
+
+  try {
+    const baseName = window.currentCutFileId ? window.currentCutFileId : "nested-stickers";
+    let layerName = "CutContour";
+    let cutColor = "#FF00FF";
+    const layerNameInput = document.getElementById("cutLayerName");
+    const cutColorInput = document.getElementById("cutColor");
+    if (layerNameInput?.value) layerName = layerNameInput.value;
+    if (cutColorInput?.value) cutColor = cutColorInput.value;
+
+    let pdfDoc = null;
+
+    for (let i = 0; i < window.nestedSvgs.length; i++) {
+      const svgElement = new DOMParser().parseFromString(
+        window.nestedSvgs[i],
+        "image/svg+xml",
+      ).documentElement;
+
+      let width = parseFloat(svgElement.getAttribute("width"));
+      let height = parseFloat(svgElement.getAttribute("height"));
+
+      if (isNaN(width) || isNaN(height)) {
+        const viewBox = svgElement.getAttribute("viewBox");
+        if (viewBox) {
+          const parts = viewBox.split(/[\s,]+/);
+          if (parts.length === 4) {
+            width = parseFloat(parts[2]);
+            height = parseFloat(parts[3]);
+          }
+        }
+      }
+
+      if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+        throw new Error(`Invalid SVG dimensions for sheet ${i + 1}`);
+      }
+
+      // Clone SVG and prepare vector cut contours
+      const vectorSvgElement = svgElement.cloneNode(true);
+      vectorSvgElement.setAttribute("width", String(width));
+      vectorSvgElement.setAttribute("height", String(height));
+
+      const cutGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      cutGroup.setAttribute("id", layerName);
+      cutGroup.setAttribute("data-name", layerName);
+
+      let hasCutElement = false;
+      vectorSvgElement.querySelectorAll("path.cut-line-element, .cut-line-element").forEach((el) => {
+        hasCutElement = true;
+        el.setAttribute("stroke", cutColor);
+        el.setAttribute("stroke-width", "1");
+        el.setAttribute("fill", "none");
+        el.removeAttribute("class");
+        cutGroup.appendChild(el);
+      });
+
+      // If no elements had cut-line-element class, fallback to cut paths
+      if (!hasCutElement) {
+        vectorSvgElement.querySelectorAll("path, polygon, polyline").forEach((el) => {
+          el.setAttribute("stroke", cutColor);
+          el.setAttribute("stroke-width", "1");
+          el.setAttribute("fill", "none");
+          el.removeAttribute("class");
+          cutGroup.appendChild(el);
+        });
+      }
+
+      vectorSvgElement.appendChild(cutGroup);
+
+      const orientation = width > height ? "landscape" : "portrait";
+
+      if (i === 0) {
+        pdfDoc = new jsPDF({
+          unit: "px",
+          format: [width, height],
+          orientation,
+        });
+      } else {
+        pdfDoc.addPage([width, height], orientation);
+      }
+
+      await pdfDoc.svg(vectorSvgElement, { x: 0, y: 0, width, height });
+    }
+
+    if (pdfDoc) {
+      const fileName = window.nestedSvgs.length > 1
+        ? `${baseName}-all-sheets.pdf`
+        : `${baseName}-sheet1.pdf`;
+      pdfDoc.save(fileName);
+      showSuccessToast("PDF cut/print file downloaded successfully.");
+    }
+  } catch (error) {
+    showErrorToast(`PDF generation failed: ${error.message}`);
+    console.error("[PRINTSHOP] PDF generation error:", error);
+  } finally {
+    if (btn) setButtonLoading(btn, false);
+  }
+}
+
 async function handleExportPdf() {
   if (!window.nestedSvgs || window.nestedSvgs.length === 0) {
     showErrorToast("No nested SVG sheets to export.");
     return;
   }
+
+  const btn = ui.exportPdfBtn || document.getElementById("exportPdfBtn");
+  if (btn) setButtonLoading(btn, true, "Exporting Package...");
 
   try {
     let doc = null;
@@ -2786,122 +2919,101 @@ async function handleExportPdf() {
           return;
         }
 
-        // Remove cut lines and bin outlines for PDF export so we only print the image layer
-        // Stickers are PNG <image> tags, fiducials are <circle>/<rect>, QRs are <image>/<text>.
-        svgElement.querySelectorAll('path, polygon, polyline, line').forEach(el => el.remove());
+        // Try rasterizing image layer for the flattened PrintOnly PDF
+        try {
+          const rasterSvg = svgElement.cloneNode(true);
+          rasterSvg.querySelectorAll('path, polygon, polyline, line').forEach(el => el.remove());
+          const scale = 300 / 96;
+          const targetWidth = Math.round(width * scale);
+          const targetHeight = Math.round(height * scale);
+          rasterSvg.setAttribute("width", String(targetWidth));
+          rasterSvg.setAttribute("height", String(targetHeight));
 
-        // Target 300 DPI (Default SVG scale is usually 96 DPI)
-        const scale = 300 / 96;
-        const targetWidth = Math.round(width * scale);
-        const targetHeight = Math.round(height * scale);
+          const svgString = new XMLSerializer().serializeToString(rasterSvg);
+          const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+          const url = URL.createObjectURL(svgBlob);
 
-        // Update SVG dimensions for crisp rendering onto canvas
-        svgElement.setAttribute("width", targetWidth);
-        svgElement.setAttribute("height", targetHeight);
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = () => reject(new Error("Failed to load SVG into Image element"));
+              img.src = url;
+          });
 
-        // Serialize back to string
-        const svgString = new XMLSerializer().serializeToString(svgElement);
-        const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-        const url = URL.createObjectURL(svgBlob);
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, targetWidth, targetHeight);
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+          URL.revokeObjectURL(url);
 
-        // Load into an Image
-        const img = new Image();
-        await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = url;
-        });
+          const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-        // Draw to a scaled Canvas with white background
-        const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, targetWidth, targetHeight);
-        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-        URL.revokeObjectURL(url);
+          if (i === 0) {
+              doc = new jsPDF({
+                unit: "px",
+                format: [width, height],
+              });
+          } else {
+              doc.addPage([width, height]);
+          }
 
-        // Get JPEG for PDF
-        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+          doc.addImage(jpegDataUrl, 'JPEG', 0, 0, width, height);
 
-        // Add to PDF
-        if (i === 0) {
-            // Create the PDF with the correct original dimensions
-            doc = new jsPDF({
-              unit: "px",
-              format: [width, height],
-            });
-        } else {
-            doc.addPage([width, height]);
+          const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          const sheetSuffix = window.nestedSvgs.length > 1 ? `-sheet${i + 1}` : '';
+          if (pngBlob) {
+            zip.file(`${baseName}${sheetSuffix}-300dpi.png`, pngBlob);
+          }
+        } catch (rasterErr) {
+          console.warn("[PRINTSHOP] Could not rasterize flattened print canvas, proceeding with vector PDF:", rasterErr);
         }
 
-        doc.addImage(jpegDataUrl, 'JPEG', 0, 0, width, height);
+        // Generate Vector Print & Cut PDF using svg2pdf
+        const vectorSvgElement = svgElement.cloneNode(true);
+        vectorSvgElement.setAttribute("width", String(width));
+        vectorSvgElement.setAttribute("height", String(height));
 
-        // Get PNG Blob and add to zip
-        const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        const sheetSuffix = window.nestedSvgs.length > 1 ? `-sheet${i + 1}` : '';
-        zip.file(`${baseName}${sheetSuffix}-300dpi.png`, pngBlob);
-
-        // --- NEW: Generate Vector Print & Cut PDF using svg2pdf ---
-        // Clone the original nested SVG (which still has cutlines)
-        const vectorSvgElement = new DOMParser().parseFromString(
-          window.nestedSvgs[i],
-          "image/svg+xml"
-        ).documentElement;
-        
-        // Ensure proper dimensions
-        vectorSvgElement.setAttribute("width", width);
-        vectorSvgElement.setAttribute("height", height);
-
-        // Fetch the selected printer's layer config
         let layerName = 'CutContour';
         let cutColor = '#FF00FF';
-        
-        // Grab from UI if available
         const layerNameInput = document.getElementById('cutLayerName');
         const cutColorInput = document.getElementById('cutColor');
-        if (layerNameInput) layerName = layerNameInput.value || layerName;
-        if (cutColorInput) cutColor = cutColorInput.value || cutColor;
+        if (layerNameInput?.value) layerName = layerNameInput.value;
+        if (cutColorInput?.value) cutColor = cutColorInput.value;
 
-        // Group cutlines for the specific layer name (useful for RIPs that use layer names)
         const cutGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
         cutGroup.setAttribute("id", layerName);
         cutGroup.setAttribute("data-name", layerName);
         
-        // Standardize the cutlines for the RIP software
         vectorSvgElement.querySelectorAll('path, polygon, polyline').forEach(el => {
             el.setAttribute('stroke', cutColor);
-            el.setAttribute('stroke-width', '1'); // 1px stroke
+            el.setAttribute('stroke-width', '1');
             el.setAttribute('fill', 'none');
-            // Remove any classes that might interfere
             el.removeAttribute('class');
-            
-            // Move into our specific layer group
             cutGroup.appendChild(el);
         });
         
         vectorSvgElement.appendChild(cutGroup);
 
-        // Initialize a new PDF document for this sheet
         const vectorDoc = new jsPDF({
             unit: "px",
             format: [width, height],
         });
 
-        // Render the SVG into the PDF document natively (preserves vectors!)
         await vectorDoc.svg(vectorSvgElement, { x: 0, y: 0, width: width, height: height });
 
-        // Add the Vector PDF to the ZIP
+        const sheetSuffix = window.nestedSvgs.length > 1 ? `-sheet${i + 1}` : '';
         const vectorPdfBlob = vectorDoc.output('blob');
         zip.file(`${baseName}${sheetSuffix}-VinylMaster-PrintCut.pdf`, vectorPdfBlob);
     }
 
-    // Add Flattened Print-Only PDF to zip
-    const pdfBlob = doc.output('blob');
-    zip.file(`${baseName}-PrintOnly.pdf`, pdfBlob);
+    if (doc) {
+      const pdfBlob = doc.output('blob');
+      zip.file(`${baseName}-PrintOnly.pdf`, pdfBlob);
+    }
 
-    // Generate zip and trigger download
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     const a = document.createElement("a");
     const zipUrl = URL.createObjectURL(zipBlob);
@@ -2916,6 +3028,8 @@ async function handleExportPdf() {
   } catch (error) {
     showErrorToast(`Print Package Export Failed: ${error.message}`);
     console.error(error);
+  } finally {
+    if (btn) setButtonLoading(btn, false);
   }
 }
 
@@ -4371,6 +4485,8 @@ export async function init() {
     "searchBtn",
     "downloadCutFileBtn",
     "downloadCutFilePltBtn",
+    "downloadXmlBtn",
+    "downloadPdfBtn",
     "exportPdfBtn",
     "scan-mode-banner",
     "scanTargetStatus",
@@ -4434,6 +4550,8 @@ export async function init() {
   ui.nestStickersBtn?.addEventListener("click", handleNesting);
   ui.downloadCutFileBtn?.addEventListener("click", handleDownloadCutFile);
   ui.downloadCutFilePltBtn?.addEventListener("click", handleDownloadCutFilePlt);
+  ui.downloadXmlBtn?.addEventListener("click", handleDownloadCutFileXml);
+  ui.downloadPdfBtn?.addEventListener("click", handleDownloadPdf);
   ui.exportPdfBtn?.addEventListener("click", handleExportPdf);
   ui.searchBtn?.addEventListener("click", handleSearch);
   ui.savePricingBtn?.addEventListener("click", savePricingConfig);

@@ -113,6 +113,8 @@ describe('PDF Export Functionality', () => {
 
         document.body.innerHTML = `
             <div id="exportPdfBtn"></div>
+            <div id="downloadPdfBtn"></div>
+            <div id="downloadXmlBtn"></div>
             <div id="success-toast" class="opacity-0 translate-y-full pointer-events-none"></div>
             <span id="success-message"></span>
             <div id="error-toast" class="opacity-0 translate-y-full pointer-events-none"></div>
@@ -134,8 +136,7 @@ describe('PDF Export Functionality', () => {
         // Import the module dynamically to ensure mocks are applied
         printshop = await import('../../src/printshop.js');
 
-        // Call init to attach listeners (if necessary, but we can also trigger the logic if we could access it)
-        // Since handleExportPdf is not exported, we rely on init attaching the listener.
+        // Call init to attach listeners
         await printshop.init();
     });
 
@@ -156,19 +157,42 @@ describe('PDF Export Functionality', () => {
 
         // Verify zip operations
         expect(mockZipFile).toHaveBeenCalledWith('nested-stickers-300dpi.png', expect.any(Blob));
-        expect(mockZipFile).toHaveBeenCalledWith('nested-stickers-300dpi.pdf', expect.any(Blob));
+        expect(mockZipFile).toHaveBeenCalledWith('nested-stickers-PrintOnly.pdf', expect.any(Blob));
+        expect(mockZipFile).toHaveBeenCalledWith('nested-stickers-VinylMaster-PrintCut.pdf', expect.any(Blob));
         expect(mockZipGenerateAsync).toHaveBeenCalled();
     });
 
-    test('should show error if no nested SVG', async () => {
+    test('should download PDF directly when downloadPdfBtn is clicked', async () => {
+        const btn = document.getElementById('downloadPdfBtn');
+        btn.click();
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(jsPDFMock).toHaveBeenCalledWith(expect.objectContaining({
+            unit: 'px',
+            format: [100, 100],
+        }));
+
+        expect(docMock.save).toHaveBeenCalledWith('nested-stickers-sheet1.pdf');
+    });
+
+    test('should show error if downloadPdfBtn clicked with no nested SVG', async () => {
+        window.nestedSvgs = [];
+        const btn = document.getElementById('downloadPdfBtn');
+        btn.click();
+
+        const errorToast = document.getElementById('error-toast');
+        expect(errorToast.classList.contains('opacity-0')).toBe(false);
+        expect(document.getElementById('error-message').textContent).toBe('No nested SVG sheets to generate a PDF from.');
+    });
+
+    test('should show error if no nested SVG on exportPdfBtn', async () => {
         window.nestedSvgs = [];
         const btn = document.getElementById('exportPdfBtn');
         btn.click();
 
         expect(jsPDFMock).not.toHaveBeenCalled();
-        // Check if error toast is shown (checking class removal)
         const errorToast = document.getElementById('error-toast');
-        // The toast is visible when opacity-0 is removed
         expect(errorToast.classList.contains('opacity-0')).toBe(false);
         expect(document.getElementById('error-message').textContent).toBe('No nested SVG sheets to export.');
     });
@@ -179,7 +203,7 @@ describe('PDF Export Functionality', () => {
         btn.click();
 
         expect(jsPDFMock).not.toHaveBeenCalled();
-         const errorToast = document.getElementById('error-toast');
+        const errorToast = document.getElementById('error-toast');
         expect(errorToast.classList.contains('opacity-0')).toBe(false);
         expect(document.getElementById('error-message').textContent).toBe('Invalid SVG dimensions for PDF export on sheet 1');
     });
