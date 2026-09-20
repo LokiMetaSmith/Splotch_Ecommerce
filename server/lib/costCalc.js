@@ -135,6 +135,101 @@ export const DEFAULT_SHIPPING_CONFIG = {
 };
 
 /**
+ * Normalizes promo configuration into standard structure: { codes: [...] }
+ */
+export function normalizePromoConfig(promoConfig) {
+  if (!promoConfig) return { codes: [] };
+  if (Array.isArray(promoConfig.codes)) {
+    return {
+      codes: promoConfig.codes.map((c, idx) => {
+        let timesUsed = Number(c.timesUsed || 0);
+        if (
+          promoConfig.codes.length === 1 &&
+          typeof promoConfig.timesUsed === "number" &&
+          promoConfig.timesUsed > timesUsed
+        ) {
+          timesUsed = promoConfig.timesUsed;
+        }
+        return {
+          id: c.id || `promo_${idx + 1}`,
+          code: String(c.code || "").trim().toUpperCase(),
+          type: c.type === "flat" ? "flat" : "percentage",
+          amount: Number(c.amount || 0),
+          enabled: Boolean(c.enabled),
+          maxUses:
+            c.maxUses !== null && c.maxUses !== undefined && c.maxUses !== ""
+              ? Number(c.maxUses)
+              : null,
+          timesUsed,
+          expiresAt: c.expiresAt ? String(c.expiresAt).trim() : null,
+          createdAt: c.createdAt || null,
+        };
+      }),
+    };
+  }
+  if (Array.isArray(promoConfig)) {
+    return normalizePromoConfig({ codes: promoConfig });
+  }
+  if (typeof promoConfig === "object" && promoConfig.code) {
+    return {
+      codes: [
+        {
+          id: promoConfig.id || "promo_1",
+          code: String(promoConfig.code || "").trim().toUpperCase(),
+          type: promoConfig.type === "flat" ? "flat" : "percentage",
+          amount: Number(promoConfig.amount || 0),
+          enabled: Boolean(promoConfig.enabled),
+          maxUses:
+            promoConfig.maxUses !== null &&
+            promoConfig.maxUses !== undefined &&
+            promoConfig.maxUses !== ""
+              ? Number(promoConfig.maxUses)
+              : null,
+          timesUsed: Number(promoConfig.timesUsed || 0),
+          expiresAt: promoConfig.expiresAt
+            ? String(promoConfig.expiresAt).trim()
+            : null,
+          createdAt: promoConfig.createdAt || null,
+        },
+      ],
+    };
+  }
+  return { codes: [] };
+}
+
+/**
+ * Check if a promo code has expired.
+ * If expiresAt is 'YYYY-MM-DD', it expires at the end of that day (23:59:59.999 local).
+ */
+export function isPromoExpired(expiresAt, now = new Date()) {
+  if (!expiresAt) return false;
+  const str = String(expiresAt).trim();
+  if (!str) return false;
+
+  let expDate;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [year, month, day] = str.split("-").map(Number);
+    expDate = new Date(year, month - 1, day, 23, 59, 59, 999);
+  } else {
+    expDate = new Date(str);
+  }
+
+  if (isNaN(expDate.getTime())) return false;
+  return now.getTime() > expDate.getTime();
+}
+
+/**
+ * Find matching promo code from configuration.
+ */
+export function findMatchingPromo(promoConfig, promoCode) {
+  if (!promoCode || !promoConfig) return null;
+  const normalized = normalizePromoConfig(promoConfig);
+  const search = String(promoCode).trim().toUpperCase();
+  if (!search) return null;
+  return normalized.codes.find((c) => c && c.code === search) || null;
+}
+
+/**
  * Run a full cost breakdown for an order.
  * @param {Object} opts
  * @param {number} opts.areaInSqIn       Total sticker area in square inches
@@ -226,28 +321,25 @@ export function calcOrderBreakdown({
   let promoDiscountCents = 0;
   let appliedPromoCode = null;
 
-  if (
-    promoCode &&
-    promoConfig &&
-    promoConfig.enabled &&
-    promoConfig.code &&
-    promoConfig.code.trim().toUpperCase() === String(promoCode).trim().toUpperCase()
-  ) {
-    const hasLimit =
-      typeof promoConfig.maxUses === "number" && promoConfig.maxUses > 0;
-    if (!hasLimit || (promoConfig.timesUsed || 0) < promoConfig.maxUses) {
-      appliedPromoCode = promoConfig.code.trim().toUpperCase();
-      if (promoConfig.type === "percentage") {
-        promoDiscountCents = Math.round(
-          adjustedSubtotalCents * (Number(promoConfig.amount) / 100),
+  if (promoCode && promoConfig) {
+    const promo = findMatchingPromo(promoConfig, promoCode);
+    if (promo && promo.enabled && !isPromoExpired(promo.expiresAt)) {
+      const hasLimit =
+        typeof promo.maxUses === "number" && promo.maxUses > 0;
+      if (!hasLimit || (promo.timesUsed || 0) < promo.maxUses) {
+        appliedPromoCode = promo.code;
+        if (promo.type === "percentage") {
+          promoDiscountCents = Math.round(
+            adjustedSubtotalCents * (Number(promo.amount) / 100),
+          );
+        } else {
+          promoDiscountCents = Math.round(Number(promo.amount) * 100);
+        }
+        promoDiscountCents = Math.max(
+          0,
+          Math.min(promoDiscountCents, adjustedSubtotalCents),
         );
-      } else {
-        promoDiscountCents = Math.round(Number(promoConfig.amount) * 100);
       }
-      promoDiscountCents = Math.max(
-        0,
-        Math.min(promoDiscountCents, adjustedSubtotalCents),
-      );
     }
   }
 

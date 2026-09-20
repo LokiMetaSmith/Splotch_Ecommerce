@@ -45,7 +45,13 @@ import {
 } from "./validators.js";
 import { fileTypeFromFile } from "file-type";
 import { calculateStickerPrice, getDesignDimensions } from "./pricing.js";
-import { calcOrderBreakdown, DEFAULT_SHIPPING_CONFIG } from "./lib/costCalc.js";
+import {
+  calcOrderBreakdown,
+  DEFAULT_SHIPPING_CONFIG,
+  normalizePromoConfig,
+  isPromoExpired,
+  findMatchingPromo,
+} from "./lib/costCalc.js";
 import { logOrderTransition, readAuditLogForOrder } from "./lib/auditLogger.js";
 import { getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from "./lib/telegramReminder.js";
 
@@ -1553,37 +1559,43 @@ async function startServer(
           const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
           const promoConfig = fullConfig?.promo;
 
-          if (!promoConfig || !promoConfig.enabled || !promoConfig.code) {
-            return res.status(400).json({ valid: false, error: "Promo code is inactive or invalid." });
-          }
-
-          if (rawCode.toUpperCase() !== String(promoConfig.code).trim().toUpperCase()) {
+          const promo = findMatchingPromo(promoConfig, rawCode);
+          if (!promo) {
             return res.status(400).json({ valid: false, error: "Invalid promo code." });
           }
 
+          if (!promo.enabled) {
+            return res.status(400).json({ valid: false, error: "Promo code is inactive or invalid." });
+          }
+
+          if (isPromoExpired(promo.expiresAt)) {
+            return res.status(400).json({ valid: false, error: "Promo code has expired." });
+          }
+
           if (
-            typeof promoConfig.maxUses === "number" &&
-            promoConfig.maxUses !== null &&
-            (promoConfig.timesUsed || 0) >= promoConfig.maxUses
+            typeof promo.maxUses === "number" &&
+            promo.maxUses !== null &&
+            (promo.timesUsed || 0) >= promo.maxUses
           ) {
             return res.status(400).json({ valid: false, error: "Promo code usage limit has been reached." });
           }
 
           let discountCents = 0;
           if (subtotalCents !== null && subtotalCents > 0) {
-            if (promoConfig.type === "percentage") {
-              discountCents = Math.round((subtotalCents * (promoConfig.amount || 0)) / 100);
+            if (promo.type === "percentage") {
+              discountCents = Math.round((subtotalCents * (promo.amount || 0)) / 100);
             } else {
-              discountCents = Math.round((promoConfig.amount || 0) * 100);
+              discountCents = Math.round((promo.amount || 0) * 100);
             }
             discountCents = Math.min(discountCents, subtotalCents);
           }
 
           return res.json({
             valid: true,
-            code: promoConfig.code,
-            type: promoConfig.type,
-            amount: promoConfig.amount,
+            code: promo.code,
+            type: promo.type,
+            amount: promo.amount,
+            expiresAt: promo.expiresAt || null,
             discountCents,
           });
         } catch (err) {
@@ -1676,19 +1688,23 @@ async function startServer(
       async (req, res) => {
         if (!(await isAdmin(req.user)))
           return res.status(403).json({ error: "Forbidden" });
-        const defaultPromo = {
+        const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
+        const normalized = normalizePromoConfig(fullConfig?.promo);
+        const first = normalized.codes[0] || {
           enabled: false,
           code: "",
           type: "percentage",
           amount: 0,
           maxUses: null,
           timesUsed: 0,
+          expiresAt: null,
         };
-        const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
-        const saved = fullConfig?.promo || {};
         res.json({
           success: true,
-          config: { ...defaultPromo, ...saved },
+          config: {
+            ...first,
+            codes: normalized.codes,
+          },
         });
       },
     );
@@ -1696,57 +1712,100 @@ async function startServer(
     app.post(
       "/api/admin/promo/config",
       authenticateToken,
-      [
-        body("enabled").isBoolean().withMessage("enabled must be a boolean"),
-        body("code")
-          .isString()
-          .trim()
-          .notEmpty()
-          .isLength({ max: 50 })
-          .withMessage("code must be non-empty and at most 50 characters"),
-        body("type")
-          .isIn(["percentage", "flat"])
-          .withMessage("type must be either 'percentage' or 'flat'"),
-        body("amount")
-          .isFloat({ min: 0 })
-          .withMessage("amount must be a non-negative number"),
-        body("maxUses")
-          .optional({ nullable: true })
-          .custom((val) => {
-            if (val === null || val === "" || val === undefined) return true;
-            const num = Number(val);
-            if (!Number.isInteger(num) || num < 1) {
-              throw new Error("maxUses must be a positive integer or null");
-            }
-            return true;
-          }),
-        body("resetTimesUsed")
-          .optional()
-          .isBoolean()
-          .withMessage("resetTimesUsed must be a boolean"),
-      ],
       async (req, res) => {
         if (!(await isAdmin(req.user)))
           return res.status(403).json({ error: "Forbidden" });
-        const errors = validationResult(req);
-        if (!errors.isEmpty())
-          return res.status(400).json({ errors: errors.array() });
 
         const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
-        const current = fullConfig?.promo || {};
-        const isReset = Boolean(req.body.resetTimesUsed);
-        const parsedMaxUses =
-          req.body.maxUses !== null && req.body.maxUses !== undefined && req.body.maxUses !== ""
-            ? parseInt(req.body.maxUses, 10)
-            : null;
+        const currentNormalized = normalizePromoConfig(fullConfig?.promo);
 
+        let incomingCodes = [];
+        if (Array.isArray(req.body.codes)) {
+          incomingCodes = req.body.codes;
+        } else if (req.body.code !== undefined) {
+          // Legacy single code payload
+          incomingCodes = [
+            {
+              id: req.body.id || "promo_1",
+              code: req.body.code,
+              type: req.body.type,
+              amount: req.body.amount,
+              enabled: req.body.enabled,
+              maxUses: req.body.maxUses,
+              expiresAt: req.body.expiresAt,
+              resetTimesUsed: req.body.resetTimesUsed,
+            },
+          ];
+        }
+
+        const validatedCodes = [];
+        const seenCodes = new Set();
+
+        for (let i = 0; i < incomingCodes.length; i++) {
+          const item = incomingCodes[i];
+          const rawCode = String(item.code || "").trim().toUpperCase();
+          if (!rawCode) {
+            return res.status(400).json({ error: `Promo code at row ${i + 1} cannot be empty.` });
+          }
+          if (rawCode.length > 50) {
+            return res.status(400).json({ error: `Promo code '${rawCode}' exceeds 50 characters.` });
+          }
+          if (seenCodes.has(rawCode)) {
+            return res.status(400).json({ error: `Duplicate promo code '${rawCode}' is not allowed.` });
+          }
+          seenCodes.add(rawCode);
+
+          const type = item.type === "flat" ? "flat" : "percentage";
+          const amount = Number(item.amount);
+          if (isNaN(amount) || amount < 0) {
+            return res.status(400).json({ error: `Invalid discount amount for promo code '${rawCode}'.` });
+          }
+          if (type === "percentage" && amount > 100) {
+            return res.status(400).json({ error: `Percentage discount cannot exceed 100% for '${rawCode}'.` });
+          }
+
+          let parsedMaxUses = null;
+          if (item.maxUses !== null && item.maxUses !== undefined && String(item.maxUses).trim() !== "") {
+            const num = Number(item.maxUses);
+            if (!Number.isInteger(num) || num < 1) {
+              return res.status(400).json({ error: `Usage limit for '${rawCode}' must be a positive integer.` });
+            }
+            parsedMaxUses = num;
+          }
+
+          let expiresAt = null;
+          if (item.expiresAt && String(item.expiresAt).trim() !== "") {
+            const dateStr = String(item.expiresAt).trim();
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) {
+              return res.status(400).json({ error: `Invalid expiration date format for '${rawCode}'.` });
+            }
+            expiresAt = dateStr;
+          }
+
+          const existing = currentNormalized.codes.find(
+            (c) => c.id === item.id || c.code === rawCode,
+          );
+          const isReset = Boolean(item.resetTimesUsed);
+          const timesUsed = isReset ? 0 : (existing ? (existing.timesUsed || 0) : 0);
+
+          validatedCodes.push({
+            id: item.id || `promo_${randomUUID().slice(0, 8)}`,
+            code: rawCode,
+            type,
+            amount,
+            enabled: Boolean(item.enabled),
+            maxUses: parsedMaxUses,
+            timesUsed,
+            expiresAt,
+            createdAt: existing?.createdAt || new Date().toISOString(),
+          });
+        }
+
+        const first = validatedCodes[0] || {};
         const newPromoConfig = {
-          enabled: Boolean(req.body.enabled),
-          code: String(req.body.code).trim().toUpperCase(),
-          type: req.body.type,
-          amount: Number(req.body.amount),
-          maxUses: parsedMaxUses,
-          timesUsed: isReset ? 0 : (current.timesUsed || 0),
+          ...first,
+          codes: validatedCodes,
         };
 
         if (typeof db.setConfig === "function") {
@@ -1756,8 +1815,14 @@ async function startServer(
           await db.write?.();
         }
 
-        logger.info("[PROMO] Config updated:", newPromoConfig);
-        return res.json({ success: true, config: newPromoConfig });
+        logger.info("[PROMO] Config updated with multiple codes:", newPromoConfig);
+        return res.json({
+          success: true,
+          config: {
+            ...(validatedCodes[0] || {}),
+            codes: validatedCodes,
+          },
+        });
       },
     );
 
@@ -3328,24 +3393,26 @@ async function startServer(
                 typeof db.getConfig === "function"
                   ? await db.getConfig()
                   : db.data?.config || {};
-              const currentPromo = fullDbConfig?.promo;
-              if (
-                currentPromo &&
-                String(currentPromo.code).trim().toUpperCase() ===
-                  String(orderBreakdown.appliedPromoCode).trim().toUpperCase()
-              ) {
-                const updatedPromo = {
-                  ...currentPromo,
-                  timesUsed: (currentPromo.timesUsed || 0) + 1,
+              const normalizedPromo = normalizePromoConfig(fullDbConfig?.promo);
+              const appliedUpper = String(orderBreakdown.appliedPromoCode).trim().toUpperCase();
+              const matchedCode = normalizedPromo.codes.find(
+                (c) => String(c.code).trim().toUpperCase() === appliedUpper,
+              );
+              if (matchedCode) {
+                matchedCode.timesUsed = (matchedCode.timesUsed || 0) + 1;
+                const first = normalizedPromo.codes[0] || {};
+                const promoToSave = {
+                  ...first,
+                  codes: normalizedPromo.codes,
                 };
                 if (typeof db.setConfig === "function") {
-                  await db.setConfig("promo", updatedPromo);
+                  await db.setConfig("promo", promoToSave);
                 } else if (db.data?.config) {
-                  db.data.config.promo = updatedPromo;
+                  db.data.config.promo = promoToSave;
                   await db.write?.();
                 }
                 logger.info(
-                  `[PROMO] Incremented usage for code ${orderBreakdown.appliedPromoCode}. Times used: ${updatedPromo.timesUsed}`,
+                  `[PROMO] Incremented usage for code ${orderBreakdown.appliedPromoCode}. Times used: ${matchedCode.timesUsed}`,
                 );
               }
             } catch (promoErr) {

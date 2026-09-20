@@ -192,4 +192,118 @@ describe('costCalc - Promo Code Discounts', () => {
     expect(breakdown.isPromoApplied).toBe(true);
     expect(breakdown.promoDiscountCents).toBe(500); // 10% of $50
   });
+
+  describe('Multiple Concurrent Promo Codes & Expiration Dates', () => {
+    const multiPromoConfig = {
+      codes: [
+        {
+          id: 'p1',
+          code: 'SUMMER20',
+          type: 'percentage',
+          amount: 20,
+          enabled: true,
+          maxUses: 100,
+          timesUsed: 10,
+          expiresAt: '2026-12-31',
+        },
+        {
+          id: 'p2',
+          code: 'FLAT5',
+          type: 'flat',
+          amount: 5.0,
+          enabled: true,
+          maxUses: null,
+          timesUsed: 3,
+          expiresAt: null, // never expires
+        },
+        {
+          id: 'p3',
+          code: 'EXPIRED15',
+          type: 'percentage',
+          amount: 15,
+          enabled: true,
+          maxUses: 50,
+          timesUsed: 2,
+          expiresAt: '2026-01-01', // already expired
+        },
+        {
+          id: 'p4',
+          code: 'PAUSED',
+          type: 'percentage',
+          amount: 30,
+          enabled: false,
+          maxUses: null,
+          timesUsed: 0,
+          expiresAt: '2026-12-31',
+        },
+        {
+          id: 'p5',
+          code: 'MAXEDOUT',
+          type: 'flat',
+          amount: 10.0,
+          enabled: true,
+          maxUses: 5,
+          timesUsed: 5,
+          expiresAt: '2026-12-31',
+        },
+      ],
+    };
+
+    it('should correctly match and apply SUMMER20 from multi-promo config', () => {
+      const breakdown = calcOrderBreakdown({
+        ...baseOptions,
+        subtotalCents: 5000,
+        promoConfig: multiPromoConfig,
+        promoCode: 'summer20',
+      });
+      expect(breakdown.isPromoApplied).toBe(true);
+      expect(breakdown.appliedPromoCode).toBe('SUMMER20');
+      expect(breakdown.promoDiscountCents).toBe(1000); // 20% of 5000
+    });
+
+    it('should correctly match and apply FLAT5 while SUMMER20 is also running', () => {
+      const breakdown = calcOrderBreakdown({
+        ...baseOptions,
+        subtotalCents: 5000,
+        promoConfig: multiPromoConfig,
+        promoCode: 'flat5',
+      });
+      expect(breakdown.isPromoApplied).toBe(true);
+      expect(breakdown.appliedPromoCode).toBe('FLAT5');
+      expect(breakdown.promoDiscountCents).toBe(500); // $5.00
+    });
+
+    it('should reject EXPIRED15 because expiration date has passed', () => {
+      const breakdown = calcOrderBreakdown({
+        ...baseOptions,
+        subtotalCents: 5000,
+        promoConfig: multiPromoConfig,
+        promoCode: 'expired15',
+      });
+      expect(breakdown.isPromoApplied).toBe(false);
+      expect(breakdown.promoDiscountCents).toBe(0);
+    });
+
+    it('should reject PAUSED because it is disabled', () => {
+      const breakdown = calcOrderBreakdown({
+        ...baseOptions,
+        subtotalCents: 5000,
+        promoConfig: multiPromoConfig,
+        promoCode: 'PAUSED',
+      });
+      expect(breakdown.isPromoApplied).toBe(false);
+      expect(breakdown.promoDiscountCents).toBe(0);
+    });
+
+    it('should reject MAXEDOUT because timesUsed equals maxUses', () => {
+      const breakdown = calcOrderBreakdown({
+        ...baseOptions,
+        subtotalCents: 5000,
+        promoConfig: multiPromoConfig,
+        promoCode: 'MAXEDOUT',
+      });
+      expect(breakdown.isPromoApplied).toBe(false);
+      expect(breakdown.promoDiscountCents).toBe(0);
+    });
+  });
 });

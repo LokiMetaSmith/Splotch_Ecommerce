@@ -3687,131 +3687,376 @@ function initShippingConfigListeners() {
 }
 
 // --- Promo Code Configuration ---
+let currentPromoCodes = [];
+
+function generateRandomPromoCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+function isCodeExpiredUI(expiresAt) {
+  if (!expiresAt) return false;
+  const str = String(expiresAt).trim();
+  if (!str) return false;
+  const now = new Date();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [year, month, day] = str.split("-").map(Number);
+    const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+    return now.getTime() > endOfDay.getTime();
+  }
+  const exp = new Date(str);
+  return !isNaN(exp.getTime()) && now.getTime() > exp.getTime();
+}
+
 async function loadPromoConfig() {
   try {
     const data = await fetchWithAuth(`${serverUrl}/api/admin/promo/config`);
     if (!data || !data.config) return;
-    const c = data.config;
 
-    const enabledCheckbox = document.getElementById("promo-enabled");
-    const statusLabel = document.getElementById("promo-status-label");
-    const codeInput = document.getElementById("promo-code");
-    const typeSelect = document.getElementById("promo-type");
-    const amountInput = document.getElementById("promo-amount");
-    const amountLabel = document.getElementById("promo-amount-label");
-    const maxUsesInput = document.getElementById("promo-max-uses");
-    const timesUsedSpan = document.getElementById("promo-times-used");
-    const usageLimitSpan = document.getElementById("promo-usage-limit-indicator");
+    if (Array.isArray(data.config.codes)) {
+      currentPromoCodes = data.config.codes.map((c) => ({
+        id: c.id || `promo_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        code: String(c.code || "").trim().toUpperCase(),
+        type: c.type === "flat" ? "flat" : "percentage",
+        amount: Number(c.amount !== undefined ? c.amount : 0),
+        enabled: Boolean(c.enabled),
+        maxUses: c.maxUses !== null && c.maxUses !== undefined && c.maxUses !== "" ? parseInt(c.maxUses, 10) : null,
+        timesUsed: Number(c.timesUsed || 0),
+        expiresAt: c.expiresAt ? String(c.expiresAt).trim() : null,
+        resetTimesUsed: false,
+      }));
+    } else if (data.config.code) {
+      currentPromoCodes = [
+        {
+          id: data.config.id || "promo_1",
+          code: String(data.config.code).trim().toUpperCase(),
+          type: data.config.type === "flat" ? "flat" : "percentage",
+          amount: Number(data.config.amount || 0),
+          enabled: Boolean(data.config.enabled),
+          maxUses: data.config.maxUses ? parseInt(data.config.maxUses, 10) : null,
+          timesUsed: Number(data.config.timesUsed || 0),
+          expiresAt: data.config.expiresAt ? String(data.config.expiresAt).trim() : null,
+          resetTimesUsed: false,
+        },
+      ];
+    } else {
+      currentPromoCodes = [];
+    }
 
-    if (enabledCheckbox) {
-      enabledCheckbox.checked = Boolean(c.enabled);
-    }
-    if (statusLabel) {
-      statusLabel.textContent = c.enabled ? "Active" : "Inactive";
-      statusLabel.className = `ml-3 text-sm font-medium ${c.enabled ? "text-green-600 font-bold" : "text-gray-900"}`;
-    }
-    if (codeInput) codeInput.value = c.code || "";
-    if (typeSelect) typeSelect.value = c.type || "percentage";
-    if (amountLabel) {
-      amountLabel.textContent = c.type === "flat" ? "Discount Amount ($)" : "Discount Amount (%)";
-    }
-    if (amountInput) amountInput.value = c.amount !== undefined ? c.amount : "";
-    if (maxUsesInput) maxUsesInput.value = (c.maxUses !== null && c.maxUses !== undefined) ? c.maxUses : "";
-    if (timesUsedSpan) timesUsedSpan.textContent = c.timesUsed || 0;
-    if (usageLimitSpan) {
-      if (c.maxUses !== null && c.maxUses !== undefined && c.maxUses > 0) {
-        const isExhausted = (c.timesUsed || 0) >= c.maxUses;
-        usageLimitSpan.textContent = isExhausted
-          ? `(Limit of ${c.maxUses} reached)`
-          : `(out of ${c.maxUses} max)`;
-        usageLimitSpan.className = `ml-2 text-xs font-semibold ${isExhausted ? "text-red-600" : "text-gray-500"}`;
-      } else {
-        usageLimitSpan.textContent = "(Unlimited uses)";
-        usageLimitSpan.className = "ml-2 text-xs text-gray-500";
-      }
-    }
+    renderPromoCodeCards();
   } catch (err) {
     console.warn("[PRINTSHOP] Failed to load promo config:", err);
   }
 }
 
+function renderPromoCodeCards() {
+  const container = document.getElementById("promo-codes-container");
+  const emptyState = document.getElementById("promo-empty-state");
+  const summaryCounts = document.getElementById("promo-summary-counts");
+
+  if (!container) return;
+
+  if (currentPromoCodes.length === 0) {
+    container.innerHTML = "";
+    if (emptyState) emptyState.classList.remove("hidden");
+    if (summaryCounts) summaryCounts.textContent = "0 promo codes";
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add("hidden");
+
+  let activeCount = 0;
+  let expiredCount = 0;
+  for (const c of currentPromoCodes) {
+    const expired = isCodeExpiredUI(c.expiresAt);
+    if (expired) expiredCount++;
+    if (c.enabled && !expired && (c.maxUses === null || c.timesUsed < c.maxUses)) {
+      activeCount++;
+    }
+  }
+
+  if (summaryCounts) {
+    summaryCounts.textContent = `${activeCount} active · ${expiredCount} expired · ${currentPromoCodes.length} total`;
+  }
+
+  container.innerHTML = "";
+
+  currentPromoCodes.forEach((item, idx) => {
+    const isExpired = isCodeExpiredUI(item.expiresAt);
+    const isLimitReached = Boolean(item.maxUses !== null && item.timesUsed >= item.maxUses);
+
+    let statusBadgeClass = "bg-green-100 text-green-800 border-green-300";
+    let statusBadgeText = "Active";
+
+    if (!item.enabled) {
+      statusBadgeClass = "bg-gray-100 text-gray-700 border-gray-300";
+      statusBadgeText = "Inactive";
+    } else if (isExpired) {
+      statusBadgeClass = "bg-red-100 text-red-700 border-red-300";
+      statusBadgeText = "Expired";
+    } else if (isLimitReached) {
+      statusBadgeClass = "bg-amber-100 text-amber-800 border-amber-300";
+      statusBadgeText = "Limit Reached";
+    }
+
+    const card = document.createElement("div");
+    card.className = "p-4 border rounded-lg bg-gray-50/70 shadow-sm border-gray-200 transition-all hover:border-gray-300 space-y-3";
+    card.dataset.promoIndex = String(idx);
+
+    card.innerHTML = `
+      <div class="flex items-center justify-between pb-2 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" class="sr-only peer promo-card-enabled" ${item.enabled ? "checked" : ""}>
+            <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
+            <span class="ml-2 text-xs font-semibold text-gray-700">Enabled</span>
+          </label>
+          <span class="promo-card-status-badge text-xs font-bold px-2 py-0.5 rounded-full border ${statusBadgeClass}">
+            ${statusBadgeText}
+          </span>
+        </div>
+        <button type="button" class="promo-card-delete text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 rounded hover:bg-red-50 transition-colors flex items-center gap-1" title="Delete promo code">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          Delete
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Promo Code</label>
+          <div class="flex items-center gap-1.5">
+            <input type="text" class="promo-card-code font-mono font-bold uppercase tracking-wider block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-2.5 py-1.5 border" value="${escapeHtml(item.code || "")}" placeholder="e.g. SUMMER25" maxlength="50" required>
+            <button type="button" class="promo-card-generate px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-xs font-medium rounded shadow-sm text-gray-700 whitespace-nowrap" title="Generate random code">
+              🎲 Random
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+          <select class="promo-card-type block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-2 py-1.5 border bg-white">
+            <option value="percentage" ${item.type === "percentage" ? "selected" : ""}>Percentage (%)</option>
+            <option value="flat" ${item.type === "flat" ? "selected" : ""}>Flat Amount ($)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="promo-card-amount-label block text-xs font-medium text-gray-700 mb-1">
+            ${item.type === "flat" ? "Discount ($)" : "Discount (%)"}
+          </label>
+          <input type="number" step="any" min="0" ${item.type === "percentage" ? 'max="100"' : ""} class="promo-card-amount block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-2.5 py-1.5 border" value="${item.amount !== undefined ? item.amount : ""}" placeholder="0" required>
+        </div>
+
+        <div class="sm:col-span-2">
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-medium text-gray-700">Expiration Date</label>
+            ${isExpired ? `<span class="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.2 rounded border border-red-200">Expired</span>` : ""}
+          </div>
+          <input type="date" class="promo-card-expires block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs px-2.5 py-1.5 border bg-white" value="${item.expiresAt ? String(item.expiresAt).slice(0, 10) : ""}">
+          <p class="text-[11px] text-gray-400 mt-0.5">Expires at 11:59:59 PM on date. Blank = no expiration.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Usage Limit</label>
+          <input type="number" min="1" step="1" class="promo-card-maxuses block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-2.5 py-1.5 border" value="${item.maxUses !== null && item.maxUses !== undefined ? item.maxUses : ""}" placeholder="Unlimited">
+          <p class="text-[11px] text-gray-400 mt-0.5">Blank = unlimited</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Usage Tracker</label>
+          <div class="flex items-center justify-between gap-1 mt-0.5">
+            <span class="promo-card-times-used text-xs font-semibold px-2 py-1 rounded bg-indigo-50 border border-indigo-200 text-indigo-800">
+              ${item.resetTimesUsed ? "0 (Pending Save)" : `${item.timesUsed || 0} uses`}
+            </span>
+            <button type="button" class="promo-card-reset text-[11px] text-gray-600 hover:text-indigo-600 font-medium px-1.5 py-1 rounded hover:bg-indigo-50 border border-gray-200 transition-colors" title="Reset counter to 0">
+              🔄 Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Event handlers
+    const enabledInput = card.querySelector(".promo-card-enabled");
+    const codeInput = card.querySelector(".promo-card-code");
+    const generateBtn = card.querySelector(".promo-card-generate");
+    const typeSelect = card.querySelector(".promo-card-type");
+    const amountInput = card.querySelector(".promo-card-amount");
+    const amountLabel = card.querySelector(".promo-card-amount-label");
+    const expiresInput = card.querySelector(".promo-card-expires");
+    const maxUsesInput = card.querySelector(".promo-card-maxuses");
+    const resetBtn = card.querySelector(".promo-card-reset");
+    const deleteBtn = card.querySelector(".promo-card-delete");
+
+    if (enabledInput) {
+      enabledInput.addEventListener("change", () => {
+        item.enabled = enabledInput.checked;
+        renderPromoCodeCards();
+      });
+    }
+
+    if (codeInput) {
+      codeInput.addEventListener("input", (e) => {
+        item.code = e.target.value.toUpperCase();
+      });
+    }
+
+    if (generateBtn && codeInput) {
+      generateBtn.addEventListener("click", () => {
+        const newCode = generateRandomPromoCode();
+        codeInput.value = newCode;
+        item.code = newCode;
+      });
+    }
+
+    if (typeSelect && amountLabel && amountInput) {
+      typeSelect.addEventListener("change", () => {
+        item.type = typeSelect.value;
+        if (item.type === "flat") {
+          amountLabel.textContent = "Discount ($)";
+          amountInput.removeAttribute("max");
+        } else {
+          amountLabel.textContent = "Discount (%)";
+          amountInput.setAttribute("max", "100");
+        }
+      });
+    }
+
+    if (amountInput) {
+      amountInput.addEventListener("input", (e) => {
+        item.amount = parseFloat(e.target.value) || 0;
+      });
+    }
+
+    if (expiresInput) {
+      expiresInput.addEventListener("change", (e) => {
+        item.expiresAt = e.target.value ? e.target.value : null;
+        renderPromoCodeCards();
+      });
+    }
+
+    if (maxUsesInput) {
+      maxUsesInput.addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        item.maxUses = val ? parseInt(val, 10) : null;
+      });
+    }
+
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        if (confirm(`Reset times used counter to 0 for promo code "${item.code || "this code"}"?`)) {
+          item.resetTimesUsed = true;
+          const timesUsedSpan = card.querySelector(".promo-card-times-used");
+          if (timesUsedSpan) timesUsedSpan.textContent = "0 (Pending Save)";
+          showSuccessToast("Usage counter will reset to 0 upon saving.");
+        }
+      });
+    }
+
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", () => {
+        if (confirm(`Are you sure you want to delete promo code "${item.code || "this code"}"?`)) {
+          currentPromoCodes.splice(idx, 1);
+          renderPromoCodeCards();
+          showSuccessToast("Promo code removed. Click 'Save Promo Settings' to commit.");
+        }
+      });
+    }
+
+    container.appendChild(card);
+  });
+}
+
+function addPromoCode() {
+  currentPromoCodes.push({
+    id: `promo_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    code: generateRandomPromoCode(),
+    type: "percentage",
+    amount: 10,
+    enabled: true,
+    maxUses: null,
+    timesUsed: 0,
+    expiresAt: null,
+    resetTimesUsed: false,
+  });
+  renderPromoCodeCards();
+  const container = document.getElementById("promo-codes-container");
+  if (container && container.lastElementChild) {
+    container.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const codeInput = container.lastElementChild.querySelector(".promo-card-code");
+    if (codeInput) codeInput.focus();
+  }
+}
+
 function initPromoConfigListeners() {
   const form = document.getElementById("promo-config-form");
-  const enabledCheckbox = document.getElementById("promo-enabled");
-  const statusLabel = document.getElementById("promo-status-label");
-  const typeSelect = document.getElementById("promo-type");
-  const amountLabel = document.getElementById("promo-amount-label");
-  const generateBtn = document.getElementById("generate-promo-btn");
-  const resetBtn = document.getElementById("reset-promo-uses-btn");
-  const codeInput = document.getElementById("promo-code");
+  const addBtn = document.getElementById("add-promo-code-btn");
+  const emptyAddBtn = document.getElementById("empty-add-promo-btn");
 
-  if (enabledCheckbox && statusLabel) {
-    enabledCheckbox.addEventListener("change", () => {
-      statusLabel.textContent = enabledCheckbox.checked ? "Active" : "Inactive";
-      statusLabel.className = `ml-3 text-sm font-medium ${enabledCheckbox.checked ? "text-green-600 font-bold" : "text-gray-900"}`;
-    });
+  if (addBtn) {
+    addBtn.addEventListener("click", () => addPromoCode());
   }
-
-  if (typeSelect && amountLabel) {
-    typeSelect.addEventListener("change", () => {
-      amountLabel.textContent = typeSelect.value === "flat" ? "Discount Amount ($)" : "Discount Amount (%)";
-    });
-  }
-
-  if (generateBtn && codeInput) {
-    generateBtn.addEventListener("click", () => {
-      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-      let code = "";
-      for (let i = 0; i < 8; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      codeInput.value = code;
-    });
-  }
-
-  let shouldResetUses = false;
-  if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
-      if (confirm("Are you sure you want to reset the times used counter to 0?")) {
-        shouldResetUses = true;
-        const timesUsedSpan = document.getElementById("promo-times-used");
-        if (timesUsedSpan) timesUsedSpan.textContent = "0 (Pending Save)";
-        showSuccessToast("Uses counter will reset to 0 upon saving.");
-      }
-    });
+  if (emptyAddBtn) {
+    emptyAddBtn.addEventListener("click", () => addPromoCode());
   }
 
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const statusEl = document.getElementById("promo-config-status");
-      const isEnabled = Boolean(document.getElementById("promo-enabled")?.checked);
-      const code = String(document.getElementById("promo-code")?.value || "").trim().toUpperCase();
-      const type = document.getElementById("promo-type")?.value || "percentage";
-      const amount = parseFloat(document.getElementById("promo-amount")?.value || "0");
-      const maxUsesRaw = document.getElementById("promo-max-uses")?.value?.trim();
-      const maxUses = maxUsesRaw ? parseInt(maxUsesRaw, 10) : null;
 
-      if (isEnabled && !code) {
-        showErrorToast("Promo code cannot be empty when promo is enabled.");
-        return;
-      }
-      if (isNaN(amount) || amount < 0) {
-        showErrorToast("Discount amount must be a non-negative number.");
-        return;
-      }
-      if (type === "percentage" && amount > 100) {
-        showErrorToast("Percentage discount cannot exceed 100%.");
-        return;
+      // Validate all codes before sending
+      const seenCodes = new Set();
+      for (let i = 0; i < currentPromoCodes.length; i++) {
+        const item = currentPromoCodes[i];
+        const rawCode = String(item.code || "").trim().toUpperCase();
+
+        if (!rawCode) {
+          showErrorToast(`Promo code at row ${i + 1} cannot be empty.`);
+          return;
+        }
+        if (rawCode.length > 50) {
+          showErrorToast(`Promo code '${rawCode}' exceeds 50 characters.`);
+          return;
+        }
+        if (seenCodes.has(rawCode)) {
+          showErrorToast(`Duplicate promo code '${rawCode}' found. Each code must be unique.`);
+          return;
+        }
+        seenCodes.add(rawCode);
+
+        if (isNaN(item.amount) || item.amount < 0) {
+          showErrorToast(`Discount amount for '${rawCode}' must be a non-negative number.`);
+          return;
+        }
+        if (item.type === "percentage" && item.amount > 100) {
+          showErrorToast(`Percentage discount for '${rawCode}' cannot exceed 100%.`);
+          return;
+        }
+        if (item.maxUses !== null && item.maxUses !== undefined && item.maxUses !== "") {
+          const maxNum = Number(item.maxUses);
+          if (!Number.isInteger(maxNum) || maxNum < 1) {
+            showErrorToast(`Usage limit for '${rawCode}' must be a positive integer.`);
+            return;
+          }
+        }
       }
 
       const payload = {
-        enabled: isEnabled,
-        code,
-        type,
-        amount,
-        maxUses,
-        resetTimesUsed: shouldResetUses,
+        codes: currentPromoCodes.map((c) => ({
+          id: c.id,
+          code: String(c.code || "").trim().toUpperCase(),
+          type: c.type === "flat" ? "flat" : "percentage",
+          amount: Number(c.amount || 0),
+          enabled: Boolean(c.enabled),
+          maxUses: c.maxUses !== null && c.maxUses !== undefined && c.maxUses !== "" ? parseInt(c.maxUses, 10) : null,
+          expiresAt: c.expiresAt ? String(c.expiresAt).trim() : null,
+          resetTimesUsed: Boolean(c.resetTimesUsed),
+        })),
       };
 
       try {
@@ -3819,17 +4064,19 @@ function initPromoConfigListeners() {
           method: "POST",
           body: JSON.stringify(payload),
         });
+
         if (result && result.success) {
-          shouldResetUses = false;
           showSuccessToast("Promo settings saved!");
           if (statusEl) {
             statusEl.textContent = "Saved ✓";
             statusEl.className = "text-sm text-green-600";
-            setTimeout(() => { statusEl.textContent = ""; }, 3000);
+            setTimeout(() => {
+              if (statusEl.textContent === "Saved ✓") statusEl.textContent = "";
+            }, 3000);
           }
           await loadPromoConfig();
         } else {
-          throw new Error("Server returned failure");
+          throw new Error(result?.error || "Server returned failure");
         }
       } catch (err) {
         showErrorToast(`Failed to save promo settings: ${err.message}`);
