@@ -59,16 +59,28 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
       }
     }
 
-    // Default fallback if unset
-    if (!key) key = 'ck_splotch_default_key';
-    if (!secret) secret = 'cs_splotch_default_secret';
+    if (!key || !secret) {
+      throw new Error('WooCommerce credentials are not configured.');
+    }
 
     return { consumerKey: key, consumerSecret: secret };
   }
 
   // Middleware: Authenticate WooCommerce requests via Basic Auth or Query String
   function authenticateWooCommerce(req, res, next) {
-    const { consumerKey, consumerSecret } = getCredentials();
+    let consumerKey, consumerSecret;
+    try {
+      const creds = getCredentials();
+      consumerKey = creds.consumerKey;
+      consumerSecret = creds.consumerSecret;
+    } catch (err) {
+      logger.warn(`[WOOCOMMERCE] Authentication failed: ${err.message}`);
+      return res.status(401).json({
+        code: 'woocommerce_rest_cannot_view',
+        message: 'Sorry, you cannot list resources.',
+        data: { status: 401 }
+      });
+    }
 
     let clientKey = '';
     let clientSecret = '';
@@ -1120,7 +1132,25 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
     const callback_url = params.callback_url;
     const user_id = params.user_id;
     const scope = params.scope || 'read_write';
-    const { consumerKey, consumerSecret } = getCredentials();
+
+    let consumerKey, consumerSecret;
+    try {
+      const creds = getCredentials();
+      consumerKey = creds.consumerKey;
+      consumerSecret = creds.consumerSecret;
+    } catch (err) {
+      logger.error(`[WOOCOMMERCE] OAuth connection failed: ${err.message}`);
+      return res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>Configuration Error</title></head>
+        <body style="font-family: sans-serif; padding: 2rem; text-align: center;">
+          <h2>Configuration Error</h2>
+          <p>The WooCommerce API credentials are not configured on this server.</p>
+        </body>
+        </html>
+      `);
+    }
 
     logger.info(`[WOOCOMMERCE] Completing OAuth connection for user_id=${user_id}`);
 
