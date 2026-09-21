@@ -13,6 +13,9 @@ describe('WooCommerce REST API v3 Emulation (Pirate Ship Integration)', () => {
   let testConsumerSecret = 'cs_test_654321';
 
   beforeEach(() => {
+    testConsumerKey = 'ck_test_123456';
+    testConsumerSecret = 'cs_test_654321';
+
     mockOrders = {
       'order-uuid-1': {
         orderId: 'order-uuid-1',
@@ -128,6 +131,16 @@ describe('WooCommerce REST API v3 Emulation (Pirate Ship Integration)', () => {
 
     it('should reject unauthenticated requests to system_status', async () => {
       const res = await request(app).get('/wp-json/wc/v3/system_status');
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('woocommerce_rest_cannot_view');
+    });
+
+    it('should reject requests when server is not configured with credentials', async () => {
+      testConsumerKey = null;
+      testConsumerSecret = null;
+      mockDb.data.config.woocommerce.consumerKey = null;
+      mockDb.data.config.woocommerce.consumerSecret = null;
+      const res = await request(app).get('/wp-json/wc/v3/system_status').auth('random_key', 'random_secret');
       expect(res.status).toBe(401);
       expect(res.body.code).toBe('woocommerce_rest_cannot_view');
     });
@@ -344,6 +357,18 @@ describe('WooCommerce REST API v3 Emulation (Pirate Ship Integration)', () => {
       expect(res.headers.location).toContain('https://ship.pirateship.com/woocommerce/install/redirect');
       expect(res.headers.location).toContain('success=1');
       expect(res.headers.location).toContain('user_id=test-user-123');
+    });
+
+    it('should return 500 on GET /wc-auth/v1/grant when server is not configured', async () => {
+      testConsumerKey = null;
+      testConsumerSecret = null;
+      mockDb.data.config.woocommerce.consumerKey = null;
+      mockDb.data.config.woocommerce.consumerSecret = null;
+      const res = await request(app)
+        .get('/wc-auth/v1/grant?return_url=https://ship.pirateship.com/woocommerce/install/redirect&user_id=test-user-123');
+
+      expect(res.status).toBe(500);
+      expect(res.text).toContain('Configuration Error');
     });
 
     it('should approve authorization on POST /wc-auth/v1/authorize with urlencoded form', async () => {
