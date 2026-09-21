@@ -46,7 +46,19 @@ cscli collections install crowdsecurity/sshd --force || true
 # Step 4: Restart and verify CrowdSec
 echo "7. Restarting CrowdSec service..."
 systemctl restart crowdsec
-systemctl restart crowdsec-firewall-bouncer || true
+
+# Ensure firewall bouncer has a valid API key registered with LAPI
+if [ -f /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml ]; then
+  CURRENT_KEY=$(grep -E "^api_key:" /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml | awk '{print $2}' || true)
+  if [ -z "$CURRENT_KEY" ] || [ "$CURRENT_KEY" = "<API_KEY>" ] || [ "$CURRENT_KEY" = "null" ]; then
+    echo "Registering firewall bouncer API key with CrowdSec LAPI..."
+    cscli bouncers delete firewall-bouncer 2>/dev/null || true
+    API_KEY=$(cscli bouncers add firewall-bouncer -o raw)
+    sed -i "s/^api_key:.*/api_key: ${API_KEY}/" /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+  fi
+  systemctl enable crowdsec-firewall-bouncer || true
+  systemctl restart crowdsec-firewall-bouncer || true
+fi
 
 echo "8. Verifying CrowdSec status..."
 cscli metrics

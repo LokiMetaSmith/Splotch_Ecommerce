@@ -53,9 +53,21 @@ cp "${REPO_ROOT}/server/crowdsec/scenarios/splotch-attacks.yaml" /etc/crowdsec/s
 cscli collections install crowdsecurity/linux --force || true
 cscli collections install crowdsecurity/sshd --force || true
 
-systemctl enable crowdsec crowdsec-firewall-bouncer || true
+systemctl enable crowdsec
 systemctl restart crowdsec
-systemctl restart crowdsec-firewall-bouncer || true
+
+# Ensure firewall bouncer has a valid API key registered with LAPI
+if [ -f /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml ]; then
+  CURRENT_KEY=$(grep -E "^api_key:" /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml | awk '{print $2}' || true)
+  if [ -z "$CURRENT_KEY" ] || [ "$CURRENT_KEY" = "<API_KEY>" ] || [ "$CURRENT_KEY" = "null" ]; then
+    echo "Registering firewall bouncer API key with CrowdSec LAPI..."
+    cscli bouncers delete firewall-bouncer 2>/dev/null || true
+    API_KEY=$(cscli bouncers add firewall-bouncer -o raw)
+    sed -i "s/^api_key:.*/api_key: ${API_KEY}/" /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+  fi
+  systemctl enable crowdsec-firewall-bouncer || true
+  systemctl restart crowdsec-firewall-bouncer || true
+fi
 echo "✅ CrowdSec engine and nftables firewall bouncer are active."
 
 # ------------------------------------------------------------

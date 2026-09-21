@@ -6,9 +6,9 @@ groupby: "evt.Meta.source_ip"
 capacity: 2
 leakspeed: 10m
 blackhole: 10m
-remediation: true
 labels:
   type: splotch_attack
   service: splotch
+  remediation: true
   confidence: 3
   spoofable: 0
