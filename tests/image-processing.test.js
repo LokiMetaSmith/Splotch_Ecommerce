@@ -1,5 +1,5 @@
 // tests/image-processing.test.js
-import { imageHasTransparentBorder, traceContour, simplifyPolygon, perpendicularDistance } from '../src/lib/image-processing.js';
+import { imageHasTransparentBorder, traceContour, simplifyPolygon, perpendicularDistance, getPolygonBounds } from '../src/lib/image-processing.js';
 
 describe('Image Processing Library', () => {
 
@@ -185,6 +185,71 @@ describe('Image Processing Library', () => {
             const l2 = {x: 10, y: 0};
             // Distance from (5,5) to x-axis is 5
             expect(perpendicularDistance(p, l1, l2)).toBe(5);
+        });
+    });
+
+    describe('getPolygonBounds', () => {
+        it('should return correct bounds for a typical polygon', () => {
+            const points = [
+                { x: -5, y: 10 },
+                { x: 10, y: -20 },
+                { x: 25, y: 5 },
+                { x: 0, y: 30 }
+            ];
+            const bounds = getPolygonBounds(points);
+            expect(bounds).toEqual({
+                minX: -5,
+                minY: -20,
+                maxX: 25,
+                maxY: 30,
+                width: 30,
+                height: 50
+            });
+        });
+
+        it('should handle a single point correctly', () => {
+            const points = [{ x: 5, y: 5 }];
+            const bounds = getPolygonBounds(points);
+            expect(bounds).toEqual({
+                minX: 5,
+                minY: 5,
+                maxX: 5,
+                maxY: 5,
+                width: 0,
+                height: 0
+            });
+        });
+
+        it('should handle a horizontal line', () => {
+            const points = [
+                { x: -10, y: 5 },
+                { x: 10, y: 5 }
+            ];
+            const bounds = getPolygonBounds(points);
+            expect(bounds).toEqual({
+                minX: -10,
+                minY: 5,
+                maxX: 10,
+                maxY: 5,
+                width: 20,
+                height: 0
+            });
+        });
+
+        it('should handle a vertical line', () => {
+            const points = [
+                { x: 7, y: -5 },
+                { x: 7, y: 15 }
+            ];
+            const bounds = getPolygonBounds(points);
+            expect(bounds).toEqual({
+                minX: 7,
+                minY: -5,
+                maxX: 7,
+                maxY: 15,
+                width: 0,
+                height: 20
+            });
         });
     });
 
