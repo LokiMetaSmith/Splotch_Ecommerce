@@ -1183,6 +1183,31 @@ async function startServer(
       next();
     });
 
+    // SECURITY: Block hidden files and sensitive configuration paths.
+    app.use((req, res, next) => {
+      // Decode URL to prevent bypass using URL-encoded paths
+      let requestPath;
+      try {
+        requestPath = decodeURIComponent(req.path);
+      } catch (e) {
+        requestPath = req.path;
+      }
+
+      // Block dotfiles except .well-known
+      if (/(^|\/)\.(?!well-known)/.test(requestPath)) {
+        logger.warn(`[SECURITY] Blocked access to hidden file/directory: ${requestPath} from IP ${req.ip}`);
+        return res.status(404).send("Not Found");
+      }
+
+      // Block common sensitive configuration and backup extensions
+      if (/\.(bak|conf|config|env|ini|log|sh|sql|yaml|yml)$/i.test(requestPath)) {
+        logger.warn(`[SECURITY] Blocked access to sensitive file extension: ${requestPath} from IP ${req.ip}`);
+        return res.status(404).send("Not Found");
+      }
+
+      next();
+    });
+
     // SECURITY: Enforce strict CSP for uploaded files to prevent Stored XSS
     // This sandbox directive prevents script execution even if an attacker uploads a malicious SVG/HTML file
     // that bypasses other checks.
@@ -1211,7 +1236,7 @@ async function startServer(
     app.use(
       express.static(path.join(__dirname, "../public"), {
         maxAge: "1h",
-        dotfiles: "allow",
+        dotfiles: "ignore",
       }),
     );
 
