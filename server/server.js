@@ -53,10 +53,7 @@ import {
   findMatchingPromo,
 } from "./lib/costCalc.js";
 import { logOrderTransition, readAuditLogForOrder } from "./lib/auditLogger.js";
-import {
-  getTelegramConfig,
-  DEFAULT_TELEGRAM_CONFIG,
-} from "./lib/telegramReminder.js";
+import { getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from "./lib/telegramReminder.js";
 
 import { Markup } from "telegraf";
 import { getOrderStatusKeyboard } from "./telegramHelpers.js";
@@ -99,13 +96,7 @@ import util from "util";
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
 
-export const FINAL_STATUSES = [
-  "SHIPPED",
-  "CANCELED",
-  "COMPLETED",
-  "DELIVERED",
-  "ARCHIVED",
-];
+export const FINAL_STATUSES = ["SHIPPED", "CANCELED", "COMPLETED", "DELIVERED", "ARCHIVED"];
 export const VALID_STATUSES = [
   "NEW",
   "ACCEPTED",
@@ -415,11 +406,7 @@ export async function runRetentionFlush(dbInstance, options = {}) {
     }
   }
 
-  return {
-    flushedCount: flushedOrderIds.length,
-    flushedOrderIds,
-    archivedCount: flushedOrderIds.length,
-  };
+  return { flushedCount: flushedOrderIds.length, flushedOrderIds, archivedCount: flushedOrderIds.length };
 }
 
 // Define an async function to contain all server logic
@@ -485,13 +472,9 @@ async function startServer(
       } else if (jobName === "update-status") {
         await updateOrderStatusNotification(bot, db, data.orderId, data.status);
       } else if (jobName === "security-alert") {
-        const channelId =
-          getSecret("TELEGRAM_SECURITY_CHANNEL_ID") ||
-          getSecret("TELEGRAM_CHANNEL_ID");
+        const channelId = getSecret("TELEGRAM_SECURITY_CHANNEL_ID") || getSecret("TELEGRAM_CHANNEL_ID");
         if (bot && bot.telegram && channelId && data.message) {
-          await bot.telegram.sendMessage(channelId, data.message, {
-            parse_mode: "Markdown",
-          });
+          await bot.telegram.sendMessage(channelId, data.message, { parse_mode: "Markdown" });
         }
       }
     } else {
@@ -577,10 +560,7 @@ async function startServer(
     logger.info("[SERVER] LowDB database initialized at:", dbPath);
 
     // Load the refresh token from the database if it exists
-    const config =
-      typeof db.getConfig === "function"
-        ? await db.getConfig()
-        : db.data?.config || {};
+    const config = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
     if (config?.google_refresh_token) {
       oauth2Client.setCredentials({
         refresh_token: config.google_refresh_token,
@@ -1059,12 +1039,8 @@ async function startServer(
 
     app.use((req, res, next) => {
       const reqPath = req.path;
-      const isCritical = CRITICAL_HONEYPOT_PATTERNS.some((pattern) =>
-        pattern.test(reqPath),
-      );
-      const isScanner =
-        !isCritical &&
-        SCANNER_HONEYPOT_PATTERNS.some((pattern) => pattern.test(reqPath));
+      const isCritical = CRITICAL_HONEYPOT_PATTERNS.some((pattern) => pattern.test(reqPath));
+      const isScanner = !isCritical && SCANNER_HONEYPOT_PATTERNS.some((pattern) => pattern.test(reqPath));
 
       if (isCritical || isScanner) {
         const ip = getClientIp(req);
@@ -1219,13 +1195,13 @@ async function startServer(
 
       // Block dotfiles except .well-known
       if (/(^|\/)\.(?!well-known)/.test(requestPath)) {
+        logger.warn(`[SECURITY] Blocked access to hidden file/directory: ${requestPath} from IP ${req.ip}`);
         return res.status(404).send("Not Found");
       }
 
       // Block common sensitive configuration and backup extensions
-      if (
-        /\.(bak|conf|config|env|ini|log|sh|sql|yaml|yml)$/i.test(requestPath)
-      ) {
+      if (/\.(bak|conf|config|env|ini|log|sh|sql|yaml|yml)$/i.test(requestPath)) {
+        logger.warn(`[SECURITY] Blocked access to sensitive file extension: ${requestPath} from IP ${req.ip}`);
         return res.status(404).send("Not Found");
       }
 
@@ -1664,10 +1640,7 @@ async function startServer(
             quantity,
             promoCode,
           } = req.body;
-          const fullConfig =
-            typeof db.getConfig === "function"
-              ? await db.getConfig()
-              : db.data?.config || {};
+          const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
           const shippingCfg = {
             ...DEFAULT_SHIPPING_CONFIG,
             ...(fullConfig?.shipping || {}),
@@ -1714,43 +1687,26 @@ async function startServer(
       async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-          return res
-            .status(400)
-            .json({ valid: false, error: errors.array()[0].msg });
+          return res.status(400).json({ valid: false, error: errors.array()[0].msg });
         }
 
         try {
           const rawCode = String(req.body.code || "").trim();
-          const subtotalCents =
-            req.body.subtotalCents !== undefined
-              ? Number(req.body.subtotalCents)
-              : null;
-          const fullConfig =
-            typeof db.getConfig === "function"
-              ? await db.getConfig()
-              : db.data?.config || {};
+          const subtotalCents = req.body.subtotalCents !== undefined ? Number(req.body.subtotalCents) : null;
+          const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
           const promoConfig = fullConfig?.promo;
 
           const promo = findMatchingPromo(promoConfig, rawCode);
           if (!promo) {
-            return res
-              .status(400)
-              .json({ valid: false, error: "Invalid promo code." });
+            return res.status(400).json({ valid: false, error: "Invalid promo code." });
           }
 
           if (!promo.enabled) {
-            return res
-              .status(400)
-              .json({
-                valid: false,
-                error: "Promo code is inactive or invalid.",
-              });
+            return res.status(400).json({ valid: false, error: "Promo code is inactive or invalid." });
           }
 
           if (isPromoExpired(promo.expiresAt)) {
-            return res
-              .status(400)
-              .json({ valid: false, error: "Promo code has expired." });
+            return res.status(400).json({ valid: false, error: "Promo code has expired." });
           }
 
           if (
@@ -1758,20 +1714,13 @@ async function startServer(
             promo.maxUses !== null &&
             (promo.timesUsed || 0) >= promo.maxUses
           ) {
-            return res
-              .status(400)
-              .json({
-                valid: false,
-                error: "Promo code usage limit has been reached.",
-              });
+            return res.status(400).json({ valid: false, error: "Promo code usage limit has been reached." });
           }
 
           let discountCents = 0;
           if (subtotalCents !== null && subtotalCents > 0) {
             if (promo.type === "percentage") {
-              discountCents = Math.round(
-                (subtotalCents * (promo.amount || 0)) / 100,
-              );
+              discountCents = Math.round((subtotalCents * (promo.amount || 0)) / 100);
             } else {
               discountCents = Math.round((promo.amount || 0) * 100);
             }
@@ -1788,9 +1737,7 @@ async function startServer(
           });
         } catch (err) {
           logger.error("[PROMO] Error validating promo code:", err);
-          return res
-            .status(500)
-            .json({ valid: false, error: "Failed to validate promo code." });
+          return res.status(500).json({ valid: false, error: "Failed to validate promo code." });
         }
       },
     );
@@ -1823,9 +1770,7 @@ async function startServer(
         body("handlingFeePerItemCents")
           .optional()
           .isInt({ min: 0 })
-          .withMessage(
-            "handlingFeePerItemCents must be a non-negative integer",
-          ),
+          .withMessage("handlingFeePerItemCents must be a non-negative integer"),
         body("squareFeePercent")
           .isFloat({ min: 0, max: 1 })
           .withMessage("squareFeePercent must be between 0 and 1"),
@@ -1874,180 +1819,149 @@ async function startServer(
     );
 
     // --- Promo Code Config (admin) ---
-    app.get("/api/admin/promo/config", authenticateToken, async (req, res) => {
-      if (!(await isAdmin(req.user)))
-        return res.status(403).json({ error: "Forbidden" });
-      const fullConfig =
-        typeof db.getConfig === "function"
-          ? await db.getConfig()
-          : db.data?.config || {};
-      const normalized = normalizePromoConfig(fullConfig?.promo);
-      const first = normalized.codes[0] || {
-        enabled: false,
-        code: "",
-        type: "percentage",
-        amount: 0,
-        maxUses: null,
-        timesUsed: 0,
-        expiresAt: null,
-      };
-      res.json({
-        success: true,
-        config: {
-          ...first,
-          codes: normalized.codes,
-        },
-      });
-    });
-
-    app.post("/api/admin/promo/config", authenticateToken, async (req, res) => {
-      if (!(await isAdmin(req.user)))
-        return res.status(403).json({ error: "Forbidden" });
-
-      const fullConfig =
-        typeof db.getConfig === "function"
-          ? await db.getConfig()
-          : db.data?.config || {};
-      const currentNormalized = normalizePromoConfig(fullConfig?.promo);
-
-      let incomingCodes = [];
-      if (Array.isArray(req.body.codes)) {
-        incomingCodes = req.body.codes;
-      } else if (req.body.code !== undefined) {
-        // Legacy single code payload
-        incomingCodes = [
-          {
-            id: req.body.id || "promo_1",
-            code: req.body.code,
-            type: req.body.type,
-            amount: req.body.amount,
-            enabled: req.body.enabled,
-            maxUses: req.body.maxUses,
-            expiresAt: req.body.expiresAt,
-            resetTimesUsed: req.body.resetTimesUsed,
+    app.get(
+      "/api/admin/promo/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
+        const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
+        const normalized = normalizePromoConfig(fullConfig?.promo);
+        const first = normalized.codes[0] || {
+          enabled: false,
+          code: "",
+          type: "percentage",
+          amount: 0,
+          maxUses: null,
+          timesUsed: 0,
+          expiresAt: null,
+        };
+        res.json({
+          success: true,
+          config: {
+            ...first,
+            codes: normalized.codes,
           },
-        ];
-      }
-
-      const validatedCodes = [];
-      const seenCodes = new Set();
-
-      for (let i = 0; i < incomingCodes.length; i++) {
-        const item = incomingCodes[i];
-        const rawCode = String(item.code || "")
-          .trim()
-          .toUpperCase();
-        if (!rawCode) {
-          return res
-            .status(400)
-            .json({ error: `Promo code at row ${i + 1} cannot be empty.` });
-        }
-        if (rawCode.length > 50) {
-          return res
-            .status(400)
-            .json({ error: `Promo code '${rawCode}' exceeds 50 characters.` });
-        }
-        if (seenCodes.has(rawCode)) {
-          return res
-            .status(400)
-            .json({
-              error: `Duplicate promo code '${rawCode}' is not allowed.`,
-            });
-        }
-        seenCodes.add(rawCode);
-
-        const type = item.type === "flat" ? "flat" : "percentage";
-        const amount = Number(item.amount);
-        if (isNaN(amount) || amount < 0) {
-          return res
-            .status(400)
-            .json({
-              error: `Invalid discount amount for promo code '${rawCode}'.`,
-            });
-        }
-        if (type === "percentage" && amount > 100) {
-          return res
-            .status(400)
-            .json({
-              error: `Percentage discount cannot exceed 100% for '${rawCode}'.`,
-            });
-        }
-
-        let parsedMaxUses = null;
-        if (
-          item.maxUses !== null &&
-          item.maxUses !== undefined &&
-          String(item.maxUses).trim() !== ""
-        ) {
-          const num = Number(item.maxUses);
-          if (!Number.isInteger(num) || num < 1) {
-            return res
-              .status(400)
-              .json({
-                error: `Usage limit for '${rawCode}' must be a positive integer.`,
-              });
-          }
-          parsedMaxUses = num;
-        }
-
-        let expiresAt = null;
-        if (item.expiresAt && String(item.expiresAt).trim() !== "") {
-          const dateStr = String(item.expiresAt).trim();
-          const d = new Date(dateStr);
-          if (isNaN(d.getTime())) {
-            return res
-              .status(400)
-              .json({
-                error: `Invalid expiration date format for '${rawCode}'.`,
-              });
-          }
-          expiresAt = dateStr;
-        }
-
-        const existing = currentNormalized.codes.find(
-          (c) => c.id === item.id || c.code === rawCode,
-        );
-        const isReset = Boolean(item.resetTimesUsed);
-        const timesUsed = isReset ? 0 : existing ? existing.timesUsed || 0 : 0;
-
-        validatedCodes.push({
-          id: item.id || `promo_${randomUUID().slice(0, 8)}`,
-          code: rawCode,
-          type,
-          amount,
-          enabled: Boolean(item.enabled),
-          maxUses: parsedMaxUses,
-          timesUsed,
-          expiresAt,
-          createdAt: existing?.createdAt || new Date().toISOString(),
         });
-      }
+      },
+    );
 
-      const first = validatedCodes[0] || {};
-      const newPromoConfig = {
-        ...first,
-        codes: validatedCodes,
-      };
+    app.post(
+      "/api/admin/promo/config",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user)))
+          return res.status(403).json({ error: "Forbidden" });
 
-      if (typeof db.setConfig === "function") {
-        await db.setConfig("promo", newPromoConfig);
-      } else if (db.data?.config) {
-        db.data.config.promo = newPromoConfig;
-        await db.write?.();
-      }
+        const fullConfig = typeof db.getConfig === "function" ? await db.getConfig() : (db.data?.config || {});
+        const currentNormalized = normalizePromoConfig(fullConfig?.promo);
 
-      logger.info(
-        "[PROMO] Config updated with multiple codes:",
-        newPromoConfig,
-      );
-      return res.json({
-        success: true,
-        config: {
-          ...(validatedCodes[0] || {}),
+        let incomingCodes = [];
+        if (Array.isArray(req.body.codes)) {
+          incomingCodes = req.body.codes;
+        } else if (req.body.code !== undefined) {
+          // Legacy single code payload
+          incomingCodes = [
+            {
+              id: req.body.id || "promo_1",
+              code: req.body.code,
+              type: req.body.type,
+              amount: req.body.amount,
+              enabled: req.body.enabled,
+              maxUses: req.body.maxUses,
+              expiresAt: req.body.expiresAt,
+              resetTimesUsed: req.body.resetTimesUsed,
+            },
+          ];
+        }
+
+        const validatedCodes = [];
+        const seenCodes = new Set();
+
+        for (let i = 0; i < incomingCodes.length; i++) {
+          const item = incomingCodes[i];
+          const rawCode = String(item.code || "").trim().toUpperCase();
+          if (!rawCode) {
+            return res.status(400).json({ error: `Promo code at row ${i + 1} cannot be empty.` });
+          }
+          if (rawCode.length > 50) {
+            return res.status(400).json({ error: `Promo code '${rawCode}' exceeds 50 characters.` });
+          }
+          if (seenCodes.has(rawCode)) {
+            return res.status(400).json({ error: `Duplicate promo code '${rawCode}' is not allowed.` });
+          }
+          seenCodes.add(rawCode);
+
+          const type = item.type === "flat" ? "flat" : "percentage";
+          const amount = Number(item.amount);
+          if (isNaN(amount) || amount < 0) {
+            return res.status(400).json({ error: `Invalid discount amount for promo code '${rawCode}'.` });
+          }
+          if (type === "percentage" && amount > 100) {
+            return res.status(400).json({ error: `Percentage discount cannot exceed 100% for '${rawCode}'.` });
+          }
+
+          let parsedMaxUses = null;
+          if (item.maxUses !== null && item.maxUses !== undefined && String(item.maxUses).trim() !== "") {
+            const num = Number(item.maxUses);
+            if (!Number.isInteger(num) || num < 1) {
+              return res.status(400).json({ error: `Usage limit for '${rawCode}' must be a positive integer.` });
+            }
+            parsedMaxUses = num;
+          }
+
+          let expiresAt = null;
+          if (item.expiresAt && String(item.expiresAt).trim() !== "") {
+            const dateStr = String(item.expiresAt).trim();
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) {
+              return res.status(400).json({ error: `Invalid expiration date format for '${rawCode}'.` });
+            }
+            expiresAt = dateStr;
+          }
+
+          const existing = currentNormalized.codes.find(
+            (c) => c.id === item.id || c.code === rawCode,
+          );
+          const isReset = Boolean(item.resetTimesUsed);
+          const timesUsed = isReset ? 0 : (existing ? (existing.timesUsed || 0) : 0);
+
+          validatedCodes.push({
+            id: item.id || `promo_${randomUUID().slice(0, 8)}`,
+            code: rawCode,
+            type,
+            amount,
+            enabled: Boolean(item.enabled),
+            maxUses: parsedMaxUses,
+            timesUsed,
+            expiresAt,
+            createdAt: existing?.createdAt || new Date().toISOString(),
+          });
+        }
+
+        const first = validatedCodes[0] || {};
+        const newPromoConfig = {
+          ...first,
           codes: validatedCodes,
-        },
-      });
-    });
+        };
+
+        if (typeof db.setConfig === "function") {
+          await db.setConfig("promo", newPromoConfig);
+        } else if (db.data?.config) {
+          db.data.config.promo = newPromoConfig;
+          await db.write?.();
+        }
+
+        logger.info("[PROMO] Config updated with multiple codes:", newPromoConfig);
+        return res.json({
+          success: true,
+          config: {
+            ...(validatedCodes[0] || {}),
+            codes: validatedCodes,
+          },
+        });
+      },
+    );
 
     app.get("/api/inventory", async (req, res) => {
       // Public endpoint to get cached inventory status
@@ -2165,9 +2079,11 @@ async function startServer(
           storageProvider.deleteFile(designImageFile.path).catch((err) => {
             if (err) logger.error("Error deleting invalid file:", err);
           });
-          return res.status(400).json({
-            error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
-          });
+          return res
+            .status(400)
+            .json({
+              error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
+            });
         }
 
         // --- SVG Sanitization for designImage ---
@@ -2177,10 +2093,12 @@ async function startServer(
         ) {
           const isSafe = await sanitizeSVGFile(designImageFile.path);
           if (!isSafe) {
-            return res.status(400).json({
-              error:
-                "The uploaded SVG file contains potentially malicious content and was rejected.",
-            });
+            return res
+              .status(400)
+              .json({
+                error:
+                  "The uploaded SVG file contains potentially malicious content and was rejected.",
+              });
           }
         }
 
@@ -2239,10 +2157,12 @@ async function startServer(
             storageProvider.deleteFile(edgecutLineFile.path).catch((err) => {
               if (err) logger.error("Error deleting invalid file:", err);
             });
-            return res.status(400).json({
-              error:
-                "Invalid file type. Only SVG files are allowed for the edgecut line.",
-            });
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid file type. Only SVG files are allowed for the edgecut line.",
+              });
           }
 
           // --- SVG Sanitization for cutLineFile ---
@@ -2253,10 +2173,12 @@ async function startServer(
               if (err)
                 logger.error("Error deleting orphaned design file:", err);
             });
-            return res.status(400).json({
-              error:
-                "The uploaded cut line file contains potentially malicious content and was rejected.",
-            });
+            return res
+              .status(400)
+              .json({
+                error:
+                  "The uploaded cut line file contains potentially malicious content and was rejected.",
+              });
           }
 
           // --- SECURITY: Enforce correct extension ---
@@ -2308,9 +2230,11 @@ async function startServer(
             "eps",
           ];
           if (!allowedExtensions.includes(ext)) {
-            return res.status(400).json({
-              error: `Unsupported file extension .${ext}. Allowed extensions: ${allowedExtensions.join(", ")}`,
-            });
+            return res
+              .status(400)
+              .json({
+                error: `Unsupported file extension .${ext}. Allowed extensions: ${allowedExtensions.join(", ")}`,
+              });
           }
 
           const session = chunkedUploadManager.initSession({
@@ -2451,9 +2375,11 @@ async function startServer(
             try {
               await fs.promises.unlink(tempAssembledPath);
             } catch (e) {}
-            return res.status(400).json({
-              error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
-            });
+            return res
+              .status(400)
+              .json({
+                error: `Invalid file type. Only ${allowedMimeTypes.join(", ")} are allowed.`,
+              });
           }
 
           // SVG Sanitization
@@ -2466,10 +2392,12 @@ async function startServer(
               try {
                 await fs.promises.unlink(tempAssembledPath);
               } catch (e) {}
-              return res.status(400).json({
-                error:
-                  "The uploaded SVG file contains potentially malicious content and was rejected.",
-              });
+              return res
+                .status(400)
+                .json({
+                  error:
+                    "The uploaded SVG file contains potentially malicious content and was rejected.",
+                });
             }
           }
 
@@ -2484,10 +2412,12 @@ async function startServer(
               try {
                 await fs.promises.unlink(tempAssembledPath);
               } catch (e) {}
-              return res.status(400).json({
-                error:
-                  "Invalid file type. Only SVG files are allowed for cutline.",
-              });
+              return res
+                .status(400)
+                .json({
+                  error:
+                    "Invalid file type. Only SVG files are allowed for cutline.",
+                });
             }
           } else {
             // Pixel bomb / dimension check for raster images
@@ -2499,9 +2429,11 @@ async function startServer(
                   try {
                     await fs.promises.unlink(tempAssembledPath);
                   } catch (e) {}
-                  return res.status(400).json({
-                    error: "Image dimensions too large (exceeds 50MP limit).",
-                  });
+                  return res
+                    .status(400)
+                    .json({
+                      error: "Image dimensions too large (exceeds 50MP limit).",
+                    });
                 }
               }
             } catch (e) {
@@ -2540,9 +2472,11 @@ async function startServer(
             `[CHUNKED] Assembly/finalization error for session ${uploadId}:`,
             err,
           );
-          res.status(500).json({
-            error: err.message || "Failed to assemble and finalize upload",
-          });
+          res
+            .status(500)
+            .json({
+              error: err.message || "Failed to assemble and finalize upload",
+            });
         }
       },
     );
@@ -2952,10 +2886,12 @@ async function startServer(
         try {
           // --- Guard: Confirmation Checkbox ---
           if (!req.body.orderReadyConfirmed) {
-            return res.status(400).json({
-              error:
-                "Order confirmation required. Please check the confirmation box before submitting.",
-            });
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Order confirmation required. Please check the confirmation box before submitting.",
+              });
           }
 
           const {
@@ -3009,27 +2945,13 @@ async function startServer(
             deliveryMethod: deliveryMethod,
             dimensions: orderDetails.dimensions || null,
             size: orderDetails.size || null,
-            widthInches:
-              typeof orderDetails.widthInches === "number"
-                ? orderDetails.widthInches
-                : undefined,
-            heightInches:
-              typeof orderDetails.heightInches === "number"
-                ? orderDetails.heightInches
-                : undefined,
+            widthInches: typeof orderDetails.widthInches === "number" ? orderDetails.widthInches : undefined,
+            heightInches: typeof orderDetails.heightInches === "number" ? orderDetails.heightInches : undefined,
             cutType: orderDetails.cutType || "die_cut",
             stickerName: orderDetails.stickerName || null,
-            tradeoffs: Array.isArray(orderDetails.tradeoffs)
-              ? orderDetails.tradeoffs
-              : [],
-            standbyBidCents:
-              typeof orderDetails.standbyBidCents === "number"
-                ? orderDetails.standbyBidCents
-                : null,
-            promoCode:
-              typeof orderDetails.promoCode === "string"
-                ? orderDetails.promoCode.trim()
-                : null,
+            tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
+            standbyBidCents: typeof orderDetails.standbyBidCents === "number" ? orderDetails.standbyBidCents : null,
+            promoCode: typeof orderDetails.promoCode === "string" ? orderDetails.promoCode.trim() : null,
           };
 
           // --- Product / Creator Payout Logic ---
@@ -3181,9 +3103,7 @@ async function startServer(
                 config: shippingCfg,
                 destinationState,
                 deliveryMethod,
-                tradeoffs: Array.isArray(orderDetails.tradeoffs)
-                  ? orderDetails.tradeoffs
-                  : [],
+                tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
                 pricingConfig: pricingConfig || fullDbConfig?.pricing || null,
                 quantity: orderDetails.quantity || 1,
                 promoConfig: fullDbConfig?.promo || null,
@@ -3204,10 +3124,12 @@ async function startServer(
                 logger.warn(
                   `[SECURITY] Inputs: q=${quantity}, mat=${material}, res=${resolution.id}, layers=${JSON.stringify(orderDetails.customLayers)}, bounds=${JSON.stringify(dimensions.bounds)}`,
                 );
-                return res.status(400).json({
-                  error:
-                    "Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.",
-                });
+                return res
+                  .status(400)
+                  .json({
+                    error:
+                      "Price mismatch. The calculated price does not match the submitted amount. Please refresh and try again.",
+                  });
               } else {
                 logger.info(
                   `[SECURITY] Price validated. Expected Grand Total: ${expectedGrandTotal}, Received: ${submittedTotal}`,
@@ -3585,10 +3507,12 @@ async function startServer(
               "[SERVER] Square API returned an error:",
               JSON.stringify(paymentResult.errors),
             );
-            return res.status(400).json({
-              error: "Square API Error",
-              details: paymentResult.errors,
-            });
+            return res
+              .status(400)
+              .json({
+                error: "Square API Error",
+                details: paymentResult.errors,
+              });
           }
           logger.info(
             "[SERVER] Square payment successful. Payment ID:",
@@ -3607,9 +3531,7 @@ async function startServer(
                   ? await db.getConfig()
                   : db.data?.config || {};
               const normalizedPromo = normalizePromoConfig(fullDbConfig?.promo);
-              const appliedUpper = String(orderBreakdown.appliedPromoCode)
-                .trim()
-                .toUpperCase();
+              const appliedUpper = String(orderBreakdown.appliedPromoCode).trim().toUpperCase();
               const matchedCode = normalizedPromo.codes.find(
                 (c) => String(c.code).trim().toUpperCase() === appliedUpper,
               );
@@ -3631,10 +3553,7 @@ async function startServer(
                 );
               }
             } catch (promoErr) {
-              logger.error(
-                "[PROMO] Failed to increment promo timesUsed:",
-                promoErr,
-              );
+              logger.error("[PROMO] Failed to increment promo timesUsed:", promoErr);
             }
           }
 
@@ -3745,30 +3664,35 @@ async function startServer(
           // Handle mocked Square errors or real Square errors that expose status code directly
           // Also handle explicit "Card declined" error from tests as 400 if statusCode is missing/invalid
           if (
-            (error instanceof SquareError &&
-              error.statusCode &&
+            (error instanceof SquareError && error.statusCode &&
               Number(error.statusCode) >= 400 &&
               Number(error.statusCode) < 500) ||
             error.message === "Card declined"
           ) {
             const status =
               (error.statusCode && Number(error.statusCode)) || 400;
-            return res.status(status).json({
-              error: "Square API Error",
-              details: error.result ? error.result.errors : error.message,
-            });
+            return res
+              .status(status)
+              .json({
+                error: "Square API Error",
+                details: error.result ? error.result.errors : error.message,
+              });
           }
           if (error.result && error.result.errors) {
-            return res.status(error.statusCode || 500).json({
-              error: "Square API Error",
-              details: error.result.errors,
-            });
+            return res
+              .status(error.statusCode || 500)
+              .json({
+                error: "Square API Error",
+                details: error.result.errors,
+              });
           }
           // SECURITY: Do not leak error details to the client
-          return res.status(500).json({
-            error: "Internal Server Error",
-            message: "An unexpected error occurred.",
-          });
+          return res
+            .status(500)
+            .json({
+              error: "Internal Server Error",
+              message: "An unexpected error occurred.",
+            });
         }
       },
     );
@@ -3794,10 +3718,12 @@ async function startServer(
     app.get("/api/orders", authenticateToken, async (req, res) => {
       // This endpoint is for the print shop dashboard and should only be accessible by admins.
       if (!(await isAdmin(req.user))) {
-        return res.status(403).json({
-          error:
-            "Forbidden: You do not have permission to access this resource.",
-        });
+        return res
+          .status(403)
+          .json({
+            error:
+              "Forbidden: You do not have permission to access this resource.",
+          });
       }
       let allOrders = await db.getAllOrders();
 
@@ -3881,10 +3807,12 @@ async function startServer(
 
     app.get("/api/admin/sales-metrics", authenticateToken, async (req, res) => {
       if (!(await isAdmin(req.user))) {
-        return res.status(403).json({
-          error:
-            "Forbidden: You do not have permission to access this resource.",
-        });
+        return res
+          .status(403)
+          .json({
+            error:
+              "Forbidden: You do not have permission to access this resource.",
+          });
       }
       const allOrders = await db.getAllOrders();
       let totalOrders = 0;
@@ -4493,11 +4421,13 @@ async function startServer(
             }),
           );
 
-          res.status(200).json({
-            success: true,
-            batch,
-            updatedOrdersCount: updatedOrders.length,
-          });
+          res
+            .status(200)
+            .json({
+              success: true,
+              batch,
+              updatedOrdersCount: updatedOrders.length,
+            });
         } catch (error) {
           await logAndEmailError(error, "Error updating batch status");
           res.status(500).json({ error: "Internal Server Error" });
@@ -4802,33 +4732,19 @@ async function startServer(
         if (weightOz !== undefined && weightOz !== null && weightOz !== "") {
           const parsedWeight = Number(weightOz);
           if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
-            return res
-              .status(400)
-              .json({ error: "weightOz must be a positive number." });
+            return res.status(400).json({ error: "weightOz must be a positive number." });
           }
           order.packageWeightOz = parsedWeight;
         }
 
-        if (
-          length !== undefined ||
-          width !== undefined ||
-          height !== undefined
-        ) {
-          const parsedL =
-            Number(length) || order.packageDimensions?.length || 6;
+        if (length !== undefined || width !== undefined || height !== undefined) {
+          const parsedL = Number(length) || order.packageDimensions?.length || 6;
           const parsedW = Number(width) || order.packageDimensions?.width || 4;
-          const parsedH =
-            Number(height) || order.packageDimensions?.height || 0.5;
+          const parsedH = Number(height) || order.packageDimensions?.height || 0.5;
           if (parsedL <= 0 || parsedW <= 0 || parsedH <= 0) {
-            return res
-              .status(400)
-              .json({ error: "Package dimensions must be positive numbers." });
+            return res.status(400).json({ error: "Package dimensions must be positive numbers." });
           }
-          order.packageDimensions = {
-            length: parsedL,
-            width: parsedW,
-            height: parsedH,
-          };
+          order.packageDimensions = { length: parsedL, width: parsedW, height: parsedH };
         }
 
         order.exportToPirateship = true;
@@ -4841,26 +4757,15 @@ async function startServer(
         if (easyPostKey) {
           try {
             const EasyPostPkg = await import("@easypost/api");
-            const EasyPost =
-              EasyPostPkg.default?.default ||
-              EasyPostPkg.default ||
-              EasyPostPkg;
+            const EasyPost = EasyPostPkg.default?.default || EasyPostPkg.default || EasyPostPkg;
             const client = new EasyPost(easyPostKey);
 
             const toAddress = {
-              name:
-                `${order.shippingContact?.givenName || ""} ${order.shippingContact?.familyName || ""}`.trim() ||
-                "Customer",
+              name: `${order.shippingContact?.givenName || ""} ${order.shippingContact?.familyName || ""}`.trim() || "Customer",
               street1: order.shippingContact?.addressLines?.[0] || "",
               street2: order.shippingContact?.addressLines?.[1] || undefined,
-              city:
-                order.shippingContact?.locality ||
-                order.shippingContact?.city ||
-                "",
-              state:
-                order.shippingContact?.administrativeDistrictLevel1 ||
-                order.shippingContact?.state ||
-                "",
+              city: order.shippingContact?.locality || order.shippingContact?.city || "",
+              state: order.shippingContact?.administrativeDistrictLevel1 || order.shippingContact?.state || "",
               zip: order.shippingContact?.postalCode || "",
               country: order.shippingContact?.country || "US",
             };
@@ -4889,25 +4794,17 @@ async function startServer(
 
             if (shipment.rates && shipment.rates.length > 0) {
               const lowestRate = client.Utils.getLowestRate(shipment.rates);
-              const boughtShipment = await client.Shipment.buy(
-                shipment.id,
-                lowestRate.id,
-              );
+              const boughtShipment = await client.Shipment.buy(shipment.id, lowestRate.id);
               if (boughtShipment.tracking_code) {
                 order.trackingNumber = boughtShipment.tracking_code;
                 order.courier = boughtShipment.selected_rate?.carrier || "USPS";
-                order.labelUrl =
-                  boughtShipment.postage_label?.label_url || null;
+                order.labelUrl = boughtShipment.postage_label?.label_url || null;
                 easyPostGenerated = true;
-                logger.info(
-                  `[SHIPPING] Purchased EasyPost label for order ${orderId}: ${order.trackingNumber}`,
-                );
+                logger.info(`[SHIPPING] Purchased EasyPost label for order ${orderId}: ${order.trackingNumber}`);
               }
             }
           } catch (epError) {
-            logger.warn(
-              `[SHIPPING] EasyPost label generation skipped/failed: ${epError.message}`,
-            );
+            logger.warn(`[SHIPPING] EasyPost label generation skipped/failed: ${epError.message}`);
           }
         }
 
@@ -4977,12 +4874,8 @@ async function startServer(
           purgeArtworkOnFlush: false,
         };
         const allOrders = Object.values(lowdb?.data?.orders || {});
-        const canceledOrders = allOrders.filter(
-          (o) => o.status === "CANCELED" && !o.isArchived,
-        );
-        const archivedOrders = allOrders.filter(
-          (o) => o.isArchived || o.status === "ARCHIVED",
-        );
+        const canceledOrders = allOrders.filter((o) => o.status === "CANCELED" && !o.isArchived);
+        const archivedOrders = allOrders.filter((o) => o.isArchived || o.status === "ARCHIVED");
 
         res.json({
           purgeArtworkOnFlush: !!retentionConfig.purgeArtworkOnFlush,
@@ -5080,46 +4973,32 @@ async function startServer(
         }
 
         const parsedThreshold =
-          stalledThresholdHours !== undefined
-            ? Number(stalledThresholdHours)
-            : undefined;
+          stalledThresholdHours !== undefined ? Number(stalledThresholdHours) : undefined;
         if (
           parsedThreshold !== undefined &&
-          (!Number.isFinite(parsedThreshold) ||
-            parsedThreshold <= 0 ||
-            parsedThreshold > 168)
+          (!Number.isFinite(parsedThreshold) || parsedThreshold <= 0 || parsedThreshold > 168)
         ) {
           return res.status(400).json({
-            error:
-              "stalledThresholdHours must be a positive number up to 168 (1 week).",
+            error: "stalledThresholdHours must be a positive number up to 168 (1 week).",
           });
         }
 
         const parsedInterval =
-          checkIntervalMinutes !== undefined
-            ? Number(checkIntervalMinutes)
-            : undefined;
+          checkIntervalMinutes !== undefined ? Number(checkIntervalMinutes) : undefined;
         if (
           parsedInterval !== undefined &&
-          (!Number.isFinite(parsedInterval) ||
-            parsedInterval < 1 ||
-            parsedInterval > 1440)
+          (!Number.isFinite(parsedInterval) || parsedInterval < 1 || parsedInterval > 1440)
         ) {
           return res.status(400).json({
-            error:
-              "checkIntervalMinutes must be between 1 and 1440 (24 hours).",
+            error: "checkIntervalMinutes must be between 1 and 1440 (24 hours).",
           });
         }
 
         const parsedRepeat =
-          repeatReminderHours !== undefined
-            ? Number(repeatReminderHours)
-            : undefined;
+          repeatReminderHours !== undefined ? Number(repeatReminderHours) : undefined;
         if (
           parsedRepeat !== undefined &&
-          (!Number.isFinite(parsedRepeat) ||
-            parsedRepeat < 0 ||
-            parsedRepeat > 168)
+          (!Number.isFinite(parsedRepeat) || parsedRepeat < 0 || parsedRepeat > 168)
         ) {
           return res.status(400).json({
             error: "repeatReminderHours must be a number between 0 and 168.",
@@ -5134,17 +5013,11 @@ async function startServer(
         lowdb.data.config.telegram = {
           enabled: enabled !== undefined ? enabled : currentConfig.enabled,
           stalledThresholdHours:
-            parsedThreshold !== undefined
-              ? parsedThreshold
-              : currentConfig.stalledThresholdHours,
+            parsedThreshold !== undefined ? parsedThreshold : currentConfig.stalledThresholdHours,
           checkIntervalMinutes:
-            parsedInterval !== undefined
-              ? parsedInterval
-              : currentConfig.checkIntervalMinutes,
+            parsedInterval !== undefined ? parsedInterval : currentConfig.checkIntervalMinutes,
           repeatReminderHours:
-            parsedRepeat !== undefined
-              ? parsedRepeat
-              : currentConfig.repeatReminderHours,
+            parsedRepeat !== undefined ? parsedRepeat : currentConfig.repeatReminderHours,
         };
 
         if (typeof db.write === "function") await db.write();
@@ -6185,7 +6058,7 @@ async function startServer(
       // Hide stack trace in production (and generally in API responses)
       const response = {
         error: "Internal Server Error",
-        message: "An unexpected error occurred.",
+        message: "An unexpected error occurred."
       };
 
       // SECURITY FIX: Never leak error details to the client in any environment
