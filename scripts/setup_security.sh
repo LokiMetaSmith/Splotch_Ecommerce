@@ -40,7 +40,7 @@ echo ""
 echo "🛡️  [2/3] Configuring CrowdSec & Community Threat Intelligence..."
 if ! command -v cscli &> /dev/null; then
   echo "Adding official CrowdSec repository..."
-  curl -s https://packagecloud.io/install/repositories/crowdsecurity/crowdsec/script.deb.sh | bash
+  curl -s https://install.crowdsec.net | sh
   apt-get update -y
   apt-get install -y crowdsec crowdsec-firewall-bouncer-nftables
 fi

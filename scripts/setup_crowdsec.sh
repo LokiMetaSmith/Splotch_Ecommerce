@@ -16,7 +16,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Step 1: Install CrowdSec repository if not already installed
 if ! command -v cscli &> /dev/null; then
   echo "1. Adding official CrowdSec repository..."
-  curl -s https://packagecloud.io/install/repositories/crowdsecurity/crowdsec/script.deb.sh | bash
+  curl -s https://install.crowdsec.net | sh
 
   echo "2. Installing crowdsec engine and nftables firewall bouncer..."
   apt-get update
