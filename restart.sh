@@ -13,6 +13,7 @@ cd "$REPO_DIR"
 
 DO_PULL=false
 SKIP_BUILD=false
+SYNC_SECURITY=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -25,17 +26,23 @@ while [[ $# -gt 0 ]]; do
       SKIP_BUILD=true
       shift
       ;;
+    -s|--security|--sync-security)
+      SYNC_SECURITY=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: ./restart.sh [OPTIONS]"
       echo ""
       echo "Options:"
-      echo "  -p, --pull     Pull latest changes from git before restarting"
-      echo "  --skip-build   Skip building frontend assets (npm run build)"
-      echo "  -h, --help     Show this help message"
+      echo "  -p, --pull        Pull latest changes from git before restarting"
+      echo "  --skip-build      Skip building frontend assets (npm run build)"
+      echo "  -s, --security    Sync CrowdSec and Fail2ban security configurations"
+      echo "  -h, --help        Show this help message"
       echo ""
       echo "Examples:"
-      echo "  ./restart.sh          # Rebuild frontend & restart service"
-      echo "  ./restart.sh --pull   # Pull git, rebuild frontend & restart service"
+      echo "  ./restart.sh                  # Rebuild frontend & restart service"
+      echo "  ./restart.sh --pull           # Pull git, rebuild frontend & restart service"
+      echo "  ./restart.sh --pull --security # Full update including security policies"
       exit 0
       ;;
     *)
@@ -75,6 +82,19 @@ else
   else
     echo "❌ Error: Neither npm nor pnpm was found to build frontend."
     exit 1
+  fi
+fi
+
+# 2.5. Security Policies Sync (Fail2ban & CrowdSec)
+if [ "$SYNC_SECURITY" = true ] || { [ -f "./scripts/setup_security.sh" ] && sudo -n true 2>/dev/null && [ ! -f "/etc/fail2ban/jail.d/splotch.local" ]; }; then
+  echo ""
+  echo "🛡️  [2.5/4] Syncing security policies (Fail2ban & CrowdSec)..."
+  if sudo -n true 2>/dev/null; then
+    sudo bash ./scripts/setup_security.sh || true
+  elif [ -t 0 ]; then
+    sudo bash ./scripts/setup_security.sh || true
+  else
+    echo "⚠️ Sudo password required for security sync; run 'sudo ./scripts/setup_security.sh' manually."
   fi
 fi
 

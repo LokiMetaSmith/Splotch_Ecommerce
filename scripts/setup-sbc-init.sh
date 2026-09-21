@@ -74,6 +74,15 @@ sudo mandb -c
 sudo ufw allow ssh
 sudo ufw status
 
+# 3.5. Automated Security Provisioning (CrowdSec, Fail2ban, and Sudoers)
+echo "Starting Automated Security Setup (CrowdSec & Fail2ban)..."
+if [ -f "./setup_security.sh" ]; then
+    sudo bash ./setup_security.sh
+elif [ -f "./scripts/setup_security.sh" ]; then
+    sudo bash ./scripts/setup_security.sh
+fi
+echo "Ending Automated Security Setup."
+
 # 4. USB Auto Mount Setup (Linked to our Splotch Drop Box script)
 echo "Starting USB Automount Setup..."
 # Ensure we are in the project directory where the script lives
