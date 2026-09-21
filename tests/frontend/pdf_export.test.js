@@ -134,6 +134,8 @@ describe('PDF Export Functionality', () => {
             <div id="auth-status"></div>
             <button id="loginBtn"></button>
             <button id="registerBtn"></button>
+            <button id="nestStickersBtn">Nest Stickers</button>
+            <div id="nested-svg-container"></div>
             <div id="loading-indicator" class="hidden"></div>
         `;
 
@@ -375,6 +377,37 @@ describe('PDF Export Functionality', () => {
         expect(loaded.kissCutColor).toBe('#123456');
         expect(loaded.edgeCutLayerName).toBe('CustomEdge');
         expect(loaded.edgeCutColor).toBe('#654321');
+    });
+
+    test('handleNesting should not freeze or disable the button when no orders are selected', async () => {
+        const nestBtn = document.getElementById('nestStickersBtn');
+        const container = document.getElementById('nested-svg-container');
+
+        // No orders selected
+        nestBtn.click();
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Button must not be stuck in loading state or disabled
+        expect(nestBtn.disabled).toBe(false);
+        expect(nestBtn.textContent).toContain('Nest Stickers');
+        expect(container.innerHTML).toContain('Please select at least one order to nest.');
+
+        // Now select an order card
+        const ordersList = document.getElementById('orders-list');
+        ordersList.innerHTML = `
+            <div class="order-card" data-order-id="order-123">
+                <input type="checkbox" class="order-select-checkbox" checked />
+                <img class="sticker-design" src="data:image/svg+xml;base64,mock" data-quantity="1" />
+            </div>
+        `;
+
+        // Trigger change event to simulate checking an order
+        const checkbox = ordersList.querySelector('.order-select-checkbox');
+        checkbox.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+        // Container error should be cleared and button still ready
+        expect(container.innerHTML).toBe('');
+        expect(nestBtn.disabled).toBe(false);
     });
 });
 

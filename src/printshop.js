@@ -1811,6 +1811,18 @@ function handleOrderListChange(e) {
 
     updateOrderStatus(orderId, payload, actionDropdown);
   }
+
+  const orderCheckbox = e.target.closest(".order-select-checkbox");
+  if (orderCheckbox) {
+    const checkedCount = ui.ordersList?.querySelectorAll(".order-select-checkbox:checked").length || 0;
+    if (checkedCount > 0 && ui.nestedSvgContainer?.innerHTML.includes("Please select at least one order")) {
+      ui.nestedSvgContainer.innerHTML = "";
+    }
+    const nestBtn = ui.nestStickersBtn || document.getElementById("nestStickersBtn");
+    if (nestBtn && nestBtn.disabled && !nestBtn.dataset.busy) {
+      setButtonLoading(nestBtn, false);
+    }
+  }
 }
 
 async function handleTimeLog(orderId, btn) {
@@ -2180,12 +2192,10 @@ async function handleNesting(e) {
   const btn = e
     ? e.currentTarget || e.target.closest("button")
     : ui.nestStickersBtn;
-  setButtonLoading(btn, true, "Nesting...");
-  ui.nestedSvgContainer.innerHTML = "<p>Nesting in progress...</p>";
 
   // Grab all checked order cards and then find their sticker-design elements
   const checkedCheckboxes = Array.from(
-    ui.ordersList.querySelectorAll(".order-select-checkbox:checked"),
+    ui.ordersList?.querySelectorAll(".order-select-checkbox:checked") || [],
   );
   const svgElements = checkedCheckboxes
     .map((cb) => {
@@ -2195,10 +2205,19 @@ async function handleNesting(e) {
     .filter((img) => img !== null);
 
   if (svgElements.length === 0) {
-    ui.nestedSvgContainer.innerHTML =
-      '<p class="text-red-500 font-bold">Please select at least one order to nest.</p>';
+    if (ui.nestedSvgContainer) {
+      ui.nestedSvgContainer.innerHTML =
+        '<p class="text-red-500 font-bold">Please select at least one order to nest.</p>';
+    }
+    showErrorToast("Please select at least one order to nest.");
     hideLoadingIndicator();
+    if (btn) setButtonLoading(btn, false);
     return;
+  }
+
+  setButtonLoading(btn, true, "Nesting...");
+  if (ui.nestedSvgContainer) {
+    ui.nestedSvgContainer.innerHTML = "<p>Nesting in progress...</p>";
   }
 
   try {
