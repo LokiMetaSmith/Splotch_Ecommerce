@@ -472,7 +472,7 @@ async function startServer(
       } else if (jobName === "update-status") {
         await updateOrderStatusNotification(bot, db, data.orderId, data.status);
       } else if (jobName === "security-alert") {
-        const channelId = getSecret("TELEGRAM_CHANNEL_ID");
+        const channelId = getSecret("TELEGRAM_SECURITY_CHANNEL_ID") || getSecret("TELEGRAM_CHANNEL_ID");
         if (bot && bot.telegram && channelId && data.message) {
           await bot.telegram.sendMessage(channelId, data.message, { parse_mode: "Markdown" });
         }
@@ -785,6 +785,7 @@ async function startServer(
         const ip = getClientIp(req);
         dispatchSecurityAlert({
           type: "Auth Rate Limit Exceeded",
+          severity: "CRITICAL",
           ip,
           method: req.method,
           path: req.originalUrl || req.path,
@@ -824,6 +825,7 @@ async function startServer(
         const ip = getClientIp(req);
         dispatchSecurityAlert({
           type: "Email/Token Rate Limit Exceeded",
+          severity: "CRITICAL",
           ip,
           method: req.method,
           path: req.originalUrl || req.path,
@@ -864,6 +866,7 @@ async function startServer(
         const ip = getClientIp(req);
         dispatchSecurityAlert({
           type: "Promo Enumeration Rate Limit Exceeded",
+          severity: "CRITICAL",
           ip,
           method: req.method,
           path: req.originalUrl || req.path,
@@ -1014,12 +1017,15 @@ async function startServer(
     app.disable("x-powered-by");
 
     // --- HONEYPOT SECURITY TRAPS ---
-    // Traps automated malicious vulnerability scanners targeting WordPress, PHP, Spring Actuator,
-    // cloud credential leaks, or hidden environment configuration files.
-    const HONEYPOT_PATTERNS = [
+    // Distinguishes critical credential/secret probes from background CMS scanner noise
+    const CRITICAL_HONEYPOT_PATTERNS = [
       /^\/\.env/i,
       /^\/\.git/i,
       /^\/\.aws/i,
+      /^\/config\.(json|yml|yaml|ini|env)/i,
+    ];
+
+    const SCANNER_HONEYPOT_PATTERNS = [
       /^\/wp-login\.php/i,
       /^\/wp-admin/i,
       /^\/wp-content/i,
@@ -1028,17 +1034,19 @@ async function startServer(
       /^\/phpmyadmin/i,
       /^\/pma/i,
       /^\/actuator/i,
-      /^\/config\.(json|yml|yaml|ini|env)/i,
       /^\/\.ds_store/i,
     ];
 
     app.use((req, res, next) => {
       const reqPath = req.path;
-      const isHoneypot = HONEYPOT_PATTERNS.some((pattern) => pattern.test(reqPath));
-      if (isHoneypot) {
+      const isCritical = CRITICAL_HONEYPOT_PATTERNS.some((pattern) => pattern.test(reqPath));
+      const isScanner = !isCritical && SCANNER_HONEYPOT_PATTERNS.some((pattern) => pattern.test(reqPath));
+
+      if (isCritical || isScanner) {
         const ip = getClientIp(req);
         dispatchSecurityAlert({
-          type: "Honeypot Trap Triggered",
+          type: isCritical ? "Critical Secret Probe" : "Scanner Probe",
+          severity: isCritical ? "CRITICAL" : "LOW",
           ip,
           method: req.method,
           path: reqPath,
@@ -1102,6 +1110,7 @@ async function startServer(
         const ip = getClientIp(req);
         dispatchSecurityAlert({
           type: "Sensitive Path Probe",
+          severity: "CRITICAL",
           ip,
           method: req.method,
           path: reqPath,

@@ -51,6 +51,7 @@ describe('Security Monitoring & Intrusion Detection', () => {
     it('should format clean Markdown and sanitize Markdown control characters', () => {
       const formatted = formatSecurityAlertMessage({
         type: 'Honeypot Triggered',
+        severity: 'CRITICAL',
         ip: '198.51.100.99',
         method: 'GET',
         path: '/wp_login.php*test*',
@@ -58,7 +59,7 @@ describe('Security Monitoring & Intrusion Detection', () => {
         userAgent: 'curl/7.68.0 `malicious`',
       });
 
-      expect(formatted).toContain('🚨 *SECURITY ALERT: Honeypot Triggered*');
+      expect(formatted).toContain('🚨 *SECURITY ALERT: [CRITICAL] Honeypot Triggered*');
       expect(formatted).toContain('`198.51.100.99`');
       expect(formatted).toContain('GET');
       expect(formatted).toContain('Automated vulnerability scanner');
@@ -66,17 +67,18 @@ describe('Security Monitoring & Intrusion Detection', () => {
     });
   });
 
-  describe('Alert Dispatching and Cooldown Throttling', () => {
+  describe('Alert Dispatching, Severity Filtering and Cooldown Throttling', () => {
     beforeEach(() => {
       clearAlertCooldowns();
     });
 
-    it('should log hostile attempt formatted for fail2ban and enqueue telegram alert', async () => {
+    it('should immediately dispatch CRITICAL alert to telegram', async () => {
       const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => {});
       const mockSchedule = jest.fn().mockResolvedValue(true);
 
       const result = await dispatchSecurityAlert({
-        type: 'Scanner Honeypot Hit',
+        type: 'Critical Secret Probe',
+        severity: 'CRITICAL',
         ip: '203.0.113.50',
         method: 'GET',
         path: '/.env',
@@ -92,51 +94,70 @@ describe('Security Monitoring & Intrusion Detection', () => {
         'security-alert',
         expect.objectContaining({
           ip: '203.0.113.50',
-          type: 'Scanner Honeypot Hit',
+          severity: 'CRITICAL',
+          type: 'Critical Secret Probe',
         })
       );
 
-      // Verify fail2ban regex compliance in log
+      // Verify fail2ban / crowdsec regex compliance in log
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/\[SECURITY\] Hostile attempt from IP 203\.0\.113\.50: Scanner Honeypot Hit/)
+        expect.stringMatching(/\[SECURITY\] Hostile attempt from IP 203\.0\.113\.50:.*Critical Secret Probe/)
       );
 
       warnSpy.mockRestore();
     });
 
-    it('should throttle repetitive alerts from the same IP within cooldown window', async () => {
-      jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    it('should skip telegram push for isolated LOW severity probe but still log for fail2ban', async () => {
+      const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => {});
       const mockSchedule = jest.fn().mockResolvedValue(true);
 
-      // First alert: goes through
-      const first = await dispatchSecurityAlert({
-        type: 'Honeypot Triggered',
-        ip: '198.51.100.77',
+      const result = await dispatchSecurityAlert({
+        type: 'Scanner Probe',
+        severity: 'LOW',
+        ip: '203.0.113.60',
+        method: 'GET',
         path: '/wp-login.php',
         scheduleTelegram: mockSchedule,
       });
-      expect(first.alerted).toBe(true);
 
-      // Second alert immediately after: throttled
-      const second = await dispatchSecurityAlert({
-        type: 'Honeypot Triggered',
-        ip: '198.51.100.77',
+      expect(result.alerted).toBe(false);
+      expect(result.skippedSeverity).toBe(true);
+      expect(mockSchedule).not.toHaveBeenCalled();
+
+      // Logged for fail2ban / crowdsec despite no Telegram notification
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\[SECURITY\] Hostile attempt from IP 203\.0\.113\.60:.*Scanner Probe/)
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('should escalate repeated LOW strikes from the same IP to CRITICAL and alert', async () => {
+      jest.spyOn(logger, 'warn').mockImplementation(() => {});
+      const mockSchedule = jest.fn().mockResolvedValue(true);
+
+      // Strike 1: LOW severity, logged, no telegram alert
+      const hit1 = await dispatchSecurityAlert({
+        type: 'Scanner Probe',
+        severity: 'LOW',
+        ip: '203.0.113.70',
+        path: '/wp-login.php',
+        scheduleTelegram: mockSchedule,
+      });
+      expect(hit1.alerted).toBe(false);
+      expect(mockSchedule).not.toHaveBeenCalled();
+
+      // Strike 2: same IP hits again, escalated to CRITICAL -> Telegram alert dispatched!
+      const hit2 = await dispatchSecurityAlert({
+        type: 'Scanner Probe',
+        severity: 'LOW',
+        ip: '203.0.113.70',
         path: '/xmlrpc.php',
         scheduleTelegram: mockSchedule,
       });
-      expect(second.alerted).toBe(false);
-      expect(second.throttled).toBe(true);
-      expect(second.reason).toBe('ip_cooldown');
-
-      // But a different IP can still alert
-      const differentIp = await dispatchSecurityAlert({
-        type: 'Honeypot Triggered',
-        ip: '198.51.100.88',
-        path: '/.git/config',
-        scheduleTelegram: mockSchedule,
-      });
-      expect(differentIp.alerted).toBe(true);
-      expect(mockSchedule).toHaveBeenCalledTimes(2);
+      expect(hit2.alerted).toBe(true);
+      expect(hit2.severity).toBe('CRITICAL');
+      expect(mockSchedule).toHaveBeenCalledTimes(1);
 
       logger.warn.mockRestore();
     });
@@ -168,7 +189,10 @@ describe('Security Monitoring & Intrusion Detection', () => {
         stop: jest.fn(),
       };
 
-      process.env.TELEGRAM_CHANNEL_ID = 'test-security-channel';
+      // Set dedicated security channel
+      process.env.TELEGRAM_SECURITY_CHANNEL_ID = 'dedicated-security-channel';
+      process.env.TELEGRAM_CHANNEL_ID = 'orders-channel';
+
       const { startServer } = await import('../server.js');
       server = await startServer(db, bot, jest.fn(), testDbPath);
       app = server.app;
@@ -188,58 +212,60 @@ describe('Security Monitoring & Intrusion Detection', () => {
       mockSendMessage.mockClear();
     });
 
-    it('should trigger honeypot trap on /.env and return 404', async () => {
+    it('should immediately trigger CRITICAL alert on /.env to dedicated security channel', async () => {
       const res = await request(app)
         .get('/.env')
         .set('X-Forwarded-For', '203.0.113.11');
 
       expect(res.statusCode).toBe(404);
       expect(mockSendMessage).toHaveBeenCalledWith(
-        'test-security-channel',
-        expect.stringContaining('Honeypot Trap Triggered'),
+        'dedicated-security-channel',
+        expect.stringContaining('Critical Secret Probe'),
         { parse_mode: 'Markdown' }
       );
       expect(mockSendMessage).toHaveBeenCalledWith(
-        'test-security-channel',
+        'dedicated-security-channel',
         expect.stringContaining('203.0.113.11'),
         { parse_mode: 'Markdown' }
       );
     });
 
-    it('should trigger honeypot trap on /wp-login.php and return 404', async () => {
+    it('should not notify Telegram on single isolated /wp-login.php scan (LOW severity)', async () => {
       const res = await request(app)
         .get('/wp-login.php')
         .set('X-Forwarded-For', '203.0.113.22');
 
       expect(res.statusCode).toBe(404);
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        'test-security-channel',
-        expect.stringContaining('/wp-login.php'),
-        { parse_mode: 'Markdown' }
-      );
+      expect(mockSendMessage).not.toHaveBeenCalled();
     });
 
-    it('should trigger honeypot trap on /actuator/env and return 404', async () => {
-      const res = await request(app)
-        .get('/actuator/env')
+    it('should escalate and notify Telegram when same IP scans multiple times', async () => {
+      // Strike 1
+      await request(app)
+        .get('/wp-login.php')
         .set('X-Forwarded-For', '203.0.113.33');
+      expect(mockSendMessage).not.toHaveBeenCalled();
 
-      expect(res.statusCode).toBe(404);
+      // Strike 2 (same IP)
+      await request(app)
+        .get('/xmlrpc.php')
+        .set('X-Forwarded-For', '203.0.113.33');
+      expect(mockSendMessage).toHaveBeenCalledTimes(1);
       expect(mockSendMessage).toHaveBeenCalledWith(
-        'test-security-channel',
-        expect.stringContaining('/actuator/env'),
+        'dedicated-security-channel',
+        expect.stringContaining('Multi-strike repeat scanner'),
         { parse_mode: 'Markdown' }
       );
     });
 
-    it('should trigger sensitive path blocker on /server/server.js and return 403', async () => {
+    it('should trigger CRITICAL alert on /server/server.js sensitive path probe', async () => {
       const res = await request(app)
         .get('/server/server.js')
         .set('X-Forwarded-For', '203.0.113.44');
 
       expect(res.statusCode).toBe(403);
       expect(mockSendMessage).toHaveBeenCalledWith(
-        'test-security-channel',
+        'dedicated-security-channel',
         expect.stringContaining('Sensitive Path Probe'),
         { parse_mode: 'Markdown' }
       );

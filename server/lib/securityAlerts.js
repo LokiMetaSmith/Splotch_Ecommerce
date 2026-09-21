@@ -4,17 +4,27 @@ import logger from '../logger.js';
 const ipAlertCooldowns = new Map();
 const DEFAULT_IP_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes per IP
 
+// Strike tracking: map client IP to strike count and timestamps for multi-strike escalation
+const ipStrikes = new Map();
+const STRIKE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const STRIKES_TO_ESCALATE = 2; // 2nd strike escalates to CRITICAL
+
 // Global alert throttle: maximum 10 alerts per minute to avoid hitting Telegram rate limits
 let globalAlertsInMinute = 0;
 let globalWindowStart = Date.now();
 const MAX_GLOBAL_ALERTS_PER_MINUTE = 10;
 
-// Periodic cleanup of stale cooldown entries every 15 minutes
+// Periodic cleanup of stale cooldown and strike entries every 15 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [ip, timestamp] of ipAlertCooldowns.entries()) {
     if (now - timestamp > DEFAULT_IP_COOLDOWN_MS * 2) {
       ipAlertCooldowns.delete(ip);
+    }
+  }
+  for (const [ip, data] of ipStrikes.entries()) {
+    if (now - data.lastHit > STRIKE_WINDOW_MS) {
+      ipStrikes.delete(ip);
     }
   }
 }, 15 * 60 * 1000).unref();
@@ -43,10 +53,11 @@ export function getClientIp(req) {
 }
 
 /**
- * Clears the alert cooldown map. Useful for unit and integration testing.
+ * Clears the alert cooldown and strike maps. Useful for unit and integration testing.
  */
 export function clearAlertCooldowns() {
   ipAlertCooldowns.clear();
+  ipStrikes.clear();
   globalAlertsInMinute = 0;
   globalWindowStart = Date.now();
 }
@@ -62,7 +73,7 @@ function sanitizeTelegramMarkdown(str) {
 /**
  * Formats a clean, readable Markdown message for the Telegram security alert channel.
  */
-export function formatSecurityAlertMessage({ type, ip, method, path, details, userAgent }) {
+export function formatSecurityAlertMessage({ type, ip, method, path, details, userAgent, severity = 'CRITICAL' }) {
   const time = new Date().toUTCString();
   const safeAgent = sanitizeTelegramMarkdown(userAgent || 'unknown');
   const safePath = sanitizeTelegramMarkdown(path || '/');
@@ -70,7 +81,7 @@ export function formatSecurityAlertMessage({ type, ip, method, path, details, us
   const safeType = sanitizeTelegramMarkdown(type || 'Hostile Activity');
 
   const lines = [
-    `🚨 *SECURITY ALERT: ${safeType}*`,
+    `🚨 *SECURITY ALERT: [${severity}] ${safeType}*`,
     ``,
     `*Attacker IP:* \`${ip}\``,
     `*Method / Path:* \`${method || 'GET'}\` \`${safePath}\``,
@@ -84,7 +95,7 @@ export function formatSecurityAlertMessage({ type, ip, method, path, details, us
   lines.push(
     `*User-Agent:* \`${safeAgent.slice(0, 150)}\``,
     ``,
-    `⚠️ _Fail2ban will automatically ban this IP if hostile attempts continue._`
+    `⚠️ _Fail2ban & CrowdSec are tracking this IP and will drop packets at the firewall level._`
   );
 
   return lines.join('\n');
@@ -92,9 +103,10 @@ export function formatSecurityAlertMessage({ type, ip, method, path, details, us
 
 /**
  * Dispatches a security alert:
- * 1. ALWAYS logs a standardized [SECURITY] warning for fail2ban to capture and count towards bans.
- * 2. Checks IP and global cooldowns to prevent Telegram notification spam.
- * 3. Enqueues a Telegram alert job to notify the administrator.
+ * 1. ALWAYS logs a standardized [SECURITY] warning for Fail2ban & CrowdSec to count towards bans.
+ * 2. Tracks strikes per IP: repeated low/medium strikes automatically escalate to CRITICAL.
+ * 3. Filters alerts: Only CRITICAL events trigger a Telegram push notification.
+ * 4. Applies IP and global cooldowns to prevent Telegram notification spam.
  */
 export async function dispatchSecurityAlert({
   type,
@@ -103,6 +115,7 @@ export async function dispatchSecurityAlert({
   path = '',
   details = '',
   userAgent = '',
+  severity = 'MEDIUM',
   scheduleTelegram,
   req,
 }) {
@@ -111,15 +124,43 @@ export async function dispatchSecurityAlert({
   const clientPath = path || (req ? (req.originalUrl || req.path) : '');
   const clientAgent = userAgent || (req?.headers ? req.headers['user-agent'] : 'unknown');
 
-  // Standardized log line formatted specifically for fail2ban regex matching:
-  // [SECURITY] Hostile attempt from IP <ip>: <type> on <method> <path>
+  const now = Date.now();
+  let effectiveSeverity = severity.toUpperCase();
+  let effectiveDetails = details;
+
+  // Track strikes for non-critical hits; escalate to CRITICAL on repeated attempts
+  if (effectiveSeverity !== 'CRITICAL') {
+    const existing = ipStrikes.get(clientIp) || { count: 0, firstHit: now, lastHit: now };
+    // Reset strikes if older than STRIKE_WINDOW_MS
+    if (now - existing.lastHit > STRIKE_WINDOW_MS) {
+      existing.count = 0;
+      existing.firstHit = now;
+    }
+    existing.count += 1;
+    existing.lastHit = now;
+    ipStrikes.set(clientIp, existing);
+
+    if (existing.count >= STRIKES_TO_ESCALATE) {
+      effectiveSeverity = 'CRITICAL';
+      effectiveDetails = effectiveDetails
+        ? `${effectiveDetails} - Multi-strike repeat scanner (Strike ${existing.count})`
+        : `Multi-strike repeat scanner (Strike ${existing.count})`;
+    }
+  }
+
+  // Standardized log line formatted specifically for fail2ban / CrowdSec regex matching:
+  // [SECURITY] Hostile attempt from IP <ip>: [<severity>] <type> on <method> <path>
   logger.warn(
-    `[SECURITY] Hostile attempt from IP ${clientIp}: ${type} on ${clientMethod} ${clientPath}${
-      details ? ` (${details})` : ''
+    `[SECURITY] Hostile attempt from IP ${clientIp}: [${effectiveSeverity}] ${type} on ${clientMethod} ${clientPath}${
+      effectiveDetails ? ` (${effectiveDetails})` : ''
     }`
   );
 
-  const now = Date.now();
+  // Filter: only CRITICAL alerts send Telegram push notifications (ignore background scanner noise)
+  const minSeverity = (process.env.SECURITY_ALERT_MIN_SEVERITY || 'CRITICAL').toUpperCase();
+  if (effectiveSeverity !== 'CRITICAL' && minSeverity === 'CRITICAL') {
+    return { alerted: false, skippedSeverity: true, severity: effectiveSeverity };
+  }
 
   // Check per-IP cooldown
   const lastAlertTime = ipAlertCooldowns.get(clientIp);
@@ -145,8 +186,9 @@ export async function dispatchSecurityAlert({
     ip: clientIp,
     method: clientMethod,
     path: clientPath,
-    details,
+    details: effectiveDetails,
     userAgent: clientAgent,
+    severity: effectiveSeverity,
   });
 
   if (typeof scheduleTelegram === 'function') {
@@ -155,9 +197,10 @@ export async function dispatchSecurityAlert({
         message,
         ip: clientIp,
         type,
+        severity: effectiveSeverity,
         timestamp: now,
       });
-      return { alerted: true, throttled: false };
+      return { alerted: true, throttled: false, severity: effectiveSeverity };
     } catch (err) {
       logger.error('[SECURITY] Failed to schedule telegram security alert:', err);
       return { alerted: false, error: err.message };

@@ -24,11 +24,11 @@ export const startTelegramWorker = (bot, db) => {
                 await updateOrderStatusNotification(bot, db, orderId, status);
             } else if (job.name === 'security-alert') {
                 const { message } = data;
-                const channelId = getSecret('TELEGRAM_CHANNEL_ID');
+                const channelId = getSecret('TELEGRAM_SECURITY_CHANNEL_ID') || getSecret('TELEGRAM_CHANNEL_ID');
                 if (bot && bot.telegram && channelId && message) {
                     await bot.telegram.sendMessage(channelId, message, { parse_mode: 'Markdown' });
                 } else if (!channelId) {
-                    logger.warn('[WORKER] Cannot send security alert: TELEGRAM_CHANNEL_ID not configured.');
+                    logger.warn('[WORKER] Cannot send security alert: TELEGRAM_SECURITY_CHANNEL_ID or TELEGRAM_CHANNEL_ID not configured.');
                 }
             }
             logger.info(`[WORKER] Telegram job ${job.id} completed.`);
