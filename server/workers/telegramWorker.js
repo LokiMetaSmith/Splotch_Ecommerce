@@ -1,6 +1,7 @@
 import { Worker, connection } from '../queueManager.js';
 import logger from '../logger.js';
 import { sendNewOrderNotification, updateOrderStatusNotification } from '../notificationLogic.js';
+import { getSecret } from '../secretManager.js';
 
 let worker;
 
@@ -21,6 +22,14 @@ export const startTelegramWorker = (bot, db) => {
                 // but we keep it for consistency or if logic changes to use it.
                 // However, notificationLogic uses order.status from DB.
                 await updateOrderStatusNotification(bot, db, orderId, status);
+            } else if (job.name === 'security-alert') {
+                const { message } = data;
+                const channelId = getSecret('TELEGRAM_CHANNEL_ID');
+                if (bot && bot.telegram && channelId && message) {
+                    await bot.telegram.sendMessage(channelId, message, { parse_mode: 'Markdown' });
+                } else if (!channelId) {
+                    logger.warn('[WORKER] Cannot send security alert: TELEGRAM_CHANNEL_ID not configured.');
+                }
             }
             logger.info(`[WORKER] Telegram job ${job.id} completed.`);
         } catch (error) {

@@ -1,0 +1,10 @@
+[splotch]
+enabled = true
+port = http,https,3000
+filter = splotch
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=splotch.service
+maxretry = 3
+findtime = 600
+bantime = 86400
+action = %(action_)s

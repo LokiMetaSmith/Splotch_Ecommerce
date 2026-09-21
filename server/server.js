@@ -88,6 +88,7 @@ import {
 } from "./notificationLogic.js";
 import { processIncomingOrderToDropBox } from "./utils/usbDropBox.js"; // SBC Drop Box Integration
 import { wafMiddleware } from "./waf.js";
+import { dispatchSecurityAlert, getClientIp } from "./lib/securityAlerts.js";
 import OdooClient from "./odoo.js";
 import { exec, execFile } from "child_process";
 import util from "util";
@@ -470,6 +471,11 @@ async function startServer(
         await sendNewOrderNotification(bot, db, data.orderId);
       } else if (jobName === "update-status") {
         await updateOrderStatusNotification(bot, db, data.orderId, data.status);
+      } else if (jobName === "security-alert") {
+        const channelId = getSecret("TELEGRAM_CHANNEL_ID");
+        if (bot && bot.telegram && channelId && data.message) {
+          await bot.telegram.sendMessage(channelId, data.message, { parse_mode: "Markdown" });
+        }
       }
     } else {
       await telegramQueue.add(jobName, data);
@@ -775,6 +781,23 @@ async function startServer(
       },
       standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
       legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+      handler: (req, res, next, options) => {
+        const ip = getClientIp(req);
+        dispatchSecurityAlert({
+          type: "Auth Rate Limit Exceeded",
+          ip,
+          method: req.method,
+          path: req.originalUrl || req.path,
+          details: "Excessive authentication attempts",
+          userAgent: req.headers["user-agent"],
+          scheduleTelegram,
+        });
+        if (typeof options.message === "object") {
+          res.status(options.statusCode).json(options.message);
+        } else {
+          res.status(options.statusCode).send(options.message);
+        }
+      },
       store: redisClient
         ? new RateLimitRedisStore({
             sendCommand: (...args) => redisClient.sendCommand(args),
@@ -797,6 +820,23 @@ async function startServer(
         "Too many requests from this IP, please try again after 15 minutes",
       standardHeaders: true,
       legacyHeaders: false,
+      handler: (req, res, next, options) => {
+        const ip = getClientIp(req);
+        dispatchSecurityAlert({
+          type: "Email/Token Rate Limit Exceeded",
+          ip,
+          method: req.method,
+          path: req.originalUrl || req.path,
+          details: "Excessive email trigger or temporary token requests",
+          userAgent: req.headers["user-agent"],
+          scheduleTelegram,
+        });
+        if (typeof options.message === "object") {
+          res.status(options.statusCode).json(options.message);
+        } else {
+          res.status(options.statusCode).send(options.message);
+        }
+      },
       store: redisClient
         ? new RateLimitRedisStore({
             sendCommand: (...args) => redisClient.sendCommand(args),
@@ -820,6 +860,23 @@ async function startServer(
       },
       standardHeaders: true,
       legacyHeaders: false,
+      handler: (req, res, next, options) => {
+        const ip = getClientIp(req);
+        dispatchSecurityAlert({
+          type: "Promo Enumeration Rate Limit Exceeded",
+          ip,
+          method: req.method,
+          path: req.originalUrl || req.path,
+          details: "Excessive promo code attempts (possible enumeration)",
+          userAgent: req.headers["user-agent"],
+          scheduleTelegram,
+        });
+        if (typeof options.message === "object") {
+          res.status(options.statusCode).json(options.message);
+        } else {
+          res.status(options.statusCode).send(options.message);
+        }
+      },
       store: redisClient
         ? new RateLimitRedisStore({
             sendCommand: (...args) => redisClient.sendCommand(args),
@@ -956,6 +1013,44 @@ async function startServer(
     app.use(wafMiddleware);
     app.disable("x-powered-by");
 
+    // --- HONEYPOT SECURITY TRAPS ---
+    // Traps automated malicious vulnerability scanners targeting WordPress, PHP, Spring Actuator,
+    // cloud credential leaks, or hidden environment configuration files.
+    const HONEYPOT_PATTERNS = [
+      /^\/\.env/i,
+      /^\/\.git/i,
+      /^\/\.aws/i,
+      /^\/wp-login\.php/i,
+      /^\/wp-admin/i,
+      /^\/wp-content/i,
+      /^\/wp-includes/i,
+      /^\/xmlrpc\.php/i,
+      /^\/phpmyadmin/i,
+      /^\/pma/i,
+      /^\/actuator/i,
+      /^\/config\.(json|yml|yaml|ini|env)/i,
+      /^\/\.ds_store/i,
+    ];
+
+    app.use((req, res, next) => {
+      const reqPath = req.path;
+      const isHoneypot = HONEYPOT_PATTERNS.some((pattern) => pattern.test(reqPath));
+      if (isHoneypot) {
+        const ip = getClientIp(req);
+        dispatchSecurityAlert({
+          type: "Honeypot Trap Triggered",
+          ip,
+          method: req.method,
+          path: reqPath,
+          userAgent: req.headers["user-agent"] || "unknown",
+          scheduleTelegram,
+        });
+        // Return 404 Not Found so scanner does not detect custom honeypot behavior
+        return res.status(404).send("Not Found");
+      }
+      next();
+    });
+
     // SECURITY: Block access to sensitive files and directories
     app.use((req, res, next) => {
       const blockedPrefixes = [
@@ -1004,7 +1099,15 @@ async function startServer(
       );
 
       if (isBlockedPrefix || isBlockedExact || isBlockedExtension) {
-        logger.warn(`[SECURITY] Blocked access to sensitive path: ${reqPath}`);
+        const ip = getClientIp(req);
+        dispatchSecurityAlert({
+          type: "Sensitive Path Probe",
+          ip,
+          method: req.method,
+          path: reqPath,
+          userAgent: req.headers["user-agent"] || "unknown",
+          scheduleTelegram,
+        });
         return res.status(403).send("Forbidden");
       }
       next();
