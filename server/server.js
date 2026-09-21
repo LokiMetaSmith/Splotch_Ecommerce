@@ -1286,9 +1286,11 @@ async function startServer(
 
       // Check env var fallback first (fastest)
       // FIX: Ensure ADMIN_EMAIL is set and not empty before comparing
+      const adminEmailEnv = getSecret("ADMIN_EMAIL");
       if (
-        getSecret("ADMIN_EMAIL") &&
-        userPayload.email === getSecret("ADMIN_EMAIL")
+        adminEmailEnv &&
+        adminEmailEnv.trim() !== "" &&
+        userPayload.email === adminEmailEnv
       )
         return true;
 
