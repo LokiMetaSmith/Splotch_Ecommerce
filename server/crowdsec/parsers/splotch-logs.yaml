@@ -1,0 +1,17 @@
+name: splotch/parser
+description: "Parse Splotch security alert logs from systemd journal"
+filter: "evt.Line.Labels.type == 'splotch'"
+onsuccess: next_stage
+pattern_syntax:
+  SPLOTCH_SECURITY: '.*\[SECURITY\] Hostile attempt from IP %{IP:source_ip}: %{GREEDYDATA:attack_reason}'
+nodes:
+  - grok:
+      pattern: '%{SPLOTCH_SECURITY}'
+      apply_on: Line.Raw
+statics:
+  - meta: log_type
+    value: splotch_alert
+  - meta: source_ip
+    expression: "evt.Parsed.source_ip"
+  - meta: attack_reason
+    expression: "evt.Parsed.attack_reason"

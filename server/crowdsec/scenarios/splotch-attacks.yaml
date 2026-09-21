@@ -1,0 +1,14 @@
+type: leaky
+name: splotch/hostile-attempts
+description: "Detect hostile attempts or honeypot triggers on Splotch"
+filter: "evt.Meta.log_type == 'splotch_alert'"
+groupby: "evt.Meta.source_ip"
+capacity: 2
+leakspeed: 10m
+blackhole: 10m
+remediation: true
+labels:
+  type: splotch_attack
+  service: splotch
+  confidence: 3
+  spoofable: 0
