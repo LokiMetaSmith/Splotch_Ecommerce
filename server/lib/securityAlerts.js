@@ -156,12 +156,30 @@ export async function dispatchSecurityAlert({
   );
 
   // Filter: only CRITICAL alerts send Telegram push notifications (ignore background scanner noise)
+
   const minSeverity = (process.env.SECURITY_ALERT_MIN_SEVERITY || 'CRITICAL').toUpperCase();
   if (effectiveSeverity !== 'CRITICAL' && minSeverity === 'CRITICAL') {
     return { alerted: false, skippedSeverity: true, severity: effectiveSeverity };
   }
 
+  // Check IP exclusions
+  const excludedIps = (process.env.SECURITY_ALERT_EXCLUDED_IPS || '')
+    .split(',')
+    .map((ip) => ip.trim())
+    .filter((ip) => ip.length > 0);
+
+  // Normalize IPv6 mapped addresses for exclusion matching
+  let normalizedClientIp = clientIp;
+  if (normalizedClientIp && typeof normalizedClientIp === 'string' && normalizedClientIp.startsWith('::ffff:')) {
+    normalizedClientIp = normalizedClientIp.replace('::ffff:', '');
+  }
+
+  if (excludedIps.some((excluded) => normalizedClientIp === excluded || normalizedClientIp.startsWith(excluded))) {
+    return { alerted: false, skippedExcludedIp: true, severity: effectiveSeverity };
+  }
+
   // Check per-IP cooldown
+
   const lastAlertTime = ipAlertCooldowns.get(clientIp);
   if (lastAlertTime && now - lastAlertTime < DEFAULT_IP_COOLDOWN_MS) {
     return { alerted: false, throttled: true, reason: 'ip_cooldown' };
