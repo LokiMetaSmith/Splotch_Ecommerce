@@ -5,7 +5,7 @@ import logger from './logger.js';
 import { EventEmitter } from 'events';
 import { URL } from 'url';
 
-const redisUrl = getSecret('REDIS_URL');
+const redisUrl = getSecret('REDIS_URL') || process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 // Determine if we should use Redis
 let useRedis = false;
@@ -26,22 +26,31 @@ export const redisAvailable = useRedis;
 
 let connection;
 if (useRedis) {
-    if (redisUrl) {
-        try {
-            const urlObj = new URL(redisUrl);
-            connection = {
-                host: urlObj.hostname,
-                port: Number(urlObj.port) || 6379,
-                password: urlObj.password || undefined,
-                username: urlObj.username || undefined,
-                db: 0
-            };
-        } catch (e) {
-             logger.warn(`[QUEUE] Invalid REDIS_URL "${redisUrl}". Defaulting to localhost:6379.`);
-             connection = { host: 'localhost', port: 6379 };
-        }
-    } else {
-        connection = { host: 'localhost', port: 6379 };
+    const finalRedisUrl = redisUrl || process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+    try {
+        const urlObj = new URL(finalRedisUrl);
+        connection = {
+            host: urlObj.hostname || '127.0.0.1',
+            port: Number(urlObj.port) || 6379,
+            password: urlObj.password || undefined,
+            username: urlObj.username || undefined,
+            db: 0,
+            maxRetriesPerRequest: 3,
+            retryStrategy: function (times) {
+                const delay = Math.min(times * 50, 2000);
+                return delay;
+            }
+        };
+    } catch (e) {
+         logger.warn(`[QUEUE] Invalid REDIS_URL "${finalRedisUrl}". Defaulting to 127.0.0.1:6379.`);
+         connection = {
+            host: '127.0.0.1',
+            port: 6379,
+            maxRetriesPerRequest: 3,
+            retryStrategy: function (times) {
+                return Math.min(times * 50, 2000);
+            }
+         };
     }
 }
 

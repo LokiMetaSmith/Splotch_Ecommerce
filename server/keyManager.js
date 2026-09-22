@@ -62,10 +62,21 @@ export const rotateKeys = () => {
 export const getJwks = async () => {
     try {
         const keys = await Promise.all(
-            activeKeys.map(async (key) => {
-                const jwk = await exportJWK(key.publicKey);
-                return { ...jwk, kid: key.kid, use: 'sig', alg: 'RS256' };
-            })
+            activeKeys
+                .filter((key) => {
+                    if (!key) return false;
+                    try {
+                        const keyObj = crypto.createPublicKey(key.publicKey);
+                        return keyObj.type === 'public';
+                    } catch (e) {
+                        return false;
+                    }
+                })
+                .map(async (key) => {
+                    const keyObj = crypto.createPublicKey(key.publicKey);
+                    const jwk = await exportJWK(keyObj);
+                    return { ...jwk, kid: key.kid, use: 'sig', alg: 'RS256' };
+                })
         );
         return { keys };
     } catch (error) {

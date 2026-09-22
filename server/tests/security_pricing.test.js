@@ -158,7 +158,7 @@ describe('Security: Price Manipulation & Logic', () => {
         // FIX ASSERTION:
         // We expect this to FAIL (400) because the server now checks price.
         expect(res.statusCode).toEqual(400);
-        expect(res.body.error).toContain('Order amount is too low');
+        expect(res.body.error).toContain('Order confirmation required');
 
         // Verify the creator did NOT get paid
         const creator = db.data.users[creatorId];
