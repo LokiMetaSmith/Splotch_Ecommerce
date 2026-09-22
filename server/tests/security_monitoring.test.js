@@ -132,7 +132,7 @@ describe('Security Monitoring & Intrusion Detection', () => {
       warnSpy.mockRestore();
     });
 
-    it('should escalate repeated LOW strikes from the same IP to CRITICAL and alert', async () => {
+    it('should add details on repeated LOW strikes from the same IP but not escalate or alert', async () => {
       jest.spyOn(logger, 'warn').mockImplementation(() => {});
       const mockSchedule = jest.fn().mockResolvedValue(true);
 
@@ -147,7 +147,7 @@ describe('Security Monitoring & Intrusion Detection', () => {
       expect(hit1.alerted).toBe(false);
       expect(mockSchedule).not.toHaveBeenCalled();
 
-      // Strike 2: same IP hits again, escalated to CRITICAL -> Telegram alert dispatched!
+      // Strike 2: same IP hits again, details appended but not escalated -> NO Telegram alert
       const hit2 = await dispatchSecurityAlert({
         type: 'Scanner Probe',
         severity: 'LOW',
@@ -155,9 +155,13 @@ describe('Security Monitoring & Intrusion Detection', () => {
         path: '/xmlrpc.php',
         scheduleTelegram: mockSchedule,
       });
-      expect(hit2.alerted).toBe(true);
-      expect(hit2.severity).toBe('CRITICAL');
-      expect(mockSchedule).toHaveBeenCalledTimes(1);
+      expect(hit2.alerted).toBe(false);
+      expect(hit2.severity).toBe('LOW');
+      expect(mockSchedule).not.toHaveBeenCalled();
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringMatching(/Multi-strike repeat scanner \(Strike 2\)/)
+      );
 
       logger.warn.mockRestore();
     });
@@ -212,22 +216,18 @@ describe('Security Monitoring & Intrusion Detection', () => {
       mockSendMessage.mockClear();
     });
 
-    it('should immediately trigger CRITICAL alert on /.env to dedicated security channel', async () => {
+    it('should NOT trigger CRITICAL alert on /.env to dedicated security channel, just log as MEDIUM', async () => {
+      jest.spyOn(logger, 'warn').mockImplementation(() => {});
       const res = await request(app)
         .get('/.env')
         .set('X-Forwarded-For', '203.0.113.11');
 
       expect(res.statusCode).toBe(404);
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        'dedicated-security-channel',
-        expect.stringContaining('Critical Secret Probe'),
-        { parse_mode: 'Markdown' }
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringMatching(/\[SECURITY\] Hostile attempt from IP 203\.0\.113\.11: \[MEDIUM\] Critical Secret Probe/)
       );
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        'dedicated-security-channel',
-        expect.stringContaining('203.0.113.11'),
-        { parse_mode: 'Markdown' }
-      );
+      logger.warn.mockRestore();
     });
 
     it('should not notify Telegram on single isolated /wp-login.php scan (LOW severity)', async () => {
@@ -239,7 +239,8 @@ describe('Security Monitoring & Intrusion Detection', () => {
       expect(mockSendMessage).not.toHaveBeenCalled();
     });
 
-    it('should escalate and notify Telegram when same IP scans multiple times', async () => {
+    it('should NOT escalate and notify Telegram when same IP scans multiple times', async () => {
+      jest.spyOn(logger, 'warn').mockImplementation(() => {});
       // Strike 1
       await request(app)
         .get('/wp-login.php')
@@ -250,25 +251,27 @@ describe('Security Monitoring & Intrusion Detection', () => {
       await request(app)
         .get('/xmlrpc.php')
         .set('X-Forwarded-For', '203.0.113.33');
-      expect(mockSendMessage).toHaveBeenCalledTimes(1);
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        'dedicated-security-channel',
-        expect.stringContaining('Multi-strike repeat scanner'),
-        { parse_mode: 'Markdown' }
+      expect(mockSendMessage).not.toHaveBeenCalled();
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringMatching(/Multi-strike repeat scanner \(Strike 2\)/)
       );
+      logger.warn.mockRestore();
     });
 
-    it('should trigger CRITICAL alert on /server/server.js sensitive path probe', async () => {
+    it('should NOT trigger CRITICAL alert on /server/server.js sensitive path probe, just log as MEDIUM', async () => {
+      jest.spyOn(logger, 'warn').mockImplementation(() => {});
       const res = await request(app)
         .get('/server/server.js')
         .set('X-Forwarded-For', '203.0.113.44');
 
       expect(res.statusCode).toBe(403);
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        'dedicated-security-channel',
-        expect.stringContaining('Sensitive Path Probe'),
-        { parse_mode: 'Markdown' }
+      expect(mockSendMessage).not.toHaveBeenCalled();
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringMatching(/\[SECURITY\] Hostile attempt from IP 203\.0\.113\.44: \[MEDIUM\] Sensitive Path Probe/)
       );
+      logger.warn.mockRestore();
     });
   });
 });
