@@ -1046,7 +1046,7 @@ async function startServer(
         const ip = getClientIp(req);
         dispatchSecurityAlert({
           type: isCritical ? "Critical Secret Probe" : "Scanner Probe",
-          severity: isCritical ? "CRITICAL" : "LOW",
+          severity: isCritical ? "MEDIUM" : "LOW",
           ip,
           method: req.method,
           path: reqPath,
@@ -1110,7 +1110,7 @@ async function startServer(
         const ip = getClientIp(req);
         dispatchSecurityAlert({
           type: "Sensitive Path Probe",
-          severity: "CRITICAL",
+          severity: "MEDIUM",
           ip,
           method: req.method,
           path: reqPath,

@@ -128,7 +128,7 @@ export async function dispatchSecurityAlert({
   let effectiveSeverity = severity.toUpperCase();
   let effectiveDetails = details;
 
-  // Track strikes for non-critical hits; escalate to CRITICAL on repeated attempts
+  // Track strikes for non-critical hits; add detail on repeated attempts but do not escalate severity
   if (effectiveSeverity !== 'CRITICAL') {
     const existing = ipStrikes.get(clientIp) || { count: 0, firstHit: now, lastHit: now };
     // Reset strikes if older than STRIKE_WINDOW_MS
@@ -141,7 +141,6 @@ export async function dispatchSecurityAlert({
     ipStrikes.set(clientIp, existing);
 
     if (existing.count >= STRIKES_TO_ESCALATE) {
-      effectiveSeverity = 'CRITICAL';
       effectiveDetails = effectiveDetails
         ? `${effectiveDetails} - Multi-strike repeat scanner (Strike ${existing.count})`
         : `Multi-strike repeat scanner (Strike ${existing.count})`;
