@@ -211,6 +211,25 @@ export class LowDbAdapter {
         return order;
     }
 
+    // --- Agent Quotes ---
+    async getQuote(id) {
+        return this.db.data.agentQuotes ? this.db.data.agentQuotes[id] : undefined;
+    }
+
+    async createQuote(quote) {
+        if (!this.db.data.agentQuotes) this.db.data.agentQuotes = {};
+        this.db.data.agentQuotes[quote.quoteId] = quote;
+        await this.write();
+        return quote;
+    }
+
+    async updateQuote(quote) {
+        if (!this.db.data.agentQuotes) this.db.data.agentQuotes = {};
+        this.db.data.agentQuotes[quote.quoteId] = quote;
+        await this.write();
+        return quote;
+    }
+
     // --- Batches ---
     async getBatch(id) {
         return this.db.data.batches[id];

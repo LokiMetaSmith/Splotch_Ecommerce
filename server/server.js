@@ -92,6 +92,8 @@ import { dispatchSecurityAlert, getClientIp } from "./lib/securityAlerts.js";
 import OdooClient from "./odoo.js";
 import { exec, execFile } from "child_process";
 import util from "util";
+import { mcpRequestHandler, mcpMessageHandler } from "./mcp.js";
+import createAgentPaymentsRouter from "./routes/agent-payments.js";
 
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
@@ -302,6 +304,7 @@ const defaultData = {
   credentials: {},
   config: {},
   products: {},
+  agentQuotes: {},
 };
 
 export async function runRetentionFlush(dbInstance, options = {}) {
@@ -1333,6 +1336,14 @@ async function startServer(
 
     // --- API Endpoints ---
     app.use("/api", apiLimiter);
+
+    // --- MCP Server Endpoints ---
+    app.get("/api/mcp", (req, res) => mcpRequestHandler(req, res, db));
+    app.post("/api/mcp/messages", (req, res) => mcpMessageHandler(req, res, db));
+
+    // --- Agent Payments ---
+    app.use("/api", createAgentPaymentsRouter(db));
+
     app.get("/.well-known/jwks.json", async (req, res) => {
       res.setHeader(
         "Cache-Control",
