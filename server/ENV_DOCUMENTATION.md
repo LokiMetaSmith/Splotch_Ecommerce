@@ -38,9 +38,19 @@ By default, files are stored locally in the `server/uploads` directory. To use S
 
 Configuration for autonomous agent checkout processing via the Model Context Protocol (MCP) and x402/AP2 endpoints.
 
--   `X402_MERCHANT_ID`: Your x402 merchant identifier, used for programmatic settlement of stablecoins or crypto assets.
--   `X402_API_KEY`: The API key associated with your x402 merchant account for verifying on-chain or network payment proofs.
--   `AP2_GOVERNANCE_PUBKEY`: The public key used to verify the cryptographic signatures of AP2 Cart Mandates, ensuring the agent was authorized by the human user.
+Because x402 and AP2 are open protocols rather than proprietary platforms, you do not obtain these keys from a single central authority. Instead, they are generated through your specific payment facilitator and your own server's cryptographic configuration.
+
+-   `X402_MERCHANT_ID` & `X402_API_KEY`:
+    - The x402 protocol is a negotiation standard built on the HTTP 402 status code. It is not a payment system itself.
+    - These keys are issued by the facilitator you select to handle payment verification and settlement.
+    - **Square/Block:** Because you are using Square, you will replace these generic variables with your existing Square Merchant ID and a Square API Token generated from your Square Developer Dashboard.
+    - **Coinbase:** If you use Coinbase Developer Platform (CDP) as your mainnet facilitator, you will generate these API keys by creating a CDP account.
+    - **Stripe:** If using Stripe, you will use your standard Stripe Account ID and Secret Key after requesting access to the "Stablecoins and Crypto" machine payments feature.
+-   `AP2_GOVERNANCE_PUBKEY`:
+    - Google's AP2 protocol relies on SD-JWT verifiable digital credentials to prove an agent's authority. You **generate this key yourself**.
+    - You must create an asymmetric cryptographic key pair (e.g., RSA or ECDSA) for your server.
+    - Your server uses the private key to sign AP2 payment intents, known as Checkout JWTs.
+    - The `AP2_GOVERNANCE_PUBKEY` is the public half of that pair. You configure this environment variable to verify incoming agent mandates, and you must expose it publicly at your domain's `/.well-known/ap2` endpoint so shopping agents and payment rails can verify your store.
 
 ## Odoo Integration (Optional)
 
