@@ -71,7 +71,7 @@ export default function createAgentPaymentsRouter(db) {
     }
 
     // Replay Protection: Check if paymentId already exists
-    const existingOrders = await db.getAllOrders();
+    const existingOrders = await db.getAllOrders() || [];
     const isDuplicatePayment = existingOrders.some(order => order.paymentId === verified.paymentId);
     if (isDuplicatePayment) {
         return res.status(400).json({ error: "Payment proof has already been processed (Replay Protection)" });
