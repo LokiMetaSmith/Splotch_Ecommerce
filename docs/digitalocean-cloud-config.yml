@@ -80,6 +80,13 @@ write_files:
       CSRF_SECRET=REPLACE_WITH_ANOTHER_32_CHAR_RANDOM_SECRET
       SESSION_SECRET=REPLACE_WITH_A_THIRD_32_CHAR_RANDOM_SECRET
 
+      # Agentic Payments / Machine-to-Machine Checkout
+      # Reuse your Square credentials and JWT public key as described in docs.
+      X402_MERCHANT_ID=YOUR_PRODUCTION_SQUARE_LOCATION_ID
+      X402_API_KEY=YOUR_PRODUCTION_SQUARE_TOKEN
+      # Make sure to copy the exact value of JWT_PUBLIC_KEY here
+      AP2_GOVERNANCE_PUBKEY="-----BEGIN PUBLIC KEY-----\nPASTE_YOUR_PUBLIC_KEY_HERE\n-----END PUBLIC KEY-----"
+
       # Optional: Telegram Bot for Notifications
       TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
       TELEGRAM_CHANNEL_ID=YOUR_TELEGRAM_CHANNEL_ID
