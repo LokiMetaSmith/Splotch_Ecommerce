@@ -5,6 +5,7 @@ Welcome to the Print Shop application. This repository contains the source code 
 ## Documentation
 
 *   **[Deployment Guide](docs/deployment/README.md)**: Instructions for deploying to Cloud VPS, Proxmox, or Local Docker.
+*   **[Agentic Payments & MCP](docs/agentic_payments.md)**: Autonomous AI agent sticker ordering via Model Context Protocol (MCP) and AP2/x402.
 *   **[Security](docs/security.md)**: Security best practices and guidelines.
 *   **[Backups](docs/backups.md)**: Backup and restore procedures.
 *   **[Full Documentation Index](docs/README.md)**: Complete list of all documentation.

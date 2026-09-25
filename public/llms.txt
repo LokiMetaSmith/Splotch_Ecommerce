@@ -1,0 +1,43 @@
+﻿# Splotch Custom Sticker E-Commerce & Print Shop
+
+> Fast, high-quality custom vinyl stickers manufactured on-demand. Splotch supports both human customers and autonomous AI agents.
+
+## Autonomous Agent Ordering (MCP & AP2 / x402)
+
+Splotch supports automated machine-to-machine (M2M) purchasing using the Model Context Protocol (MCP) and Google AP2 / x402 payment protocols.
+
+### 1. Model Context Protocol (MCP) Endpoint
+- **Transport**: Server-Sent Events (SSE)
+- **SSE Connection URL**: `/api/mcp`
+- **Messages URL**: `/api/mcp/messages?sessionId=<sessionId>`
+
+#### Available MCP Tools
+- `calculate_sticker_quote`: Calculates live sticker price given dimensions, material, quantity, and cut type.
+  - Parameters:
+    - `widthInches` (number, required): Sticker width in inches (e.g., 3.0)
+    - `heightInches` (number, required): Sticker height in inches (e.g., 3.0)
+    - `quantity` (integer, required): Number of stickers (e.g., 50)
+    - `material` (string, required): One of `"vinyl_matte"`, `"vinyl_gloss"`, `"holographic"`
+    - `cutType` (string, optional): One of `"die_cut"`, `"kiss_cut"`
+  - Response: `{ quoteId, unitPrice, total, currency: "USD", validUntilMinutes: 30 }`
+
+- `create_agent_checkout`: Preflights artwork asset and generates an AP2 / x402 payment intent.
+  - Parameters:
+    - `quoteId` (string, required): Valid, unexpired quoteId from `calculate_sticker_quote`
+    - `amount` (string, required): Quoted total matching the quoteId (e.g., "15.00")
+    - `designUrl` (string, required): Publicly reachable HTTP/HTTPS URL to SVG or PNG artwork (< 5MB)
+    - `shippingAddress` (object, required): `{ name, street, city, state, zip }`
+  - Response: `{ orderIntentId, quoteId, paymentStatus: "REQUIRES_PAYMENT", x402Challenge: { paymentEndpoint: "/api/v1/payments/ap2", amount, currency: "USD" } }`
+
+### 2. Payment & Settlement (x402 / AP2)
+- **Payment Endpoint**: `POST /api/v1/payments/ap2`
+- **Governance Public Key**: `GET /.well-known/ap2`
+- **Required Headers**:
+  - `authorization-x402`: Base64 JSON payment proof (`{"status": "PAID", "amount": 15.00, "paymentId": "..."}`)
+  - `x-ap2-mandate`: Base64 JSON AP2 Cart Mandate signed by user (`{"intentId": "...", "quoteId": "...", "mandateId": "..."}`)
+- **Payload**: `{ quoteId, amount, shippingAddress, items: [...] }`
+- **Response**: `201 Created` with confirmed `orderId`.
+
+## Human Ordering Interface
+- Website: `https://splotch.shop` (or local host)
+- Sticker designer canvas with smart cutline generation, preview, and instant checkout.

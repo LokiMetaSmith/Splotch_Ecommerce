@@ -40,7 +40,76 @@ When an autonomous AI agent wants to order stickers, the interaction follows a s
 3.  **Security Checks:** Splotch ensures the quote exists, has not expired, and most importantly, that the paid `amount` matches the originally quoted price exactly. (This prevents agents from arbitrarily dictating lower prices in their payloads).
 4.  If all checks pass, the print-shop job is enqueued via `db.createOrder()`, and a `201 Created` status is returned to the agent with tracking information.
 
-## 3. Setup & Configuration
+## 3. Quick Start: Connecting an Agent to Splotch
+
+### Option A: Connect via Claude Desktop or Cursor (MCP)
+
+Add Splotch's SSE endpoint to your MCP client settings (e.g. `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "splotch": {
+      "url": "http://localhost:3000/api/mcp"
+    }
+  }
+}
+```
+*(Replace `http://localhost:3000` with your production domain, e.g. `https://splotch.shop` or your server's LAN IP).*
+
+Once connected, your agent receives two tools:
+- **`calculate_sticker_quote`**: Takes `widthInches`, `heightInches`, `quantity`, `material` (`"vinyl_matte"`, `"vinyl_gloss"`, `"holographic"`), and `cutType` (`"die_cut"`, `"kiss_cut"`). Returns `quoteId`, unit price, and total.
+- **`create_agent_checkout`**: Takes `quoteId`, `amount`, `designUrl` (public HTTP/HTTPS link to SVG/PNG <= 5MB), and `shippingAddress` (`name`, `street`, `city`, `state`, `zip`). Preflights the artwork and generates the `x402Challenge`.
+
+### Option B: Direct HTTP / x402 Autonomous Checkout
+
+If an agent communicates directly via HTTP REST:
+
+1. Request quote: Call the pricing tool or endpoint to obtain a valid `quoteId` and total.
+2. Submit order to `/api/v1/payments/ap2` with cryptographic settlement proofs:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/payments/ap2 \
+  -H "Content-Type: application/json" \
+  -H "authorization-x402: eyJzdGF0dXMiOiAiUEFJRCI...==" \
+  -H "x-ap2-mandate: eyJpbnRlbnRJZCI6ICJpbnRl...==" \
+  -d '{
+    "quoteId": "quote_1727286000000",
+    "amount": "15.00",
+    "shippingAddress": {
+      "name": "Jane Doe",
+      "street": "123 Sticker Lane",
+      "city": "Austin",
+      "state": "TX",
+      "zip": "78701"
+    },
+    "items": [
+      {
+        "name": "Custom Die Cut Sticker",
+        "designUrl": "https://example.com/artwork.svg",
+        "quantity": 50
+      }
+    ]
+  }'
+```
+
+Response (`201 Created`):
+```json
+{
+  "status": "CONFIRMED",
+  "orderId": "ord_1727286050000",
+  "amount": 15.00,
+  "mandateId": "mandate-1727286050000",
+  "paymentId": "x402-payment-1727286050000"
+}
+```
+
+### Discovery Endpoints for AI Web Crawlers
+- **`GET /llms.txt`**: Plaintext specification for LLMs detailing tools, schemas, and endpoints.
+- **`GET /.well-known/ap2`**: Exposes the store's public key (`AP2_GOVERNANCE_PUBKEY`) for mandate cryptographic verification.
+- **`GET /api/mcp`**: Server-Sent Events entrypoint for Model Context Protocol agents.
+
+## 4. Setup & Configuration
 
 To enable the agentic payment endpoints and begin accepting autonomous checkouts, configure the following variables in your `server/.env` file:
 
@@ -66,7 +135,7 @@ Because x402 and AP2 are open protocols rather than proprietary platforms, you d
     *   Your server uses the private key to sign AP2 payment intents, known as Checkout JWTs.
     *   The `AP2_GOVERNANCE_PUBKEY` is the public half of that pair. You configure this environment variable to verify incoming agent mandates, and you must expose it publicly at your domain's `/.well-known/ap2` endpoint so shopping agents and payment rails can verify your store.
 
-## 4. Print Shop Payouts & Settlement
+## 5. Print Shop Payouts & Settlement
 
 While standard customer orders on Splotch use the Square API to process credit card transactions, machine-to-machine payments operate differently. The x402 and AP2 protocols dictate *how* an agent authorizes and proves a payment occurred, but the actual funds must still settle to the print shop.
 
@@ -75,7 +144,7 @@ Currently, Splotch's agentic payment endpoints advertise support for automated d
 *   **Stablecoins (Base USDC) & Lightning:** The primary mechanism for autonomous agents to settle micro-transactions instantly without requiring credit card forms. Funds settle directly to the print shop's configured custodial or non-custodial crypto wallet (e.g., Coinbase Commerce or a self-hosted Lightning node).
 *   **Tokenized Fiat (Future Integration):** While our standard Square integration handles human checkout, agentic checkout can eventually bridge back to traditional fiat rails. If a user authorizes an agent via AP2, the agent could theoretically transmit a tokenized mandate that tells a Stripe or Square clearinghouse to charge the user's card-on-file, allowing the print shop to receive payouts through their existing banking infrastructure.
 
-## 5. Security Considerations
+## 6. Security Considerations
 
 *   **No Payload Trust:** The payment endpoint *never* trusts the `amount` field provided in the agent's raw JSON body. It strictly relies on the server-calculated total stored in the quote cache.
 *   **Session Isolation:** MCP connections over Express can suffer from cross-talk if not handled carefully. Our implementation maps `SSEServerTransport` instances dynamically to active `sessionIds`, ensuring concurrent agent checkouts remain completely isolated.

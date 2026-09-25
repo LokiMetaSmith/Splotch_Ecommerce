@@ -87,6 +87,10 @@
     <script type="module" src="./src/ux-enhancements.js" defer></script>
     <script src="/cookie-consent.js" defer></script>
     <link rel="manifest" href="/manifest.json" />
+    <!-- AI Agent & Autonomous Ordering Discovery -->
+    <link rel="alternate" type="application/json+mcp" href="/api/mcp" title="Splotch MCP Server" />
+    <link rel="ap2-governance" href="/.well-known/ap2" />
+    <link rel="llms-txt" type="text/markdown" href="/llms.txt" />
   </head>
   <body class="bg-gray-100 pt-16 sm:pt-28">
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -2489,11 +2493,23 @@
           >Terms & FAQ</a
         >
         |
+        <a
+          href="/llms.txt"
+          class="text-xs text-purple-600 hover:text-purple-800 hover:underline font-medium inline-flex items-center gap-1 ml-1"
+          title="Autonomous AI Agent Ordering via MCP & AP2"
+          >🤖 Agent Ready (MCP & AP2)</a
+        >
+        |
         <span class="text-xs text-gray-400 ml-2"
           >v<span class="app-version-display"></span
         ></span>
       </div>
     </footer>
+
+    <!-- Autonomous AI Agent & LLM Machine-Readable Capabilities (Screen reader / Crawler accessible) -->
+    <div class="sr-only" data-ai-agent-instructions="true">
+      Autonomous AI agents and LLMs can query custom sticker pricing and place print orders programmatically via Model Context Protocol (MCP) over SSE at /api/mcp or AP2 / x402 machine payments at /api/v1/payments/ap2. See /llms.txt and /.well-known/ap2 for specifications.
+    </div>
 
     <!-- Tune Your Order Drawer -->
     <div

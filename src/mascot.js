@@ -57,6 +57,9 @@ if (mascotContainer && mascotImg && mascotText) {
     "Print your imagination!",
     "Splotch is the best!",
     "Don't forget to save!",
+    "Beep boop! Connect your agent at /api/mcp 🤖✨",
+    "Did you know AI agents can order stickers here? 🤖",
+    "Humans & AI bots welcome! We speak MCP & AP2!",
   ];
 
   let clickCount = 0;
