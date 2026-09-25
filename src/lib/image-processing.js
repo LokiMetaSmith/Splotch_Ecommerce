@@ -60,6 +60,117 @@ export function imageHasTransparentBorder(imageData) {
   return totalSamples > 0 && transparentCount / totalSamples > 0.25;
 }
 
+/**
+ * Detects if at least `thresholdRatio` (default 25%) of the outer perimeter samples
+ * are the same color.
+ *
+ * @param {ImageData} imageData - Canvas ImageData object
+ * @param {number} [thresholdRatio=0.25] - Minimum fraction of perimeter samples (0.25 = 25%)
+ * @param {number} [colorTolerance=25] - Max Euclidean color distance to consider same color
+ * @returns {{ detected: boolean, color: string|null, rgb: {r: number, g: number, b: number}|null, ratio: number }}
+ */
+export function getDominantPerimeterColor(
+  imageData,
+  thresholdRatio = 0.25,
+  colorTolerance = 25,
+) {
+  if (!imageData || !imageData.data) {
+    return { detected: false, color: null, rgb: null, ratio: 0 };
+  }
+  const { data, width, height } = imageData;
+  if (width < 2 || height < 2) {
+    return { detected: false, color: null, rgb: null, ratio: 0 };
+  }
+
+  const sampleStepX = Math.max(1, Math.floor(width / 50));
+  const sampleStepY = Math.max(1, Math.floor(height / 50));
+
+  const clusters = [];
+  let totalSamples = 0;
+
+  const samplePixel = (idx) => {
+    totalSamples++;
+    const a = data[idx + 3];
+    if (a < 128) return; // Transparent pixels don't have an opaque edge cut color
+
+    const r = data[idx];
+    const g = data[idx + 1];
+    const b = data[idx + 2];
+
+    let closestCluster = null;
+    let minDistanceSq = colorTolerance * colorTolerance;
+
+    for (let c = 0; c < clusters.length; c++) {
+      const cluster = clusters[c];
+      const dr = r - cluster.r;
+      const dg = g - cluster.g;
+      const db = b - cluster.b;
+      const distSq = dr * dr + dg * dg + db * db;
+      if (distSq <= minDistanceSq) {
+        minDistanceSq = distSq;
+        closestCluster = cluster;
+      }
+    }
+
+    if (closestCluster) {
+      closestCluster.count++;
+      closestCluster.sumR += r;
+      closestCluster.sumG += g;
+      closestCluster.sumB += b;
+      closestCluster.r = Math.round(closestCluster.sumR / closestCluster.count);
+      closestCluster.g = Math.round(closestCluster.sumG / closestCluster.count);
+      closestCluster.b = Math.round(closestCluster.sumB / closestCluster.count);
+    } else {
+      clusters.push({
+        r,
+        g,
+        b,
+        count: 1,
+        sumR: r,
+        sumG: g,
+        sumB: b,
+      });
+    }
+  };
+
+  // Top and bottom edges
+  for (let x = 0; x < width; x += sampleStepX) {
+    samplePixel(x * 4);
+    samplePixel(((height - 1) * width + x) * 4);
+  }
+  // Left and right edges (skipping corner rows to avoid double sampling)
+  for (let y = sampleStepY; y < height - 1; y += sampleStepY) {
+    samplePixel((y * width) * 4);
+    samplePixel((y * width + (width - 1)) * 4);
+  }
+
+  if (totalSamples === 0 || clusters.length === 0) {
+    return { detected: false, color: null, rgb: null, ratio: 0 };
+  }
+
+  let dominant = clusters[0];
+  for (let i = 1; i < clusters.length; i++) {
+    if (clusters[i].count > dominant.count) {
+      dominant = clusters[i];
+    }
+  }
+
+  const ratio = dominant.count / totalSamples;
+  if (ratio >= thresholdRatio) {
+    const toHex = (c) =>
+      Math.max(0, Math.min(255, c)).toString(16).padStart(2, "0");
+    const hex = `#${toHex(dominant.r)}${toHex(dominant.g)}${toHex(dominant.b)}`;
+    return {
+      detected: true,
+      color: hex,
+      rgb: { r: dominant.r, g: dominant.g, b: dominant.b },
+      ratio,
+    };
+  }
+
+  return { detected: false, color: null, rgb: null, ratio };
+}
+
 export function getPolygonArea(points) {
   let area = 0;
   const len = points.length;

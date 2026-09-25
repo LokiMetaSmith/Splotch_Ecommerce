@@ -1,5 +1,5 @@
 // tests/image-processing.test.js
-import { imageHasTransparentBorder, traceContour, simplifyPolygon, perpendicularDistance, getPolygonBounds } from '../src/lib/image-processing.js';
+import { imageHasTransparentBorder, getDominantPerimeterColor, traceContour, simplifyPolygon, perpendicularDistance, getPolygonBounds } from '../src/lib/image-processing.js';
 
 describe('Image Processing Library', () => {
 
@@ -92,6 +92,111 @@ describe('Image Processing Library', () => {
 
             const imageData = { data, width, height };
             expect(imageHasTransparentBorder(imageData)).toBe(true);
+        });
+    });
+
+    describe('getDominantPerimeterColor', () => {
+        it('should detect dominant color when >= 25% of perimeter samples share a color', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+
+            // Fill entire top row (and more) with solid red: (255, 0, 0, 255)
+            // Top row + first 30 rows = red
+            for (let y = 0; y < 30; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    data[i] = 255;   // R
+                    data[i+1] = 0;   // G
+                    data[i+2] = 0;   // B
+                    data[i+3] = 255; // A
+                }
+            }
+
+            const imageData = { data, width, height };
+            const result = getDominantPerimeterColor(imageData, 0.25);
+            expect(result.detected).toBe(true);
+            expect(result.color).toBe('#ff0000');
+            expect(result.ratio).toBeGreaterThanOrEqual(0.25);
+        });
+
+        it('should return detected: true with 100% ratio for a full solid color image', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+
+            // Fill entire image with solid cyan (0, 255, 255)
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = 0;
+                data[i+1] = 255;
+                data[i+2] = 255;
+                data[i+3] = 255;
+            }
+
+            const imageData = { data, width, height };
+            const result = getDominantPerimeterColor(imageData, 0.25);
+            expect(result.detected).toBe(true);
+            expect(result.color).toBe('#00ffff');
+            expect(result.ratio).toBe(1);
+        });
+
+        it('should return detected: false when perimeter is varied and no color reaches 25%', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+
+            // Fill each pixel along the perimeter with completely different colors
+            for (let i = 0; i < data.length; i += 4) {
+                const pixelIdx = i / 4;
+                data[i] = (pixelIdx * 7) % 256;
+                data[i+1] = (pixelIdx * 13) % 256;
+                data[i+2] = (pixelIdx * 17) % 256;
+                data[i+3] = 255;
+            }
+
+            const imageData = { data, width, height };
+            const result = getDominantPerimeterColor(imageData, 0.25);
+            expect(result.detected).toBe(false);
+            expect(result.color).toBeNull();
+        });
+
+        it('should ignore transparent pixels when clustering but include them in total sample count', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+
+            // Fill only 10% of top row with red, rest is transparent (alpha = 0)
+            for (let x = 0; x < 10; x++) {
+                const i = x * 4;
+                data[i] = 255;
+                data[i+1] = 0;
+                data[i+2] = 0;
+                data[i+3] = 255;
+            }
+
+            const imageData = { data, width, height };
+            const result = getDominantPerimeterColor(imageData, 0.25);
+            expect(result.detected).toBe(false);
+        });
+
+        it('should cluster colors within tolerance (e.g. compression noise)', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+
+            // Fill entire top row with slight blue color variations: (0, 0, 245) to (0, 0, 255)
+            for (let x = 0; x < width; x++) {
+                const i = x * 4;
+                data[i] = 0;
+                data[i+1] = 0;
+                data[i+2] = 245 + (x % 10);
+                data[i+3] = 255;
+            }
+
+            const imageData = { data, width, height };
+            const result = getDominantPerimeterColor(imageData, 0.25, 25);
+            expect(result.detected).toBe(true);
+            expect(result.color).toMatch(/^#0000[f|e]/i);
         });
     });
 

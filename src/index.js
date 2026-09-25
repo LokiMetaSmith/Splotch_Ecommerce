@@ -17,6 +17,7 @@ import {
   simplifyPolygon,
   smoothPolygon,
   imageHasTransparentBorder,
+  getDominantPerimeterColor,
   filterInternalContours,
   processCustomLayerMask,
 } from "./lib/image-processing.js";
@@ -3484,6 +3485,40 @@ function reprocessCustomLayer(layer) {
     });
 }
 
+/**
+ * Checks if >= 25% of the outer perimeter samples share the same color.
+ * If so, sets the custom edge cut / bleed color to that detected color,
+ * and returns the detection result.
+ */
+function applyPerimeterEdgeColor(currentImageData) {
+  if (!currentImageData) return null;
+  const dominant = getDominantPerimeterColor(currentImageData, 0.25);
+  if (dominant && dominant.detected) {
+    const hex = dominant.color;
+    const bleedColor1 = document.getElementById("bleedColor1");
+    const bleedColor2 = document.getElementById("bleedColor2");
+    if (bleedColor1) bleedColor1.value = hex;
+    if (bleedColor2) bleedColor2.value = hex;
+    const edgeCutColorEl =
+      document.getElementById("edgeCutColor") ||
+      document.getElementById("customEdgeCutColor");
+    if (edgeCutColorEl) edgeCutColorEl.value = hex;
+    if (activeBase) {
+      activeBase.edgeCutColor = hex;
+      activeBase.bleedColor1 = hex;
+      activeBase.bleedColor2 = hex;
+    }
+    const activeSticker = getActiveSticker();
+    if (activeSticker) {
+      activeSticker.edgeCutColor = hex;
+      activeSticker.bleedColor1 = hex;
+      activeSticker.bleedColor2 = hex;
+    }
+    return dominant;
+  }
+  return null;
+}
+
 function handleFileChange(event) {
   const file = event.target.files[0];
   if (file) {
@@ -3809,7 +3844,9 @@ function loadFileAsImage(file, isMascot = false) {
               console.warn("[CLIENT] Failed to get canvas image data for transparency check:", err);
             }
 
-            if (currentImageData && imageHasTransparentBorder(currentImageData)) {
+            const dominantColor = applyPerimeterEdgeColor(currentImageData);
+
+            if (dominantColor || (currentImageData && imageHasTransparentBorder(currentImageData))) {
               if (cutShapeSelect) cutShapeSelect.value = "trace";
               handleGenerateCutline(true);
             } else {
@@ -5691,7 +5728,9 @@ function handleResetImage() {
       const logicalWidth = canvas.width / dpr;
       const logicalHeight = canvas.height / dpr;
 
-      if (imageHasTransparentBorder(currentImageData)) {
+      const dominantColor = applyPerimeterEdgeColor(currentImageData);
+
+      if (dominantColor || imageHasTransparentBorder(currentImageData)) {
         if (cutShapeSelect) cutShapeSelect.value = "trace";
         handleGenerateCutline(true);
       } else {
@@ -6805,7 +6844,9 @@ async function handleRemoteImageLoad(imageUrl) {
     const logicalWidth = canvas.width / dpr;
     const logicalHeight = canvas.height / dpr;
 
-    if (imageHasTransparentBorder(currentImageData)) {
+    const dominantColor = applyPerimeterEdgeColor(currentImageData);
+
+    if (dominantColor || imageHasTransparentBorder(currentImageData)) {
       if (cutShapeSelect) cutShapeSelect.value = "trace";
       handleGenerateCutline(true);
     } else {
@@ -6904,7 +6945,9 @@ async function loadProductForBuyer(productId) {
       const logicalWidth = canvas.width / dpr;
       const logicalHeight = canvas.height / dpr;
 
-      if (imageHasTransparentBorder(currentImageData)) {
+      const dominantColor = applyPerimeterEdgeColor(currentImageData);
+
+      if (dominantColor || imageHasTransparentBorder(currentImageData)) {
         if (cutShapeSelect) cutShapeSelect.value = "trace";
         handleGenerateCutline(true);
       } else {
