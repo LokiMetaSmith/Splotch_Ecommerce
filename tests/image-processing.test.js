@@ -68,6 +68,31 @@ describe('Image Processing Library', () => {
             const imageData = { data, width, height };
             expect(imageHasTransparentBorder(imageData)).toBe(false);
         });
+
+        it('should detect a circular image with transparent corners touching bounding box', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+            const cx = 50, cy = 50, r = 50;
+
+            // Inscribe a solid circle: points inside circle are opaque red, corners are transparent
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const dx = x - cx;
+                    const dy = y - cy;
+                    const i = (y * width + x) * 4;
+                    if (dx * dx + dy * dy <= r * r) {
+                        data[i] = 255;
+                        data[i+1] = 0;
+                        data[i+2] = 0;
+                        data[i+3] = 255;
+                    }
+                }
+            }
+
+            const imageData = { data, width, height };
+            expect(imageHasTransparentBorder(imageData)).toBe(true);
+        });
     });
 
     describe('traceContour', () => {

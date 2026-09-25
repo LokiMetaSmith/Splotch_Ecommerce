@@ -208,11 +208,13 @@ let widthInputEl, heightInputEl;
 let canvasPlaceholder;
 let canvasLegendContainer;
 let canvasLoadingOverlay, canvasLoadingText, canvasLoadingSubtext;
+let canvasLoadingWatchdog = null;
 let isExporting = false;
 
 export function showCanvasLoading(
   mainText = "Processing Image...",
   subText = "Analyzing transparency & generating cutlines",
+  timeoutMs = 8000,
 ) {
   if (!canvasLoadingOverlay) {
     canvasLoadingOverlay = document.getElementById("canvas-loading-overlay");
@@ -227,6 +229,22 @@ export function showCanvasLoading(
 
   canvasLoadingOverlay.classList.remove("opacity-0", "pointer-events-none");
   canvasLoadingOverlay.classList.add("opacity-100");
+
+  if (canvasLoadingWatchdog) {
+    clearTimeout(canvasLoadingWatchdog);
+  }
+  canvasLoadingWatchdog = setTimeout(() => {
+    console.warn(
+      "[CLIENT] Canvas loading watchdog triggered: auto-dismissing loading overlay after timeout",
+    );
+    hideCanvasLoading();
+    const btn = document.getElementById("generateCutlineBtn");
+    if (btn && btn.disabled) {
+      btn.disabled = false;
+      btn.classList.remove("opacity-50", "cursor-not-allowed");
+      btn.innerHTML = "Generate Smart Cutline";
+    }
+  }, timeoutMs);
 }
 
 export function updateCanvasLoading(mainText, subText) {
@@ -243,6 +261,10 @@ export function updateCanvasLoading(mainText, subText) {
 }
 
 export function hideCanvasLoading() {
+  if (canvasLoadingWatchdog) {
+    clearTimeout(canvasLoadingWatchdog);
+    canvasLoadingWatchdog = null;
+  }
   if (!canvasLoadingOverlay) {
     canvasLoadingOverlay = document.getElementById("canvas-loading-overlay");
   }
@@ -3596,210 +3618,216 @@ function loadFileAsImage(file, isMascot = false) {
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const activeTab = getActiveLineId() || "base";
+        try {
+          const activeTab = getActiveLineId() || "base";
 
-        if (activeTab !== "base" && activeTab !== "cutline") {
-          // Custom Layer Upload
+          if (activeTab !== "base" && activeTab !== "cutline") {
+            // Custom Layer Upload
+            updateCanvasLoading(
+              "Processing Layer...",
+              "Applying layer mask and color mapping",
+            );
+            const customLayer = activeBase.customLayers.find(
+              (l) => l.id === activeTab,
+            );
+            if (customLayer) {
+              // Apply grayscale to the image
+              const tempCanvas = document.createElement("canvas");
+              tempCanvas.width = img.width;
+              tempCanvas.height = img.height;
+              const tempCtx = tempCanvas.getContext("2d");
+              tempCtx.filter = "grayscale(100%)";
+              tempCtx.drawImage(img, 0, 0);
+
+              const processedImg = new Image();
+              processedImg.onload = () => {
+                customLayer.image = processedImg;
+                showNotification(
+                  `Image loaded to ${customLayer.name} layer.`,
+                  "success",
+                );
+                redrawAllForHighlight();
+                hideCanvasLoading();
+              };
+              processedImg.onerror = () => {
+                hideCanvasLoading();
+                showNotification(
+                  "Failed to load processed layer image.",
+                  "error",
+                );
+              };
+              processedImg.src = tempCanvas.toDataURL();
+            } else {
+              hideCanvasLoading();
+            }
+            return; // Stop here, don't reset base design
+          }
+
+          // Base Layer Upload: position new sticker touching the right-most edge of existing stickers, top flush
+          let spawnX = 0;
+          let spawnY = 0;
+          const validExistingStickers = stickers.filter(
+            (s) =>
+              s.image ||
+              s.originalImage ||
+              (s.basePolygons && s.basePolygons.length > 0),
+          );
+          if (validExistingStickers.length > 0) {
+            let maxRight = 0;
+            let minTop = Infinity;
+            validExistingStickers.forEach((s) => {
+              const sx = s.x || 0;
+              const sy = s.y || 0;
+              const sw =
+                s.width ||
+                (s.image
+                  ? s.image.naturalWidth || s.image.width
+                  : s.originalImage
+                    ? s.originalImage.naturalWidth || s.originalImage.width
+                    : 0);
+              const sRight = sx + sw;
+              if (sRight > maxRight) maxRight = sRight;
+              if (sy < minTop) minTop = sy;
+            });
+            spawnX = maxRight;
+            spawnY = minTop === Infinity ? 0 : minTop;
+          }
+
           updateCanvasLoading(
-            "Processing Layer...",
-            "Applying layer mask and color mapping",
+            "Analyzing Image...",
+            "Detecting contours & tracing cutlines",
           );
-          const customLayer = activeBase.customLayers.find(
-            (l) => l.id === activeTab,
+          const newLayer = addSticker(
+            img,
+            file.name || "Upload",
+            spawnX,
+            spawnY,
+            img.width,
+            img.height,
           );
-          if (customLayer) {
-            // Apply grayscale to the image
-            const tempCanvas = document.createElement("canvas");
-            tempCanvas.width = img.width;
-            tempCanvas.height = img.height;
-            const tempCtx = tempCanvas.getContext("2d");
-            tempCtx.filter = "grayscale(100%)";
-            tempCtx.drawImage(img, 0, 0);
+          setActiveSticker(stickers.length - 1);
+          updateEditingButtonsState(false);
+          renderLayerList();
+          if (clearFileBtn) clearFileBtn.classList.remove("hidden");
+          showNotification("Image loaded successfully.", "success");
+          let newWidth = img.width;
+          let newHeight = img.height;
+          if (canvas && ctx) {
+            setCanvasSize(newWidth, newHeight);
+            ctx.clearRect(0, 0, newWidth, newHeight);
+            ctx.drawImage(activeBase.originalImage, 0, 0, newWidth, newHeight);
 
-            const processedImg = new Image();
-            processedImg.onload = () => {
-              customLayer.image = processedImg;
-              showNotification(
-                `Image loaded to ${customLayer.name} layer.`,
-                "success",
+            saveCleanState(); // Save state before decorations
+
+            // Bolt Fix: Default to 2 inches on import (2.8 for Mascot)
+            if (pricingConfig) {
+              const defaultSize = isMascot ? 2.8 : 2;
+              handleStandardResize(defaultSize);
+
+              // Update Slider UI
+              const resizeSliderEl = document.getElementById("resizeSlider");
+              const resizeInputNumberEl = document.getElementById("resizeInput");
+              const resizeUnitLabelEl =
+                document.getElementById("resizeUnitLabel");
+
+              if (resizeSliderEl && resizeInputNumberEl) {
+                const val = isMetric ? defaultSize * 25.4 : defaultSize;
+                resizeSliderEl.value = val;
+                resizeInputNumberEl.value = val.toFixed(1);
+                if (resizeUnitLabelEl)
+                  resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
+              }
+            }
+
+            // --- AUTO WHITE UNDERBASE GENERATION ---
+            if (pricingConfig && pricingConfig.layers) {
+              // Check if material supports white layer and we don't already have one
+              const hasWhiteLayer = activeBase.customLayers.some(
+                (l) => l.type.toLowerCase() === "white",
               );
-              redrawAllForHighlight();
-              hideCanvasLoading();
-            };
-            processedImg.onerror = () => {
-              hideCanvasLoading();
-              showNotification(
-                "Failed to load processed layer image.",
-                "error",
+              const supportsWhite = pricingConfig.layers.some(
+                (l) => l.name.toLowerCase() === "white",
               );
-            };
-            processedImg.src = tempCanvas.toDataURL();
+
+              if (supportsWhite && !hasWhiteLayer) {
+                const whiteLayer = {
+                  id: `custom_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                  name: "White Layer",
+                  type: "white",
+                  image: null,
+                  originalImage: null,
+                  visible: true,
+                  alphaColorHex: "#ffffff",
+                  maskColorHex: "#000000",
+                };
+
+                const pricingLayer = pricingConfig.layers.find(
+                  (l) => l.name.toLowerCase() === "white",
+                );
+                if (
+                  pricingLayer &&
+                  pricingLayer.subTypes &&
+                  pricingLayer.subTypes.length > 0
+                ) {
+                  whiteLayer.subType = pricingLayer.subTypes[0].id;
+                }
+
+                activeBase.customLayers.push(whiteLayer);
+                renderLayerTabs();
+                calculateAndUpdatePrice();
+
+                processCustomLayerMask(
+                  activeBase.originalImage,
+                  "underbase",
+                  "#ffffff",
+                  true,
+                )
+                  .then((processedImg) => {
+                    whiteLayer.image = processedImg;
+                    redrawAll();
+                    showNotification(
+                      "Auto-generated White Underbase layer.",
+                      "info",
+                    );
+                  })
+                  .catch((err) => {
+                    console.error("Auto mask generation failed:", err);
+                  });
+              }
+            }
+
+            // Generate cutline based on image transparency
+            let currentImageData = null;
+            try {
+              currentImageData = ctx.getImageData(
+                0,
+                0,
+                canvas.width,
+                canvas.height,
+              );
+            } catch (err) {
+              console.warn("[CLIENT] Failed to get canvas image data for transparency check:", err);
+            }
+
+            if (currentImageData && imageHasTransparentBorder(currentImageData)) {
+              if (cutShapeSelect) cutShapeSelect.value = "trace";
+              handleGenerateCutline(true);
+            } else {
+              if (cutShapeSelect) cutShapeSelect.value = "square";
+              handleGenerateCutline(true);
+            }
+
+            activeBase.currentPolygons = []; // Clear any previous SVG data
+
+            // Show the legend tabs since an image is loaded
+            renderLayerTabs();
           } else {
             hideCanvasLoading();
           }
-          return; // Stop here, don't reset base design
-        }
-
-        // Base Layer Upload: position new sticker touching the right-most edge of existing stickers, top flush
-        let spawnX = 0;
-        let spawnY = 0;
-        const validExistingStickers = stickers.filter(
-          (s) =>
-            s.image ||
-            s.originalImage ||
-            (s.basePolygons && s.basePolygons.length > 0),
-        );
-        if (validExistingStickers.length > 0) {
-          let maxRight = 0;
-          let minTop = Infinity;
-          validExistingStickers.forEach((s) => {
-            const sx = s.x || 0;
-            const sy = s.y || 0;
-            const sw =
-              s.width ||
-              (s.image
-                ? s.image.naturalWidth || s.image.width
-                : s.originalImage
-                  ? s.originalImage.naturalWidth || s.originalImage.width
-                  : 0);
-            const sRight = sx + sw;
-            if (sRight > maxRight) maxRight = sRight;
-            if (sy < minTop) minTop = sy;
-          });
-          spawnX = maxRight;
-          spawnY = minTop === Infinity ? 0 : minTop;
-        }
-
-        updateCanvasLoading(
-          "Analyzing Image...",
-          "Detecting contours & tracing cutlines",
-        );
-        const newLayer = addSticker(
-          img,
-          file.name || "Upload",
-          spawnX,
-          spawnY,
-          img.width,
-          img.height,
-        );
-        setActiveSticker(stickers.length - 1);
-        updateEditingButtonsState(false);
-        renderLayerList();
-        if (clearFileBtn) clearFileBtn.classList.remove("hidden");
-        showNotification("Image loaded successfully.", "success");
-        let newWidth = img.width;
-        let newHeight = img.height;
-        if (canvas && ctx) {
-          setCanvasSize(newWidth, newHeight);
-          ctx.clearRect(0, 0, newWidth, newHeight);
-          ctx.drawImage(activeBase.originalImage, 0, 0, newWidth, newHeight);
-
-          saveCleanState(); // Save state before decorations
-
-          // Bolt Fix: Default to 2 inches on import (2.8 for Mascot)
-          if (pricingConfig) {
-            const defaultSize = isMascot ? 2.8 : 2;
-            handleStandardResize(defaultSize);
-
-            // Update Slider UI
-            const resizeSliderEl = document.getElementById("resizeSlider");
-            const resizeInputNumberEl = document.getElementById("resizeInput");
-            const resizeUnitLabelEl =
-              document.getElementById("resizeUnitLabel");
-
-            if (resizeSliderEl && resizeInputNumberEl) {
-              const val = isMetric ? defaultSize * 25.4 : defaultSize;
-              resizeSliderEl.value = val;
-              resizeInputNumberEl.value = val.toFixed(1);
-              if (resizeUnitLabelEl)
-                resizeUnitLabelEl.textContent = isMetric ? "mm" : "in";
-            }
-          }
-
-          // --- AUTO WHITE UNDERBASE GENERATION ---
-          if (pricingConfig && pricingConfig.layers) {
-            // Check if material supports white layer and we don't already have one
-            const hasWhiteLayer = activeBase.customLayers.some(
-              (l) => l.type.toLowerCase() === "white",
-            );
-            const supportsWhite = pricingConfig.layers.some(
-              (l) => l.name.toLowerCase() === "white",
-            );
-
-            if (supportsWhite && !hasWhiteLayer) {
-              const whiteLayer = {
-                id: `custom_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                name: "White Layer",
-                type: "white",
-                image: null,
-                originalImage: null,
-                visible: true,
-                alphaColorHex: "#ffffff",
-                maskColorHex: "#000000",
-              };
-
-              const pricingLayer = pricingConfig.layers.find(
-                (l) => l.name.toLowerCase() === "white",
-              );
-              if (
-                pricingLayer &&
-                pricingLayer.subTypes &&
-                pricingLayer.subTypes.length > 0
-              ) {
-                whiteLayer.subType = pricingLayer.subTypes[0].id;
-              }
-
-              activeBase.customLayers.push(whiteLayer);
-              renderLayerTabs();
-              calculateAndUpdatePrice();
-
-              processCustomLayerMask(
-                activeBase.originalImage,
-                "underbase",
-                "#ffffff",
-                true,
-              )
-                .then((processedImg) => {
-                  whiteLayer.image = processedImg;
-                  redrawAll();
-                  showNotification(
-                    "Auto-generated White Underbase layer.",
-                    "info",
-                  );
-                })
-                .catch((err) => {
-                  console.error("Auto mask generation failed:", err);
-                });
-            }
-          }
-
-          // Generate cutline based on image transparency
-          let currentImageData = null;
-          try {
-            currentImageData = ctx.getImageData(
-              0,
-              0,
-              canvas.width,
-              canvas.height,
-            );
-          } catch (err) {
-            console.warn("[CLIENT] Failed to get canvas image data for transparency check:", err);
-          }
-
-          if (currentImageData && imageHasTransparentBorder(currentImageData)) {
-            if (cutShapeSelect) cutShapeSelect.value = "trace";
-            handleGenerateCutline(true);
-          } else {
-            if (cutShapeSelect) cutShapeSelect.value = "square";
-            handleGenerateCutline(true);
-          }
-
-          activeBase.currentPolygons = []; // Clear any previous SVG data
-
-          // Show the legend tabs since an image is loaded
-          renderLayerTabs();
-        } else {
+        } catch (err) {
+          console.error("[CLIENT] Error during image loading/processing:", err);
           hideCanvasLoading();
+          showNotification("Error processing image.", "error");
         }
       };
       img.onerror = () => {
@@ -6206,11 +6234,15 @@ function handleGenerateCutline(skipPrompt = false) {
     if (!skipPrompt) {
       showNotification("Please upload an image first.", "error");
     }
+    hideCanvasLoading();
     return;
   }
 
   const activeBaseLayer = stickers[activeStickerIndex];
-  if (!activeBaseLayer.image && !activeBaseLayer.basePolygons?.length) return;
+  if (!activeBaseLayer.image && !activeBaseLayer.basePolygons?.length) {
+    hideCanvasLoading();
+    return;
+  }
   if (skipPrompt instanceof Event) skipPrompt = false;
   if (
     !canvas ||
@@ -6221,16 +6253,21 @@ function handleGenerateCutline(skipPrompt = false) {
       "Smart cutline requires a raster image (PNG, JPG). Please upload one.",
       "error",
     );
+    hideCanvasLoading();
     return;
   }
 
   // Pass the raw activeBase.cleanCanvasState if available so we don't trace the bounding box and rulers.
   // We use a temporary canvas to get the ImageData if it's stored as ImageData.
   let currentImageData;
-  if (activeBase.cleanCanvasState) {
-    currentImageData = activeBase.cleanCanvasState;
-  } else {
-    currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  try {
+    if (activeBase.cleanCanvasState) {
+      currentImageData = activeBase.cleanCanvasState;
+    } else {
+      currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    }
+  } catch (err) {
+    console.warn("[CLIENT] Failed to get canvas image data in handleGenerateCutline:", err);
   }
 
   if (!skipPrompt) {
@@ -6259,12 +6296,17 @@ function handleGenerateCutline(skipPrompt = false) {
   }
 
   // Save the current canvas state so we can restore it if tracing fails.
-  const originalCanvasData = ctx.getImageData(
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
+  let originalCanvasData = null;
+  try {
+    originalCanvasData = ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+  } catch (err) {
+    console.warn("[CLIENT] Failed to capture original canvas data:", err);
+  }
 
   const lazyLassoSlider = document.getElementById("lazyLassoSlider");
   const lazyLassoRadius = lazyLassoSlider

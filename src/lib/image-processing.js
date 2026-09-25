@@ -14,8 +14,9 @@ const IS_LITTLE_ENDIAN =
   new Uint8Array(new Uint32Array([0x12345678]).buffer)[0] === 0x78;
 
 export function imageHasTransparentBorder(imageData) {
+  if (!imageData || !imageData.data) return false;
   const { data, width, height } = imageData;
-  const borderSampleSize = 10; // Check this many pixels on each edge
+  if (width < 2 || height < 2) return false;
 
   const isTransparentOrWhite = (i) => {
     if (data[i + 3] < 128) return true; // Alpha check
@@ -23,25 +24,40 @@ export function imageHasTransparentBorder(imageData) {
     return false;
   };
 
-  // Check top and bottom borders
-  for (let x = 0; x < width; x += Math.floor(width / borderSampleSize)) {
-    if (
-      !isTransparentOrWhite((0 * width + x) * 4) ||
-      !isTransparentOrWhite(((height - 1) * width + x) * 4)
-    ) {
-      return false;
-    }
+  // Check 4 corners first. For circular stickers and irregular die-cuts, corners are transparent
+  const cornerIndices = [
+    0, // top-left
+    (width - 1) * 4, // top-right
+    ((height - 1) * width) * 4, // bottom-left
+    ((height - 1) * width + (width - 1)) * 4, // bottom-right
+  ];
+  let transparentCorners = 0;
+  for (let c = 0; c < 4; c++) {
+    if (isTransparentOrWhite(cornerIndices[c])) transparentCorners++;
   }
-  // Check left and right borders
-  for (let y = 0; y < height; y += Math.floor(height / borderSampleSize)) {
-    if (
-      !isTransparentOrWhite((y * width + 0) * 4) ||
-      !isTransparentOrWhite((y * width + (width - 1)) * 4)
-    ) {
-      return false;
-    }
+  // If at least 3 of 4 corners are transparent/white, it's a die-cut or circular design
+  if (transparentCorners >= 3) {
+    return true;
   }
-  return true;
+
+  // Sample perimeter pixels to check overall border transparency ratio
+  let transparentCount = 0;
+  let totalSamples = 0;
+  const sampleStepX = Math.max(1, Math.floor(width / 20));
+  const sampleStepY = Math.max(1, Math.floor(height / 20));
+
+  for (let x = 0; x < width; x += sampleStepX) {
+    totalSamples += 2;
+    if (isTransparentOrWhite(x * 4)) transparentCount++;
+    if (isTransparentOrWhite(((height - 1) * width + x) * 4)) transparentCount++;
+  }
+  for (let y = 0; y < height; y += sampleStepY) {
+    totalSamples += 2;
+    if (isTransparentOrWhite((y * width) * 4)) transparentCount++;
+    if (isTransparentOrWhite((y * width + (width - 1)) * 4)) transparentCount++;
+  }
+
+  return totalSamples > 0 && transparentCount / totalSamples > 0.25;
 }
 
 export function getPolygonArea(points) {
@@ -684,62 +700,67 @@ export function filterInternalContours(
 }
 
 export function processCustomLayerMask(img, alphaColorHex, maskColorHex, isGrayscale = true) {
-  return new Promise((resolve) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width || img.naturalWidth;
-    canvas.height = img.height || img.naturalHeight;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
+  return new Promise((resolve, reject) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width || img.naturalWidth;
+      canvas.height = img.height || img.naturalHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
 
-    const hexToRgb = (hex) => {
-      let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
-    };
+      const hexToRgb = (hex) => {
+        let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+      };
 
-    const alphaRGB = hexToRgb(alphaColorHex);
-    const maskRGB = hexToRgb(maskColorHex);
-    const tolerance = 40;
+      const alphaRGB = hexToRgb(alphaColorHex);
+      const maskRGB = hexToRgb(maskColorHex);
+      const tolerance = 40;
 
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const a = data[i + 3];
-      
-      if (a < 10) continue;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        
+        if (a < 10) continue;
 
-      if (alphaRGB && Math.abs(r - alphaRGB.r) <= tolerance && Math.abs(g - alphaRGB.g) <= tolerance && Math.abs(b - alphaRGB.b) <= tolerance) {
-        data[i + 3] = 0;
-        continue;
-      }
+        if (alphaRGB && Math.abs(r - alphaRGB.r) <= tolerance && Math.abs(g - alphaRGB.g) <= tolerance && Math.abs(b - alphaRGB.b) <= tolerance) {
+          data[i + 3] = 0;
+          continue;
+        }
 
-      if (isGrayscale) {
-        if (alphaColorHex === "underbase") {
-           // White underbase mode: fill non-transparent pixels with the mask color
-           if (maskRGB) {
-             data[i] = maskRGB.r;
-             data[i + 1] = maskRGB.g;
-             data[i + 2] = maskRGB.b;
-           } else {
-             // fallback to white
-             data[i] = 255;
-             data[i + 1] = 255;
-             data[i + 2] = 255;
-           }
-        } else {
-           const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-           data[i] = gray;
-           data[i + 1] = gray;
-           data[i + 2] = gray;
+        if (isGrayscale) {
+          if (alphaColorHex === "underbase") {
+             // White underbase mode: fill non-transparent pixels with the mask color
+             if (maskRGB) {
+               data[i] = maskRGB.r;
+               data[i + 1] = maskRGB.g;
+               data[i + 2] = maskRGB.b;
+             } else {
+               // fallback to white
+               data[i] = 255;
+               data[i + 1] = 255;
+               data[i + 2] = 255;
+             }
+          } else {
+             const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+             data[i] = gray;
+             data[i + 1] = gray;
+             data[i + 2] = gray;
+          }
         }
       }
-    }
 
-    ctx.putImageData(imageData, 0, 0);
-    const processedImg = new Image();
-    processedImg.onload = () => resolve(processedImg);
-    processedImg.src = canvas.toDataURL();
+      ctx.putImageData(imageData, 0, 0);
+      const processedImg = new Image();
+      processedImg.onload = () => resolve(processedImg);
+      processedImg.onerror = (e) => reject(new Error("Failed to load processed mask image"));
+      processedImg.src = canvas.toDataURL();
+    } catch (err) {
+      reject(err);
+    }
   });
 }
