@@ -51,14 +51,16 @@ export function renderDevBanner(isDev = true) {
 
   // Adjust top navigation bar on pages with fixed headers (e.g. index.html)
   const topMenuBar = document.querySelector('.top-menu-bar');
+  const bannerRectHeight = banner.offsetHeight || (banner.getBoundingClientRect ? banner.getBoundingClientRect().height : 0);
   if (topMenuBar) {
-    topMenuBar.style.top = '3.5rem';
+    topMenuBar.style.top = bannerRectHeight > 0 ? `${bannerRectHeight}px` : '3.5rem';
   }
 
   // Adjust body top padding so content is not obscured
   const currentPt = window.getComputedStyle(document.body).paddingTop;
   const currentPtPx = parseFloat(currentPt) || 0;
-  document.body.style.paddingTop = `${currentPtPx + 38}px`;
+  const addedPad = bannerRectHeight > 0 ? bannerRectHeight : 38;
+  document.body.style.paddingTop = `${currentPtPx + addedPad}px`;
 }
 
 export async function checkAndRenderDevBanner(serverUrl = '') {

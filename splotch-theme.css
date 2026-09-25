@@ -571,3 +571,34 @@ main.container > div:first-of-type {
 #canvas-loading-overlay.opacity-100 {
   pointer-events: auto;
 }
+
+/* Mobile responsive enhancements for top banner & container */
+@media (max-width: 639px) {
+  body {
+    padding-top: 4.25rem !important;
+  }
+  main.container {
+    margin-top: 0.75rem !important;
+    margin-bottom: 1.5rem !important;
+    border-width: 3px !important;
+    border-radius: 18px !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 4px 12px rgba(42, 40, 77, 0.2) !important;
+  }
+  main.container > div:first-of-type {
+    padding: 0.75rem 1rem !important;
+    border-width: 2px !important;
+    border-radius: 14px !important;
+    margin-bottom: 0.75rem !important;
+    box-shadow: inset 0 0 6px rgba(0, 169, 157, 0.15) !important;
+  }
+  main.container h1.text-3xl,
+  main.container h1.text-2xl {
+    font-size: 1.35rem !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 1.25 !important;
+    -webkit-text-stroke: 1.5px var(--splotch-white) !important;
+    text-shadow: 2px 2px 0px var(--splotch-teal) !important;
+  }
+}
