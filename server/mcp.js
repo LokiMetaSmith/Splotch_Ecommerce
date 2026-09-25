@@ -3,6 +3,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const activeSessions = new Map();
+export const agentQuotes = new Map();
 
 function createMcpServer() {
   const mcpServer = new Server(
@@ -63,12 +64,24 @@ function createMcpServer() {
       // Call Splotch internal pricing logic
       const unitPrice = (args.widthInches * args.heightInches * 0.15) + (args.material === "holographic" ? 0.35 : 0.20);
       const total = parseFloat((unitPrice * args.quantity).toFixed(2));
+
+      const quoteId = `quote_${Date.now()}`;
+      const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
+
+      agentQuotes.set(quoteId, {
+          quoteId,
+          unitPrice,
+          total,
+          currency: "USD",
+          expiresAt
+      });
+
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify({
-              quoteId: `quote_${Date.now()}`,
+              quoteId,
               unitPrice,
               total,
               currency: "USD",
@@ -116,7 +129,12 @@ export const mcpRequestHandler = async (req, res) => {
   await mcpServer.connect(sseTransport);
   activeSessions.set(sseTransport.sessionId, { sseTransport, mcpServer });
 
-  res.on("close", () => {
+  res.on("close", async () => {
+    try {
+      await sseTransport.close();
+    } catch (e) {
+      // Ignore cleanup errors
+    }
     activeSessions.delete(sseTransport.sessionId);
   });
 };

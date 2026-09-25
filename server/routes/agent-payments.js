@@ -1,4 +1,5 @@
 import express from "express";
+import { agentQuotes } from "../mcp.js";
 
 export default function createAgentPaymentsRouter(db) {
   const router = express.Router();
@@ -33,10 +34,28 @@ export default function createAgentPaymentsRouter(db) {
       const parsedMandate = JSON.parse(Buffer.from(ap2Mandate, 'base64').toString('utf-8'));
 
       if (parsedProof.status === "PAID" && parsedMandate.intentId) {
+        // Validate Quote
+        const quoteId = parsedMandate.quoteId || req.body.quoteId;
+        const storedQuote = agentQuotes.get(quoteId);
+
+        if (!storedQuote) {
+            return res.status(404).json({ error: "Quote not found or invalid quoteId" });
+        }
+
+        if (new Date() > new Date(storedQuote.expiresAt)) {
+            return res.status(400).json({ error: "Quote has expired" });
+        }
+
+        const providedAmount = parseFloat(req.body.amount || parsedProof.amount);
+        if (providedAmount !== storedQuote.total) {
+             return res.status(400).json({ error: "Payment amount does not match stored quote" });
+        }
+
         verified = {
           success: true,
           mandateId: parsedMandate.mandateId || ("mandate-" + Date.now()),
-          paymentId: parsedProof.paymentId || ("x402-payment-" + Date.now())
+          paymentId: parsedProof.paymentId || ("x402-payment-" + Date.now()),
+          amount: storedQuote.total
         };
       }
     } catch (error) {
@@ -54,7 +73,7 @@ export default function createAgentPaymentsRouter(db) {
         status: "NEW",
         receivedAt: new Date().toISOString(),
         paymentId: verified.paymentId,
-        amount: req.body.amount || "15.00",
+        amount: verified.amount,
         buyerType: "agent",
         items: req.body.items || [],
         shippingAddress: req.body.shippingAddress || {}
