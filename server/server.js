@@ -1344,6 +1344,15 @@ async function startServer(
     // --- Agent Payments ---
     app.use("/api", createAgentPaymentsRouter(db));
 
+    app.get("/.well-known/ap2", (req, res) => {
+      const pubkey = process.env.AP2_GOVERNANCE_PUBKEY;
+      if (!pubkey) {
+        return res.status(404).send("Not Found");
+      }
+      res.setHeader("Content-Type", "text/plain");
+      res.send(pubkey);
+    });
+
     app.get("/.well-known/jwks.json", async (req, res) => {
       res.setHeader(
         "Cache-Control",
