@@ -60,7 +60,7 @@ export function renderDevBanner(isDev = true) {
   const currentPt = window.getComputedStyle(document.body).paddingTop;
   const currentPtPx = parseFloat(currentPt) || 0;
   const addedPad = bannerRectHeight > 0 ? bannerRectHeight : 38;
-  document.body.style.paddingTop = `${currentPtPx + addedPad}px`;
+  document.body.style.setProperty('padding-top', `${currentPtPx + addedPad}px`, 'important');
 }
 
 export async function checkAndRenderDevBanner(serverUrl = '') {

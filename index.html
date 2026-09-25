@@ -56,9 +56,17 @@
       .top-menu-brand .brand-link {
         color: white;
         text-decoration: none;
-        text-shadow: 2px 2px 0px var(--splotch-teal, #00a99d);
         display: inline-flex;
         align-items: center;
+      }
+      .top-menu-brand .brand-link span {
+        font-family: var(--font-modak, cursive);
+        font-size: 1.75rem;
+        letter-spacing: 1.5px;
+        color: #ffffff;
+        -webkit-text-stroke: 1px var(--splotch-navy, #2a284d);
+        text-shadow: 2px 2px 0px var(--splotch-teal, #00a99d);
+        line-height: 1;
       }
       .top-menu-actions {
         display: flex;
@@ -154,7 +162,7 @@
     <nav class="top-menu-bar" aria-label="Main Navigation">
       <div class="top-menu-brand flex items-center">
         <a href="/" class="brand-link" aria-label="Splotch Home">
-          <span class="text-xl sm:text-2xl font-bold tracking-wide" style="font-family: var(--font-modak); color: white;">Splotch</span>
+          <span class="font-bold">Splotch</span>
         </a>
       </div>
       <div class="top-menu-actions flex items-center gap-2 sm:gap-4">
