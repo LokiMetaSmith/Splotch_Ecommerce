@@ -93,7 +93,7 @@ import OdooClient from "./odoo.js";
 import { exec, execFile } from "child_process";
 import util from "util";
 import { mcpRequestHandler, mcpMessageHandler } from "./mcp.js";
-import agentPaymentsRouter from "./routes/agent-payments.js";
+import createAgentPaymentsRouter from "./routes/agent-payments.js";
 
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
@@ -1333,15 +1333,16 @@ async function startServer(
       return false;
     };
 
+    // --- API Endpoints ---
+    app.use("/api", apiLimiter);
+
     // --- MCP Server Endpoints ---
     app.get("/api/mcp", mcpRequestHandler);
     app.post("/api/mcp/messages", mcpMessageHandler);
 
     // --- Agent Payments ---
-    app.use(agentPaymentsRouter);
+    app.use("/api", createAgentPaymentsRouter(db));
 
-    // --- API Endpoints ---
-    app.use("/api", apiLimiter);
     app.get("/.well-known/jwks.json", async (req, res) => {
       res.setHeader(
         "Cache-Control",
