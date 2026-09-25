@@ -34,6 +34,14 @@ By default, files are stored locally in the `server/uploads` directory. To use S
 -   `AWS_ACCESS_KEY_ID`: Your AWS or S3 provider access key ID.
 -   `AWS_SECRET_ACCESS_KEY`: Your AWS or S3 provider secret access key.
 
+## Agentic Payments / Machine-to-Machine Checkout (Optional)
+
+Configuration for autonomous agent checkout processing via the Model Context Protocol (MCP) and x402/AP2 endpoints.
+
+-   `X402_MERCHANT_ID`: Your x402 merchant identifier, used for programmatic settlement of stablecoins or crypto assets.
+-   `X402_API_KEY`: The API key associated with your x402 merchant account for verifying on-chain or network payment proofs.
+-   `AP2_GOVERNANCE_PUBKEY`: The public key used to verify the cryptographic signatures of AP2 Cart Mandates, ensuring the agent was authorized by the human user.
+
 ## Odoo Integration (Optional)
 
 To enable integration with Odoo for inventory management or other features:

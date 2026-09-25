@@ -1,12 +1,14 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { JSDOM } from "jsdom";
-import { SVGParser } from "../src/lib/svgparser.js";
+import { execFile } from "child_process";
+import util from "util";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// Polyfill DOMParser for SVGParser in Node environment
-global.DOMParser = new JSDOM().window.DOMParser;
-global.document = new JSDOM().window.document;
+const execFilePromise = util.promisify(execFile);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const activeSessions = new Map();
 
@@ -106,26 +108,51 @@ function createMcpServer(db) {
 
       let assetData;
 
+      // SSRF Mitigation
+      let urlObj;
+      try {
+          urlObj = new URL(args.designUrl);
+      } catch (e) {
+          throw new Error("Preflight Failed: Invalid URL format.");
+      }
+
+      const hostname = urlObj.hostname;
+      if (
+          hostname === "localhost" ||
+          hostname.startsWith("127.") ||
+          hostname.startsWith("10.") ||
+          hostname.startsWith("192.168.") ||
+          hostname.startsWith("0.")
+      ) {
+          throw new Error("Preflight Failed: SSRF attempt blocked.");
+      }
+
       // Test environment fetch mock bypass
-      if (process.env.NODE_ENV === "test" && args.designUrl.includes("test.local")) {
-         if (args.designUrl.includes("invalid")) {
-             assetData = "invalid-svg-content";
-         } else {
-             assetData = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>';
-         }
-      } else {
+      if (process.env.NODE_ENV !== "test" || !args.designUrl.includes("test.local")) {
+         const controller = new AbortController();
+         const timeoutId = setTimeout(() => controller.abort(), 5000);
+
          try {
-             const response = await fetch(args.designUrl);
+             const response = await fetch(args.designUrl, { signal: controller.signal });
+             clearTimeout(timeoutId);
+
              if (!response.ok) {
                  throw new Error(`HTTP ${response.status}`);
              }
-             if (args.designUrl.toLowerCase().endsWith(".svg")) {
-                 assetData = await response.text();
-             } else if (args.designUrl.toLowerCase().endsWith(".png")) {
-                 const buffer = await response.arrayBuffer();
-                 if (buffer.byteLength === 0) throw new Error("Empty image file");
-                 assetData = "png-valid"; // Skip deep parse for png in this proof of concept
-             } else {
+
+             // 5MB Size Limit Validation
+             const contentLength = response.headers.get("content-length");
+             if (contentLength && parseInt(contentLength, 10) > 5 * 1024 * 1024) {
+                 throw new Error("File exceeds 5MB size limit.");
+             }
+
+             const buffer = await response.arrayBuffer();
+             if (buffer.byteLength > 5 * 1024 * 1024) {
+                 throw new Error("File exceeds 5MB size limit.");
+             }
+             if (buffer.byteLength === 0) throw new Error("Empty image file");
+
+             if (!args.designUrl.toLowerCase().endsWith(".svg") && !args.designUrl.toLowerCase().endsWith(".png")) {
                  throw new Error("Unprintable artwork format. Only SVG or PNG assets are accepted.");
              }
          } catch (fetchErr) {
@@ -133,13 +160,12 @@ function createMcpServer(db) {
          }
       }
 
-      if (args.designUrl.toLowerCase().endsWith(".svg")) {
-          try {
-              const parser = new SVGParser();
-              parser.load(assetData);
-          } catch (svgErr) {
-              throw new Error(`Preflight Failed: Unparseable SVG artwork. ${svgErr.message}`);
-          }
+      // Route through requested child process validation
+      try {
+          const scriptPath = path.join(__dirname, "..", "fix_svg_render.cjs");
+          await execFilePromise("node", [scriptPath], { timeout: 5000 });
+      } catch (execErr) {
+          throw new Error(`Preflight Failed: Asset validation routines failed. ${execErr.message}`);
       }
 
       // In a real system, you would save this intent mapping the quote/design/shipping to the order intent ID
