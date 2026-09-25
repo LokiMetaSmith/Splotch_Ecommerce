@@ -12,6 +12,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_DIR"
 
 DO_PULL=false
+DO_INSTALL=false
+SKIP_INSTALL=false
 SKIP_BUILD=false
 SYNC_SECURITY=false
 
@@ -20,6 +22,14 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -p|--pull)
       DO_PULL=true
+      shift
+      ;;
+    -i|--install)
+      DO_INSTALL=true
+      shift
+      ;;
+    --skip-install)
+      SKIP_INSTALL=true
       shift
       ;;
     --skip-build)
@@ -34,14 +44,17 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: ./restart.sh [OPTIONS]"
       echo ""
       echo "Options:"
-      echo "  -p, --pull        Pull latest changes from git before restarting"
-      echo "  --skip-build      Skip building frontend assets (npm run build)"
+      echo "  -p, --pull        Pull latest changes from git and install dependencies"
+      echo "  -i, --install     Install dependencies (pnpm/npm) before building"
+      echo "  --skip-install    Skip installing dependencies"
+      echo "  --skip-build      Skip building frontend assets (npm/pnpm run build)"
       echo "  -s, --security    Sync CrowdSec and Fail2ban security configurations"
       echo "  -h, --help        Show this help message"
       echo ""
       echo "Examples:"
       echo "  ./restart.sh                  # Rebuild frontend & restart service"
-      echo "  ./restart.sh --pull           # Pull git, rebuild frontend & restart service"
+      echo "  ./restart.sh --pull           # Pull git, install dependencies, rebuild frontend & restart service"
+      echo "  ./restart.sh --install        # Install dependencies, rebuild frontend & restart service"
       echo "  ./restart.sh --pull --security # Full update including security policies"
       exit 0
       ;;
@@ -61,34 +74,57 @@ echo "=================================================="
 # 1. Git Pull (if requested)
 if [ "$DO_PULL" = true ]; then
   echo ""
-  echo "📥 [1/4] Pulling latest changes from git..."
+  echo "📥 [1/5] Pulling latest changes from git..."
   git pull
 else
   echo ""
-  echo "ℹ️  [1/4] Skipping git pull (use './restart.sh --pull' to pull latest changes)."
+  echo "ℹ️  [1/5] Skipping git pull (use './restart.sh --pull' to pull latest changes)."
 fi
 
-# 2. Build Frontend Assets
-if [ "$SKIP_BUILD" = true ]; then
+# 2. Dependency Installation
+if [ "$SKIP_INSTALL" = true ]; then
   echo ""
-  echo "⏭️  [2/4] Skipping frontend build as requested."
+  echo "⏭️  [2/5] Skipping dependency installation as requested."
+elif [ "$DO_PULL" = true ] || [ "$DO_INSTALL" = true ] || [ ! -d "node_modules" ] || [ ! -d "server/node_modules" ]; then
+  echo ""
+  echo "📦 [2/5] Installing dependencies..."
+  if command -v pnpm >/dev/null 2>&1; then
+    HUSKY=0 pnpm install
+  elif command -v npm >/dev/null 2>&1; then
+    npm install
+    if [ -d "server" ] && [ -f "server/package.json" ]; then
+      (cd server && npm install)
+    fi
+  else
+    echo "❌ Error: Neither pnpm nor npm was found to install dependencies."
+    exit 1
+  fi
 else
   echo ""
-  echo "🔨 [2/4] Building frontend assets (Vite)..."
-  if command -v npm >/dev/null 2>&1; then
-    npm run build
-  elif command -v pnpm >/dev/null 2>&1; then
+  echo "ℹ️  [2/5] Dependencies are intact (use '--install' or '--pull' to update)."
+fi
+
+# 3. Build Frontend Assets
+if [ "$SKIP_BUILD" = true ]; then
+  echo ""
+  echo "⏭️  [3/5] Skipping frontend build as requested."
+else
+  echo ""
+  echo "🔨 [3/5] Building frontend assets (Vite)..."
+  if command -v pnpm >/dev/null 2>&1; then
     pnpm run build
+  elif command -v npm >/dev/null 2>&1; then
+    npm run build
   else
-    echo "❌ Error: Neither npm nor pnpm was found to build frontend."
+    echo "❌ Error: Neither pnpm nor npm was found to build frontend."
     exit 1
   fi
 fi
 
-# 2.5. Security Policies Sync (Fail2ban & CrowdSec)
+# 3.5. Security Policies Sync (Fail2ban & CrowdSec)
 if [ "$SYNC_SECURITY" = true ] || { [ -f "./scripts/setup_security.sh" ] && sudo -n true 2>/dev/null && [ ! -f "/etc/fail2ban/jail.d/splotch.local" ]; }; then
   echo ""
-  echo "🛡️  [2.5/4] Syncing security policies (Fail2ban & CrowdSec)..."
+  echo "🛡️  [3.5/5] Syncing security policies (Fail2ban & CrowdSec)..."
   if sudo -n true 2>/dev/null; then
     sudo bash ./scripts/setup_security.sh || true
   elif [ -t 0 ]; then
@@ -98,9 +134,9 @@ if [ "$SYNC_SECURITY" = true ] || { [ -f "./scripts/setup_security.sh" ] && sudo
   fi
 fi
 
-# 3. Restart Service
+# 4. Restart Service
 echo ""
-echo "🔄 [3/4] Restarting Splotch backend..."
+echo "🔄 [4/5] Restarting Splotch backend..."
 
 RESTART_SUCCESS=false
 
@@ -133,9 +169,9 @@ if [ "$RESTART_SUCCESS" = false ]; then
   fi
 fi
 
-# 4. Verification & Health Check
+# 5. Verification & Health Check
 echo ""
-echo "🩺 [4/4] Verifying server health..."
+echo "🩺 [5/5] Verifying server health..."
 
 HEALTHY=false
 for i in {1..15}; do
