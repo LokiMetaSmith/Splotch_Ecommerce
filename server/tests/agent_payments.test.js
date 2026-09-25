@@ -1,19 +1,25 @@
 import request from "supertest";
 import express from "express";
 import createAgentPaymentsRouter from "../routes/agent-payments.js";
-import { agentQuotes } from "../mcp.js";
 import { jest } from "@jest/globals";
 
 describe("Agent Payments API (/v1/payments/ap2)", () => {
   let app;
   let mockDb;
+  let inMemoryQuotes;
 
   beforeEach(() => {
-    // Reset global quotes map
-    agentQuotes.clear();
+    // Reset global quotes map mock
+    inMemoryQuotes = new Map();
 
     mockDb = {
       createOrder: jest.fn().mockResolvedValue({}),
+      getQuote: jest.fn().mockImplementation(async (id) => inMemoryQuotes.get(id)),
+      updateQuote: jest.fn().mockImplementation(async (quote) => {
+         inMemoryQuotes.set(quote.quoteId, quote);
+         return quote;
+      }),
+      getAllOrders: jest.fn().mockResolvedValue([]),
     };
 
     app = express();
@@ -58,9 +64,10 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
 
   it("should return 400 if quote is expired", async () => {
     const expiredQuoteId = "quote_expired";
-    agentQuotes.set(expiredQuoteId, {
+    inMemoryQuotes.set(expiredQuoteId, {
       quoteId: expiredQuoteId,
       total: 15.00,
+      status: "PENDING",
       expiresAt: new Date(Date.now() - 1000).toISOString(), // Expired
     });
 
@@ -79,9 +86,10 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
 
   it("should return 400 if provided amount does not match stored quote", async () => {
     const validQuoteId = "quote_amount_mismatch";
-    agentQuotes.set(validQuoteId, {
+    inMemoryQuotes.set(validQuoteId, {
       quoteId: validQuoteId,
       total: 25.00, // Quote is for 25.00
+      status: "PENDING",
       expiresAt: new Date(Date.now() + 100000).toISOString(),
     });
 
@@ -99,11 +107,37 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     expect(res.body.error).toBe("Payment amount does not match stored quote");
   });
 
-  it("should create an order and return 201 on valid payment and quote", async () => {
-    const validQuoteId = "quote_valid";
-    agentQuotes.set(validQuoteId, {
+  it("should return 400 on duplicate payment (replay protection)", async () => {
+    const validQuoteId = "quote_valid_replay";
+    inMemoryQuotes.set(validQuoteId, {
       quoteId: validQuoteId,
       total: 15.00,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 100000).toISOString(),
+    });
+
+    // Mock an existing order with the same paymentId
+    mockDb.getAllOrders.mockResolvedValue([{ paymentId: "pay123" }]);
+
+    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
+    const mandate = Buffer.from(JSON.stringify({ intentId: "intent123", quoteId: validQuoteId })).toString("base64");
+
+    const res = await request(app)
+      .post("/api/v1/payments/ap2")
+      .set("authorization-x402", paymentProof)
+      .set("x-ap2-mandate", mandate)
+      .send({});
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toContain("Payment proof has already been processed (Replay Protection)");
+  });
+
+  it("should create an order, consume the quote, and return 201 on valid payment and quote", async () => {
+    const validQuoteId = "quote_valid";
+    inMemoryQuotes.set(validQuoteId, {
+      quoteId: validQuoteId,
+      total: 15.00,
+      status: "PENDING",
       expiresAt: new Date(Date.now() + 100000).toISOString(),
     });
 

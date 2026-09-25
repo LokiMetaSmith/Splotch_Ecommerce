@@ -304,6 +304,7 @@ const defaultData = {
   credentials: {},
   config: {},
   products: {},
+  agentQuotes: {},
 };
 
 export async function runRetentionFlush(dbInstance, options = {}) {
@@ -1337,8 +1338,8 @@ async function startServer(
     app.use("/api", apiLimiter);
 
     // --- MCP Server Endpoints ---
-    app.get("/api/mcp", mcpRequestHandler);
-    app.post("/api/mcp/messages", mcpMessageHandler);
+    app.get("/api/mcp", (req, res) => mcpRequestHandler(req, res, db));
+    app.post("/api/mcp/messages", (req, res) => mcpMessageHandler(req, res, db));
 
     // --- Agent Payments ---
     app.use("/api", createAgentPaymentsRouter(db));

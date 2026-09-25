@@ -1,5 +1,4 @@
 import express from "express";
-import { agentQuotes } from "../mcp.js";
 
 export default function createAgentPaymentsRouter(db) {
   const router = express.Router();
@@ -36,10 +35,14 @@ export default function createAgentPaymentsRouter(db) {
       if (parsedProof.status === "PAID" && parsedMandate.intentId) {
         // Validate Quote
         const quoteId = parsedMandate.quoteId || req.body.quoteId;
-        const storedQuote = agentQuotes.get(quoteId);
+        const storedQuote = await db.getQuote(quoteId);
 
         if (!storedQuote) {
             return res.status(404).json({ error: "Quote not found or invalid quoteId" });
+        }
+
+        if (storedQuote.status === "CONSUMED") {
+            return res.status(400).json({ error: "Quote has already been consumed (Replay Protection)" });
         }
 
         if (new Date() > new Date(storedQuote.expiresAt)) {
@@ -55,7 +58,8 @@ export default function createAgentPaymentsRouter(db) {
           success: true,
           mandateId: parsedMandate.mandateId || ("mandate-" + Date.now()),
           paymentId: parsedProof.paymentId || ("x402-payment-" + Date.now()),
-          amount: storedQuote.total
+          amount: storedQuote.total,
+          quote: storedQuote
         };
       }
     } catch (error) {
@@ -64,6 +68,13 @@ export default function createAgentPaymentsRouter(db) {
 
     if (!verified.success) {
       return res.status(403).json({ error: "Cryptographic validation failed for AP2 mandate or x402 payment proof" });
+    }
+
+    // Replay Protection: Check if paymentId already exists
+    const existingOrders = await db.getAllOrders();
+    const isDuplicatePayment = existingOrders.some(order => order.paymentId === verified.paymentId);
+    if (isDuplicatePayment) {
+        return res.status(400).json({ error: "Payment proof has already been processed (Replay Protection)" });
     }
 
     // Create real order record mapping incoming request
@@ -80,6 +91,10 @@ export default function createAgentPaymentsRouter(db) {
     };
 
     await db.createOrder(orderRecord);
+
+    // Mark quote as consumed
+    verified.quote.status = "CONSUMED";
+    await db.updateQuote(verified.quote);
 
     return res.status(201).json({
       status: "CONFIRMED",
