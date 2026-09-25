@@ -3314,13 +3314,19 @@ function setCanvasSize(logicalWidth, logicalHeight) {
   if (!canvas || !ctx) return;
   const dpr = isExporting ? 1 : window.devicePixelRatio || 1;
 
-  // Set the "actual" size of the canvas in device pixels
-  canvas.width = logicalWidth * dpr;
-  canvas.height = logicalHeight * dpr;
+  // Clamp canvas dimensions to safe memory limits (2560px for interactive canvas) to prevent
+  // RangeError: Out of memory at ImageData creation on high-res camera uploads on high-DPR screens
+  const maxCanvasDimension = isExporting ? 8192 : 2560;
+  const maxDim = Math.max(logicalWidth, logicalHeight);
+  const effectiveDpr = Math.min(dpr, maxCanvasDimension / Math.max(1, maxDim));
 
-  // Scale the context to account for the higher resolution.
+  // Set the "actual" size of the canvas in device pixels
+  canvas.width = Math.round(logicalWidth * effectiveDpr);
+  canvas.height = Math.round(logicalHeight * effectiveDpr);
+
+  // Scale the context to account for the resolution scaling.
   // Using setTransform ensures this is not cumulative.
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
 
   // Bolt Fix: True-to-Size Preview
   // Calculate display size based on the selected PPI (or default to 96 if not loaded/selected)
@@ -3356,12 +3362,16 @@ function setCanvasSize(logicalWidth, logicalHeight) {
 
 function saveCleanState() {
   if (!canvas || !ctx) return;
-  activeBase.cleanCanvasState = ctx.getImageData(
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
+  try {
+    activeBase.cleanCanvasState = ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+  } catch (err) {
+    console.warn("[CLIENT] Failed to save clean canvas state:", err);
+  }
   cachedTempCanvas = null; // Invalidate cache
 }
 
@@ -3764,14 +3774,19 @@ function loadFileAsImage(file, isMascot = false) {
           }
 
           // Generate cutline based on image transparency
-          const currentImageData = ctx.getImageData(
-            0,
-            0,
-            canvas.width,
-            canvas.height,
-          );
+          let currentImageData = null;
+          try {
+            currentImageData = ctx.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+            );
+          } catch (err) {
+            console.warn("[CLIENT] Failed to get canvas image data for transparency check:", err);
+          }
 
-          if (imageHasTransparentBorder(currentImageData)) {
+          if (currentImageData && imageHasTransparentBorder(currentImageData)) {
             if (cutShapeSelect) cutShapeSelect.value = "trace";
             handleGenerateCutline(true);
           } else {
