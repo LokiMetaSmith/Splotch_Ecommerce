@@ -609,4 +609,17 @@ main.container > div:first-of-type {
     line-height: 1.25 !important;
     text-align: center !important;
   }
+  #payment-form {
+    padding: 1.25rem 0.85rem !important;
+    border-radius: 14px !important;
+  }
+  #payment-details-section {
+    padding: 1.25rem 0.85rem !important;
+  }
+  #checkout-promo-code {
+    min-width: 0 !important;
+  }
+  #apply-promo-btn {
+    flex-shrink: 0 !important;
+  }
 }
