@@ -13,8 +13,8 @@ export function switchTab(tabId) {
   });
 
   tabs.forEach((t) => {
-    t.classList.remove("bg-indigo-600", "text-white");
-    t.classList.add("bg-white", "text-gray-600", "hover:bg-gray-50");
+    t.classList.remove("bg-white", "text-indigo-700", "shadow-sm");
+    t.classList.add("text-gray-600", "hover:text-gray-900");
   });
 
   if (sections[tabId]) {
@@ -25,12 +25,8 @@ export function switchTab(tabId) {
     `.mobile-tab-btn[data-tab="${tabId}"]`,
   );
   if (activeTab) {
-    activeTab.classList.remove(
-      "bg-white",
-      "text-gray-600",
-      "hover:bg-gray-50",
-    );
-    activeTab.classList.add("bg-indigo-600", "text-white");
+    activeTab.classList.remove("text-gray-600", "hover:text-gray-900");
+    activeTab.classList.add("bg-white", "text-indigo-700", "shadow-sm");
   }
 }
 
@@ -38,7 +34,9 @@ export function setupJumpToEditor() {
   const jumpLinks = document.querySelectorAll('a[href="#sticker-design-box"]');
   jumpLinks.forEach((link) => {
     link.addEventListener("click", () => {
-      const artTabBtn = document.querySelector('.mobile-tab-btn[data-tab="art"]');
+      const artTabBtn = document.querySelector(
+        '.mobile-tab-btn[data-tab="art"]',
+      );
       if (artTabBtn) {
         artTabBtn.click();
       } else {
@@ -48,8 +46,14 @@ export function setupJumpToEditor() {
   });
 
   const checkHash = () => {
-    if (typeof window !== "undefined" && window.location && window.location.hash === "#sticker-design-box") {
-      const artTabBtn = document.querySelector('.mobile-tab-btn[data-tab="art"]');
+    if (
+      typeof window !== "undefined" &&
+      window.location &&
+      window.location.hash === "#sticker-design-box"
+    ) {
+      const artTabBtn = document.querySelector(
+        '.mobile-tab-btn[data-tab="art"]',
+      );
       if (artTabBtn) {
         artTabBtn.click();
       } else {
