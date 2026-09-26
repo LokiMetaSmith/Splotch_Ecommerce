@@ -3486,6 +3486,28 @@ function reprocessCustomLayer(layer) {
 }
 
 /**
+ * Fast thumbnail ImageData extractor for perimeter & transparency checks.
+ * Avoids blocking the main thread by copying multi-megapixel full-resolution canvases.
+ */
+function getSamplingImageData(source, maxDim = 400) {
+  if (!source) return null;
+  const sw = source.naturalWidth || source.width;
+  const sh = source.naturalHeight || source.height;
+  if (!sw || !sh) return null;
+
+  const scale = Math.min(1, maxDim / Math.max(sw, sh));
+  const w = Math.max(1, Math.round(sw * scale));
+  const h = Math.max(1, Math.round(sh * scale));
+
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = w;
+  tempCanvas.height = h;
+  const tempCtx = tempCanvas.getContext("2d", { willReadFrequently: true });
+  tempCtx.drawImage(source, 0, 0, w, h);
+  return tempCtx.getImageData(0, 0, w, h);
+}
+
+/**
  * Checks if >= 25% of the outer perimeter samples share the same color.
  * If so, sets the custom edge cut / bleed color to that detected color,
  * and returns the detection result.
@@ -3837,28 +3859,18 @@ function loadFileAsImage(file, isMascot = false) {
               }
             }
 
-            // Generate cutline based on image transparency
-            let currentImageData = null;
-            try {
-              currentImageData = ctx.getImageData(
-                0,
-                0,
-                canvas.width,
-                canvas.height,
-              );
-            } catch (err) {
-              console.warn("[CLIENT] Failed to get canvas image data for transparency check:", err);
-            }
+            // Generate cutline based on image transparency & perimeter color sampling
+            const samplingData = getSamplingImageData(activeBase.originalImage || canvas, 400);
+            const dominantColor = applyPerimeterEdgeColor(samplingData);
 
-            const dominantColor = applyPerimeterEdgeColor(currentImageData);
-
-            if (dominantColor || (currentImageData && imageHasTransparentBorder(currentImageData))) {
+            if (dominantColor || (samplingData && imageHasTransparentBorder(samplingData))) {
               if (cutShapeSelect) cutShapeSelect.value = "trace";
-              handleGenerateCutline(true);
             } else {
               if (cutShapeSelect) cutShapeSelect.value = "square";
-              handleGenerateCutline(true);
             }
+            setTimeout(() => {
+              handleGenerateCutline(true);
+            }, 0);
 
             activeBase.currentPolygons = []; // Clear any previous SVG data
 
@@ -5723,26 +5735,18 @@ function handleResetImage() {
 
       saveCleanState(); // Save state before decorations
 
-      // Generate cutline based on image transparency
-      const currentImageData = ctx.getImageData(
-        0,
-        0,
-        canvas.width,
-        canvas.height,
-      );
-      const dpr = window.devicePixelRatio || 1;
-      const logicalWidth = canvas.width / dpr;
-      const logicalHeight = canvas.height / dpr;
+      // Generate cutline based on image transparency & perimeter color sampling
+      const samplingData = getSamplingImageData(activeBase.originalImage || canvas, 400);
+      const dominantColor = applyPerimeterEdgeColor(samplingData);
 
-      const dominantColor = applyPerimeterEdgeColor(currentImageData);
-
-      if (dominantColor || imageHasTransparentBorder(currentImageData)) {
+      if (dominantColor || (samplingData && imageHasTransparentBorder(samplingData))) {
         if (cutShapeSelect) cutShapeSelect.value = "trace";
-        handleGenerateCutline(true);
       } else {
         if (cutShapeSelect) cutShapeSelect.value = "square";
-        handleGenerateCutline(true);
       }
+      setTimeout(() => {
+        handleGenerateCutline(true);
+      }, 0);
 
       updateFilterButtonVisuals();
 
@@ -6303,18 +6307,6 @@ function handleGenerateCutline(skipPrompt = false) {
   }
 
   // Pass the raw activeBase.cleanCanvasState if available so we don't trace the bounding box and rulers.
-  // We use a temporary canvas to get the ImageData if it's stored as ImageData.
-  let currentImageData;
-  try {
-    if (activeBase.cleanCanvasState) {
-      currentImageData = activeBase.cleanCanvasState;
-    } else {
-      currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    }
-  } catch (err) {
-    console.warn("[CLIENT] Failed to get canvas image data in handleGenerateCutline:", err);
-  }
-
   if (!skipPrompt) {
     showNotification("Generating smart cutline...", "info");
   }
@@ -6338,19 +6330,6 @@ function handleGenerateCutline(skipPrompt = false) {
 
     // Update mobile sticky bar
     updateMobileStickyPrice();
-  }
-
-  // Save the current canvas state so we can restore it if tracing fails.
-  let originalCanvasData = null;
-  try {
-    originalCanvasData = ctx.getImageData(
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    );
-  } catch (err) {
-    console.warn("[CLIENT] Failed to capture original canvas data:", err);
   }
 
   const lazyLassoSlider = document.getElementById("lazyLassoSlider");
@@ -6839,22 +6818,19 @@ async function handleRemoteImageLoad(imageUrl) {
 
     saveCleanState(); // Save state before decorations
 
-    // Generate cutline based on image transparency
-    const currentImageData = ctx.getImageData(
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    );
+    // Generate cutline based on image transparency & perimeter color sampling
+    const samplingData = getSamplingImageData(activeBase.originalImage || canvas, 400);
     const dpr = window.devicePixelRatio || 1;
     const logicalWidth = canvas.width / dpr;
     const logicalHeight = canvas.height / dpr;
 
-    const dominantColor = applyPerimeterEdgeColor(currentImageData);
+    const dominantColor = applyPerimeterEdgeColor(samplingData);
 
-    if (dominantColor || imageHasTransparentBorder(currentImageData)) {
+    if (dominantColor || (samplingData && imageHasTransparentBorder(samplingData))) {
       if (cutShapeSelect) cutShapeSelect.value = "trace";
-      handleGenerateCutline(true);
+      setTimeout(() => {
+        handleGenerateCutline(true);
+      }, 0);
     } else {
       if (cutShapeSelect) cutShapeSelect.value = "square";
       activeBase.rasterCutlinePoly = [
@@ -6940,26 +6916,19 @@ async function loadProductForBuyer(productId) {
       // Better: If we have the image, we can just treat it as a fresh load.
       // But we should "Lock" the UI.
 
-      // Generate cutline based on image transparency
-      const currentImageData = ctx.getImageData(
-        0,
-        0,
-        canvas.width,
-        canvas.height,
-      );
-      const dpr = window.devicePixelRatio || 1;
-      const logicalWidth = canvas.width / dpr;
-      const logicalHeight = canvas.height / dpr;
+      // Generate cutline based on image transparency & perimeter color sampling
+      const samplingData = getSamplingImageData(activeBase.originalImage || canvas, 400);
 
-      const dominantColor = applyPerimeterEdgeColor(currentImageData);
+      const dominantColor = applyPerimeterEdgeColor(samplingData);
 
-      if (dominantColor || imageHasTransparentBorder(currentImageData)) {
+      if (dominantColor || (samplingData && imageHasTransparentBorder(samplingData))) {
         if (cutShapeSelect) cutShapeSelect.value = "trace";
-        handleGenerateCutline(true);
       } else {
         if (cutShapeSelect) cutShapeSelect.value = "square";
-        handleGenerateCutline(true);
       }
+      setTimeout(() => {
+        handleGenerateCutline(true);
+      }, 0);
       // If the product had a complex cutline, we aren't loading it visually here for the buyer
       // unless we fetch and parse the SVG.
       // For this MVP, let's trigger the "Smart Cutline" automatically if it looks transparent?

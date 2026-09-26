@@ -891,12 +891,19 @@ export function filterInternalContours(
 export function processCustomLayerMask(img, alphaColorHex, maskColorHex, isGrayscale = true) {
   return new Promise((resolve, reject) => {
     try {
+      const origW = img.width || img.naturalWidth || 500;
+      const origH = img.height || img.naturalHeight || 500;
+      const maxMaskDim = 1600;
+      const scale = Math.min(1, maxMaskDim / Math.max(origW, origH));
+      const w = Math.max(1, Math.round(origW * scale));
+      const h = Math.max(1, Math.round(origH * scale));
+
       const canvas = document.createElement('canvas');
-      canvas.width = img.width || img.naturalWidth;
-      canvas.height = img.height || img.naturalHeight;
+      canvas.width = w;
+      canvas.height = h;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
       const data = imageData.data;
 
       const hexToRgb = (hex) => {
