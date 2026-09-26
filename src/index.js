@@ -3494,23 +3494,29 @@ function applyPerimeterEdgeColor(currentImageData) {
   if (!currentImageData) return null;
   const dominant = getDominantPerimeterColor(currentImageData, 0.25);
   if (dominant && dominant.detected) {
-    const hex = dominant.color;
+    const hex = dominant.hex || dominant.color;
     const bleedColor1 = document.getElementById("bleedColor1");
     const bleedColor2 = document.getElementById("bleedColor2");
-    if (bleedColor1) bleedColor1.value = hex;
-    if (bleedColor2) bleedColor2.value = hex;
+    if (bleedColor1 && hex) bleedColor1.value = hex;
+    if (bleedColor2 && hex) bleedColor2.value = hex;
     const edgeCutColorEl =
       document.getElementById("edgeCutColor") ||
       document.getElementById("customEdgeCutColor");
-    if (edgeCutColorEl) edgeCutColorEl.value = hex;
+    if (edgeCutColorEl && hex) edgeCutColorEl.value = hex;
     if (activeBase) {
-      activeBase.edgeCutColor = hex;
+      activeBase.edgeCutColor = dominant.rgba || hex;
+      activeBase.edgeCutHex = hex;
+      activeBase.edgeCutAlpha = dominant.alphaRatio;
+      activeBase.isTransparentBorder = dominant.isTransparent;
       activeBase.bleedColor1 = hex;
       activeBase.bleedColor2 = hex;
     }
     const activeSticker = getActiveSticker();
     if (activeSticker) {
-      activeSticker.edgeCutColor = hex;
+      activeSticker.edgeCutColor = dominant.rgba || hex;
+      activeSticker.edgeCutHex = hex;
+      activeSticker.edgeCutAlpha = dominant.alphaRatio;
+      activeSticker.isTransparentBorder = dominant.isTransparent;
       activeSticker.bleedColor1 = hex;
       activeSticker.bleedColor2 = hex;
     }

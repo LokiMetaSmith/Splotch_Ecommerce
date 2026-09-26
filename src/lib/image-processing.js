@@ -62,12 +62,12 @@ export function imageHasTransparentBorder(imageData) {
 
 /**
  * Detects if at least `thresholdRatio` (default 25%) of the outer perimeter samples
- * are the same color.
+ * are the same color, accounting for the alpha channel as well.
  *
  * @param {ImageData} imageData - Canvas ImageData object
  * @param {number} [thresholdRatio=0.25] - Minimum fraction of perimeter samples (0.25 = 25%)
- * @param {number} [colorTolerance=25] - Max Euclidean color distance to consider same color
- * @returns {{ detected: boolean, color: string|null, rgb: {r: number, g: number, b: number}|null, ratio: number }}
+ * @param {number} [colorTolerance=25] - Max Euclidean RGBA color distance to consider same color
+ * @returns {{ detected: boolean, color: string|null, hex: string|null, hex8: string|null, rgba: string|null, rgb: {r: number, g: number, b: number}|null, alpha: number|null, alphaRatio: number, isTransparent: boolean, ratio: number }}
  */
 export function getDominantPerimeterColor(
   imageData,
@@ -75,11 +75,33 @@ export function getDominantPerimeterColor(
   colorTolerance = 25,
 ) {
   if (!imageData || !imageData.data) {
-    return { detected: false, color: null, rgb: null, ratio: 0 };
+    return {
+      detected: false,
+      color: null,
+      hex: null,
+      hex8: null,
+      rgba: null,
+      rgb: null,
+      alpha: null,
+      alphaRatio: 0,
+      isTransparent: false,
+      ratio: 0,
+    };
   }
   const { data, width, height } = imageData;
   if (width < 2 || height < 2) {
-    return { detected: false, color: null, rgb: null, ratio: 0 };
+    return {
+      detected: false,
+      color: null,
+      hex: null,
+      hex8: null,
+      rgba: null,
+      rgb: null,
+      alpha: null,
+      alphaRatio: 0,
+      isTransparent: false,
+      ratio: 0,
+    };
   }
 
   const sampleStepX = Math.max(1, Math.floor(width / 50));
@@ -90,12 +112,18 @@ export function getDominantPerimeterColor(
 
   const samplePixel = (idx) => {
     totalSamples++;
-    const a = data[idx + 3];
-    if (a < 128) return; // Transparent pixels don't have an opaque edge cut color
+    let a = data[idx + 3];
+    let r = data[idx];
+    let g = data[idx + 1];
+    let b = data[idx + 2];
 
-    const r = data[idx];
-    const g = data[idx + 1];
-    const b = data[idx + 2];
+    // If practically fully transparent, canonicalize to transparent black so all transparent pixels cluster together
+    if (a < 10) {
+      r = 0;
+      g = 0;
+      b = 0;
+      a = 0;
+    }
 
     let closestCluster = null;
     let minDistanceSq = colorTolerance * colorTolerance;
@@ -105,7 +133,9 @@ export function getDominantPerimeterColor(
       const dr = r - cluster.r;
       const dg = g - cluster.g;
       const db = b - cluster.b;
-      const distSq = dr * dr + dg * dg + db * db;
+      const da = a - cluster.a;
+      // 4D RGBA distance to account for alpha channel as well
+      const distSq = dr * dr + dg * dg + db * db + da * da;
       if (distSq <= minDistanceSq) {
         minDistanceSq = distSq;
         closestCluster = cluster;
@@ -117,18 +147,22 @@ export function getDominantPerimeterColor(
       closestCluster.sumR += r;
       closestCluster.sumG += g;
       closestCluster.sumB += b;
+      closestCluster.sumA += a;
       closestCluster.r = Math.round(closestCluster.sumR / closestCluster.count);
       closestCluster.g = Math.round(closestCluster.sumG / closestCluster.count);
       closestCluster.b = Math.round(closestCluster.sumB / closestCluster.count);
+      closestCluster.a = Math.round(closestCluster.sumA / closestCluster.count);
     } else {
       clusters.push({
         r,
         g,
         b,
+        a,
         count: 1,
         sumR: r,
         sumG: g,
         sumB: b,
+        sumA: a,
       });
     }
   };
@@ -145,30 +179,74 @@ export function getDominantPerimeterColor(
   }
 
   if (totalSamples === 0 || clusters.length === 0) {
-    return { detected: false, color: null, rgb: null, ratio: 0 };
+    return {
+      detected: false,
+      color: null,
+      hex: null,
+      hex8: null,
+      rgba: null,
+      rgb: null,
+      alpha: null,
+      alphaRatio: 0,
+      isTransparent: false,
+      ratio: 0,
+    };
   }
 
-  let dominant = clusters[0];
-  for (let i = 1; i < clusters.length; i++) {
-    if (clusters[i].count > dominant.count) {
-      dominant = clusters[i];
-    }
+  // Sort clusters by count descending
+  clusters.sort((a, b) => b.count - a.count);
+
+  // If there is an opaque/visible border (a >= 128) that meets the threshold,
+  // prioritize it over transparent padding/corners because it represents the visible sticker edge
+  let dominant = clusters.find(
+    (c) => c.a >= 128 && c.count / totalSamples >= thresholdRatio,
+  );
+
+  // Otherwise pick the largest cluster overall (e.g. transparent or translucent)
+  if (!dominant && clusters[0].count / totalSamples >= thresholdRatio) {
+    dominant = clusters[0];
   }
 
-  const ratio = dominant.count / totalSamples;
-  if (ratio >= thresholdRatio) {
+  if (dominant) {
+    const ratio = dominant.count / totalSamples;
     const toHex = (c) =>
       Math.max(0, Math.min(255, c)).toString(16).padStart(2, "0");
-    const hex = `#${toHex(dominant.r)}${toHex(dominant.g)}${toHex(dominant.b)}`;
+    const isTrans = dominant.a < 128;
+    const hex6 = isTrans
+      ? "#ffffff"
+      : `#${toHex(dominant.r)}${toHex(dominant.g)}${toHex(dominant.b)}`;
+    const hex8 = `#${toHex(dominant.r)}${toHex(dominant.g)}${toHex(dominant.b)}${toHex(dominant.a)}`;
+    const alphaRatio = dominant.a / 255;
+    const rgbaStr = isTrans
+      ? "rgba(0, 0, 0, 0)"
+      : `rgba(${dominant.r}, ${dominant.g}, ${dominant.b}, ${alphaRatio.toFixed(2)})`;
+
     return {
       detected: true,
-      color: hex,
+      color: isTrans ? "#ffffff" : (dominant.a >= 250 ? hex6 : hex8),
+      hex: hex6,
+      hex8,
+      rgba: rgbaStr,
       rgb: { r: dominant.r, g: dominant.g, b: dominant.b },
+      alpha: dominant.a,
+      alphaRatio,
+      isTransparent: isTrans,
       ratio,
     };
   }
 
-  return { detected: false, color: null, rgb: null, ratio };
+  return {
+    detected: false,
+    color: null,
+    hex: null,
+    hex8: null,
+    rgba: null,
+    rgb: null,
+    alpha: null,
+    alphaRatio: 0,
+    isTransparent: false,
+    ratio: clusters[0] ? clusters[0].count / totalSamples : 0,
+  };
 }
 
 export function getPolygonArea(points) {

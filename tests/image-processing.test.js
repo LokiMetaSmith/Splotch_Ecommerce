@@ -160,23 +160,110 @@ describe('Image Processing Library', () => {
             expect(result.color).toBeNull();
         });
 
-        it('should ignore transparent pixels when clustering but include them in total sample count', () => {
+        it('should detect transparent perimeter when >= 25% of perimeter is transparent', () => {
             const width = 100;
             const height = 100;
             const data = new Uint8ClampedArray(width * height * 4);
 
-            // Fill only 10% of top row with red, rest is transparent (alpha = 0)
+            // All transparent by default (0, 0, 0, 0)
+            const imageData = { data, width, height };
+            const result = getDominantPerimeterColor(imageData, 0.25);
+            expect(result.detected).toBe(true);
+            expect(result.isTransparent).toBe(true);
+            expect(result.alpha).toBe(0);
+            expect(result.hex).toBe('#ffffff');
+            expect(result.ratio).toBe(1);
+        });
+
+        it('should differentiate between pixels with different alpha values', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+
+            // Varied background
+            for (let i = 0; i < data.length; i += 4) {
+                const pixelIdx = i / 4;
+                data[i] = (pixelIdx * 7) % 256;
+                data[i+1] = (pixelIdx * 13) % 256;
+                data[i+2] = (pixelIdx * 17) % 256;
+                data[i+3] = 255;
+            }
+
+            // 10% opaque red (alpha 255)
             for (let x = 0; x < 10; x++) {
                 const i = x * 4;
-                data[i] = 255;
-                data[i+1] = 0;
-                data[i+2] = 0;
-                data[i+3] = 255;
+                data[i] = 255; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
+            }
+            // 10% translucent red (alpha 50)
+            for (let x = 10; x < 20; x++) {
+                const i = x * 4;
+                data[i] = 255; data[i+1] = 0; data[i+2] = 0; data[i+3] = 50;
             }
 
             const imageData = { data, width, height };
             const result = getDominantPerimeterColor(imageData, 0.25);
             expect(result.detected).toBe(false);
+        });
+
+        it('should detect semi-transparent color when >= 25% of perimeter has matching RGBA', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+
+            // Varied background
+            for (let i = 0; i < data.length; i += 4) {
+                const pixelIdx = i / 4;
+                data[i] = (pixelIdx * 7) % 256;
+                data[i+1] = (pixelIdx * 13) % 256;
+                data[i+2] = (pixelIdx * 17) % 256;
+                data[i+3] = 255;
+            }
+
+            // Fill top 35% of perimeter with semi-transparent blue (0, 128, 255, 180)
+            for (let y = 0; y < 35; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    data[i] = 0;
+                    data[i+1] = 128;
+                    data[i+2] = 255;
+                    data[i+3] = 180;
+                }
+            }
+
+            const imageData = { data, width, height };
+            const result = getDominantPerimeterColor(imageData, 0.25);
+            expect(result.detected).toBe(true);
+            expect(result.alpha).toBe(180);
+            expect(result.rgb.r).toBe(0);
+            expect(result.rgb.g).toBe(128);
+            expect(result.rgb.b).toBe(255);
+            expect(result.hex).toBe('#0080ff');
+            expect(result.isTransparent).toBe(false);
+        });
+
+        it('should prioritize opaque artwork border over transparent canvas padding if opaque border reaches 25%', () => {
+            const width = 100;
+            const height = 100;
+            const data = new Uint8ClampedArray(width * height * 4);
+
+            // Transparent everywhere (alpha = 0)
+            // But top 35 rows are opaque red (#ff0000)
+            for (let y = 0; y < 35; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    data[i] = 255;
+                    data[i+1] = 0;
+                    data[i+2] = 0;
+                    data[i+3] = 255;
+                }
+            }
+
+            const imageData = { data, width, height };
+            const result = getDominantPerimeterColor(imageData, 0.25);
+            expect(result.detected).toBe(true);
+            expect(result.color).toBe('#ff0000');
+            expect(result.isTransparent).toBe(false);
+            expect(result.alpha).toBe(255);
         });
 
         it('should cluster colors within tolerance (e.g. compression noise)', () => {
