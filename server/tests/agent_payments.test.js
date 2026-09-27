@@ -132,6 +132,62 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     expect(res.body.error).toContain("Payment proof has already been processed (Replay Protection)");
   });
 
+  it("should return 403 if agent mandate is expired", async () => {
+    const validQuoteId = "quote_valid_but_mandate_expired";
+    inMemoryQuotes.set(validQuoteId, {
+      quoteId: validQuoteId,
+      total: 15.00,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 100000).toISOString(),
+    });
+
+    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
+    const mandate = Buffer.from(JSON.stringify({
+      intentId: "intent123",
+      quoteId: validQuoteId,
+      agentRules: {
+        expiresAt: new Date(Date.now() - 1000).toISOString() // Mandate Expired
+      }
+    })).toString("base64");
+
+    const res = await request(app)
+      .post("/api/v1/payments/ap2")
+      .set("authorization-x402", paymentProof)
+      .set("x-ap2-mandate", mandate)
+      .send({});
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.error).toBe("Agent mandate expired");
+  });
+
+  it("should return 403 if agent mandate spending limit is exceeded", async () => {
+    const validQuoteId = "quote_valid_but_spending_exceeded";
+    inMemoryQuotes.set(validQuoteId, {
+      quoteId: validQuoteId,
+      total: 15.00, // Quote is $15.00 (1500 cents)
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 100000).toISOString(),
+    });
+
+    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
+    const mandate = Buffer.from(JSON.stringify({
+      intentId: "intent123",
+      quoteId: validQuoteId,
+      agentRules: {
+        maxSpendCents: 1000 // Mandate only allows $10.00 (1000 cents)
+      }
+    })).toString("base64");
+
+    const res = await request(app)
+      .post("/api/v1/payments/ap2")
+      .set("authorization-x402", paymentProof)
+      .set("x-ap2-mandate", mandate)
+      .send({});
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.error).toBe("Agent mandate spending limit exceeded");
+  });
+
   it("should create an order, consume the quote, and return 201 on valid payment and quote", async () => {
     const validQuoteId = "quote_valid";
     inMemoryQuotes.set(validQuoteId, {

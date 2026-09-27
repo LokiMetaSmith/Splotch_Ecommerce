@@ -54,6 +54,26 @@ export default function createAgentPaymentsRouter(db) {
              return res.status(400).json({ error: "Payment amount does not match stored quote" });
         }
 
+        // Validate agent rules if provided in the mandate
+        if (parsedMandate.agentRules) {
+            const rules = parsedMandate.agentRules;
+
+            if (rules.expiresAt && new Date() > new Date(rules.expiresAt)) {
+                return res.status(403).json({ error: "Agent mandate expired" });
+            }
+
+            if (rules.maxSpendCents !== undefined) {
+                // Ensure maxSpendCents is an integer
+                const maxSpendCents = parseInt(rules.maxSpendCents, 10);
+                // Convert storedQuote.total (dollars) to cents for comparison
+                const storedQuoteCents = Math.round(storedQuote.total * 100);
+
+                if (storedQuoteCents > maxSpendCents) {
+                    return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
+                }
+            }
+        }
+
         verified = {
           success: true,
           mandateId: parsedMandate.mandateId || ("mandate-" + Date.now()),
