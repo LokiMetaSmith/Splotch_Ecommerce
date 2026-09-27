@@ -80,7 +80,7 @@ offsetWorker.onerror = (error) => {
 };
 
 // Declare globals for SDK objects and key DOM elements
-let payments, card, csrfToken;
+let payments, card, applePay, googlePay, paymentRequest, csrfToken;
 let canvas, ctx;
 
 function getActiveBase() {
@@ -899,7 +899,36 @@ async function BootStrap() {
           throw new Error("Square SDK is not loaded.");
         }
         payments = window.Square.payments(appId, locationId);
+
+        // Initialize base PaymentRequest
+        paymentRequest = payments.paymentRequest(buildPaymentRequestOptions());
+
+        // Initialize Card
         card = await initializeCard(payments);
+
+        // Try to initialize Digital Wallets
+        applePay = await initializeApplePay(payments, paymentRequest);
+        googlePay = await initializeGooglePay(payments, paymentRequest);
+
+        if (applePay || googlePay) {
+          const divider = document.getElementById("wallet-divider");
+          if (divider) divider.style.display = "flex";
+        }
+
+        if (applePay) {
+          const applePayButton = document.getElementById('apple-pay-button');
+          applePayButton.addEventListener('click', async (event) => {
+            await handlePaymentFormSubmit(event, applePay);
+          });
+        }
+
+        if (googlePay) {
+          const googlePayButton = document.getElementById('google-pay-button');
+          googlePayButton.addEventListener('click', async (event) => {
+            await handlePaymentFormSubmit(event, googlePay);
+          });
+        }
+
         hideAdBlockerWarning();
         break; // Success
       } catch (error) {
@@ -2202,6 +2231,15 @@ function calculateAndUpdatePrice() {
     currentOrderTotalCents = 0;
   }
 
+  // Update PaymentRequest for Digital Wallets
+  if (paymentRequest) {
+    try {
+      paymentRequest.update(buildPaymentRequestOptions());
+    } catch (e) {
+      console.warn("Failed to update Digital Wallet payment request", e);
+    }
+  }
+
   calculatedPriceDisplay.innerHTML = `
         <div class="flex flex-wrap items-baseline">
             <span id="calculatedPriceValue" class="font-extrabold text-2xl text-splotch-navy">${formatPrice(estimatedTotalCents)}</span>
@@ -2486,6 +2524,19 @@ function formatPrice(amountInCents) {
 }
 
 // --- Square SDK Functions ---
+function buildPaymentRequestOptions() {
+  // Use currentOrderTotalCents if available, otherwise default to a small string amount
+  const amountVal = currentOrderTotalCents ? (currentOrderTotalCents / 100).toFixed(2) : "1.00";
+  return {
+    countryCode: 'US',
+    currencyCode: 'USD',
+    total: {
+      amount: amountVal,
+      label: 'Splotch Stickers',
+    },
+  };
+}
+
 async function initializeCard(paymentsSDK) {
   if (!paymentsSDK)
     throw new Error("Payments SDK not ready for card initialization.");
@@ -2494,9 +2545,45 @@ async function initializeCard(paymentsSDK) {
   return cardInstance;
 }
 
+async function initializeApplePay(paymentsSDK, request) {
+  try {
+    const applePayInstance = await paymentsSDK.applePay(request);
+    await applePayInstance.attach('#apple-pay-button');
+    return applePayInstance;
+  } catch (error) {
+    console.warn("Apple Pay initialization failed or not supported:", error);
+    return null;
+  }
+}
+
+async function initializeGooglePay(paymentsSDK, request) {
+  try {
+    const googlePayInstance = await paymentsSDK.googlePay(request);
+    await googlePayInstance.attach('#google-pay-button');
+    return googlePayInstance;
+  } catch (error) {
+    console.warn("Google Pay initialization failed or not supported:", error);
+    return null;
+  }
+}
+
 async function tokenize(paymentMethod, verificationDetails) {
-  if (!paymentMethod) throw new Error("Card payment method not initialized.");
-  const tokenResult = await paymentMethod.tokenize(verificationDetails);
+  if (!paymentMethod) throw new Error("Payment method not initialized.");
+
+  // Apple/Google Pay might not need verification details the same way Card does,
+  // but passing it is safe as the SDK handles it under the hood.
+  let tokenResult;
+  try {
+    // Determine if we're tokenizing a digital wallet or a card
+    if (paymentMethod === applePay || paymentMethod === googlePay) {
+      tokenResult = await paymentMethod.tokenize();
+    } else {
+      tokenResult = await paymentMethod.tokenize(verificationDetails);
+    }
+  } catch (e) {
+    throw new Error(`Tokenization process failed: ${e.message}`);
+  }
+
   if (tokenResult.status === "OK") {
     if (!tokenResult.token)
       throw new Error("Tokenization succeeded but no token was returned.");
@@ -2686,9 +2773,9 @@ async function fetchCsrfToken() {
 }
 
 // --- Form Submission Logic ---
-async function handlePaymentFormSubmit(event) {
+async function handlePaymentFormSubmit(event, paymentMethodOverride = null) {
   console.log("[CLIENT] handlePaymentFormSubmit triggered.");
-  event.preventDefault();
+  if (event) event.preventDefault();
 
   let originalBtnContent = "";
   if (submitPaymentBtn) {
@@ -2964,10 +3051,11 @@ async function handlePaymentFormSubmit(event) {
     // 3. Tokenize the card with verification details
     let sourceId = "cnon:card-nonce-ok";
     if (!window.PLAYWRIGHT_TEST_MODE) {
-      showPaymentStatus("Securing card details...", "info");
-      console.log("[CLIENT] Tokenizing card with verification details.");
+      showPaymentStatus("Securing payment details...", "info");
+      const methodToTokenize = paymentMethodOverride || card;
+      console.log("[CLIENT] Tokenizing payment method with verification details.");
       // UPDATED: Pass the new verificationDetails object to tokenize
-      sourceId = await tokenize(card, verificationDetails);
+      sourceId = await tokenize(methodToTokenize, verificationDetails);
     }
 
     console.log(
