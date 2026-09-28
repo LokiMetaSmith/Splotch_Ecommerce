@@ -3519,7 +3519,7 @@ async function startServer(
               country: finalShippingContact.country || "US",
             },
             referenceId: randomUUID(),
-            note: `Custom Stickers (${quantity}x) - ${shippingContact.givenName} ${shippingContact.familyName || ""}`.trim(),
+            note: `Custom Stickers (${quantity}x) - ${shippingContact.givenName} ${shippingContact.familyName || ""}${Array.isArray(orderDetails.tradeoffs) && orderDetails.tradeoffs.length > 0 ? " | Tradeoffs: " + orderDetails.tradeoffs.join(", ") : ""}`.trim(),
           };
 
           const paymentResult =
