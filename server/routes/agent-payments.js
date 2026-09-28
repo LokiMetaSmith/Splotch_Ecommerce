@@ -7,6 +7,7 @@ export default function createAgentPaymentsRouter(db) {
   router.post("/v1/payments/ap2", async (req, res) => {
     const paymentProof = req.headers["authorization-x402"];
     const ap2Mandate = req.headers["x-ap2-mandate"];
+    const body = req.body || {};
 
     if (!paymentProof || !ap2Mandate) {
       // Return standard HTTP 402 challenge, requesting both x402 payment proof and AP2 mandate
@@ -15,7 +16,7 @@ export default function createAgentPaymentsRouter(db) {
         protocol: "x402",
         ap2_support: true,
         quote: {
-          amount: req.body.amount || "15.00",
+          amount: body.amount || "15.00",
           currency: "USD",
           recipient: "splotch-creative-settlement",
           settlement_methods: ["lightning", "base_usdc"]
@@ -35,7 +36,7 @@ export default function createAgentPaymentsRouter(db) {
 
       if (parsedProof.status === "PAID" && parsedMandate.intentId) {
         // Validate Quote
-        const quoteId = parsedMandate.quoteId || req.body.quoteId;
+        const quoteId = parsedMandate.quoteId || body.quoteId;
         const storedQuote = await db.getQuote(quoteId);
 
         if (!storedQuote) {
@@ -50,7 +51,7 @@ export default function createAgentPaymentsRouter(db) {
             return res.status(400).json({ error: "Quote has expired" });
         }
 
-        const providedAmount = parseFloat(req.body.amount || parsedProof.amount);
+        const providedAmount = parseFloat(body.amount || parsedProof.amount);
         if (providedAmount !== storedQuote.total) {
              return res.status(400).json({ error: "Payment amount does not match stored quote" });
         }
@@ -112,8 +113,8 @@ export default function createAgentPaymentsRouter(db) {
         paymentId: verified.paymentId,
         amount: verified.amount,
         buyerType: "agent",
-        items: req.body.items || [],
-        shippingAddress: req.body.shippingAddress || {}
+        items: body.items || [],
+        shippingAddress: body.shippingAddress || {}
     };
 
     await db.createOrder(orderRecord);
