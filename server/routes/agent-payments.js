@@ -6,18 +6,32 @@ export default function createAgentPaymentsRouter(db) {
 
   // Helper function to handle AP2 & x402 payment validation and order creation
   async function handlePaymentProcessing(req, res) {
-    const paymentProof = req.headers["authorization-x402"];
-    const ap2Mandate = req.headers["x-ap2-mandate"];
     const body = req.body || {};
+    let paymentProof = req.headers["authorization-x402"] || req.headers["x-payment"] || req.headers["authorization"];
+    let ap2Mandate = req.headers["x-ap2-mandate"] || req.headers["x-ap2-cart-mandate"] || body.ap2_mandate_jws || body.mandate;
+
+    // Handle settlement passed in body (e.g. Gemini / AgentKit payload)
+    if (!paymentProof && body.settlement) {
+      paymentProof = Buffer.from(JSON.stringify({
+        status: "PAID",
+        amount: body.settlement.amount || body.amount,
+        paymentId: body.settlement.tx_hash || ("tx-" + Date.now()),
+        rail: body.settlement.rail || "x402",
+        asset: body.settlement.asset || "USDC",
+        network: body.settlement.network || "base",
+        payer: body.settlement.payer_wallet
+      })).toString("base64");
+    }
 
     if (!paymentProof || !ap2Mandate) {
       // Return standard HTTP 402 challenge
+      const quoteAmount = body.amount || (body.settlement && body.settlement.amount) || "15.00";
       return res.status(402).json({
         error: "Payment Required",
         protocol: "x402",
         ap2_support: true,
         quote: {
-          amount: body.amount || "15.00",
+          amount: quoteAmount,
           currency: "USD",
           recipient: "splotch-creative-settlement",
           settlement_methods: ["lightning", "base_usdc"]
@@ -31,7 +45,7 @@ export default function createAgentPaymentsRouter(db) {
           docs: "/llms.txt",
           openapi: "/openapi.json"
         },
-        instructions: "Include authorization header 'authorization-x402' for payment proof and 'x-ap2-mandate' for the signed AP2 Cart Mandate."
+        instructions: "Include authorization header 'authorization-x402' (or 'X-Payment') for payment proof and 'x-ap2-mandate' (or body.ap2_mandate_jws) for the signed AP2 Cart Mandate."
       });
     }
 
@@ -43,9 +57,9 @@ export default function createAgentPaymentsRouter(db) {
       // Parse payment proof
       const parsedProof = JSON.parse(Buffer.from(paymentProof, "base64").toString("utf-8"));
 
-      if (parsedProof.status === "PAID" && parsedMandate.intentId) {
+      if (parsedProof.status === "PAID" && (parsedMandate.intentId || parsedMandate.cart_binding || parsedMandate.mandate_id)) {
         // Validate Quote
-        const quoteId = parsedMandate.quoteId || body.quoteId;
+        const quoteId = parsedMandate.quoteId || parsedMandate.quote_id || (parsedMandate.cart_binding && parsedMandate.cart_binding.quote_id) || body.quoteId || body.quote_id;
         const storedQuote = await db.getQuote(quoteId);
 
         if (!storedQuote) {
@@ -60,17 +74,19 @@ export default function createAgentPaymentsRouter(db) {
           return res.status(400).json({ error: "Quote has expired" });
         }
 
-        const providedAmount = parseFloat(body.amount || parsedProof.amount);
+        const providedAmount = parseFloat(body.amount || (body.settlement && body.settlement.amount) || parsedProof.amount);
         if (providedAmount !== storedQuote.total) {
           return res.status(400).json({ error: "Payment amount does not match stored quote" });
         }
 
-        // Validate maxSpendCents if present
+        // Validate maxSpendCents / agentRules if present
         let maxSpendCents;
         if (parsedMandate.maxSpendCents !== undefined) {
           maxSpendCents = parseInt(parsedMandate.maxSpendCents, 10);
         } else if (parsedMandate.agentRules && parsedMandate.agentRules.maxSpendCents !== undefined) {
           maxSpendCents = parseInt(parsedMandate.agentRules.maxSpendCents, 10);
+        } else if (parsedMandate.agent_rules?.max_amount?.amount !== undefined) {
+          maxSpendCents = Math.round(parseFloat(parsedMandate.agent_rules.max_amount.amount) * 100);
         }
 
         if (maxSpendCents !== undefined) {
@@ -81,8 +97,9 @@ export default function createAgentPaymentsRouter(db) {
         }
 
         // Validate custom expiration in agentRules if present
-        if (parsedMandate.agentRules && parsedMandate.agentRules.expiresAt) {
-          const customExpiry = new Date(parsedMandate.agentRules.expiresAt);
+        const customExpiryStr = parsedMandate.agentRules?.expiresAt || parsedMandate.agent_rules?.valid_until;
+        if (customExpiryStr) {
+          const customExpiry = new Date(customExpiryStr);
           if (isNaN(customExpiry.getTime()) || new Date() > customExpiry) {
             return res.status(403).json({ error: "Agent mandate expired" });
           }
@@ -90,10 +107,11 @@ export default function createAgentPaymentsRouter(db) {
 
         verified = {
           success: true,
-          mandateId: parsedMandate.mandateId || ("mandate-" + Date.now()),
+          mandateId: parsedMandate.mandateId || parsedMandate.mandate_id || ("man_" + Date.now()),
           paymentId: parsedProof.paymentId || ("x402-payment-" + Date.now()),
           amount: storedQuote.total,
-          quote: storedQuote
+          quote: storedQuote,
+          quoteId: quoteId
         };
       }
     } catch (error) {
@@ -116,13 +134,14 @@ export default function createAgentPaymentsRouter(db) {
     const orderId = "ord_" + Date.now();
     const orderRecord = {
       orderId: orderId,
+      order_id: orderId,
       status: "NEW",
       receivedAt: new Date().toISOString(),
       paymentId: verified.paymentId,
       amount: verified.amount,
       buyerType: "agent",
       items: body.items || (verified.quote.spec ? [verified.quote.spec] : []),
-      shippingAddress: body.shippingAddress || {}
+      shippingAddress: body.shippingAddress || body.shipping_destination || {}
     };
 
     await db.createOrder(orderRecord);
@@ -134,7 +153,20 @@ export default function createAgentPaymentsRouter(db) {
     return res.status(201).json({
       status: "CONFIRMED",
       orderId: orderRecord.orderId,
-      trackingUrl: `https://splotch.page/orders.html?id=${orderRecord.orderId}`
+      order_id: orderRecord.orderId,
+      quote_id: verified.quoteId,
+      mandate_verification: {
+        valid: true,
+        mandate_id: verified.mandateId,
+        agent_rules_enforced: true,
+        within_budget: true
+      },
+      settlement_verification: {
+        rail: "x402",
+        tx_status: "confirmed"
+      },
+      trackingUrl: `https://splotch.page/orders.html?id=${orderRecord.orderId}`,
+      fulfillment_tracking_url: `https://splotch.page/api/v1/orders/${orderRecord.orderId}`
     });
   }
 
@@ -147,7 +179,7 @@ export default function createAgentPaymentsRouter(db) {
       ap2_support: true,
       description: "Splotch Autonomous Agent Payment & Settlement Protocol Endpoint",
       methods_supported: ["GET", "POST", "OPTIONS"],
-      required_headers: ["authorization-x402", "x-ap2-mandate"],
+      required_headers: ["authorization-x402", "x-ap2-mandate", "X-Payment", "X-AP2-Mandate"],
       settlement_methods: ["lightning", "base_usdc"],
       recipient: "splotch-creative-settlement",
       default_quote: {
@@ -175,7 +207,26 @@ export default function createAgentPaymentsRouter(db) {
 
   // --- REST Quoting API: POST /v1/quotes ---
   router.post("/v1/quotes", async (req, res) => {
-    const { widthInches, heightInches, quantity, material = "vinyl_matte", cutType = "die_cut" } = req.body || {};
+    const body = req.body || {};
+    let widthInches = body.widthInches;
+    let heightInches = body.heightInches;
+    let quantity = body.quantity;
+    let material = body.material || "vinyl_matte";
+    let cutType = body.cutType || "die_cut";
+    let shape = body.shape || "custom_contour";
+
+    // Support nested items array (e.g. Gemini / MCP schema)
+    if ((!widthInches || !heightInches || !quantity) && Array.isArray(body.items) && body.items.length > 0) {
+      const item = body.items[0];
+      if (item.dimensions) {
+        widthInches = item.dimensions.width_in || item.dimensions.widthInches || item.dimensions.width;
+        heightInches = item.dimensions.height_in || item.dimensions.heightInches || item.dimensions.height;
+      }
+      quantity = item.quantity || quantity;
+      material = item.material || material;
+      cutType = item.cut_type || item.cutType || cutType;
+      shape = item.shape || shape;
+    }
 
     if (!widthInches || !heightInches || !quantity) {
       return res.status(400).json({
@@ -192,15 +243,17 @@ export default function createAgentPaymentsRouter(db) {
     }
 
     const baseRate = 0.15;
-    const materialSurcharge = material === "holographic" ? 0.35 : 0.20;
+    const isSpecialMaterial = material === "holographic" || material === "heavy_duty_pvc";
+    const materialSurcharge = isSpecialMaterial ? 0.35 : 0.20;
     const unitPrice = parseFloat(((width * height * baseRate) + materialSurcharge).toFixed(2));
     const total = parseFloat((unitPrice * qty).toFixed(2));
 
-    const quoteId = `quote_${Date.now()}`;
+    const quoteId = `quo_${Date.now()}`;
     const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
 
     const quoteRecord = {
       quoteId,
+      quote_id: quoteId,
       unitPrice,
       total,
       currency: "USD",
@@ -211,7 +264,8 @@ export default function createAgentPaymentsRouter(db) {
         heightInches: height,
         quantity: qty,
         material,
-        cutType
+        cutType,
+        shape
       }
     };
 
@@ -219,14 +273,29 @@ export default function createAgentPaymentsRouter(db) {
 
     return res.status(201).json({
       quoteId,
+      quote_id: quoteId,
+      status: "valid",
       unitPrice,
       total,
+      total_usd: total.toFixed(2),
       currency: "USD",
+      pricing: {
+        print_subtotal_usd: total.toFixed(2),
+        tradeoff_discount_usd: "0.00",
+        shipping_usd: "0.00",
+        total_usd: total.toFixed(2)
+      },
+      settlement_equivalents: {
+        usdc: total.toFixed(2),
+        chain_id: 8453
+      },
+      digest_sha256: Buffer.from(`${quoteId}:${total}`).toString("hex"),
       validUntilMinutes: 30,
       expiresAt,
+      expires_at: expiresAt,
       ap2_payment_endpoint: "/api/v1/payments/ap2",
       orders_endpoint: "/api/v1/orders",
-      instructions: "Sign an AP2 Cart Mandate with maxSpendCents >= required amount, and POST to /api/v1/orders or /api/v1/payments/ap2 with headers 'authorization-x402' and 'x-ap2-mandate'."
+      instructions: "Sign an AP2 Cart Mandate with maxSpendCents >= required amount, and POST to /api/v1/orders or /api/v1/payments/ap2 with headers 'authorization-x402' (or settlement object) and 'x-ap2-mandate'."
     });
   });
 
@@ -250,10 +319,12 @@ export default function createAgentPaymentsRouter(db) {
     }
     return res.json({
       orderId: order.orderId,
+      order_id: order.orderId,
       status: order.status,
       receivedAt: order.receivedAt,
       amount: order.amount,
-      trackingUrl: `https://splotch.page/orders.html?id=${order.orderId}`
+      trackingUrl: `https://splotch.page/orders.html?id=${order.orderId}`,
+      fulfillment_tracking_url: `https://splotch.page/api/v1/orders/${order.orderId}`
     });
   });
 

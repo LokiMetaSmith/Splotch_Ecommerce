@@ -327,4 +327,75 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     expect(res.body.status).toBe("NEW");
     expect(res.body.trackingUrl).toContain("ord_sample_123");
   });
+
+  it("should accept Gemini's exact nested items payload for quotes and payments", async () => {
+    // 1. Quoting with Gemini nested payload
+    const quoteRes = await request(app)
+      .post("/api/v1/quotes")
+      .send({
+        items: [
+          {
+            product_type: "custom_sticker",
+            dimensions: { width_in: 3.0, height_in: 3.0, unit: "inch" },
+            cut_type: "die_cut",
+            shape: "custom_contour",
+            material: "standard_pp",
+            quantity: 100,
+            artwork_url: "https://example.com/agent.png"
+          }
+        ],
+        tradeoffs: { flexible_filler_window: true },
+        delivery: { method: "ship", postal_code: "73159", country: "US" }
+      });
+
+    expect(quoteRes.statusCode).toBe(201);
+    expect(quoteRes.body.quote_id).toBeDefined();
+    expect(quoteRes.body.status).toBe("valid");
+    expect(quoteRes.body.pricing).toBeDefined();
+    expect(quoteRes.body.settlement_equivalents).toBeDefined();
+
+    const quoteId = quoteRes.body.quote_id;
+    const totalAmount = quoteRes.body.total;
+
+    // 2. AP2 Cart Mandate with Gemini format
+    const mandate = await generateMandate({
+      cart_binding: {
+        quote_id: quoteId,
+        exact_amount: totalAmount.toFixed(2)
+      },
+      agent_rules: {
+        max_amount: { amount: (totalAmount + 10).toFixed(2), currency: "USD" }
+      }
+    });
+
+    // 3. Payment with Gemini payload (settlement in body, X-AP2-Mandate header)
+    const payRes = await request(app)
+      .post("/api/v1/payments/ap2")
+      .set("X-AP2-Mandate", mandate)
+      .send({
+        quote_id: quoteId,
+        settlement: {
+          rail: "x402",
+          asset: "USDC",
+          network: "base",
+          tx_hash: "0xb67d983e8fa298108c4e78291f09238e821bca89d1341052981ef407e3cb752a",
+          amount: totalAmount.toFixed(2),
+          payer_wallet: "0x49B3c11E866299bBfA689D8B4E15682C562f7D35"
+        },
+        shipping_destination: {
+          recipient_name: "Autonomous Agent Lab",
+          street_address: "7712 S. Penn Ave",
+          city: "Oklahoma City",
+          state: "OK",
+          postal_code: "73159",
+          country: "US"
+        }
+      });
+
+    expect(payRes.statusCode).toBe(201);
+    expect(payRes.body.order_id).toBeDefined();
+    expect(payRes.body.mandate_verification.valid).toBe(true);
+    expect(payRes.body.settlement_verification.tx_status).toBe("confirmed");
+    expect(payRes.body.fulfillment_tracking_url).toContain("orders");
+  });
 });

@@ -113,4 +113,67 @@ describe("MCP Server Endpoints and Tools", () => {
     expect(parsedContent.status).toBe("PRINTING");
     expect(parsedContent.trackingUrl).toContain("ord_mcp_123");
   });
+
+  it("should handle splotch_get_sticker_quote and splotch_execute_ap2_payment tools", async () => {
+    mockDb.createQuote = jest.fn().mockResolvedValue({});
+    mockDb.createOrder = jest.fn().mockResolvedValue({});
+
+    const mcpServer = createMcpServer(mockDb);
+    const handler = mcpServer._requestHandlers.get('tools/call');
+
+    // 1. splotch_get_sticker_quote with items array
+    const quoteResult = await handler({
+      method: "tools/call",
+      params: {
+        name: "splotch_get_sticker_quote",
+        arguments: {
+          items: [
+            {
+              product_type: "custom_sticker",
+              dimensions: { width_in: 3.0, height_in: 3.0, unit: "inch" },
+              quantity: 50,
+              material: "standard_pp"
+            }
+          ]
+        }
+      }
+    }, {});
+
+    const quoteParsed = JSON.parse(quoteResult.content[0].text);
+    expect(quoteParsed.quote_id).toBeDefined();
+    expect(quoteParsed.pricing).toBeDefined();
+
+    // 2. splotch_execute_ap2_payment with mandate and settlement
+    const payResult = await handler({
+      method: "tools/call",
+      params: {
+        name: "splotch_execute_ap2_payment",
+        arguments: {
+          quote_id: quoteParsed.quote_id,
+          ap2_mandate_jws: "eyJhbGciOiJFZERTQSI...",
+          settlement: {
+            rail: "x402",
+            asset: "USDC",
+            network: "base",
+            tx_hash: "0x123abc",
+            amount: quoteParsed.total_usd,
+            payer_wallet: "0x49B3c11E866299bBfA689D8B4E15682C562f7D35"
+          },
+          shipping_destination: {
+            recipient_name: "Agent Lab",
+            street_address: "123 Main St",
+            city: "Oklahoma City",
+            state: "OK",
+            postal_code: "73159",
+            country: "US"
+          }
+        }
+      }
+    }, {});
+
+    const payParsed = JSON.parse(payResult.content[0].text);
+    expect(payParsed.order_id).toBeDefined();
+    expect(payParsed.status).toBe("queued_for_print");
+    expect(payParsed.settlement_verification.tx_status).toBe("confirmed");
+  });
 });

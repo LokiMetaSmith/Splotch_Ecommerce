@@ -1375,12 +1375,20 @@ async function startServer(
             description: "Alias for calculate_sticker_quote"
           },
           {
+            name: "splotch_get_sticker_quote",
+            description: "Calculates deterministic pricing and cart digest for custom sticker print runs"
+          },
+          {
             name: "create_agent_checkout",
             description: "Preflight artwork asset and generate AP2 / x402 payment challenge"
           },
           {
             name: "place_order",
             description: "Alias for create_agent_checkout"
+          },
+          {
+            name: "splotch_execute_ap2_payment",
+            description: "Settles and places a finalized print order using the AP2 protocol and x402 settlement rails"
           },
           {
             name: "get_order_status",
