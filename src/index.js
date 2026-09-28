@@ -793,6 +793,82 @@ async function BootStrap() {
   promoAddonCheckbox = document.getElementById("promoAddonCheckbox");
   promoAddonStatusMsg = document.getElementById("promoAddonStatusMsg");
 
+  // Mobile Toolbar Controls
+  const mobileRotateBtn = document.getElementById("mobileRotateBtn");
+  const mobileScaleUpBtn = document.getElementById("mobileScaleUpBtn");
+  const mobileScaleDownBtn = document.getElementById("mobileScaleDownBtn");
+  const mobileCenterBtn = document.getElementById("mobileCenterBtn");
+
+  if (mobileRotateBtn) {
+    mobileRotateBtn.addEventListener("click", () => {
+      const active = getActiveSticker();
+      if (active) {
+        active.rotation = ((active.rotation || 0) + 90) % 360;
+        markStickerDirty(active, "transform");
+        doRedrawAll();
+      }
+    });
+  }
+
+  if (mobileScaleUpBtn) {
+    mobileScaleUpBtn.addEventListener("click", () => {
+      const active = getActiveSticker();
+      if (active && active.width && active.height) {
+        const factor = 1.1;
+        // Keep it centered by adjusting x/y
+        active.x = active.x - (active.width * (factor - 1)) / 2;
+        active.y = active.y - (active.height * (factor - 1)) / 2;
+        active.width *= factor;
+        active.height *= factor;
+        markStickerDirty(active, "transform");
+        doRedrawAll();
+      }
+    });
+  }
+
+  if (mobileScaleDownBtn) {
+    mobileScaleDownBtn.addEventListener("click", () => {
+      const active = getActiveSticker();
+      if (active && active.width && active.height) {
+        const factor = 0.9;
+        active.x = active.x - (active.width * (factor - 1)) / 2;
+        active.y = active.y - (active.height * (factor - 1)) / 2;
+        active.width *= factor;
+        active.height *= factor;
+        markStickerDirty(active, "transform");
+        doRedrawAll();
+      }
+    });
+  }
+
+  if (mobileCenterBtn) {
+    mobileCenterBtn.addEventListener("click", () => {
+      const active = getActiveSticker();
+      if (active && active.image) {
+        const imgAspect = active.image.width / active.image.height;
+        const canvasAspect = DEFAULT_CANVAS_WIDTH / DEFAULT_CANVAS_HEIGHT;
+
+        let renderWidth, renderHeight;
+        if (imgAspect > canvasAspect) {
+          renderWidth = DEFAULT_CANVAS_WIDTH * 0.8;
+          renderHeight = renderWidth / imgAspect;
+        } else {
+          renderHeight = DEFAULT_CANVAS_HEIGHT * 0.8;
+          renderWidth = renderHeight * imgAspect;
+        }
+
+        active.width = renderWidth;
+        active.height = renderHeight;
+        active.x = (DEFAULT_CANVAS_WIDTH - renderWidth) / 2;
+        active.y = (DEFAULT_CANVAS_HEIGHT - renderHeight) / 2;
+        active.rotation = 0;
+
+        markStickerDirty(active, "transform");
+        doRedrawAll();
+      }
+    });
+  }
+
   if (promoAddonCheckbox) {
     promoAddonCheckbox.addEventListener("change", () => {
       calculateAndUpdatePrice();
@@ -882,6 +958,17 @@ async function BootStrap() {
       };
       document.head.appendChild(script);
     });
+  }
+
+  // Show developer status indicator if debug mode is active
+  const statusUrlParams = new URLSearchParams(window.location.search);
+  const debugMode = statusUrlParams.get('debug') === 'true' || localStorage.getItem('debug') === 'true';
+  const statusIndicator = document.getElementById("status-indicator");
+  if (statusIndicator && debugMode) {
+      statusIndicator.style.display = "flex";
+      // ensure we override hidden class
+      statusIndicator.classList.remove("hidden");
+      statusIndicator.classList.add("flex");
   }
 
   await Promise.all([fetchPricingInfo(), fetchInventory()]);
@@ -2532,7 +2619,13 @@ function populateMaterialDropdown() {
   pricingConfig.materials.forEach((mat) => {
     const option = document.createElement("option");
     option.value = mat.id;
-    option.textContent = mat.name;
+    let displayName = mat.name;
+    if (mat.id.toLowerCase().includes("pvc")) {
+        displayName = "Heavy-Duty Laminated Vinyl";
+    } else if (mat.id.toLowerCase().includes("pp")) {
+        displayName = "Standard Weatherproof Film";
+    }
+    option.textContent = displayName;
     stickerMaterialSelect.appendChild(option);
   });
   // Set selection: preserve if valid, else pp_standard, else first material
@@ -2550,7 +2643,7 @@ function populateMaterialDropdown() {
   checkInventoryStatus(stickerMaterialSelect.value);
 }
 
-async function fetchPricingInfo() {
+async function fetchPricingInfo(retries = 3, delay = 500) {
   try {
     const response = await fetch(
       `${serverUrl}/api/pricing-info?t=${Date.now()}`,
@@ -2583,6 +2676,11 @@ async function fetchPricingInfo() {
     renderLayerTabs();
   } catch (error) {
     console.error("[CLIENT] Error fetching pricing info:", error);
+    if (retries > 0) {
+      console.log(`[CLIENT] Retrying pricing fetch... (${retries} attempts left)`);
+      await new Promise(res => setTimeout(res, delay));
+      return fetchPricingInfo(retries - 1, delay * 2); // Exponential backoff
+    }
     showPaymentStatus(
       "Could not load pricing information. Please refresh.",
       "error",
