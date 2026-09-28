@@ -1,5 +1,7 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/index.js', 'utf8');
+const path = require('path');
+const targetFile = path.join(__dirname, 'src', 'index.js');
+let content = fs.readFileSync(targetFile, 'utf8');
 
 // Fix 1: The currentBounds variable might be out of sync. We should use the raw SVG bounds if possible or fallback correctly, and account for bounds offsets.
 // Since the previous fix had a problem where tempCanvas dimensions were drawn without offset. Let's fix the drawing logic for SVG.
@@ -43,4 +45,4 @@ const replacement = `const allPolys = [];
 
 content = content.replace(regex, replacement);
 
-fs.writeFileSync('src/index.js', content);
+fs.writeFileSync(targetFile, content);

@@ -162,8 +162,9 @@ export function createMcpServer(db) {
 
       // Route through requested child process validation
       try {
-          const scriptPath = path.join(__dirname, "..", "fix_svg_render.cjs");
-          await execFilePromise("node", [scriptPath], { timeout: 5000 });
+          const projectRoot = path.join(__dirname, "..");
+          const scriptPath = path.join(projectRoot, "fix_svg_render.cjs");
+          await execFilePromise("node", [scriptPath], { cwd: projectRoot, timeout: 5000 });
       } catch (execErr) {
           throw new Error(`Preflight Failed: Asset validation routines failed. ${execErr.message}`);
       }
