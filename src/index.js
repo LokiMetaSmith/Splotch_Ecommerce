@@ -971,6 +971,12 @@ async function BootStrap() {
       statusIndicator.classList.add("flex");
   }
 
+  if (debugMode || window.PLAYWRIGHT_TEST_MODE) {
+    window.__getActiveSticker = getActiveSticker;
+    window.__addSticker = addSticker;
+    window.__doRedrawAll = doRedrawAll;
+  }
+
   await Promise.all([fetchPricingInfo(), fetchInventory()]);
 
   // Initialize Square Payments SDK
@@ -2682,6 +2688,10 @@ async function fetchPricingInfo(retries = 3, delay = 500) {
       return fetchPricingInfo(retries - 1, delay * 2); // Exponential backoff
     }
     showPaymentStatus(
+      "Could not load pricing information. Please refresh.",
+      "error",
+    );
+    showNotification(
       "Could not load pricing information. Please refresh.",
       "error",
     );

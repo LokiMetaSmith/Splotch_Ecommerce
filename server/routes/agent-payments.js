@@ -58,17 +58,20 @@ export default function createAgentPaymentsRouter(db) {
         if (parsedMandate.agentRules) {
             const rules = parsedMandate.agentRules;
 
-            if (rules.expiresAt && new Date() > new Date(rules.expiresAt)) {
-                return res.status(403).json({ error: "Agent mandate expired" });
+            if (rules.expiresAt) {
+                const expiryDate = new Date(rules.expiresAt);
+                if (isNaN(expiryDate.getTime()) || new Date() > expiryDate) {
+                    return res.status(403).json({ error: "Agent mandate expired" });
+                }
             }
 
             if (rules.maxSpendCents !== undefined) {
-                // Ensure maxSpendCents is an integer
+                // Ensure maxSpendCents is a valid non-negative integer
                 const maxSpendCents = parseInt(rules.maxSpendCents, 10);
                 // Convert storedQuote.total (dollars) to cents for comparison
                 const storedQuoteCents = Math.round(storedQuote.total * 100);
 
-                if (storedQuoteCents > maxSpendCents) {
+                if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
                     return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
                 }
             }

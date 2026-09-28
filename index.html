@@ -245,6 +245,17 @@
         PeerJS Status: Initializing...
       </div>
 
+      <!-- Developer Status Indicator (active when ?debug=true) -->
+      <div
+        id="status-indicator"
+        class="hidden mb-4 p-2 rounded-md text-xs font-mono text-emerald-800 bg-emerald-100 border border-emerald-300 items-center justify-center gap-2"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>Developer Mode Active</span>
+      </div>
+
       <form id="payment-form" novalidate>
         <!-- Sticker Design and Options Box -->
         <div
