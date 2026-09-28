@@ -1,4 +1,5 @@
 import express from "express";
+import { verifyAP2Mandate } from "../lib/ap2_crypto.js";
 
 export default function createAgentPaymentsRouter(db) {
   const router = express.Router();
@@ -23,14 +24,14 @@ export default function createAgentPaymentsRouter(db) {
       });
     }
 
-    // Robust cryptographic verification (simulated securely via JWT for proof-of-concept without adding dependencies)
-    // A production system would verify the ed25519 or secp256k1 signatures of the x402 token and AP2 Mandate.
     let verified = { success: false };
     try {
-      // Decode and verify the structure of the mandate (usually a base64 encoded JSON string or JWT)
-      // Here we parse them strictly to ensure they are valid JSON objects matching the protocol schema.
+      // Cryptographically verify the AP2 Mandate using jose
+      // We also enforce audience to verify merchant identity, as specified by AP2 rules.
+      const parsedMandate = await verifyAP2Mandate(ap2Mandate, { audience: "splotch-creative-settlement" });
+
+      // We still simulate the paymentProof parsing for now as x402 is out of scope of AP2 crypto
       const parsedProof = JSON.parse(Buffer.from(paymentProof, 'base64').toString('utf-8'));
-      const parsedMandate = JSON.parse(Buffer.from(ap2Mandate, 'base64').toString('utf-8'));
 
       if (parsedProof.status === "PAID" && parsedMandate.intentId) {
         // Validate Quote
@@ -54,26 +55,27 @@ export default function createAgentPaymentsRouter(db) {
              return res.status(400).json({ error: "Payment amount does not match stored quote" });
         }
 
-        // Validate agent rules if provided in the mandate
-        if (parsedMandate.agentRules) {
-            const rules = parsedMandate.agentRules;
+        // We leverage JWT exp if available, though agentRules might be passed in for legacy compat.
+        // If maxSpendCents is specified, we must validate it against storedQuote.total
+        let maxSpendCents;
+        if (parsedMandate.maxSpendCents !== undefined) {
+            maxSpendCents = parseInt(parsedMandate.maxSpendCents, 10);
+        } else if (parsedMandate.agentRules && parsedMandate.agentRules.maxSpendCents !== undefined) {
+            maxSpendCents = parseInt(parsedMandate.agentRules.maxSpendCents, 10);
+        }
 
-            if (rules.expiresAt) {
-                const expiryDate = new Date(rules.expiresAt);
-                if (isNaN(expiryDate.getTime()) || new Date() > expiryDate) {
-                    return res.status(403).json({ error: "Agent mandate expired" });
-                }
+        if (maxSpendCents !== undefined) {
+            const storedQuoteCents = Math.round(storedQuote.total * 100);
+            if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
+                return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
             }
+        }
 
-            if (rules.maxSpendCents !== undefined) {
-                // Ensure maxSpendCents is a valid non-negative integer
-                const maxSpendCents = parseInt(rules.maxSpendCents, 10);
-                // Convert storedQuote.total (dollars) to cents for comparison
-                const storedQuoteCents = Math.round(storedQuote.total * 100);
-
-                if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
-                    return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
-                }
+        let customExpiry;
+        if (parsedMandate.agentRules && parsedMandate.agentRules.expiresAt) {
+            customExpiry = new Date(parsedMandate.agentRules.expiresAt);
+            if (isNaN(customExpiry.getTime()) || new Date() > customExpiry) {
+                return res.status(403).json({ error: "Agent mandate expired" });
             }
         }
 
@@ -87,10 +89,11 @@ export default function createAgentPaymentsRouter(db) {
       }
     } catch (error) {
       verified.success = false;
+      verified.errorMsg = error.message;
     }
 
     if (!verified.success) {
-      return res.status(403).json({ error: "Cryptographic validation failed for AP2 mandate or x402 payment proof" });
+      return res.status(403).json({ error: "Cryptographic validation failed for AP2 mandate or x402 payment proof: " + (verified.errorMsg || "") });
     }
 
     // Replay Protection: Check if paymentId already exists

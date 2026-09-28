@@ -1349,8 +1349,13 @@ async function startServer(
       if (!pubkey) {
         return res.status(404).send("Not Found");
       }
-      res.setHeader("Content-Type", "text/plain");
-      res.send(pubkey);
+      res.setHeader("Content-Type", "application/json");
+      res.json({
+        capabilities: ["x402"],
+        accepted_methods: ["x402"],
+        mandate_formats: ["sd-jwt", "jwt"],
+        pubkey: pubkey
+      });
     });
 
     app.get("/.well-known/jwks.json", async (req, res) => {

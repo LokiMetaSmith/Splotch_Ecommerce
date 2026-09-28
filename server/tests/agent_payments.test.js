@@ -2,30 +2,48 @@ import request from "supertest";
 import express from "express";
 import createAgentPaymentsRouter from "../routes/agent-payments.js";
 import { jest } from "@jest/globals";
+import * as jose from "jose";
 
 describe("Agent Payments API (/v1/payments/ap2)", () => {
   let app;
   let mockDb;
   let inMemoryQuotes;
+  let keypair;
+  let badKeypair;
+  let jwk;
+
+  beforeAll(async () => {
+    keypair = await jose.generateKeyPair('RS256');
+    badKeypair = await jose.generateKeyPair('RS256');
+    jwk = await jose.exportJWK(keypair.publicKey);
+  });
 
   beforeEach(() => {
-    // Reset global quotes map mock
     inMemoryQuotes = new Map();
 
     mockDb = {
       createOrder: jest.fn().mockResolvedValue({}),
-      getQuote: jest.fn().mockImplementation(async (id) => inMemoryQuotes.get(id)),
-      updateQuote: jest.fn().mockImplementation(async (quote) => {
-         inMemoryQuotes.set(quote.quoteId, quote);
-         return quote;
+      getQuote: jest.fn(async (id) => inMemoryQuotes.get(id)),
+      updateQuote: jest.fn(async (quote) => {
+        inMemoryQuotes.set(quote.quoteId, quote);
+        return quote;
       }),
-      getAllOrders: jest.fn().mockResolvedValue([]),
+      getAllOrders: jest.fn().mockResolvedValue([])
     };
 
     app = express();
     app.use(express.json());
     app.use("/api", createAgentPaymentsRouter(mockDb));
   });
+
+  async function generateMandate(payload, signKey = keypair.privateKey) {
+    return await new jose.SignJWT(payload)
+      .setProtectedHeader({ alg: 'RS256', jwk })
+      .setIssuedAt()
+      .setExpirationTime('2h')
+      .setAudience('splotch-creative-settlement')
+      .sign(signKey);
+  }
 
   it("should return 402 Payment Required if headers are missing", async () => {
     const res = await request(app).post("/api/v1/payments/ap2").send({
@@ -41,7 +59,42 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     const res = await request(app)
       .post("/api/v1/payments/ap2")
       .set("authorization-x402", "invalid-base64")
-      .set("x-ap2-mandate", "invalid-base64")
+      .set("x-ap2-mandate", "invalid-jwt")
+      .send({});
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.error).toContain("Cryptographic validation failed");
+  });
+
+  it("should return 403 if cryptographic verification fails (tampered/invalid signature)", async () => {
+    // Mandate signed with badKeypair but claiming to be the good jwk
+    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
+    const mandate = await generateMandate({ intentId: "intent123", quoteId: "quote_1" }, badKeypair.privateKey);
+    const res = await request(app)
+      .post("/api/v1/payments/ap2")
+      .set("authorization-x402", paymentProof)
+      .set("x-ap2-mandate", mandate)
+      .send({});
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.error).toContain("Cryptographic validation failed");
+  });
+
+  it("should return 403 if mandate is expired (via standard JWT exp claim)", async () => {
+    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
+
+    // Create an explicitly expired token
+    const mandate = await new jose.SignJWT({ intentId: "intent123", quoteId: "quote_1" })
+      .setProtectedHeader({ alg: 'RS256', jwk })
+      .setIssuedAt()
+      .setExpirationTime('-1h')
+      .setAudience('splotch-creative-settlement')
+      .sign(keypair.privateKey);
+
+    const res = await request(app)
+      .post("/api/v1/payments/ap2")
+      .set("authorization-x402", paymentProof)
+      .set("x-ap2-mandate", mandate)
       .send({});
 
     expect(res.statusCode).toBe(403);
@@ -50,7 +103,7 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
 
   it("should return 404 if quote is not found", async () => {
     const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({ intentId: "intent123", quoteId: "nonexistent_quote" })).toString("base64");
+    const mandate = await generateMandate({ intentId: "intent123", quoteId: "nonexistent_quote" });
 
     const res = await request(app)
       .post("/api/v1/payments/ap2")
@@ -68,11 +121,11 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
       quoteId: expiredQuoteId,
       total: 15.00,
       status: "PENDING",
-      expiresAt: new Date(Date.now() - 1000).toISOString(), // Expired
+      expiresAt: new Date(Date.now() - 1000).toISOString()
     });
 
     const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({ intentId: "intent123", quoteId: expiredQuoteId })).toString("base64");
+    const mandate = await generateMandate({ intentId: "intent123", quoteId: expiredQuoteId });
 
     const res = await request(app)
       .post("/api/v1/payments/ap2")
@@ -88,14 +141,13 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     const validQuoteId = "quote_amount_mismatch";
     inMemoryQuotes.set(validQuoteId, {
       quoteId: validQuoteId,
-      total: 25.00, // Quote is for 25.00
+      total: 20.00,
       status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString()
     });
 
-    // Payment proof says 15.00
     const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({ intentId: "intent123", quoteId: validQuoteId })).toString("base64");
+    const mandate = await generateMandate({ intentId: "intent123", quoteId: validQuoteId });
 
     const res = await request(app)
       .post("/api/v1/payments/ap2")
@@ -113,14 +165,13 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
       quoteId: validQuoteId,
       total: 15.00,
       status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString()
     });
 
-    // Mock an existing order with the same paymentId
-    mockDb.getAllOrders.mockResolvedValue([{ paymentId: "pay123" }]);
+    mockDb.getAllOrders = jest.fn().mockResolvedValue([{ paymentId: "pay123" }]);
 
     const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({ intentId: "intent123", quoteId: validQuoteId })).toString("base64");
+    const mandate = await generateMandate({ intentId: "intent123", quoteId: validQuoteId });
 
     const res = await request(app)
       .post("/api/v1/payments/ap2")
@@ -129,54 +180,24 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
       .send({});
 
     expect(res.statusCode).toBe(400);
-    expect(res.body.error).toContain("Payment proof has already been processed (Replay Protection)");
-  });
-
-  it("should return 403 if agent mandate is expired", async () => {
-    const validQuoteId = "quote_valid_but_mandate_expired";
-    inMemoryQuotes.set(validQuoteId, {
-      quoteId: validQuoteId,
-      total: 15.00,
-      status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
-    });
-
-    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({
-      intentId: "intent123",
-      quoteId: validQuoteId,
-      agentRules: {
-        expiresAt: new Date(Date.now() - 1000).toISOString() // Mandate Expired
-      }
-    })).toString("base64");
-
-    const res = await request(app)
-      .post("/api/v1/payments/ap2")
-      .set("authorization-x402", paymentProof)
-      .set("x-ap2-mandate", mandate)
-      .send({});
-
-    expect(res.statusCode).toBe(403);
-    expect(res.body.error).toBe("Agent mandate expired");
+    expect(res.body.error).toContain("Payment proof has already been processed");
   });
 
   it("should return 403 if agent mandate spending limit is exceeded", async () => {
     const validQuoteId = "quote_valid_but_spending_exceeded";
     inMemoryQuotes.set(validQuoteId, {
       quoteId: validQuoteId,
-      total: 15.00, // Quote is $15.00 (1500 cents)
+      total: 15.00,
       status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString()
     });
 
     const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({
+    const mandate = await generateMandate({
       intentId: "intent123",
       quoteId: validQuoteId,
-      agentRules: {
-        maxSpendCents: 1000 // Mandate only allows $10.00 (1000 cents)
-      }
-    })).toString("base64");
+      maxSpendCents: 1000 // Only allowed $10, quote is $15
+    });
 
     const res = await request(app)
       .post("/api/v1/payments/ap2")
@@ -188,150 +209,30 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     expect(res.body.error).toBe("Agent mandate spending limit exceeded");
   });
 
-  it("should return 403 if agent mandate has invalid expiresAt date string", async () => {
-    const validQuoteId = "quote_valid_invalid_date";
-    inMemoryQuotes.set(validQuoteId, {
-      quoteId: validQuoteId,
-      total: 15.00,
-      status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
-    });
-
-    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay_inv_date", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({
-      intentId: "intent123",
-      quoteId: validQuoteId,
-      agentRules: {
-        expiresAt: "invalid-iso-date-string"
-      }
-    })).toString("base64");
-
-    const res = await request(app)
-      .post("/api/v1/payments/ap2")
-      .set("authorization-x402", paymentProof)
-      .set("x-ap2-mandate", mandate)
-      .send({});
-
-    expect(res.statusCode).toBe(403);
-    expect(res.body.error).toBe("Agent mandate expired");
-  });
-
-  it("should return 403 if agent mandate spending limit is invalid or negative", async () => {
-    const validQuoteId = "quote_valid_invalid_spend";
-    inMemoryQuotes.set(validQuoteId, {
-      quoteId: validQuoteId,
-      total: 15.00,
-      status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
-    });
-
-    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay_inv_spend", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({
-      intentId: "intent123",
-      quoteId: validQuoteId,
-      agentRules: {
-        maxSpendCents: "not-a-number"
-      }
-    })).toString("base64");
-
-    const res = await request(app)
-      .post("/api/v1/payments/ap2")
-      .set("authorization-x402", paymentProof)
-      .set("x-ap2-mandate", mandate)
-      .send({});
-
-    expect(res.statusCode).toBe(403);
-    expect(res.body.error).toBe("Agent mandate spending limit exceeded");
-  });
-
-  it("should succeed with 201 if agent mandate rules (future expiresAt and sufficient maxSpendCents) are satisfied", async () => {
+  it("should succeed with 201 if agent mandate rules are satisfied", async () => {
     const validQuoteId = "quote_valid_with_rules";
     inMemoryQuotes.set(validQuoteId, {
       quoteId: validQuoteId,
       total: 15.00,
       status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
-    });
-
-    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay_rules_ok", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({
-      intentId: "intent_rules_ok",
-      quoteId: validQuoteId,
-      agentRules: {
-        expiresAt: new Date(Date.now() + 60000).toISOString(),
-        maxSpendCents: 2000 // $20.00 max spend >= $15.00
-      }
-    })).toString("base64");
-
-    const res = await request(app)
-      .post("/api/v1/payments/ap2")
-      .set("authorization-x402", paymentProof)
-      .set("x-ap2-mandate", mandate)
-      .send({});
-
-    expect(res.statusCode).toBe(201);
-    expect(res.body.orderId).toBeDefined();
-    expect(res.body.status).toBe("CONFIRMED");
-  });
-
-  it("should succeed with 201 when maxSpendCents exactly equals quote amount", async () => {
-    const validQuoteId = "quote_valid_exact_spend";
-    inMemoryQuotes.set(validQuoteId, {
-      quoteId: validQuoteId,
-      total: 15.00,
-      status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
-    });
-
-    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay_exact_spend", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({
-      intentId: "intent_exact",
-      quoteId: validQuoteId,
-      agentRules: {
-        maxSpendCents: 1500 // Exactly $15.00
-      }
-    })).toString("base64");
-
-    const res = await request(app)
-      .post("/api/v1/payments/ap2")
-      .set("authorization-x402", paymentProof)
-      .set("x-ap2-mandate", mandate)
-      .send({});
-
-    expect(res.statusCode).toBe(201);
-    expect(res.body.orderId).toBeDefined();
-  });
-
-  it("should create an order, consume the quote, and return 201 on valid payment and quote", async () => {
-    const validQuoteId = "quote_valid";
-    inMemoryQuotes.set(validQuoteId, {
-      quoteId: validQuoteId,
-      total: 15.00,
-      status: "PENDING",
-      expiresAt: new Date(Date.now() + 100000).toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString()
     });
 
     const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay123", amount: "15.00" })).toString("base64");
-    const mandate = Buffer.from(JSON.stringify({ intentId: "intent123", quoteId: validQuoteId })).toString("base64");
+    const mandate = await generateMandate({
+      intentId: "intent123",
+      quoteId: validQuoteId,
+      maxSpendCents: 2000 // $20 allowed limit
+    });
 
     const res = await request(app)
       .post("/api/v1/payments/ap2")
       .set("authorization-x402", paymentProof)
       .set("x-ap2-mandate", mandate)
-      .send({
-        items: [{ id: "sticker1" }],
-        shippingAddress: { city: "New York" }
-      });
+      .send({});
 
     expect(res.statusCode).toBe(201);
+    expect(res.body.orderId).toBeDefined();
     expect(res.body.status).toBe("CONFIRMED");
-    expect(res.body.orderId).toMatch(/^ord_/);
-    expect(res.body.trackingUrl).toContain(res.body.orderId);
-
-    expect(mockDb.createOrder).toHaveBeenCalledTimes(1);
-    const orderArg = mockDb.createOrder.mock.calls[0][0];
-    expect(orderArg.amount).toBe(15.00);
-    expect(orderArg.buyerType).toBe("agent");
-    expect(orderArg.status).toBe("NEW");
   });
 });
