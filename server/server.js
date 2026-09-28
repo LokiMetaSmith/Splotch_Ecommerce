@@ -1402,7 +1402,10 @@ async function startServer(
     });
 
     app.get(["/.well-known/ap2", "/.well-known/ap2.json"], (req, res) => {
-      const pubkey = process.env.AP2_GOVERNANCE_PUBKEY || process.env.JWT_PUBLIC_KEY || "configured-on-request";
+      let pubkey = process.env.AP2_GOVERNANCE_PUBKEY;
+      if (!pubkey || pubkey.startsWith("${") || pubkey.includes("your-ap2-governance") || pubkey === "configured-on-request") {
+        pubkey = process.env.JWT_PUBLIC_KEY || "configured-on-request";
+      }
       res.setHeader("Content-Type", "application/json");
       res.json({
         capabilities: ["x402"],
