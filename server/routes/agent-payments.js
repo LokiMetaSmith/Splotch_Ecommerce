@@ -1,6 +1,6 @@
 import express from "express";
 import { verifyAP2Mandate, verifyMandateBindings, computeCartDigest } from "../lib/ap2_crypto.js";
-import { verifySettlementProof } from "../lib/settlement_verifier.js";
+import { verifySettlementProof, getActiveSettlementMethods } from "../lib/settlement_verifier.js";
 
 export default function createAgentPaymentsRouter(db) {
   const router = express.Router();
@@ -24,6 +24,8 @@ export default function createAgentPaymentsRouter(db) {
       })).toString("base64");
     }
 
+    const activeRails = getActiveSettlementMethods();
+
     if (!paymentProof || !ap2Mandate) {
       // Return standard HTTP 402 challenge
       const quoteAmount = body.amount || (body.settlement && body.settlement.amount) || "15.00";
@@ -35,7 +37,7 @@ export default function createAgentPaymentsRouter(db) {
           amount: quoteAmount,
           currency: "USD",
           recipient: "splotch-creative-settlement",
-          settlement_methods: ["lightning", "base_usdc"]
+          settlement_methods: activeRails
         },
         discovery: {
           well_known_ap2: "/.well-known/ap2",
@@ -186,15 +188,16 @@ export default function createAgentPaymentsRouter(db) {
 
   // --- GET / OPTIONS /v1/payments/ap2 (Protocol Discovery & Inspection) ---
   const ap2ProtocolInfo = (req, res) => {
+    const activeRails = getActiveSettlementMethods();
     res.setHeader("Content-Type", "application/json");
     res.json({
-      status: "active",
+      status: activeRails.length > 0 ? "active" : "disabled",
       protocol: "x402",
       ap2_support: true,
       description: "Splotch Autonomous Agent Payment & Settlement Protocol Endpoint",
       methods_supported: ["GET", "POST", "OPTIONS"],
       required_headers: ["authorization-x402", "x-ap2-mandate", "X-Payment", "X-AP2-Mandate"],
-      settlement_methods: ["lightning", "base_usdc"],
+      settlement_methods: activeRails,
       recipient: "splotch-creative-settlement",
       default_quote: {
         amount: "15.00",
@@ -299,10 +302,13 @@ export default function createAgentPaymentsRouter(db) {
         shipping_usd: "0.00",
         total_usd: total.toFixed(2)
       },
-      settlement_equivalents: {
-        usdc: total.toFixed(2),
-        chain_id: 8453
-      },
+      settlement_methods: getActiveSettlementMethods(),
+      ...(getActiveSettlementMethods().includes("base_usdc") ? {
+        settlement_equivalents: {
+          usdc: total.toFixed(2),
+          chain_id: 8453
+        }
+      } : {}),
       digest_sha256: Buffer.from(`${quoteId}:${total}`).toString("hex"),
       cart_digest: computeCartDigest(quoteRecord),
       validUntilMinutes: 30,

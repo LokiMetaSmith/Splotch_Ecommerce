@@ -1,6 +1,41 @@
 import crypto from "crypto";
 
 /**
+ * Returns true if Base USDC settlement is enabled.
+ * In production, requires an explicitly configured, non-placeholder BASE_MERCHANT_WALLET.
+ */
+export function isBaseUsdcEnabled() {
+  const wallet = process.env.BASE_MERCHANT_WALLET;
+  const PLACEHOLDER = "0x3233E3f7bFEb1eA9B0a5d4d3F8dC90209420072F".toLowerCase();
+  if (process.env.NODE_ENV === "production") {
+    return Boolean(wallet && wallet.toLowerCase() !== PLACEHOLDER && !wallet.startsWith("${"));
+  }
+  return true;
+}
+
+/**
+ * Returns true if Lightning settlement is enabled.
+ * In production, requires X402_API_KEY or SQUARE_ACCESS_TOKEN configured.
+ */
+export function isLightningEnabled() {
+  if (process.env.NODE_ENV === "production") {
+    const key = process.env.X402_API_KEY || process.env.SQUARE_ACCESS_TOKEN;
+    return Boolean(key && !key.startsWith("${"));
+  }
+  return true;
+}
+
+/**
+ * Returns list of currently active settlement rails based on configuration.
+ */
+export function getActiveSettlementMethods() {
+  const methods = [];
+  if (isLightningEnabled()) methods.push("lightning");
+  if (isBaseUsdcEnabled()) methods.push("base_usdc");
+  return methods;
+}
+
+/**
  * Validates payment and settlement proofs for autonomous agent purchases.
  * Supports:
  *  1. Base USDC on-chain settlement (via JSON-RPC eth_getTransactionReceipt)
