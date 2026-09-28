@@ -1148,6 +1148,8 @@ async function startServer(
             "/api/order/estimate",
             "/api/validate-promo",
             "/api/v1/payments/ap2",
+            "/api/v1/quotes",
+            "/api/v1/orders",
             "/api/mcp/messages",
           ],
         },
@@ -1346,17 +1348,182 @@ async function startServer(
     // --- Agent Payments ---
     app.use("/api", createAgentPaymentsRouter(db));
 
-    app.get("/.well-known/ap2", (req, res) => {
-      const pubkey = process.env.AP2_GOVERNANCE_PUBKEY;
-      if (!pubkey) {
-        return res.status(404).send("Not Found");
-      }
+    // --- Agent Discovery & Specifications ---
+    app.get(["/.well-known/mcp.json", "/.well-known/mcp"], (req, res) => {
+      res.setHeader("Content-Type", "application/json");
+      res.json({
+        schema_version: "1.0",
+        name: "Splotch Sticker Studio",
+        description: "Autonomous agent printing & purchasing protocol server (MCP & AP2 / x402)",
+        endpoints: [
+          {
+            transport: "sse",
+            url: "/api/mcp",
+            messages_url: "/api/mcp/messages"
+          }
+        ],
+        capabilities: {
+          tools: true
+        },
+        tools: [
+          {
+            name: "calculate_sticker_quote",
+            description: "Calculate sticker pricing based on width, height, quantity, and material"
+          },
+          {
+            name: "get_quote",
+            description: "Alias for calculate_sticker_quote"
+          },
+          {
+            name: "create_agent_checkout",
+            description: "Preflight artwork asset and generate AP2 / x402 payment challenge"
+          },
+          {
+            name: "place_order",
+            description: "Alias for create_agent_checkout"
+          },
+          {
+            name: "get_order_status",
+            description: "Check status and tracking of an existing order"
+          }
+        ],
+        payment_protocols: ["ap2", "x402"],
+        docs_url: "/llms.txt",
+        openapi_url: "/openapi.json"
+      });
+    });
+
+    app.get(["/.well-known/ap2", "/.well-known/ap2.json"], (req, res) => {
+      const pubkey = process.env.AP2_GOVERNANCE_PUBKEY || process.env.JWT_PUBLIC_KEY || "configured-on-request";
       res.setHeader("Content-Type", "application/json");
       res.json({
         capabilities: ["x402"],
         accepted_methods: ["x402"],
         mandate_formats: ["sd-jwt", "jwt"],
         pubkey: pubkey
+      });
+    });
+
+    app.get(["/openapi.json", "/api/v1/openapi.json"], (req, res) => {
+      res.setHeader("Content-Type", "application/json");
+      res.json({
+        openapi: "3.0.3",
+        info: {
+          title: "Splotch Sticker E-Commerce & Agent Purchasing API",
+          version: "1.0.0",
+          description: "API for custom sticker quoting, autonomous agent checkout via AP2 / x402, and Model Context Protocol (MCP) server."
+        },
+        servers: [
+          { url: "https://splotch.page", description: "Production Server" }
+        ],
+        paths: {
+          "/api/v1/quotes": {
+            post: {
+              summary: "Request instant sticker quote",
+              description: "Calculate sticker price and generate quoteId for ordering",
+              requestBody: {
+                required: true,
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      required: ["widthInches", "heightInches", "quantity"],
+                      properties: {
+                        widthInches: { type: "number", example: 3.0 },
+                        heightInches: { type: "number", example: 3.0 },
+                        quantity: { type: "integer", example: 50 },
+                        material: { type: "string", enum: ["vinyl_matte", "vinyl_gloss", "holographic"], default: "vinyl_matte" },
+                        cutType: { type: "string", enum: ["die_cut", "kiss_cut"], default: "die_cut" }
+                      }
+                    }
+                  }
+                }
+              },
+              responses: {
+                "201": { description: "Quote created successfully" }
+              }
+            }
+          },
+          "/api/v1/orders": {
+            post: {
+              summary: "Headless Order & Payment Execution",
+              description: "Execute headless purchase using AP2 Cart Mandate and x402 payment proof. Returns 402 if unauthenticated/unpaid.",
+              parameters: [
+                { in: "header", name: "authorization-x402", required: false, schema: { type: "string" }, description: "Base64 JSON x402 payment proof" },
+                { in: "header", name: "x-ap2-mandate", required: false, schema: { type: "string" }, description: "Signed AP2 Cart Mandate JWT" }
+              ],
+              requestBody: {
+                required: true,
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      required: ["quoteId", "amount", "shippingAddress"],
+                      properties: {
+                        quoteId: { type: "string" },
+                        amount: { type: "string", example: "15.00" },
+                        designUrl: { type: "string", format: "uri" },
+                        shippingAddress: {
+                          type: "object",
+                          required: ["name", "street", "city", "state", "zip"],
+                          properties: {
+                            name: { type: "string" },
+                            street: { type: "string" },
+                            city: { type: "string" },
+                            state: { type: "string" },
+                            zip: { type: "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              responses: {
+                "201": { description: "Order confirmed" },
+                "402": { description: "Payment Required - challenge returned" }
+              }
+            }
+          },
+          "/api/v1/payments/ap2": {
+            get: {
+              summary: "AP2 Protocol Discovery",
+              description: "Inspect AP2 / x402 payment capabilities and accepted methods",
+              responses: {
+                "200": { description: "Protocol metadata" }
+              }
+            },
+            post: {
+              summary: "Submit AP2 Mandate and x402 Payment",
+              description: "Cryptographically validates AP2 Cart Mandate and x402 payment proof, records order",
+              responses: {
+                "201": { description: "Order confirmed" },
+                "402": { description: "Payment Required" }
+              }
+            }
+          },
+          "/api/mcp": {
+            get: {
+              summary: "Model Context Protocol (MCP) SSE Connection",
+              description: "Server-Sent Events endpoint for MCP agent interactions",
+              responses: {
+                "200": { description: "SSE stream initialized" }
+              }
+            }
+          },
+          "/.well-known/mcp.json": {
+            get: {
+              summary: "MCP Discovery Manifest",
+              responses: { "200": { description: "MCP server descriptor" } }
+            }
+          },
+          "/.well-known/ap2": {
+            get: {
+              summary: "AP2 Discovery Manifest",
+              responses: { "200": { description: "AP2 governance and public key descriptor" } }
+            }
+          }
+        }
       });
     });
 

@@ -23,7 +23,12 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
 
     mockDb = {
       createOrder: jest.fn().mockResolvedValue({}),
+      getOrder: jest.fn(async (id) => ({ orderId: id, status: "NEW", amount: 15.00, receivedAt: new Date().toISOString() })),
       getQuote: jest.fn(async (id) => inMemoryQuotes.get(id)),
+      createQuote: jest.fn(async (quote) => {
+        inMemoryQuotes.set(quote.quoteId, quote);
+        return quote;
+      }),
       updateQuote: jest.fn(async (quote) => {
         inMemoryQuotes.set(quote.quoteId, quote);
         return quote;
@@ -234,5 +239,92 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     expect(res.statusCode).toBe(201);
     expect(res.body.orderId).toBeDefined();
     expect(res.body.status).toBe("CONFIRMED");
+    expect(res.body.trackingUrl).toContain("splotch.page");
+  });
+
+  it("should return 200 protocol information on GET /api/v1/payments/ap2", async () => {
+    const res = await request(app).get("/api/v1/payments/ap2");
+    expect(res.statusCode).toBe(200);
+    expect(res.body.status).toBe("active");
+    expect(res.body.protocol).toBe("x402");
+    expect(res.body.ap2_support).toBe(true);
+    expect(res.body.methods_supported).toContain("POST");
+    expect(res.body.required_headers).toContain("authorization-x402");
+    expect(res.body.required_headers).toContain("x-ap2-mandate");
+  });
+
+  it("should create a quote on POST /api/v1/quotes and allow retrieval via GET", async () => {
+    const quoteRes = await request(app)
+      .post("/api/v1/quotes")
+      .send({
+        widthInches: 3.0,
+        heightInches: 3.0,
+        quantity: 50,
+        material: "vinyl_matte",
+        cutType: "die_cut"
+      });
+
+    expect(quoteRes.statusCode).toBe(201);
+    expect(quoteRes.body.quoteId).toBeDefined();
+    expect(quoteRes.body.total).toBeGreaterThan(0);
+    expect(quoteRes.body.ap2_payment_endpoint).toBe("/api/v1/payments/ap2");
+
+    const getRes = await request(app).get(`/api/v1/quotes/${quoteRes.body.quoteId}`);
+    expect(getRes.statusCode).toBe(200);
+    expect(getRes.body.quoteId).toBe(quoteRes.body.quoteId);
+    expect(getRes.body.status).toBe("PENDING");
+  });
+
+  it("should return 402 challenge on POST /api/v1/orders when payment headers are missing", async () => {
+    const res = await request(app)
+      .post("/api/v1/orders")
+      .send({
+        quoteId: "quote_test_123",
+        amount: "15.00"
+      });
+
+    expect(res.statusCode).toBe(402);
+    expect(res.body.error).toBe("Payment Required");
+    expect(res.body.protocol).toBe("x402");
+    expect(res.body.quote).toBeDefined();
+  });
+
+  it("should confirm order on POST /api/v1/orders when valid payment proof and mandate are supplied", async () => {
+    const validQuoteId = "quote_order_direct";
+    inMemoryQuotes.set(validQuoteId, {
+      quoteId: validQuoteId,
+      total: 20.00,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60000).toISOString()
+    });
+
+    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay_order_direct", amount: "20.00" })).toString("base64");
+    const mandate = await generateMandate({
+      intentId: "intent_order_direct",
+      quoteId: validQuoteId,
+      maxSpendCents: 2500
+    });
+
+    const res = await request(app)
+      .post("/api/v1/orders")
+      .set("authorization-x402", paymentProof)
+      .set("x-ap2-mandate", mandate)
+      .send({
+        amount: "20.00",
+        quoteId: validQuoteId
+      });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body.status).toBe("CONFIRMED");
+    expect(res.body.orderId).toBeDefined();
+    expect(res.body.trackingUrl).toContain("splotch.page");
+  });
+
+  it("should return order details on GET /api/v1/orders/:orderId", async () => {
+    const res = await request(app).get("/api/v1/orders/ord_sample_123");
+    expect(res.statusCode).toBe(200);
+    expect(res.body.orderId).toBe("ord_sample_123");
+    expect(res.body.status).toBe("NEW");
+    expect(res.body.trackingUrl).toContain("ord_sample_123");
   });
 });

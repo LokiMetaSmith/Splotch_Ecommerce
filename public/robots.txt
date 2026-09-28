@@ -2,5 +2,19 @@ User-agent: *
 Disallow: /xmlrpc.php
 Disallow: /wp-admin/
 Disallow: /wp-json/
-Disallow: /api/
 Disallow: /uploads/
+Allow: /api/mcp
+Allow: /api/v1/payments/ap2
+Allow: /api/v1/quotes
+Allow: /api/v1/orders
+Allow: /.well-known/
+Allow: /llms.txt
+Allow: /openapi.json
+
+# AI Agent Integration
+# Machine-readable tools and agent protocols:
+# Documentation: https://splotch.page/llms.txt
+# Model Context Protocol: https://splotch.page/.well-known/mcp.json
+# OpenAPI Specification: https://splotch.page/openapi.json
+# AP2 Governance: https://splotch.page/.well-known/ap2
+

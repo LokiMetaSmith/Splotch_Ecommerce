@@ -37,8 +37,23 @@ export function createMcpServer(db) {
           }
         },
         {
+          name: "get_quote",
+          description: "Alias for calculate_sticker_quote. Computes price for custom stickers.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              widthInches: { type: "number" },
+              heightInches: { type: "number" },
+              quantity: { type: "integer" },
+              material: { type: "string", enum: ["vinyl_matte", "vinyl_gloss", "holographic"] },
+              cutType: { type: "string", enum: ["die_cut", "kiss_cut"] }
+            },
+            required: ["widthInches", "heightInches", "quantity", "material"]
+          }
+        },
+        {
           name: "create_agent_checkout",
-          description: "Generate an AP2/x402 payment intent for a sticker order.",
+          description: "Generate an AP2/x402 payment intent and challenge for an autonomous sticker order.",
           inputSchema: {
             type: "object",
             properties: {
@@ -59,6 +74,41 @@ export function createMcpServer(db) {
             },
             required: ["quoteId", "amount", "designUrl", "shippingAddress"]
           }
+        },
+        {
+          name: "place_order",
+          description: "Alias for create_agent_checkout. Preflights artwork and initiates AP2 checkout intent.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              quoteId: { type: "string" },
+              amount: { type: "string" },
+              designUrl: { type: "string" },
+              shippingAddress: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  street: { type: "string" },
+                  city: { type: "string" },
+                  state: { type: "string" },
+                  zip: { type: "string" }
+                },
+                required: ["name", "street", "city", "state", "zip"]
+              }
+            },
+            required: ["quoteId", "amount", "designUrl", "shippingAddress"]
+          }
+        },
+        {
+          name: "get_order_status",
+          description: "Check fulfillment status and tracking information for an existing sticker order.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              orderId: { type: "string" }
+            },
+            required: ["orderId"]
+          }
         }
       ]
     };
@@ -67,7 +117,7 @@ export function createMcpServer(db) {
   mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
-    if (name === "calculate_sticker_quote") {
+    if (name === "calculate_sticker_quote" || name === "get_quote") {
       // Call Splotch internal pricing logic
       const unitPrice = (args.widthInches * args.heightInches * 0.15) + (args.material === "holographic" ? 0.35 : 0.20);
       const total = parseFloat((unitPrice * args.quantity).toFixed(2));
@@ -100,7 +150,7 @@ export function createMcpServer(db) {
       };
     }
 
-    if (name === "create_agent_checkout") {
+    if (name === "create_agent_checkout" || name === "place_order") {
       // Pre-Payment Asset Preflight Validation
       if (!args.designUrl || !args.designUrl.startsWith("http")) {
         throw new Error("Preflight Failed: Invalid or inaccessible designUrl. Must be a valid HTTP(S) URL.");
@@ -181,12 +231,41 @@ export function createMcpServer(db) {
               shippingAddress: args.shippingAddress,
               paymentStatus: "REQUIRES_PAYMENT",
               ap2Challenge: {
-                paymentEndpoint: "https://api.splotch.shop/api/v1/payments/ap2",
+                paymentEndpoint: "https://splotch.page/api/v1/payments/ap2",
+                ordersEndpoint: "https://splotch.page/api/v1/orders",
                 requiredAmount: args.amount,
                 currency: "USD",
                 instructions: "Sign an AP2 Cart Mandate with maxSpendCents >= requiredAmount, and submit it along with an x402 payment proof.",
                 supportedMethods: ["x402"]
               }
+            })
+          }
+        ]
+      };
+    }
+
+    if (name === "get_order_status") {
+      const order = await db.getOrder(args.orderId);
+      if (!order) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ error: "Order not found", orderId: args.orderId })
+            }
+          ]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              orderId: order.orderId,
+              status: order.status,
+              receivedAt: order.receivedAt,
+              amount: order.amount,
+              trackingUrl: `https://splotch.page/orders.html?id=${order.orderId}`
             })
           }
         ]

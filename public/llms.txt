@@ -1,43 +1,134 @@
-﻿# Splotch Custom Sticker E-Commerce & Print Shop
+# Splotch Custom Sticker E-Commerce & Autonomous Agent Purchasing
 
-> Fast, high-quality custom vinyl stickers manufactured on-demand. Splotch supports both human customers and autonomous AI agents.
+> Fast, high-quality custom vinyl stickers manufactured on-demand. Splotch provides first-class support for autonomous AI agents, machine wallets, and programmatically driven ordering via Model Context Protocol (MCP) and HTTP x402 / AP2 settlement rails.
 
-## Autonomous Agent Ordering (MCP & AP2 / x402)
+- **Production Domain**: `https://splotch.page`
+- **MCP Server Endpoint**: `https://splotch.page/api/mcp`
+- **MCP Discovery**: `https://splotch.page/.well-known/mcp.json`
+- **AP2 Governance Key**: `https://splotch.page/.well-known/ap2`
+- **OpenAPI 3.0 Specification**: `https://splotch.page/openapi.json`
+- **Agent Payment Rails**: `x402` (Lightning sats, Base USDC), `AP2` (Google Agent Payment Protocol with signed Cart Mandates)
 
-Splotch supports automated machine-to-machine (M2M) purchasing using the Model Context Protocol (MCP) and Google AP2 / x402 payment protocols.
+---
 
-### 1. Model Context Protocol (MCP) Endpoint
-- **Transport**: Server-Sent Events (SSE)
-- **SSE Connection URL**: `/api/mcp`
-- **Messages URL**: `/api/mcp/messages?sessionId=<sessionId>`
+## 1. Quick Agent Purchase Options
 
-#### Available MCP Tools
-- `calculate_sticker_quote`: Calculates live sticker price given dimensions, material, quantity, and cut type.
-  - Parameters:
-    - `widthInches` (number, required): Sticker width in inches (e.g., 3.0)
-    - `heightInches` (number, required): Sticker height in inches (e.g., 3.0)
-    - `quantity` (integer, required): Number of stickers (e.g., 50)
-    - `material` (string, required): One of `"vinyl_matte"`, `"vinyl_gloss"`, `"holographic"`
-    - `cutType` (string, optional): One of `"die_cut"`, `"kiss_cut"`
-  - Response: `{ quoteId, unitPrice, total, currency: "USD", validUntilMinutes: 30 }`
+Autonomous agents can complete a purchase using **Option A (REST API / x402 / AP2)** or **Option B (Model Context Protocol / MCP)**.
 
-- `create_agent_checkout`: Preflights artwork asset and generates an AP2 / x402 payment intent.
-  - Parameters:
-    - `quoteId` (string, required): Valid, unexpired quoteId from `calculate_sticker_quote`
-    - `amount` (string, required): Quoted total matching the quoteId (e.g., "15.00")
-    - `designUrl` (string, required): Publicly reachable HTTP/HTTPS URL to SVG or PNG artwork (< 5MB)
-    - `shippingAddress` (object, required): `{ name, street, city, state, zip }`
-  - Response: `{ orderIntentId, quoteId, paymentStatus: "REQUIRES_PAYMENT", x402Challenge: { paymentEndpoint: "/api/v1/payments/ap2", amount, currency: "USD" } }`
+---
 
-### 2. Payment & Settlement (x402 / AP2)
-- **Payment Endpoint**: `POST /api/v1/payments/ap2`
-- **Governance Public Key**: `GET /.well-known/ap2`
-- **Required Headers**:
-  - `authorization-x402`: Base64 JSON payment proof (`{"status": "PAID", "amount": 15.00, "paymentId": "..."}`)
-  - `x-ap2-mandate`: Base64 JSON AP2 Cart Mandate signed by user (`{"intentId": "...", "quoteId": "...", "mandateId": "..."}`)
-- **Payload**: `{ quoteId, amount, shippingAddress, items: [...] }`
-- **Response**: `201 Created` with confirmed `orderId`.
+## Option A: Headless REST Ordering (HTTP 402 & AP2)
+
+### Step 1: Request Sticker Quote
+Send an HTTP POST request to calculate pricing:
+```http
+POST https://splotch.page/api/v1/quotes
+Content-Type: application/json
+
+{
+  "widthInches": 3.0,
+  "heightInches": 3.0,
+  "quantity": 50,
+  "material": "vinyl_matte",
+  "cutType": "die_cut"
+}
+```
+**Response (201 Created):**
+```json
+{
+  "quoteId": "quote_1790626000000",
+  "unitPrice": 1.55,
+  "total": 77.50,
+  "currency": "USD",
+  "validUntilMinutes": 30,
+  "expiresAt": "2026-09-28T21:00:00.000Z",
+  "ap2_payment_endpoint": "/api/v1/payments/ap2",
+  "orders_endpoint": "/api/v1/orders"
+}
+```
+
+### Step 2: Submit Headless Order (Payment Challenge Negotiation)
+Send your order payload to initiate checkout:
+```http
+POST https://splotch.page/api/v1/orders
+Content-Type: application/json
+
+{
+  "quoteId": "quote_1790626000000",
+  "amount": "77.50",
+  "designUrl": "https://example.com/artwork.png",
+  "shippingAddress": {
+    "name": "Alex Agent",
+    "street": "123 Autonomous Blvd",
+    "city": "Oklahoma City",
+    "state": "OK",
+    "zip": "73102"
+  }
+}
+```
+
+If payment proof and mandate headers are not supplied, the server returns an **HTTP 402 Payment Required** challenge:
+```json
+{
+  "error": "Payment Required",
+  "protocol": "x402",
+  "ap2_support": true,
+  "quote": {
+    "amount": "77.50",
+    "currency": "USD",
+    "recipient": "splotch-creative-settlement",
+    "settlement_methods": ["lightning", "base_usdc"]
+  },
+  "instructions": "Include authorization header 'authorization-x402' for payment proof and 'x-ap2-mandate' for the signed AP2 Cart Mandate."
+}
+```
+
+### Step 3: Complete Settlement
+Re-submit the request with the required settlement headers:
+- `authorization-x402`: Base64 JSON containing `{ "status": "PAID", "amount": 77.50, "paymentId": "<unique_tx_id>" }`
+- `x-ap2-mandate`: Base64-encoded or raw signed JWT signed by user's delegated private key verifying `quoteId`, `intentId`, and `audience: "splotch-creative-settlement"`. Public key is discoverable at `GET https://splotch.page/.well-known/ap2`.
+
+**Response (201 Created):**
+```json
+{
+  "status": "CONFIRMED",
+  "orderId": "ord_1790626500000",
+  "trackingUrl": "https://splotch.page/orders.html?id=ord_1790626500000"
+}
+```
+
+### Step 4: Track Order Fulfillment
+Query the order tracking endpoint:
+```http
+GET https://splotch.page/api/v1/orders/ord_1790626500000
+```
+Returns order status (`NEW`, `PRINTING`, `SHIPPED`), creation timestamp, and live tracking link.
+
+---
+
+## Option B: Model Context Protocol (MCP)
+
+Splotch exposes an MCP server over Server-Sent Events (SSE).
+
+- **Connection URL**: `GET https://splotch.page/api/mcp`
+- **Messages URL**: `POST https://splotch.page/api/mcp/messages?sessionId=<sessionId>`
+
+### Available MCP Tools:
+1. `calculate_sticker_quote` (alias `get_quote`):
+   - Parameters: `widthInches` (float), `heightInches` (float), `quantity` (int), `material` ("vinyl_matte"|"vinyl_gloss"|"holographic"), `cutType` ("die_cut"|"kiss_cut")
+   - Returns: `{ quoteId, unitPrice, total, currency: "USD", validUntilMinutes: 30 }`
+
+2. `create_agent_checkout` (alias `place_order`):
+   - Parameters: `quoteId` (string), `amount` (string), `designUrl` (string, SVG or PNG < 5MB), `shippingAddress` ({ name, street, city, state, zip })
+   - Returns: `{ orderIntentId, quoteId, paymentStatus: "REQUIRES_PAYMENT", ap2Challenge: { paymentEndpoint: "https://splotch.page/api/v1/payments/ap2", requiredAmount, currency: "USD" } }`
+
+3. `get_order_status`:
+   - Parameters: `orderId` (string)
+   - Returns: `{ orderId, status, receivedAt, amount, trackingUrl }`
+
+---
 
 ## Human Ordering Interface
-- Website: `https://splotch.shop` (or local host)
-- Sticker designer canvas with smart cutline generation, preview, and instant checkout.
+- Website: `https://splotch.page`
+- Interactive sticker designer canvas with real-time smart cutline generation, instant proofing, and card checkout.
+

@@ -83,8 +83,34 @@ describe("MCP Server Endpoints and Tools", () => {
 
     expect(parsedContent.paymentStatus).toBe("REQUIRES_PAYMENT");
     expect(parsedContent.ap2Challenge).toBeDefined();
-    expect(parsedContent.ap2Challenge.paymentEndpoint).toBe("https://api.splotch.shop/api/v1/payments/ap2");
+    expect(parsedContent.ap2Challenge.paymentEndpoint).toBe("https://splotch.page/api/v1/payments/ap2");
     expect(parsedContent.ap2Challenge.requiredAmount).toBe("15.00");
     expect(parsedContent.ap2Challenge.supportedMethods).toContain("x402");
+  });
+
+  it("should handle get_order_status tool correctly", async () => {
+    mockDb.getOrder = jest.fn().mockResolvedValue({
+      orderId: "ord_mcp_123",
+      status: "PRINTING",
+      receivedAt: "2026-09-28T20:00:00.000Z",
+      amount: 15.00
+    });
+
+    const mcpServer = createMcpServer(mockDb);
+    const handler = mcpServer._requestHandlers.get('tools/call');
+    const result = await handler({
+      method: "tools/call",
+      params: {
+        name: "get_order_status",
+        arguments: {
+          orderId: "ord_mcp_123"
+        }
+      }
+    }, {});
+
+    const parsedContent = JSON.parse(result.content[0].text);
+    expect(parsedContent.orderId).toBe("ord_mcp_123");
+    expect(parsedContent.status).toBe("PRINTING");
+    expect(parsedContent.trackingUrl).toContain("ord_mcp_123");
   });
 });
