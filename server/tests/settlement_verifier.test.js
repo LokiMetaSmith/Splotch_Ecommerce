@@ -73,6 +73,7 @@ describe("Settlement Verifier (Base USDC, Lightning, Simulation Controls)", () =
 
   describe("Base Network Settlement (EVM / USDC)", () => {
     const validTxHash = "0x" + "a".repeat(64);
+    const testMerchantWallet = "0x8888888888888888888888888888888888888888";
 
     it("verifies confirmed Base transaction receipt via JSON-RPC", async () => {
       const mockFetch = jest.fn().mockResolvedValue({
@@ -84,7 +85,7 @@ describe("Settlement Verifier (Base USDC, Lightning, Simulation Controls)", () =
                 topics: [
                   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
                   "0x0000000000000000000000001111111111111111111111111111111111111111",
-                  "0x0000000000000000000000003233e3f7bfeb1ea9b0a5d4d3f8dc90209420072f"
+                  "0x0000000000000000000000008888888888888888888888888888888888888888"
                 ]
               }
             ]
@@ -101,7 +102,7 @@ describe("Settlement Verifier (Base USDC, Lightning, Simulation Controls)", () =
       const result = await verifySettlementProof(proof, sampleQuote, {
         allowSimulation: false,
         rpcUrl: "https://mock.base.rpc",
-        merchantWallet: "0x3233E3f7bFEb1eA9B0a5d4d3F8dC90209420072F",
+        merchantWallet: testMerchantWallet,
         fetchFn: mockFetch
       });
 
@@ -129,6 +130,7 @@ describe("Settlement Verifier (Base USDC, Lightning, Simulation Controls)", () =
         verifySettlementProof(proof, sampleQuote, {
           allowSimulation: false,
           rpcUrl: "https://mock.base.rpc",
+          merchantWallet: testMerchantWallet,
           fetchFn: mockFetch
         })
       ).rejects.toThrow("Base transaction failed on-chain");
@@ -144,6 +146,27 @@ describe("Settlement Verifier (Base USDC, Lightning, Simulation Controls)", () =
       await expect(
         verifySettlementProof(proof, sampleQuote, { allowSimulation: false })
       ).rejects.toThrow("Invalid Base transaction hash format");
+    });
+
+    it("rejects Base USDC settlement in production if merchant wallet is missing or default placeholder", async () => {
+      const origEnv = process.env.BASE_MERCHANT_WALLET;
+      delete process.env.BASE_MERCHANT_WALLET;
+
+      try {
+        const proof = {
+          rail: "base_usdc",
+          tx_hash: validTxHash,
+          amount: 25.50
+        };
+
+        await expect(
+          verifySettlementProof(proof, sampleQuote, { allowSimulation: false })
+        ).rejects.toThrow("BASE_MERCHANT_WALLET must be explicitly configured");
+      } finally {
+        if (origEnv !== undefined) {
+          process.env.BASE_MERCHANT_WALLET = origEnv;
+        }
+      }
     });
   });
 

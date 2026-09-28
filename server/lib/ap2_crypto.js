@@ -64,8 +64,16 @@ export async function verifyAP2Mandate(token, options = {}) {
     }
   }
   // 2. Configured Governance Authority Key (takes precedence over unverified header.jwk)
-  else if (process.env.AP2_GOVERNANCE_PUBKEY) {
-    publicKey = await jose.importSPKI(process.env.AP2_GOVERNANCE_PUBKEY, header.alg || 'RS256');
+  else if (process.env.AP2_GOVERNANCE_PUBKEY || process.env.JWT_PUBLIC_KEY) {
+    const govKey = process.env.AP2_GOVERNANCE_PUBKEY || process.env.JWT_PUBLIC_KEY;
+    const isPlaceholder = govKey === 'your-ap2-governance-public-key' || govKey === 'configured-on-request';
+    if (isPlaceholder) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('AP2 Governance public key cannot use a default placeholder in production.');
+      }
+    } else {
+      publicKey = await jose.importSPKI(govKey, header.alg || 'RS256');
+    }
   }
   // 3. Header JWK handling with trust verification
   else if (header.jwk) {

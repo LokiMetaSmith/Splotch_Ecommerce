@@ -83,7 +83,17 @@ export async function verifySettlementProof(proofInput, quoteDetails, options = 
     }
 
     const rpcUrl = options.rpcUrl || process.env.BASE_RPC_URL;
-    const merchantWallet = (options.merchantWallet || process.env.BASE_MERCHANT_WALLET || "0x3233E3f7bFEb1eA9B0a5d4d3F8dC90209420072F").toLowerCase();
+    const PLACEHOLDER_WALLET = "0x3233E3f7bFEb1eA9B0a5d4d3F8dC90209420072F".toLowerCase();
+    let merchantWallet = options.merchantWallet || process.env.BASE_MERCHANT_WALLET;
+
+    if (!merchantWallet || merchantWallet.toLowerCase() === PLACEHOLDER_WALLET) {
+      if (!allowSim) {
+        throw new Error("Base USDC settlement is disabled in production: BASE_MERCHANT_WALLET must be explicitly configured in environment variables and cannot use default placeholder.");
+      }
+      merchantWallet = PLACEHOLDER_WALLET;
+    } else {
+      merchantWallet = merchantWallet.toLowerCase();
+    }
     const fetchFn = options.fetchFn || globalThis.fetch;
 
     if (rpcUrl && typeof fetchFn === "function") {
