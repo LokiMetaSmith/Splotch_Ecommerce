@@ -19,7 +19,10 @@ export function isBaseUsdcEnabled() {
  */
 export function isLightningEnabled() {
   if (process.env.NODE_ENV === "production") {
-    const key = process.env.X402_API_KEY || process.env.SQUARE_ACCESS_TOKEN;
+    let key = process.env.X402_API_KEY;
+    if (!key || key.startsWith("${")) {
+      key = process.env.SQUARE_ACCESS_TOKEN;
+    }
     return Boolean(key && !key.startsWith("${"));
   }
   return true;
