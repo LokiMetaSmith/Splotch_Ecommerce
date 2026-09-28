@@ -20,6 +20,7 @@ import {
   getDominantPerimeterColor,
   filterInternalContours,
   processCustomLayerMask,
+  isPointInPolygon,
 } from "./lib/image-processing.js";
 import { showNotification } from "./notifications.js";
 import {
@@ -136,6 +137,10 @@ const DEFAULT_CANVAS_HEIGHT = 400;
 let baseCanvasWidth = DEFAULT_CANVAS_WIDTH; // Fixed bounding box frame width
 let baseCanvasHeight = DEFAULT_CANVAS_HEIGHT; // Fixed bounding box frame height
 let currentBounds = null;
+let currentDrawOffset = { x: 0, y: 0 };
+let currentLogicalWidth = DEFAULT_CANVAS_WIDTH;
+let currentLogicalHeight = DEFAULT_CANVAS_HEIGHT;
+let currentPadding = 0;
 let organicSheetCutline = null; // Automatically generated boolean union of all layer cutlines
 let sheetBoundaryConfig = {
   shape: "contour", // 'contour', 'square', 'circle'
@@ -4035,72 +4040,74 @@ function doRedrawAll() {
   if (typeof isDraggingLayer === "undefined" || !isDraggingLayer) {
     generateOrganicSheetBoundary();
   }
-  // 2. Compute Global Bounding Box across all layers
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
-  let hasContent = false;
+  // 2. Compute Global Bounding Box across all layers (locked during dragging to prevent artboard jumps)
+  if (typeof isDraggingLayer === "undefined" || !isDraggingLayer || !currentBounds) {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    let hasContent = false;
 
-  stickers.forEach((layer) => {
-    if (
-      layer.currentCutline &&
-      layer.currentCutline.length > 0 &&
-      layer.visible !== false
-    ) {
-      const bounds = getPolygonsBounds(layer.currentCutline);
-      const absLeft = bounds.left + (layer.x || 0);
-      const absRight = bounds.right + (layer.x || 0);
-      const absTop = bounds.top + (layer.y || 0);
-      const absBottom = bounds.bottom + (layer.y || 0);
+    stickers.forEach((layer) => {
+      if (
+        layer.currentCutline &&
+        layer.currentCutline.length > 0 &&
+        layer.visible !== false
+      ) {
+        const bounds = getPolygonsBounds(layer.currentCutline);
+        const absLeft = bounds.left + (layer.x || 0);
+        const absRight = bounds.right + (layer.x || 0);
+        const absTop = bounds.top + (layer.y || 0);
+        const absBottom = bounds.bottom + (layer.y || 0);
 
-      if (absLeft < minX) minX = absLeft;
-      if (absRight > maxX) maxX = absRight;
-      if (absTop < minY) minY = absTop;
-      if (absBottom > maxY) maxY = absBottom;
-      hasContent = true;
-    } else if (
-      (layer.originalImage || layer.image) &&
-      layer.visible !== false
-    ) {
-      // Fallback to image bounds if no cutline
-      const img = layer.image || layer.originalImage;
-      const absLeft = layer.x || 0;
-      const absRight = absLeft + (layer.width || img.width);
-      const absTop = layer.y || 0;
-      const absBottom = absTop + (layer.height || img.height);
+        if (absLeft < minX) minX = absLeft;
+        if (absRight > maxX) maxX = absRight;
+        if (absTop < minY) minY = absTop;
+        if (absBottom > maxY) maxY = absBottom;
+        hasContent = true;
+      } else if (
+        (layer.originalImage || layer.image) &&
+        layer.visible !== false
+      ) {
+        // Fallback to image bounds if no cutline
+        const img = layer.image || layer.originalImage;
+        const absLeft = layer.x || 0;
+        const absRight = absLeft + (layer.width || img.width);
+        const absTop = layer.y || 0;
+        const absBottom = absTop + (layer.height || img.height);
 
-      if (absLeft < minX) minX = absLeft;
-      if (absRight > maxX) maxX = absRight;
-      if (absTop < minY) minY = absTop;
-      if (absBottom > maxY) maxY = absBottom;
-      hasContent = true;
+        if (absLeft < minX) minX = absLeft;
+        if (absRight > maxX) maxX = absRight;
+        if (absTop < minY) minY = absTop;
+        if (absBottom > maxY) maxY = absBottom;
+        hasContent = true;
+      }
+    });
+
+    if (!hasContent) {
+      minX = 0;
+      minY = 0;
+      maxX = DEFAULT_CANVAS_WIDTH;
+      maxY = DEFAULT_CANVAS_HEIGHT;
+      baseCanvasWidth = DEFAULT_CANVAS_WIDTH;
+      baseCanvasHeight = DEFAULT_CANVAS_HEIGHT;
+    } else {
+      baseCanvasWidth = maxX - minX;
+      baseCanvasHeight = maxY - minY;
     }
-  });
 
-  if (!hasContent) {
-    minX = 0;
-    minY = 0;
-    maxX = DEFAULT_CANVAS_WIDTH;
-    maxY = DEFAULT_CANVAS_HEIGHT;
-    baseCanvasWidth = DEFAULT_CANVAS_WIDTH;
-    baseCanvasHeight = DEFAULT_CANVAS_HEIGHT;
-  } else {
-    baseCanvasWidth = maxX - minX;
-    baseCanvasHeight = maxY - minY;
-  }
-
-  if (organicSheetCutline && organicSheetCutline.length > 0) {
-    currentBounds = getPolygonsBounds(organicSheetCutline);
-  } else {
-    currentBounds = {
-      left: minX,
-      top: minY,
-      right: maxX,
-      bottom: maxY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
+    if (organicSheetCutline && organicSheetCutline.length > 0) {
+      currentBounds = getPolygonsBounds(organicSheetCutline);
+    } else {
+      currentBounds = {
+        left: minX,
+        top: minY,
+        right: maxX,
+        bottom: maxY,
+        width: maxX - minX,
+        height: maxY - minY,
+      };
+    }
   }
 
   // --- VALIDATION ---
@@ -4133,6 +4140,9 @@ function doRedrawAll() {
 
   const logicalWidth = currentBounds.width + padding * 2;
   const logicalHeight = currentBounds.height + padding * 2;
+  currentLogicalWidth = logicalWidth;
+  currentLogicalHeight = logicalHeight;
+  currentPadding = padding;
 
   const dpr = isExporting ? 1 : window.devicePixelRatio || 1;
   const targetPhysicalWidth = Math.round(logicalWidth * dpr);
@@ -4151,6 +4161,7 @@ function doRedrawAll() {
     x: -currentBounds.left + padding,
     y: -currentBounds.top + padding,
   };
+  currentDrawOffset = drawOffset;
 
   // Fill entire canvas with white for the ruler/padding area only when content and sheet boundary exist
   if (
@@ -7307,15 +7318,44 @@ document.addEventListener("DOMContentLoaded", () => {
 // --- Canvas Layer Dragging Interaction ---
 
 let isDraggingLayer = false;
-let dragStartX = 0;
-let dragStartY = 0;
+let dragStartClientX = 0;
+let dragStartClientY = 0;
 let draggedLayer = null;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
+let dragScaleX = 1;
+let dragScaleY = 1;
 
 function hitTestLayers(mouseX, mouseY) {
-  const dpr = window.devicePixelRatio || 1;
-  // We check from top layer (end of array) to bottom layer (start of array)
+  // Check from top layer (highest index) to bottom layer (index 0)
+  // Pass 1: Precise polygon hit test
+  for (let i = stickers.length - 1; i >= 0; i--) {
+    const layer = stickers[i];
+    if (layer.visible === false) continue;
+
+    const localX = mouseX - (layer.x || 0);
+    const localY = mouseY - (layer.y || 0);
+
+    // If layer has a cutline polygon, check if point is inside
+    if (layer.currentCutline && layer.currentCutline.length > 0) {
+      for (const poly of layer.currentCutline) {
+        if (poly && poly.length >= 3 && isPointInPolygon({ x: localX, y: localY }, poly)) {
+          return { index: i, layer: layer };
+        }
+      }
+    }
+
+    // If layer has vector base polygons
+    if (layer.currentPolygons && layer.currentPolygons.length > 0) {
+      for (const poly of layer.currentPolygons) {
+        if (poly && poly.length >= 3 && isPointInPolygon({ x: localX, y: localY }, poly)) {
+          return { index: i, layer: layer };
+        }
+      }
+    }
+  }
+
+  // Pass 2: Fallback to bounding box (e.g. click in bleed margin or raster layer before cutline trace)
   for (let i = stickers.length - 1; i >= 0; i--) {
     const layer = stickers[i];
     if (layer.visible === false) continue;
@@ -7332,13 +7372,13 @@ function hitTestLayers(mouseX, mouseY) {
       const img = layer.image || layer.originalImage;
       left = layer.x || 0;
       top = layer.y || 0;
-      right = left + (layer.width || img.width);
-      bottom = top + (layer.height || img.height);
+      right = left + (layer.width || img.naturalWidth || img.width);
+      bottom = top + (layer.height || img.naturalHeight || img.height);
     } else {
       continue;
     }
 
-    // Pad the hit area slightly
+    // Pad the hit area slightly (10px) for easier selection near borders
     const pad = 10;
     if (
       mouseX >= left - pad &&
@@ -7395,33 +7435,17 @@ document.addEventListener("DOMContentLoaded", () => {
   if (canvas) {
     const getCanvasCoords = (clientX, clientY) => {
       const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const dpr = window.devicePixelRatio || 1;
+      if (!rect.width || !rect.height) return { x: 0, y: 0 };
 
-      let mouseX = ((clientX - rect.left) * scaleX) / dpr;
-      let mouseY = ((clientY - rect.top) * scaleY) / dpr;
+      const fracX = (clientX - rect.left) / rect.width;
+      const fracY = (clientY - rect.top) / rect.height;
 
-      let ppi = 300;
-      if (pricingConfig && stickerResolutionSelect) {
-        const selectedRes = pricingConfig.resolutions.find(
-          (r) => r.id === (stickerResolutionSelect.value || "dpi_300"),
-        );
-        if (selectedRes) ppi = selectedRes.ppi;
-      }
-      const ppiScale = ppi / 96;
-      const scale = Math.max(currentBounds.width, currentBounds.height) / 500;
-      const padding = Math.max(
-        Math.round(60 * ppiScale),
-        Math.round(40 * scale),
-      );
-
-      const drawOffsetX = -currentBounds.left + padding;
-      const drawOffsetY = -currentBounds.top + padding;
+      const mouseX = fracX * currentLogicalWidth;
+      const mouseY = fracY * currentLogicalHeight;
 
       return {
-        x: mouseX - drawOffsetX,
-        y: mouseY - drawOffsetY,
+        x: mouseX - currentDrawOffset.x,
+        y: mouseY - currentDrawOffset.y,
       };
     };
 
@@ -7437,10 +7461,14 @@ document.addEventListener("DOMContentLoaded", () => {
         renderLayerList();
         renderLayerTabs();
 
-        dragStartX = coords.x;
-        dragStartY = coords.y;
+        dragStartClientX = clientX;
+        dragStartClientY = clientY;
         dragOffsetX = hit.layer.x || 0;
         dragOffsetY = hit.layer.y || 0;
+
+        const rect = canvas.getBoundingClientRect();
+        dragScaleX = rect.width > 0 ? currentLogicalWidth / rect.width : 1;
+        dragScaleY = rect.height > 0 ? currentLogicalHeight / rect.height : 1;
 
         canvas.style.cursor = "grabbing";
         redrawAll();
@@ -7451,31 +7479,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const handleDragMove = (clientX, clientY) => {
       if (!isDraggingLayer || !draggedLayer) return;
-      const coords = getCanvasCoords(clientX, clientY);
 
-      // Slower movement factor for precision dragging
-      const movementFactor = 0.4;
-      const dx = (coords.x - dragStartX) * movementFactor;
-      const dy = (coords.y - dragStartY) * movementFactor;
+      const deltaX = (clientX - dragStartClientX) * dragScaleX;
+      const deltaY = (clientY - dragStartClientY) * dragScaleY;
 
-      let targetX = dragOffsetX + dx;
-      let targetY = dragOffsetY + dy;
-
-      // Very light snapping to an invisible grid (e.g. 10px grid)
-      const gridSize = 10;
-      const snapX = Math.round(targetX / gridSize) * gridSize;
-      const snapY = Math.round(targetY / gridSize) * gridSize;
-
-      // Snap if within 3px of a grid line
-      if (Math.abs(targetX - snapX) < 3) targetX = snapX;
-      if (Math.abs(targetY - snapY) < 3) targetY = snapY;
-
-      // Snap to corner/origin (0,0) if close
-      if (Math.abs(targetX) < 5) targetX = 0;
-      if (Math.abs(targetY) < 5) targetY = 0;
-
-      draggedLayer.x = targetX;
-      draggedLayer.y = targetY;
+      draggedLayer.x = Math.round(dragOffsetX + deltaX);
+      draggedLayer.y = Math.round(dragOffsetY + deltaY);
 
       redrawAll();
     };
@@ -7485,9 +7494,17 @@ document.addEventListener("DOMContentLoaded", () => {
         isDraggingLayer = false;
         draggedLayer = null;
         if (canvas) canvas.style.cursor = "default";
+        generateOrganicSheetBoundary();
         redrawAll();
       }
     };
+
+    // Expose test helpers
+    if (typeof window !== "undefined") {
+      window.__getCanvasCoords = getCanvasCoords;
+      window.__hitTestLayers = hitTestLayers;
+      window.__stickers = stickers;
+    }
 
     // Mouse listeners
     canvas.addEventListener("mousedown", (e) => {

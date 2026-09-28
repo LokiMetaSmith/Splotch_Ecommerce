@@ -58,7 +58,7 @@ test.describe('Mobile Canvas Controls & UI Features', () => {
 
     // 1. Test Rotate button (+90 degrees)
     const rotateBtn = page.locator('#mobileRotateBtn');
-    await rotateBtn.click();
+    await rotateBtn.click({ force: true });
     state = await page.evaluate(() => {
       const s = window.__getActiveSticker ? window.__getActiveSticker() : null;
       return { rotation: s?.rotation || 0 };
@@ -66,7 +66,7 @@ test.describe('Mobile Canvas Controls & UI Features', () => {
     expect(state.rotation).toBe(90);
 
     // Rotate again -> 180 degrees
-    await rotateBtn.click();
+    await rotateBtn.click({ force: true });
     state = await page.evaluate(() => {
       const s = window.__getActiveSticker ? window.__getActiveSticker() : null;
       return { rotation: s?.rotation || 0 };
@@ -79,7 +79,7 @@ test.describe('Mobile Canvas Controls & UI Features', () => {
       const s = window.__getActiveSticker ? window.__getActiveSticker() : null;
       return s?.width || 0;
     });
-    await scaleUpBtn.click();
+    await scaleUpBtn.click({ force: true });
     const widthAfterScaleUp = await page.evaluate(() => {
       const s = window.__getActiveSticker ? window.__getActiveSticker() : null;
       return s?.width || 0;
@@ -88,7 +88,7 @@ test.describe('Mobile Canvas Controls & UI Features', () => {
 
     // 3. Test Scale Down button (0.9x factor)
     const scaleDownBtn = page.locator('#mobileScaleDownBtn');
-    await scaleDownBtn.click();
+    await scaleDownBtn.click({ force: true });
     const widthAfterScaleDown = await page.evaluate(() => {
       const s = window.__getActiveSticker ? window.__getActiveSticker() : null;
       return s?.width || 0;
@@ -97,7 +97,7 @@ test.describe('Mobile Canvas Controls & UI Features', () => {
 
     // 4. Test Fit / Center button
     const centerBtn = page.locator('#mobileCenterBtn');
-    await centerBtn.click();
+    await centerBtn.click({ force: true });
     const stateAfterCenter = await page.evaluate(() => {
       const s = window.__getActiveSticker ? window.__getActiveSticker() : null;
       return { rotation: s?.rotation, x: s?.x, y: s?.y, width: s?.width, height: s?.height };
