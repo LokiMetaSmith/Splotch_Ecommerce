@@ -1147,6 +1147,8 @@ async function startServer(
             "/xmlrpc.php",
             "/api/order/estimate",
             "/api/validate-promo",
+            "/api/v1/payments/ap2",
+            "/api/mcp/messages",
           ],
         },
         xframe: "SAMEORIGIN",
