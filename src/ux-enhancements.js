@@ -407,6 +407,14 @@ export function setupContrastToggle() {
         btn.classList.remove("ring-2", "ring-splotch-teal", "ring-offset-1");
       }
     });
+
+    if (typeof window.redrawAll === "function") {
+      window.redrawAll();
+    } else {
+      document.dispatchEvent(
+        new CustomEvent("canvasBgChanged", { detail: { color, image } }),
+      );
+    }
   };
 
   buttons.forEach(({ btn, color, image }) => {

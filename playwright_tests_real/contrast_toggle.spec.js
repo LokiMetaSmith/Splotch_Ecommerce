@@ -46,8 +46,8 @@ test('when design is loaded and magenta is selected, canvas background is not oc
   // Upload mascot image
   const testImagePath = 'public/mascot.png';
   await page.setInputFiles('#file', testImagePath);
-  await expect(page.locator('.message-content').last()).toBeVisible({ timeout: 15000 });
-  await page.waitForTimeout(3000);
+  await page.waitForFunction(() => window.stickers && window.stickers.length > 0 && !!window.stickers[0].image);
+  await page.waitForTimeout(1500);
 
   // Click Magenta button
   const bgMagentaBtn = page.locator('#bgMagentaBtn');
@@ -69,5 +69,65 @@ test('when design is loaded and magenta is selected, canvas background is not oc
   expect(isOpaqueWhite).toBe(false);
   // It should be transparent (a === 0) so the CSS background (Magenta #ff00ff) shows through
   expect(cornerPixel.a).toBe(0);
+});
+
+test('tick marks and size indicator adapt to dark background with drop shadow and inverse contrast colors', async ({ page }) => {
+  await page.goto('/');
+
+  // Upload mascot image
+  const testImagePath = 'public/mascot.png';
+  await page.setInputFiles('#file', testImagePath);
+  await page.waitForFunction(() => window.stickers && window.stickers.length > 0 && !!window.stickers[0].image);
+  await page.waitForTimeout(1500);
+
+  // 1. Click Dark button (#bgDarkBtn)
+  const bgDarkBtn = page.locator('#bgDarkBtn');
+  await bgDarkBtn.click();
+  await page.waitForTimeout(500);
+
+  // Verify theme in dark mode
+  const darkTheme = await page.evaluate(async () => {
+    const canvas = document.getElementById('imageCanvas');
+    const ctx = canvas.getContext('2d');
+    const { getCanvasTheme } = await import('/src/lib/canvas-utils.js');
+    return getCanvasTheme(ctx);
+  });
+
+  expect(darkTheme.isDark).toBe(true);
+  expect(darkTheme.textColor).toContain('255, 255, 255');
+  expect(darkTheme.strokeColor).toContain('255, 255, 255');
+  expect(darkTheme.shadowColor).toContain('0, 0, 0');
+
+  // 2. Click Light button (#bgLightBtn)
+  const bgLightBtn = page.locator('#bgLightBtn');
+  await bgLightBtn.click();
+  await page.waitForTimeout(500);
+
+  const lightTheme = await page.evaluate(async () => {
+    const canvas = document.getElementById('imageCanvas');
+    const ctx = canvas.getContext('2d');
+    const { getCanvasTheme } = await import('/src/lib/canvas-utils.js');
+    return getCanvasTheme(ctx);
+  });
+
+  expect(lightTheme.isDark).toBe(false);
+  expect(lightTheme.textColor).toContain('0, 0, 0');
+  expect(lightTheme.strokeColor).toContain('0, 0, 0');
+  expect(lightTheme.shadowColor).toContain('255, 255, 255');
+
+  // 3. Click Magenta button (#bgMagentaBtn)
+  const bgMagentaBtn = page.locator('#bgMagentaBtn');
+  await bgMagentaBtn.click();
+  await page.waitForTimeout(500);
+
+  const magentaTheme = await page.evaluate(async () => {
+    const canvas = document.getElementById('imageCanvas');
+    const ctx = canvas.getContext('2d');
+    const { getCanvasTheme } = await import('/src/lib/canvas-utils.js');
+    return getCanvasTheme(ctx);
+  });
+
+  expect(magentaTheme.isDark).toBe(true);
+  expect(magentaTheme.textColor).toContain('255, 255, 255');
 });
 

@@ -10,6 +10,7 @@ import { calcOrderBreakdown } from "./lib/costCalc.js";
 import {
   drawRuler as drawCanvasRuler,
   drawImageWithFilters,
+  getCanvasTheme,
 } from "./lib/canvas-utils.js";
 import {
   traceContours,
@@ -4027,6 +4028,13 @@ function redrawAll() {
     doRedrawAll();
   });
 }
+if (typeof window !== "undefined") {
+  window.redrawAll = redrawAll;
+  window.stickers = stickers;
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("canvasBgChanged", () => redrawAll());
+}
 
 function doRedrawAll() {
   // Ensure active line ID matches DOM state if applicable
@@ -4997,8 +5005,9 @@ function drawBoundingBox(bounds, offset = { x: 0, y: 0 }) {
   // The previous implementation calculated a dash length from PPI, which was often
   // too large to be visible on smaller images. A fixed dash pattern is more reliable.
 
-  // Set color to light grey as a subtle backdrop for the measurement guides.
-  ctx.strokeStyle = "rgba(128, 128, 128, 0.4)"; // Faint grey
+  // Set color to subtle backdrop for the measurement guides adapting to theme.
+  const theme = getCanvasTheme(ctx);
+  ctx.strokeStyle = theme.boxStroke;
 
   // Constant hairline width
   const baseLineWidth = getConstantLineWidth(isBoxActive ? 2.0 : 1.0);
@@ -5049,11 +5058,15 @@ function drawSizeIndicator(bounds, offset = { x: 0, y: 0 }) {
   const rulerHeight = 35 * ppiScale;
   const rulerWidth = 65 * ppiScale;
 
-  // Add a slight drop shadow so it stands out against any background
+  const theme = getCanvasTheme(ctx);
+
+  // Add a drop shadow beneath the indicator text adapting to canvas background
   ctx.save();
-  ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
-  ctx.shadowBlur = 4;
-  ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+  ctx.shadowColor = theme.shadowColor;
+  ctx.shadowBlur = Math.round(4 * ppiScale);
+  ctx.shadowOffsetX = Math.round(1 * ppiScale);
+  ctx.shadowOffsetY = Math.round(1 * ppiScale);
+  ctx.fillStyle = theme.textColor;
   ctx.font = `bold ${fontSize}px Arial`;
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
