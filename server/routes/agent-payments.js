@@ -1,5 +1,6 @@
 import express from "express";
-import { verifyAP2Mandate } from "../lib/ap2_crypto.js";
+import { verifyAP2Mandate, verifyMandateBindings, computeCartDigest } from "../lib/ap2_crypto.js";
+import { verifySettlementProof } from "../lib/settlement_verifier.js";
 
 export default function createAgentPaymentsRouter(db) {
   const router = express.Router();
@@ -51,14 +52,11 @@ export default function createAgentPaymentsRouter(db) {
 
     let verified = { success: false };
     try {
-      // Cryptographically verify the AP2 Mandate using jose
+      // 1. Cryptographically verify the AP2 Mandate using jose and governance authority
       const parsedMandate = await verifyAP2Mandate(ap2Mandate, { audience: "splotch-creative-settlement" });
 
-      // Parse payment proof
-      const parsedProof = JSON.parse(Buffer.from(paymentProof, "base64").toString("utf-8"));
-
-      if (parsedProof.status === "PAID" && (parsedMandate.intentId || parsedMandate.cart_binding || parsedMandate.mandate_id)) {
-        // Validate Quote
+      if (parsedMandate.intentId || parsedMandate.cart_binding || parsedMandate.mandate_id || parsedMandate.quoteId || parsedMandate.quote_id) {
+        // 2. Validate Quote
         const quoteId = parsedMandate.quoteId || parsedMandate.quote_id || (parsedMandate.cart_binding && parsedMandate.cart_binding.quote_id) || body.quoteId || body.quote_id;
         const storedQuote = await db.getQuote(quoteId);
 
@@ -74,12 +72,20 @@ export default function createAgentPaymentsRouter(db) {
           return res.status(400).json({ error: "Quote has expired" });
         }
 
-        const providedAmount = parseFloat(body.amount || (body.settlement && body.settlement.amount) || parsedProof.amount);
+        // 3. Cryptographically verify mandate bindings (quote, cart digest, shipping address hash)
+        const shippingAddress = body.shippingAddress || body.shipping_destination || {};
+        verifyMandateBindings(parsedMandate, storedQuote, shippingAddress);
+
+        // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
+        const settlementMeta = await verifySettlementProof(paymentProof, storedQuote);
+
+        // 5. Verify payment amount matches quote
+        const providedAmount = parseFloat(body.amount || (body.settlement && body.settlement.amount) || settlementMeta.amount);
         if (providedAmount !== storedQuote.total) {
           return res.status(400).json({ error: "Payment amount does not match stored quote" });
         }
 
-        // Validate maxSpendCents / agentRules if present
+        // 6. Validate maxSpendCents / agentRules if present
         let maxSpendCents;
         if (parsedMandate.maxSpendCents !== undefined) {
           maxSpendCents = parseInt(parsedMandate.maxSpendCents, 10);
@@ -96,7 +102,7 @@ export default function createAgentPaymentsRouter(db) {
           }
         }
 
-        // Validate custom expiration in agentRules if present
+        // 7. Validate custom expiration in agentRules if present
         const customExpiryStr = parsedMandate.agentRules?.expiresAt || parsedMandate.agent_rules?.valid_until;
         if (customExpiryStr) {
           const customExpiry = new Date(customExpiryStr);
@@ -108,13 +114,17 @@ export default function createAgentPaymentsRouter(db) {
         verified = {
           success: true,
           mandateId: parsedMandate.mandateId || parsedMandate.mandate_id || ("man_" + Date.now()),
-          paymentId: parsedProof.paymentId || ("x402-payment-" + Date.now()),
+          paymentId: settlementMeta.paymentId,
+          settlement: settlementMeta,
           amount: storedQuote.total,
           quote: storedQuote,
           quoteId: quoteId
         };
       }
     } catch (error) {
+      if (error.message && error.message.includes("amount mismatch")) {
+        return res.status(400).json({ error: "Payment amount does not match stored quote" });
+      }
       verified.success = false;
       verified.errorMsg = error.message;
     }
@@ -140,6 +150,8 @@ export default function createAgentPaymentsRouter(db) {
       paymentId: verified.paymentId,
       amount: verified.amount,
       buyerType: "agent",
+      settlementRail: verified.settlement?.rail || "x402",
+      txHash: verified.settlement?.tx_hash || null,
       items: body.items || (verified.quote.spec ? [verified.quote.spec] : []),
       shippingAddress: body.shippingAddress || body.shipping_destination || {}
     };
@@ -162,8 +174,10 @@ export default function createAgentPaymentsRouter(db) {
         within_budget: true
       },
       settlement_verification: {
-        rail: "x402",
-        tx_status: "confirmed"
+        rail: verified.settlement?.rail || "x402",
+        tx_status: "confirmed",
+        payment_id: verified.paymentId,
+        tx_hash: verified.settlement?.tx_hash
       },
       trackingUrl: `https://splotch.page/orders.html?id=${orderRecord.orderId}`,
       fulfillment_tracking_url: `https://splotch.page/api/v1/orders/${orderRecord.orderId}`
@@ -290,6 +304,7 @@ export default function createAgentPaymentsRouter(db) {
         chain_id: 8453
       },
       digest_sha256: Buffer.from(`${quoteId}:${total}`).toString("hex"),
+      cart_digest: computeCartDigest(quoteRecord),
       validUntilMinutes: 30,
       expiresAt,
       expires_at: expiresAt,

@@ -398,4 +398,78 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     expect(payRes.body.settlement_verification.tx_status).toBe("confirmed");
     expect(payRes.body.fulfillment_tracking_url).toContain("orders");
   });
+
+  it("should return 403 if mandate binds a shipping address hash and a tampered address is submitted", async () => {
+    const validQuoteId = "quote_shipping_hash_test";
+    inMemoryQuotes.set(validQuoteId, {
+      quoteId: validQuoteId,
+      total: 15.00,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60000).toISOString()
+    });
+
+    const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay_ship_123", amount: "15.00" })).toString("base64");
+    
+    // Mandate authorizes shipment to original address hash
+    const mandate = await generateMandate({
+      intentId: "intent_ship_test",
+      quoteId: validQuoteId,
+      shipping_address_hash: "expected_hash_for_original_address"
+    });
+
+    const res = await request(app)
+      .post("/api/v1/payments/ap2")
+      .set("authorization-x402", paymentProof)
+      .set("x-ap2-mandate", mandate)
+      .send({
+        shipping_destination: {
+          recipient_name: "Attacker",
+          street_address: "999 Evil St",
+          city: "Oklahoma City",
+          state: "OK",
+          postal_code: "73159",
+          country: "US"
+        }
+      });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.error).toContain("recipient destination differs");
+  });
+
+  it("should return 403 in production if a simulated payment proof is submitted", async () => {
+    const origEnv = process.env.NODE_ENV;
+    const origAllowEphem = process.env.AP2_ALLOW_EPHEMERAL_JWK;
+    process.env.NODE_ENV = "production";
+    process.env.AP2_ALLOW_EPHEMERAL_JWK = "true";
+
+    try {
+      const validQuoteId = "quote_prod_sim_test";
+      inMemoryQuotes.set(validQuoteId, {
+        quoteId: validQuoteId,
+        total: 15.00,
+        status: "PENDING",
+        expiresAt: new Date(Date.now() + 60000).toISOString()
+      });
+
+      const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay_sim_prod", amount: "15.00" })).toString("base64");
+      const mandate = await generateMandate({ intentId: "intent_prod", quoteId: validQuoteId });
+
+      const res = await request(app)
+        .post("/api/v1/payments/ap2")
+        .set("authorization-x402", paymentProof)
+        .set("x-ap2-mandate", mandate)
+        .send({});
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.error).toContain("Simulated payment proofs are forbidden in production");
+    } finally {
+      process.env.NODE_ENV = origEnv;
+      if (origAllowEphem === undefined) {
+        delete process.env.AP2_ALLOW_EPHEMERAL_JWK;
+      } else {
+        process.env.AP2_ALLOW_EPHEMERAL_JWK = origAllowEphem;
+      }
+    }
+  });
 });
+

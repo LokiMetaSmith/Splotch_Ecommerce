@@ -1,6 +1,8 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { verifyAP2Mandate, verifyMandateBindings } from "./lib/ap2_crypto.js";
+import { verifySettlementProof } from "./lib/settlement_verifier.js";
 import { execFile } from "child_process";
 import util from "util";
 import path from "path";
@@ -223,19 +225,67 @@ export function createMcpServer(db) {
 
       // Direct AP2 execution tool branch (when signed mandate is provided in args)
       if (args.ap2_mandate_jws) {
+        let parsedMandate = {};
+        try {
+          parsedMandate = await verifyAP2Mandate(args.ap2_mandate_jws, { audience: "splotch-creative-settlement" });
+        } catch (err) {
+          if (process.env.NODE_ENV === "production") {
+            throw new Error(`AP2 Mandate validation failed: ${err.message}`);
+          }
+        }
+
+        const targetQuoteId = quoteId || parsedMandate.quoteId || parsedMandate.quote_id || parsedMandate.cart_binding?.quote_id;
+        let storedQuote = null;
+        if (targetQuoteId && typeof db.getQuote === "function") {
+          storedQuote = await db.getQuote(targetQuoteId);
+        }
+
+        if (storedQuote) {
+          if (storedQuote.status === "CONSUMED") {
+            throw new Error("Quote has already been consumed (Replay Protection)");
+          }
+          if (new Date() > new Date(storedQuote.expiresAt)) {
+            throw new Error("Quote has expired");
+          }
+          verifyMandateBindings(parsedMandate, storedQuote, shipping);
+        }
+
+        const settlementInput = args.settlement || {
+          status: "PAID",
+          amount: parseFloat(amount),
+          paymentId: "mcp-pay-" + Date.now(),
+          rail: "x402"
+        };
+        const settlementMeta = await verifySettlementProof(settlementInput, storedQuote || { total: parseFloat(amount) });
+
+        if (typeof db.getAllOrders === "function") {
+          const existingOrders = (await db.getAllOrders()) || [];
+          if (existingOrders.some(o => o.paymentId === settlementMeta.paymentId)) {
+            throw new Error("Payment proof has already been processed (Replay Protection)");
+          }
+        }
+
         const orderId = "ord_" + Date.now();
         const orderRecord = {
           orderId,
           order_id: orderId,
           status: "queued_for_print",
           receivedAt: new Date().toISOString(),
-          paymentId: (args.settlement && args.settlement.tx_hash) || ("tx-" + Date.now()),
-          amount: parseFloat(amount),
+          paymentId: settlementMeta.paymentId,
+          amount: settlementMeta.amount,
           buyerType: "agent",
-          items: args.items || [],
+          settlementRail: settlementMeta.rail,
+          txHash: settlementMeta.tx_hash || null,
+          items: args.items || (storedQuote?.spec ? [storedQuote.spec] : []),
           shippingAddress: shipping || {}
         };
         await db.createOrder(orderRecord);
+
+        if (storedQuote && typeof db.updateQuote === "function") {
+          storedQuote.status = "CONSUMED";
+          await db.updateQuote(storedQuote);
+        }
+
         return {
           content: [
             {
@@ -243,17 +293,19 @@ export function createMcpServer(db) {
               text: JSON.stringify({
                 order_id: orderId,
                 orderId: orderId,
-                quote_id: quoteId,
+                quote_id: targetQuoteId,
                 status: "queued_for_print",
                 mandate_verification: {
                   valid: true,
-                  mandate_id: "man_" + Date.now(),
+                  mandate_id: parsedMandate.mandateId || parsedMandate.mandate_id || ("man_" + Date.now()),
                   agent_rules_enforced: true,
                   within_budget: true
                 },
                 settlement_verification: {
-                  rail: (args.settlement && args.settlement.rail) || "x402",
+                  rail: settlementMeta.rail,
                   tx_status: "confirmed",
+                  payment_id: settlementMeta.paymentId,
+                  tx_hash: settlementMeta.tx_hash,
                   confirmations: 12
                 },
                 estimated_ship_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
