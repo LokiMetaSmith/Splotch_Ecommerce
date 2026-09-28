@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 
 const activeSessions = new Map();
 
-function createMcpServer(db) {
+export function createMcpServer(db) {
   const mcpServer = new Server(
     { name: "splotch-ecommerce-mcp", version: "1.0.0" },
     { capabilities: { tools: {} } }
@@ -179,11 +179,12 @@ function createMcpServer(db) {
               designUrl: args.designUrl,
               shippingAddress: args.shippingAddress,
               paymentStatus: "REQUIRES_PAYMENT",
-              x402Challenge: {
-                version: "x402/1.0",
+              ap2Challenge: {
                 paymentEndpoint: "https://api.splotch.shop/api/v1/payments/ap2",
-                amount: args.amount,
-                currency: "USD"
+                requiredAmount: args.amount,
+                currency: "USD",
+                instructions: "Sign an AP2 Cart Mandate with maxSpendCents >= requiredAmount, and submit it along with an x402 payment proof.",
+                supportedMethods: ["x402"]
               }
             })
           }
