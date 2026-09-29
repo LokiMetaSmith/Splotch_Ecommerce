@@ -51,6 +51,14 @@ Because x402 and AP2 are open protocols rather than proprietary platforms, you d
     - You must create an asymmetric cryptographic key pair (e.g., RSA or ECDSA) for your server.
     - Your server uses the private key to sign AP2 payment intents, known as Checkout JWTs.
     - The `AP2_GOVERNANCE_PUBKEY` is the public half of that pair. You configure this environment variable to verify incoming agent mandates, and you must expose it publicly at your domain's `/.well-known/ap2` endpoint so shopping agents and payment rails can verify your store.
+    - **Security Rule**: In production (`NODE_ENV=production`), placeholder or missing governance keys are rejected.
+-   `BASE_MERCHANT_WALLET`:
+    - The public EVM address (e.g., from Coinbase, MetaMask, or cold storage) where USDC on Base will be deposited.
+    - **Security Rule**: In production (`NODE_ENV=production`), default placeholder addresses are strictly rejected. You MUST configure this address to accept Base USDC payments.
+-   `BASE_RPC_URL`:
+    - JSON-RPC endpoint for Base (defaults to `https://mainnet.base.org`). Used by Splotch to query transaction receipts on-chain via `eth_getTransactionReceipt`.
+-   `LIGHTNING_SETTLEMENT_PROVIDER`:
+    - The settlement provider for Bitcoin Lightning micro-invoices (defaults to `square`, which utilizes `SQUARE_ACCESS_TOKEN` to settle Lightning payments to fiat USD deposits).
 
 ## Odoo Integration (Optional)
 

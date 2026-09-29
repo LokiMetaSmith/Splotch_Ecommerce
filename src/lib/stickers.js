@@ -7,6 +7,7 @@ export function addSticker(image, name, x, y, width, height) {
   // Clean up any initial placeholder sticker before adding real sticker
   if (
     stickers.length === 1 &&
+    !stickers[0].id &&
     !stickers[0].image &&
     !stickers[0].originalImage &&
     (!stickers[0].basePolygons || stickers[0].basePolygons.length === 0)

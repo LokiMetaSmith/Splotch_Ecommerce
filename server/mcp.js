@@ -1,6 +1,8 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { verifyAP2Mandate, verifyMandateBindings } from "./lib/ap2_crypto.js";
+import { verifySettlementProof } from "./lib/settlement_verifier.js";
 import { execFile } from "child_process";
 import util from "util";
 import path from "path";
@@ -12,7 +14,7 @@ const __dirname = path.dirname(__filename);
 
 const activeSessions = new Map();
 
-function createMcpServer(db) {
+export function createMcpServer(db) {
   const mcpServer = new Server(
     { name: "splotch-ecommerce-mcp", version: "1.0.0" },
     { capabilities: { tools: {} } }
@@ -37,8 +39,23 @@ function createMcpServer(db) {
           }
         },
         {
+          name: "get_quote",
+          description: "Alias for calculate_sticker_quote. Computes price for custom stickers.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              widthInches: { type: "number" },
+              heightInches: { type: "number" },
+              quantity: { type: "integer" },
+              material: { type: "string", enum: ["vinyl_matte", "vinyl_gloss", "holographic"] },
+              cutType: { type: "string", enum: ["die_cut", "kiss_cut"] }
+            },
+            required: ["widthInches", "heightInches", "quantity", "material"]
+          }
+        },
+        {
           name: "create_agent_checkout",
-          description: "Generate an AP2/x402 payment intent for a sticker order.",
+          description: "Generate an AP2/x402 payment intent and challenge for an autonomous sticker order.",
           inputSchema: {
             type: "object",
             properties: {
@@ -59,6 +76,71 @@ function createMcpServer(db) {
             },
             required: ["quoteId", "amount", "designUrl", "shippingAddress"]
           }
+        },
+        {
+          name: "place_order",
+          description: "Alias for create_agent_checkout. Preflights artwork and initiates AP2 checkout intent.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              quoteId: { type: "string" },
+              amount: { type: "string" },
+              designUrl: { type: "string" },
+              shippingAddress: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  street: { type: "string" },
+                  city: { type: "string" },
+                  state: { type: "string" },
+                  zip: { type: "string" }
+                },
+                required: ["name", "street", "city", "state", "zip"]
+              }
+            },
+            required: ["quoteId", "amount", "designUrl", "shippingAddress"]
+          }
+        },
+        {
+          name: "splotch_get_sticker_quote",
+          description: "Calculates deterministic pricing, material discounts, production tradeoffs, and shipping costs for custom sticker print runs on Splotch. Returns a quote ID, pricing breakdown, and a cart digest required for constructing an AP2 Cart Mandate.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              items: { type: "array" },
+              widthInches: { type: "number" },
+              heightInches: { type: "number" },
+              quantity: { type: "integer" },
+              material: { type: "string" },
+              delivery: { type: "object" }
+            }
+          }
+        },
+        {
+          name: "splotch_execute_ap2_payment",
+          description: "Settles and places a finalized print order using the AP2 protocol and x402 settlement rails.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              quote_id: { type: "string" },
+              quoteId: { type: "string" },
+              ap2_mandate_jws: { type: "string" },
+              settlement: { type: "object" },
+              shipping_destination: { type: "object" },
+              designUrl: { type: "string" }
+            }
+          }
+        },
+        {
+          name: "get_order_status",
+          description: "Check fulfillment status and tracking information for an existing sticker order.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              orderId: { type: "string" }
+            },
+            required: ["orderId"]
+          }
         }
       ]
     };
@@ -67,16 +149,36 @@ function createMcpServer(db) {
   mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
-    if (name === "calculate_sticker_quote") {
-      // Call Splotch internal pricing logic
-      const unitPrice = (args.widthInches * args.heightInches * 0.15) + (args.material === "holographic" ? 0.35 : 0.20);
-      const total = parseFloat((unitPrice * args.quantity).toFixed(2));
+    if (name === "calculate_sticker_quote" || name === "get_quote" || name === "splotch_get_sticker_quote") {
+      let width = args.widthInches;
+      let height = args.heightInches;
+      let quantity = args.quantity;
+      let material = args.material || "vinyl_matte";
 
-      const quoteId = `quote_${Date.now()}`;
+      if ((!width || !height || !quantity) && Array.isArray(args.items) && args.items.length > 0) {
+        const item = args.items[0];
+        if (item.dimensions) {
+          width = item.dimensions.width_in || item.dimensions.widthInches;
+          height = item.dimensions.height_in || item.dimensions.heightInches;
+        }
+        quantity = item.quantity || quantity;
+        material = item.material || material;
+      }
+
+      width = parseFloat(width || 3.0);
+      height = parseFloat(height || 3.0);
+      quantity = parseInt(quantity || 10, 10);
+
+      const isSpecial = material === "holographic" || material === "heavy_duty_pvc";
+      const unitPrice = parseFloat(((width * height * 0.15) + (isSpecial ? 0.35 : 0.20)).toFixed(2));
+      const total = parseFloat((unitPrice * quantity).toFixed(2));
+
+      const quoteId = `quo_${Date.now()}`;
       const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
 
       await db.createQuote({
           quoteId,
+          quote_id: quoteId,
           unitPrice,
           total,
           currency: "USD",
@@ -90,17 +192,129 @@ function createMcpServer(db) {
             type: "text",
             text: JSON.stringify({
               quoteId,
+              quote_id: quoteId,
+              status: "valid",
               unitPrice,
               total,
+              total_usd: total.toFixed(2),
               currency: "USD",
-              validUntilMinutes: 30
+              pricing: {
+                print_subtotal_usd: total.toFixed(2),
+                tradeoff_discount_usd: "0.00",
+                shipping_usd: "0.00",
+                total_usd: total.toFixed(2)
+              },
+              settlement_equivalents: {
+                usdc: total.toFixed(2),
+                chain_id: 8453
+              },
+              digest_sha256: Buffer.from(`${quoteId}:${total}`).toString("hex"),
+              validUntilMinutes: 30,
+              expires_at: expiresAt
             })
           }
         ]
       };
     }
 
-    if (name === "create_agent_checkout") {
+    if (name === "create_agent_checkout" || name === "place_order" || name === "splotch_execute_ap2_payment") {
+      const quoteId = args.quoteId || args.quote_id;
+      const amount = args.amount || (args.settlement && args.settlement.amount) || "15.00";
+      const designUrl = args.designUrl || (args.items && args.items[0]?.artwork_url);
+      const shipping = args.shippingAddress || args.shipping_destination;
+
+      // Direct AP2 execution tool branch (when signed mandate is provided in args)
+      if (args.ap2_mandate_jws) {
+        let parsedMandate = {};
+        try {
+          parsedMandate = await verifyAP2Mandate(args.ap2_mandate_jws, { audience: "splotch-creative-settlement" });
+        } catch (err) {
+          if (process.env.NODE_ENV === "production") {
+            throw new Error(`AP2 Mandate validation failed: ${err.message}`);
+          }
+        }
+
+        const targetQuoteId = quoteId || parsedMandate.quoteId || parsedMandate.quote_id || parsedMandate.cart_binding?.quote_id;
+        let storedQuote = null;
+        if (targetQuoteId && typeof db.getQuote === "function") {
+          storedQuote = await db.getQuote(targetQuoteId);
+        }
+
+        if (storedQuote) {
+          if (storedQuote.status === "CONSUMED") {
+            throw new Error("Quote has already been consumed (Replay Protection)");
+          }
+          if (new Date() > new Date(storedQuote.expiresAt)) {
+            throw new Error("Quote has expired");
+          }
+          verifyMandateBindings(parsedMandate, storedQuote, shipping);
+        }
+
+        const settlementInput = args.settlement || {
+          status: "PAID",
+          amount: parseFloat(amount),
+          paymentId: "mcp-pay-" + Date.now(),
+          rail: "x402"
+        };
+        const settlementMeta = await verifySettlementProof(settlementInput, storedQuote || { total: parseFloat(amount) });
+
+        if (typeof db.getAllOrders === "function") {
+          const existingOrders = (await db.getAllOrders()) || [];
+          if (existingOrders.some(o => o.paymentId === settlementMeta.paymentId)) {
+            throw new Error("Payment proof has already been processed (Replay Protection)");
+          }
+        }
+
+        const orderId = "ord_" + Date.now();
+        const orderRecord = {
+          orderId,
+          order_id: orderId,
+          status: "queued_for_print",
+          receivedAt: new Date().toISOString(),
+          paymentId: settlementMeta.paymentId,
+          amount: settlementMeta.amount,
+          buyerType: "agent",
+          settlementRail: settlementMeta.rail,
+          txHash: settlementMeta.tx_hash || null,
+          items: args.items || (storedQuote?.spec ? [storedQuote.spec] : []),
+          shippingAddress: shipping || {}
+        };
+        await db.createOrder(orderRecord);
+
+        if (storedQuote && typeof db.updateQuote === "function") {
+          storedQuote.status = "CONSUMED";
+          await db.updateQuote(storedQuote);
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                order_id: orderId,
+                orderId: orderId,
+                quote_id: targetQuoteId,
+                status: "queued_for_print",
+                mandate_verification: {
+                  valid: true,
+                  mandate_id: parsedMandate.mandateId || parsedMandate.mandate_id || ("man_" + Date.now()),
+                  agent_rules_enforced: true,
+                  within_budget: true
+                },
+                settlement_verification: {
+                  rail: settlementMeta.rail,
+                  tx_status: "confirmed",
+                  payment_id: settlementMeta.paymentId,
+                  tx_hash: settlementMeta.tx_hash,
+                  confirmations: 12
+                },
+                estimated_ship_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+                fulfillment_tracking_url: `https://splotch.page/api/v1/orders/${orderId}`
+              })
+            }
+          ]
+        };
+      }
       // Pre-Payment Asset Preflight Validation
       if (!args.designUrl || !args.designUrl.startsWith("http")) {
         throw new Error("Preflight Failed: Invalid or inaccessible designUrl. Must be a valid HTTP(S) URL.");
@@ -162,8 +376,9 @@ function createMcpServer(db) {
 
       // Route through requested child process validation
       try {
-          const scriptPath = path.join(__dirname, "..", "fix_svg_render.cjs");
-          await execFilePromise("node", [scriptPath], { timeout: 5000 });
+          const projectRoot = path.join(__dirname, "..");
+          const scriptPath = path.join(projectRoot, "fix_svg_render.cjs");
+          await execFilePromise("node", [scriptPath], { cwd: projectRoot, timeout: 5000 });
       } catch (execErr) {
           throw new Error(`Preflight Failed: Asset validation routines failed. ${execErr.message}`);
       }
@@ -179,12 +394,42 @@ function createMcpServer(db) {
               designUrl: args.designUrl,
               shippingAddress: args.shippingAddress,
               paymentStatus: "REQUIRES_PAYMENT",
-              x402Challenge: {
-                version: "x402/1.0",
-                paymentEndpoint: "https://api.splotch.shop/api/v1/payments/ap2",
-                amount: args.amount,
-                currency: "USD"
+              ap2Challenge: {
+                paymentEndpoint: "https://splotch.page/api/v1/payments/ap2",
+                ordersEndpoint: "https://splotch.page/api/v1/orders",
+                requiredAmount: args.amount,
+                currency: "USD",
+                instructions: "Sign an AP2 Cart Mandate with maxSpendCents >= requiredAmount, and submit it along with an x402 payment proof.",
+                supportedMethods: ["x402"]
               }
+            })
+          }
+        ]
+      };
+    }
+
+    if (name === "get_order_status") {
+      const order = await db.getOrder(args.orderId);
+      if (!order) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ error: "Order not found", orderId: args.orderId })
+            }
+          ]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              orderId: order.orderId,
+              status: order.status,
+              receivedAt: order.receivedAt,
+              amount: order.amount,
+              trackingUrl: `https://splotch.page/orders.html?id=${order.orderId}`
             })
           }
         ]

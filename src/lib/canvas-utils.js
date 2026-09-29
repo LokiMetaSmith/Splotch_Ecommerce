@@ -1,5 +1,71 @@
 
 /**
+ * Determines the high-contrast theme (colors and drop shadows) based on the canvas background.
+ *
+ * @param {CanvasRenderingContext2D} ctx - The canvas 2D context.
+ * @returns {object} Theme with colors and drop shadow settings for rulers and dimension indicators.
+ */
+export function getCanvasTheme(ctx) {
+    let bgColor = "white";
+    if (ctx && ctx.canvas) {
+        bgColor =
+            ctx.canvas.style?.backgroundColor ||
+            (typeof window !== "undefined" && ctx.canvas instanceof Element
+                ? window.getComputedStyle(ctx.canvas).backgroundColor
+                : "white");
+    }
+
+    let r = 255,
+        g = 255,
+        b = 255;
+    if (bgColor) {
+        const match = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (match) {
+            r = parseInt(match[1], 10);
+            g = parseInt(match[2], 10);
+            b = parseInt(match[3], 10);
+        } else if (bgColor.startsWith("#")) {
+            const hex = bgColor.replace("#", "");
+            if (hex.length === 3) {
+                r = parseInt(hex[0] + hex[0], 16);
+                g = parseInt(hex[1] + hex[1], 16);
+                b = parseInt(hex[2] + hex[2], 16);
+            } else if (hex.length >= 6) {
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+            }
+        }
+    }
+
+    // Perceived luminance (ITU-R BT.709)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    const isDark = luminance < 0.5;
+
+    if (isDark) {
+        // Inverse/contrast colors for dark background (e.g. Dark mode #1f2937 or Magenta):
+        // Bright white strokes and text with a prominent dark drop shadow underneath
+        return {
+            isDark: true,
+            strokeColor: "rgba(255, 255, 255, 0.9)",
+            textColor: "rgba(255, 255, 255, 0.95)",
+            shadowColor: "rgba(0, 0, 0, 0.9)",
+            boxStroke: "rgba(255, 255, 255, 0.45)",
+        };
+    } else {
+        // Colors for light background:
+        // Dark strokes and text with a crisp light drop shadow underneath
+        return {
+            isDark: false,
+            strokeColor: "rgba(0, 0, 0, 0.7)",
+            textColor: "rgba(0, 0, 0, 0.9)",
+            shadowColor: "rgba(255, 255, 255, 0.95)",
+            boxStroke: "rgba(128, 128, 128, 0.4)",
+        };
+    }
+}
+
+/**
  * Draws a ruler on the canvas around the provided bounds.
  * Optimized to batch line drawing calls for performance.
  *
@@ -71,14 +137,19 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
     const lineWidth = Math.max(1, Math.round(1 * ppiScale));
     const labelSpacingOffset = 2 * tickScale;
 
+    const theme = getCanvasTheme(ctx);
+
     ctx.save();
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+    ctx.shadowColor = theme.shadowColor;
+    ctx.shadowBlur = Math.round(3 * tickScale);
+    ctx.shadowOffsetX = Math.round(1 * tickScale);
+    ctx.shadowOffsetY = Math.round(1 * tickScale);
+    ctx.strokeStyle = theme.strokeColor;
+    ctx.fillStyle = theme.textColor;
     ctx.font = `${fontSize}px Arial`;
     ctx.lineWidth = lineWidth;
 
-    // Bolt Optimization: Batch drawing calls to reduce overhead
-    // Top ruler
+    // Top ruler ticks
     ctx.beginPath();
     for (let i = 0; i * minorMarkSpacing <= bounds.width; i++) {
         const x = bounds.left + offset.x + i * minorMarkSpacing;
@@ -89,16 +160,23 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
         // Draw ticks going OUTWARDS (up) from the bounding box
         ctx.moveTo(x, y);
         ctx.lineTo(x, y - markHeight);
+    }
+    ctx.stroke();
 
+    // Top ruler labels
+    for (let i = 0; i * minorMarkSpacing <= bounds.width; i++) {
+        const x = bounds.left + offset.x + i * minorMarkSpacing;
+        const y = bounds.top + offset.y;
+        const isMajorMark = i % ticksPerMajor === 0;
+        const markHeight = isMajorMark ? 15 * tickScale : 8 * tickScale;
         if (isMajorMark && i > 0) {
             const labelValue = (i / ticksPerMajor) * labelMultiplier;
             const label = `${Number.isInteger(labelValue) ? labelValue : labelValue.toFixed(1)}${labelSuffix}`;
             ctx.fillText(label, x + 3 * tickScale, y - markHeight - labelSpacingOffset);
         }
     }
-    ctx.stroke();
 
-    // Left ruler
+    // Left ruler ticks
     ctx.beginPath();
     for (let i = 0; i * minorMarkSpacing <= bounds.height; i++) {
         const y = bounds.top + offset.y + i * minorMarkSpacing;
@@ -109,14 +187,21 @@ export function drawRuler(ctx, bounds, offset = { x: 0, y: 0 }, ppi, isMetric) {
         // Draw ticks going OUTWARDS (left) from the bounding box
         ctx.moveTo(x, y);
         ctx.lineTo(x - markWidth, y);
+    }
+    ctx.stroke();
 
+    // Left ruler labels
+    for (let i = 0; i * minorMarkSpacing <= bounds.height; i++) {
+        const y = bounds.top + offset.y + i * minorMarkSpacing;
+        const x = bounds.left + offset.x;
+        const isMajorMark = i % ticksPerMajor === 0;
+        const markWidth = isMajorMark ? 15 * tickScale : 8 * tickScale;
         if (isMajorMark && i > 0) {
             const labelValue = (i / ticksPerMajor) * labelMultiplier;
             const label = `${Number.isInteger(labelValue) ? labelValue : labelValue.toFixed(1)}${labelSuffix}`;
             ctx.fillText(label, x - markWidth - (5 * tickScale) - (ctx.measureText(label).width), y + (fontSize / 3));
         }
     }
-    ctx.stroke();
 
     ctx.restore();
 }

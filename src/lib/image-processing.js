@@ -770,26 +770,24 @@ export function getPolygonBounds(points) {
 
 export function isPointInPolygon(point, polygon) {
   let inside = false;
-  const px = point.x;
-  const py = point.y;
+  const px = point.x !== undefined ? point.x : point.X;
+  const py = point.y !== undefined ? point.y : point.Y;
   const len = polygon.length;
 
   for (let i = 0, j = len - 1; i < len; j = i++) {
-    const xi = polygon[i].x,
-      yi = polygon[i].y;
-    const xj = polygon[j].x,
-      yj = polygon[j].y;
+    const ptI = polygon[i];
+    const ptJ = polygon[j];
+    const xi = ptI.x !== undefined ? ptI.x : ptI.X;
+    const yi = ptI.y !== undefined ? ptI.y : ptI.Y;
+    const xj = ptJ.x !== undefined ? ptJ.x : ptJ.X;
+    const yj = ptJ.y !== undefined ? ptJ.y : ptJ.Y;
 
     // Bolt Optimization: Check ray intersection using multiplication to avoid expensive division
     const intersect = yi > py !== yj > py;
     if (intersect) {
-      // Original: px < (xj - xi) * (py - yi) / (yj - yi) + xi
-      // Optimized: (px - xi) * (yj - yi) < (xj - xi) * (py - yi) (careful with sign of yj - yi)
       const term1 = (px - xi) * (yj - yi);
       const term2 = (xj - xi) * (py - yi);
 
-      // If yj > yi, we check <. If yj < yi, we check >.
-      // Note: yi != yj is guaranteed because (yi > py) != (yj > py)
       if (yj > yi) {
         if (term1 < term2) inside = !inside;
       } else {

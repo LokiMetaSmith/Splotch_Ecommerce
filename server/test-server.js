@@ -42,6 +42,7 @@ async function main() {
 
     // Make sure NODE_ENV is set to test when starting the test server.
     process.env.NODE_ENV = 'test';
+    process.env.ADMIN_EMAIL = 'admin@example.com';
 
     const port = process.env.PORT || 3000;
     app.listen(port, () => {

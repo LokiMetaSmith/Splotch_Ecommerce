@@ -1,21 +1,24 @@
 import request from "supertest";
 import express from "express";
-import { mcpRequestHandler, mcpMessageHandler } from "../mcp.js";
+import { mcpRequestHandler, mcpMessageHandler, createMcpServer } from "../mcp.js";
 import { jest } from "@jest/globals";
+import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-describe("MCP Server Endpoints", () => {
+describe("MCP Server Endpoints and Tools", () => {
   let app;
+  let mockDb;
 
   beforeEach(() => {
     app = express();
     app.use(express.json());
-    app.get("/api/mcp", (req, res) => mcpRequestHandler(req, res, {}));
-    app.post("/api/mcp/messages", (req, res) => mcpMessageHandler(req, res, {}));
-  });
 
-  // Supertest hangs on open SSE connections.
-  // Instead of waiting for the full response, we can just intercept the headers via HTTP request
-  // Or test that calling the message handler without a valid session works as expected.
+    mockDb = {
+      createQuote: jest.fn().mockResolvedValue({})
+    };
+
+    app.get("/api/mcp", (req, res) => mcpRequestHandler(req, res, mockDb));
+    app.post("/api/mcp/messages", (req, res) => mcpMessageHandler(req, res, mockDb));
+  });
 
   it("should return 404 for POST /api/mcp/messages without a valid session", async () => {
     const res = await request(app)
@@ -26,8 +29,151 @@ describe("MCP Server Endpoints", () => {
     expect(res.text).toBe("Session not found or MCP Server not connected");
   });
 
-  // Note: We cannot easily test the exact JSON-RPC call here because the MCP SDK handles the routing.
-  // Instead, the preflight test is implicitly covered if the tool throws during execution.
-  // A complete e2e test would use an MCP client, but we can trust the SDK and preflight logic
-  // based on the unit tests provided or we can directly invoke the handler if exposed.
+  it("should establish SSE connection at /api/mcp", async () => {
+    const req = request(app).get("/api/mcp");
+    req.buffer(false);
+
+    return new Promise((resolve, reject) => {
+      req.end((err, res) => {
+        if (err && !res) return reject(err);
+      });
+      req.on('response', (res) => {
+        expect(res.headers['content-type']).toBe('text/event-stream');
+        resolve();
+      });
+    });
+  });
+
+  it("should return AP2 Challenge compliant output for create_agent_checkout tool", async () => {
+    const mcpServer = createMcpServer(mockDb);
+    const requestArgs = {
+      method: "tools/call",
+      params: {
+        name: "create_agent_checkout",
+        arguments: {
+          quoteId: "quote123",
+          amount: "15.00",
+          designUrl: "https://example.com/sticker.png",
+          shippingAddress: {
+            name: "John",
+            street: "123 St",
+            city: "City",
+            state: "ST",
+            zip: "12345"
+          }
+        }
+      }
+    };
+
+    // We mock fetch to avoid network calls inside the tool
+    global.fetch = jest.fn(() => Promise.resolve({
+      ok: true,
+      headers: new Headers({ "content-length": "100" }),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(100))
+    }));
+
+    // The SDK registers a string 'tools/call'
+    const handler = mcpServer._requestHandlers.get('tools/call');
+    const result = await handler(requestArgs, {});
+
+    expect(result.content).toBeDefined();
+    expect(result.content[0].type).toBe("text");
+
+    const parsedContent = JSON.parse(result.content[0].text);
+
+    expect(parsedContent.paymentStatus).toBe("REQUIRES_PAYMENT");
+    expect(parsedContent.ap2Challenge).toBeDefined();
+    expect(parsedContent.ap2Challenge.paymentEndpoint).toBe("https://splotch.page/api/v1/payments/ap2");
+    expect(parsedContent.ap2Challenge.requiredAmount).toBe("15.00");
+    expect(parsedContent.ap2Challenge.supportedMethods).toContain("x402");
+  });
+
+  it("should handle get_order_status tool correctly", async () => {
+    mockDb.getOrder = jest.fn().mockResolvedValue({
+      orderId: "ord_mcp_123",
+      status: "PRINTING",
+      receivedAt: "2026-09-28T20:00:00.000Z",
+      amount: 15.00
+    });
+
+    const mcpServer = createMcpServer(mockDb);
+    const handler = mcpServer._requestHandlers.get('tools/call');
+    const result = await handler({
+      method: "tools/call",
+      params: {
+        name: "get_order_status",
+        arguments: {
+          orderId: "ord_mcp_123"
+        }
+      }
+    }, {});
+
+    const parsedContent = JSON.parse(result.content[0].text);
+    expect(parsedContent.orderId).toBe("ord_mcp_123");
+    expect(parsedContent.status).toBe("PRINTING");
+    expect(parsedContent.trackingUrl).toContain("ord_mcp_123");
+  });
+
+  it("should handle splotch_get_sticker_quote and splotch_execute_ap2_payment tools", async () => {
+    mockDb.createQuote = jest.fn().mockResolvedValue({});
+    mockDb.createOrder = jest.fn().mockResolvedValue({});
+
+    const mcpServer = createMcpServer(mockDb);
+    const handler = mcpServer._requestHandlers.get('tools/call');
+
+    // 1. splotch_get_sticker_quote with items array
+    const quoteResult = await handler({
+      method: "tools/call",
+      params: {
+        name: "splotch_get_sticker_quote",
+        arguments: {
+          items: [
+            {
+              product_type: "custom_sticker",
+              dimensions: { width_in: 3.0, height_in: 3.0, unit: "inch" },
+              quantity: 50,
+              material: "standard_pp"
+            }
+          ]
+        }
+      }
+    }, {});
+
+    const quoteParsed = JSON.parse(quoteResult.content[0].text);
+    expect(quoteParsed.quote_id).toBeDefined();
+    expect(quoteParsed.pricing).toBeDefined();
+
+    // 2. splotch_execute_ap2_payment with mandate and settlement
+    const payResult = await handler({
+      method: "tools/call",
+      params: {
+        name: "splotch_execute_ap2_payment",
+        arguments: {
+          quote_id: quoteParsed.quote_id,
+          ap2_mandate_jws: "eyJhbGciOiJFZERTQSI...",
+          settlement: {
+            rail: "x402",
+            asset: "USDC",
+            network: "base",
+            tx_hash: "0x123abc",
+            amount: quoteParsed.total_usd,
+            payer_wallet: "0x49B3c11E866299bBfA689D8B4E15682C562f7D35"
+          },
+          shipping_destination: {
+            recipient_name: "Agent Lab",
+            street_address: "123 Main St",
+            city: "Oklahoma City",
+            state: "OK",
+            postal_code: "73159",
+            country: "US"
+          }
+        }
+      }
+    }, {});
+
+    const payParsed = JSON.parse(payResult.content[0].text);
+    expect(payParsed.order_id).toBeDefined();
+    expect(payParsed.status).toBe("queued_for_print");
+    expect(payParsed.settlement_verification.tx_status).toBe("confirmed");
+  });
 });
