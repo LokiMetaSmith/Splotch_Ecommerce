@@ -1,15 +1,29 @@
 import express from "express";
 import { verifyAP2Mandate, verifyMandateBindings, computeCartDigest } from "../lib/ap2_crypto.js";
-import { verifySettlementProof, getActiveSettlementMethods } from "../lib/settlement_verifier.js";
+import { verifySettlementProof, getActiveSettlementMethods, isLightningEnabled, isBaseUsdcEnabled } from "../lib/settlement_verifier.js";
+import { DEFAULT_SHIPPING_CONFIG } from "../lib/costCalc.js";
 
 export default function createAgentPaymentsRouter(db) {
   const router = express.Router();
 
   function getSettlementContext() {
-    const activeRails = getActiveSettlementMethods();
-    const merchantWallet = process.env.BASE_MERCHANT_WALLET || "0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23";
-    const settlementDetails = {
-      base_usdc: {
+    const savedShipping = db.data?.config?.shipping || {};
+    const shippingConfig = { ...DEFAULT_SHIPPING_CONFIG, ...savedShipping };
+    const activeRails = [];
+    if (shippingConfig.lightningEnabled !== false && isLightningEnabled()) {
+      activeRails.push("lightning");
+    }
+    const merchantWallet = (shippingConfig.baseMerchantWallet && shippingConfig.baseMerchantWallet.startsWith("0x"))
+      ? shippingConfig.baseMerchantWallet
+      : (process.env.BASE_MERCHANT_WALLET || "0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23");
+
+    if (shippingConfig.baseUsdcEnabled !== false && isBaseUsdcEnabled()) {
+      activeRails.push("base_usdc");
+    }
+
+    const settlementDetails = {};
+    if (activeRails.includes("base_usdc")) {
+      settlementDetails.base_usdc = {
         rail: "base_usdc",
         network: "base",
         chain_id: 8453,
@@ -18,13 +32,15 @@ export default function createAgentPaymentsRouter(db) {
         token_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
         recipient_address: merchantWallet,
         decimals: 6
-      },
-      lightning: {
+      };
+    }
+    if (activeRails.includes("lightning")) {
+      settlementDetails.lightning = {
         rail: "lightning",
         description: "Lightning Network payment via LNURL/invoice preimage"
-      }
-    };
-    return { activeRails, merchantWallet, settlementDetails };
+      };
+    }
+    return { activeRails, merchantWallet, settlementDetails, shippingConfig };
   }
 
   // Helper function to handle AP2 & x402 payment validation and order creation

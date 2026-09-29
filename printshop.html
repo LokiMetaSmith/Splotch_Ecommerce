@@ -1098,70 +1098,166 @@
           </form>
         </div>
 
-        <!-- Shipping & Fee Settings -->
+        <!-- Shipping & Payment Method Settings -->
         <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto mt-8">
           <h2 class="text-2xl sm:text-3xl text-splotch-navy mb-2">
-            💰 Shipping &amp; Fee Settings
+            💰 Shipping &amp; Payment Method Settings
           </h2>
           <p class="text-sm text-gray-500 mb-6">
-            These values are used to calculate the order cost estimate shown to customers at checkout and to compute the total charged via Square.
+            Configure enabled shipping rails, packaging fees, customer payment options, Square processing fees, and autonomous crypto settlement parameters.
           </p>
-          <form id="shipping-config-form" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label for="shipping-tax-rate" class="block font-bold text-sm text-gray-700 mb-1">Tax Rate (%)</label>
-                <input type="number" id="shipping-tax-rate" step="0.01" min="0" max="100"
-                       class="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                       placeholder="8.5"/>
-                <p class="text-xs text-gray-500 mt-1">Oklahoma statewide rate: 8.5%</p>
+          <form id="shipping-config-form" class="space-y-6">
+            <!-- 1. Shipping Methods & Rates -->
+            <div class="border border-gray-200 rounded-lg p-5 bg-gray-50/50">
+              <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span>🚚 Shipping Options &amp; Fulfillment</span>
+              </h3>
+              
+              <!-- Parcel Tracked Shipping -->
+              <div class="mb-4 pb-4 border-b border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="shipping-parcel-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
+                    <span>USPS Ground Advantage (Tracked Parcel)</span>
+                  </label>
+                  <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-semibold">Rigid Cardboard Mailer</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                  <div>
+                    <label for="shipping-handling-fee" class="block text-xs font-semibold text-gray-600 mb-1">Base Handling Fee ($)</label>
+                    <input type="number" id="shipping-handling-fee" step="0.01" min="0" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="3.00"/>
+                  </div>
+                  <div>
+                    <label for="shipping-handling-fee-per-item" class="block text-xs font-semibold text-gray-600 mb-1">Per-Item Handling Fee ($)</label>
+                    <input type="number" id="shipping-handling-fee-per-item" step="0.01" min="0" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="0.00"/>
+                  </div>
+                  <div>
+                    <label for="shipping-tare-grams" class="block text-xs font-semibold text-gray-600 mb-1">Package Tare Weight (g)</label>
+                    <input type="number" id="shipping-tare-grams" step="1" min="0" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="28"/>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label for="shipping-handling-fee" class="block font-bold text-sm text-gray-700 mb-1">Base Handling Fee ($)</label>
-                <input type="number" id="shipping-handling-fee" step="0.01" min="0"
-                       class="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                       placeholder="3.00"/>
-                <p class="text-xs text-gray-500 mt-1">Minimum $3.00 per order recommended</p>
+
+              <!-- Economy Envelope Mail -->
+              <div class="mb-4 pb-4 border-b border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="shipping-envelope-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
+                    <span>USPS Economy Envelope (Letter Mail)</span>
+                  </label>
+                  <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-semibold">Low-Cost / Single Stickers</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                  <div>
+                    <label for="shipping-envelope-fee" class="block text-xs font-semibold text-gray-600 mb-1">Envelope Postage Rate ($)</label>
+                    <input type="number" id="shipping-envelope-fee" step="0.01" min="0" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="0.95"/>
+                    <p class="text-xs text-gray-400 mt-0.5">Standard First-Class stamped letter</p>
+                  </div>
+                  <div>
+                    <label for="shipping-envelope-handling" class="block text-xs font-semibold text-gray-600 mb-1">Envelope Handling Fee ($)</label>
+                    <input type="number" id="shipping-envelope-handling" step="0.01" min="0" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="0.30"/>
+                    <p class="text-xs text-gray-400 mt-0.5">Packaging &amp; labor for small envelopes</p>
+                  </div>
+                </div>
               </div>
+
+              <!-- Local Store Pickup -->
               <div>
-                <label for="shipping-handling-fee-per-item" class="block font-bold text-sm text-gray-700 mb-1">Per-Sticker Handling Fee ($)</label>
-                <input type="number" id="shipping-handling-fee-per-item" step="0.01" min="0"
-                       class="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                       placeholder="0.00"/>
-                <p class="text-xs text-gray-500 mt-1">Added fee per sticker in the order</p>
-              </div>
-              <div>
-                <label for="shipping-square-pct" class="block font-bold text-sm text-gray-700 mb-1">Square Processing (%)</label>
-                <input type="number" id="shipping-square-pct" step="0.001" min="0" max="100"
-                       class="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                       placeholder="2.9"/>
-                <p class="text-xs text-gray-500 mt-1">Standard Square rate: 2.9%</p>
-              </div>
-              <div>
-                <label for="shipping-square-fixed" class="block font-bold text-sm text-gray-700 mb-1">Square Fixed Fee ($)</label>
-                <input type="number" id="shipping-square-fixed" step="0.01" min="0"
-                       class="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                       placeholder="0.30"/>
-                <p class="text-xs text-gray-500 mt-1">Standard Square fixed fee: $0.30</p>
-              </div>
-              <div>
-                <label for="shipping-grams-per-sqin" class="block font-bold text-sm text-gray-700 mb-1">Vinyl Weight (g/in²)</label>
-                <input type="number" id="shipping-grams-per-sqin" step="0.001" min="0"
-                       class="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                       placeholder="0.05"/>
-                <p class="text-xs text-gray-500 mt-1">Typical 3 mil vinyl: 0.05 g/in²</p>
-              </div>
-              <div>
-                <label for="shipping-tare-grams" class="block font-bold text-sm text-gray-700 mb-1">Package Tare Weight (g)</label>
-                <input type="number" id="shipping-tare-grams" step="1" min="0"
-                       class="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                       placeholder="28"/>
-                <p class="text-xs text-gray-500 mt-1">Envelope + backing ≈ 28 g (1 oz)</p>
+                <div class="flex items-center justify-between mb-2">
+                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="shipping-pickup-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
+                    <span>Local Store Pickup</span>
+                  </label>
+                  <span class="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-semibold">Free Customer Pickup</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                  <div>
+                    <label for="shipping-pickup-discount" class="block text-xs font-semibold text-gray-600 mb-1">Pickup Subtotal Discount ($)</label>
+                    <input type="number" id="shipping-pickup-discount" step="0.01" min="0" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="3.00"/>
+                  </div>
+                </div>
               </div>
             </div>
+
+            <!-- 2. Payment Methods & Gateway Fees -->
+            <div class="border border-gray-200 rounded-lg p-5 bg-gray-50/50">
+              <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span>💳 Payment Methods &amp; Processing Fees</span>
+              </h3>
+
+              <!-- Square Processing -->
+              <div class="mb-4 pb-4 border-b border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="payment-square-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
+                    <span>Square Credit / Debit Cards</span>
+                  </label>
+                  <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded font-semibold">Standard Web Checkout</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                  <div>
+                    <label for="shipping-square-pct" class="block text-xs font-semibold text-gray-600 mb-1">Square Processing Rate (%)</label>
+                    <input type="number" id="shipping-square-pct" step="0.001" min="0" max="100" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="2.9"/>
+                  </div>
+                  <div>
+                    <label for="shipping-square-fixed" class="block text-xs font-semibold text-gray-600 mb-1">Square Fixed Fee ($)</label>
+                    <input type="number" id="shipping-square-fixed" step="0.01" min="0" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="0.30"/>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Base USDC (x402) -->
+              <div class="mb-4 pb-4 border-b border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="payment-base-usdc-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
+                    <span>Base USDC (Autonomous Agents &amp; x402 / Coinbase)</span>
+                  </label>
+                  <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-semibold">Chain ID 8453</span>
+                </div>
+                <div class="mt-2">
+                  <label for="payment-base-merchant-wallet" class="block text-xs font-semibold text-gray-600 mb-1">Merchant Base Deposit Address</label>
+                  <input type="text" id="payment-base-merchant-wallet" class="w-full p-2 border border-gray-300 rounded-md text-sm font-mono" placeholder="0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23"/>
+                  <p class="text-xs text-gray-400 mt-1">Leave empty to use server environment default. Recipient for on-chain USDC settlement.</p>
+                </div>
+              </div>
+
+              <!-- Lightning Network (x402) -->
+              <div>
+                <div class="flex items-center justify-between">
+                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="payment-lightning-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
+                    <span>Lightning Network (x402 Sats)</span>
+                  </label>
+                  <span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">Instant LNURL/Preimage</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Accept satoshis via Lightning invoice preimage cryptographic verification.</p>
+              </div>
+            </div>
+
+            <!-- 3. Tax & Material Factors -->
+            <div class="border border-gray-200 rounded-lg p-5 bg-gray-50/50">
+              <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span>⚖️ Taxes &amp; Material Factors</span>
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for="shipping-tax-rate" class="block text-xs font-semibold text-gray-600 mb-1">Statewide Tax Rate (%)</label>
+                  <input type="number" id="shipping-tax-rate" step="0.01" min="0" max="100" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="8.5"/>
+                  <p class="text-xs text-gray-400 mt-1">Applies to in-state shipments and pickups (OK default: 8.5%)</p>
+                </div>
+                <div>
+                  <label for="shipping-grams-per-sqin" class="block text-xs font-semibold text-gray-600 mb-1">Vinyl Weight Factor (g/in²)</label>
+                  <input type="number" id="shipping-grams-per-sqin" step="0.001" min="0" class="w-full p-2 border border-gray-300 rounded-md text-sm" placeholder="0.05"/>
+                  <p class="text-xs text-gray-400 mt-1">Typical 3 mil vinyl: 0.05 g/in²</p>
+                </div>
+              </div>
+            </div>
+
             <div class="pt-4 border-t border-gray-200 flex items-center gap-4">
               <button type="submit" id="save-shipping-config-btn"
-                      class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition-colors">
-                Save Shipping Settings
+                      class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-md transition-colors shadow-sm">
+                Save Shipping &amp; Payment Settings
               </button>
               <span id="shipping-config-status" class="text-sm text-gray-500"></span>
             </div>

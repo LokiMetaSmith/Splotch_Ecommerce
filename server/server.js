@@ -2031,6 +2031,36 @@ async function startServer(
           .optional()
           .isInt({ min: 0 })
           .withMessage("pickupDiscountCents must be a non-negative integer"),
+        body("envelopeShippingCents")
+          .optional()
+          .isInt({ min: 0 })
+          .withMessage("envelopeShippingCents must be a non-negative integer"),
+        body("envelopeHandlingFeeCents")
+          .optional()
+          .isInt({ min: 0 })
+          .withMessage("envelopeHandlingFeeCents must be a non-negative integer"),
+        body("parcelShippingEnabled")
+          .optional()
+          .isBoolean(),
+        body("envelopeShippingEnabled")
+          .optional()
+          .isBoolean(),
+        body("pickupEnabled")
+          .optional()
+          .isBoolean(),
+        body("squareEnabled")
+          .optional()
+          .isBoolean(),
+        body("baseUsdcEnabled")
+          .optional()
+          .isBoolean(),
+        body("lightningEnabled")
+          .optional()
+          .isBoolean(),
+        body("baseMerchantWallet")
+          .optional()
+          .isString()
+          .trim(),
       ],
       async (req, res) => {
         if (!(await isAdmin(req.user)))
@@ -2054,6 +2084,42 @@ async function startServer(
             req.body.pickupDiscountCents !== undefined
               ? Number(req.body.pickupDiscountCents)
               : DEFAULT_SHIPPING_CONFIG.pickupDiscountCents || 300,
+          envelopeShippingCents:
+            req.body.envelopeShippingCents !== undefined
+              ? Number(req.body.envelopeShippingCents)
+              : DEFAULT_SHIPPING_CONFIG.envelopeShippingCents || 95,
+          envelopeHandlingFeeCents:
+            req.body.envelopeHandlingFeeCents !== undefined
+              ? Number(req.body.envelopeHandlingFeeCents)
+              : DEFAULT_SHIPPING_CONFIG.envelopeHandlingFeeCents || 30,
+          parcelShippingEnabled:
+            req.body.parcelShippingEnabled !== undefined
+              ? Boolean(req.body.parcelShippingEnabled)
+              : true,
+          envelopeShippingEnabled:
+            req.body.envelopeShippingEnabled !== undefined
+              ? Boolean(req.body.envelopeShippingEnabled)
+              : true,
+          pickupEnabled:
+            req.body.pickupEnabled !== undefined
+              ? Boolean(req.body.pickupEnabled)
+              : true,
+          squareEnabled:
+            req.body.squareEnabled !== undefined
+              ? Boolean(req.body.squareEnabled)
+              : true,
+          baseUsdcEnabled:
+            req.body.baseUsdcEnabled !== undefined
+              ? Boolean(req.body.baseUsdcEnabled)
+              : true,
+          lightningEnabled:
+            req.body.lightningEnabled !== undefined
+              ? Boolean(req.body.lightningEnabled)
+              : true,
+          baseMerchantWallet:
+            req.body.baseMerchantWallet !== undefined
+              ? String(req.body.baseMerchantWallet).trim()
+              : "",
         };
 
         await db.setConfig("shipping", newConfig);

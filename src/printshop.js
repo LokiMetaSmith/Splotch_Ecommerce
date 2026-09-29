@@ -4151,19 +4151,43 @@ async function loadShippingConfig() {
       const el = document.getElementById(id);
       if (el) el.value = val;
     };
+    const setChecked = (id, checked) => {
+      const el = document.getElementById(id);
+      if (el) el.checked = Boolean(checked);
+    };
 
-    // Tax rate stored as decimal (0.085), display as percentage (8.5)
-    setVal("shipping-tax-rate",      ((c.taxRate || 0) * 100).toFixed(2));
-    // Handling fee stored in cents, display as dollars
-    setVal("shipping-handling-fee",  ((c.handlingFeeCents || 0) / 100).toFixed(2));
-    // Per-sticker handling fee stored in cents, display as dollars
+    // Shipping Toggles
+    setChecked("shipping-parcel-enabled", c.parcelShippingEnabled !== false);
+    setChecked("shipping-envelope-enabled", c.envelopeShippingEnabled !== false);
+    setChecked("shipping-pickup-enabled", c.pickupEnabled !== false);
+
+    // Payment Toggles
+    setChecked("payment-square-enabled", c.squareEnabled !== false);
+    setChecked("payment-base-usdc-enabled", c.baseUsdcEnabled !== false);
+    setChecked("payment-lightning-enabled", c.lightningEnabled !== false);
+
+    // Shipping Fees
+    setVal("shipping-handling-fee", ((c.handlingFeeCents || 0) / 100).toFixed(2));
     setVal("shipping-handling-fee-per-item", ((c.handlingFeePerItemCents || 0) / 100).toFixed(2));
-    // Square % stored as decimal (0.029), display as percentage (2.9)
-    setVal("shipping-square-pct",    ((c.squareFeePercent || 0) * 100).toFixed(3));
-    // Square fixed stored in cents, display as dollars
-    setVal("shipping-square-fixed",  ((c.squareFeeFixedCents || 0) / 100).toFixed(2));
+    setVal("shipping-tare-grams", (c.packageTareGrams || 0).toFixed(0));
+
+    // Envelope Fees
+    setVal("shipping-envelope-fee", ((c.envelopeShippingCents ?? 95) / 100).toFixed(2));
+    setVal("shipping-envelope-handling", ((c.envelopeHandlingFeeCents ?? 30) / 100).toFixed(2));
+
+    // Pickup Discount
+    setVal("shipping-pickup-discount", ((c.pickupDiscountCents ?? 300) / 100).toFixed(2));
+
+    // Square Fees
+    setVal("shipping-square-pct", ((c.squareFeePercent || 0) * 100).toFixed(3));
+    setVal("shipping-square-fixed", ((c.squareFeeFixedCents || 0) / 100).toFixed(2));
+
+    // Base Wallet
+    setVal("payment-base-merchant-wallet", c.baseMerchantWallet || "");
+
+    // Tax & Material
+    setVal("shipping-tax-rate", ((c.taxRate || 0) * 100).toFixed(2));
     setVal("shipping-grams-per-sqin", (c.gramsPerSqIn || 0).toFixed(3));
-    setVal("shipping-tare-grams",     (c.packageTareGrams || 0).toFixed(0));
   } catch (err) {
     console.warn("[PRINTSHOP] Failed to load shipping config:", err);
   }
@@ -4178,19 +4202,36 @@ function initShippingConfigListeners() {
     const statusEl = document.getElementById("shipping-config-status");
 
     const getNum = (id) => parseFloat(document.getElementById(id)?.value || "0");
+    const getChecked = (id) => Boolean(document.getElementById(id)?.checked);
+    const getStr = (id) => (document.getElementById(id)?.value || "").trim();
 
     const payload = {
-      // Input is %, convert back to decimal for storage
-      taxRate:            getNum("shipping-tax-rate") / 100,
-      // Input is $, convert to cents
-      handlingFeeCents:   Math.round(getNum("shipping-handling-fee") * 100),
+      // Toggles
+      parcelShippingEnabled: getChecked("shipping-parcel-enabled"),
+      envelopeShippingEnabled: getChecked("shipping-envelope-enabled"),
+      pickupEnabled: getChecked("shipping-pickup-enabled"),
+      squareEnabled: getChecked("payment-square-enabled"),
+      baseUsdcEnabled: getChecked("payment-base-usdc-enabled"),
+      lightningEnabled: getChecked("payment-lightning-enabled"),
+
+      // Shipping & Handling Fees ($ to cents)
+      handlingFeeCents: Math.round(getNum("shipping-handling-fee") * 100),
       handlingFeePerItemCents: Math.round(getNum("shipping-handling-fee-per-item") * 100),
-      // Input is %, convert back to decimal
-      squareFeePercent:   getNum("shipping-square-pct") / 100,
-      // Input is $, convert to cents
+      packageTareGrams: getNum("shipping-tare-grams"),
+      envelopeShippingCents: Math.round(getNum("shipping-envelope-fee") * 100),
+      envelopeHandlingFeeCents: Math.round(getNum("shipping-envelope-handling") * 100),
+      pickupDiscountCents: Math.round(getNum("shipping-pickup-discount") * 100),
+
+      // Square Fees
+      squareFeePercent: getNum("shipping-square-pct") / 100,
       squareFeeFixedCents: Math.round(getNum("shipping-square-fixed") * 100),
-      gramsPerSqIn:       getNum("shipping-grams-per-sqin"),
-      packageTareGrams:   getNum("shipping-tare-grams"),
+
+      // Base Merchant Wallet Override
+      baseMerchantWallet: getStr("payment-base-merchant-wallet"),
+
+      // Tax & Material
+      taxRate: getNum("shipping-tax-rate") / 100,
+      gramsPerSqIn: getNum("shipping-grams-per-sqin"),
     };
 
     try {
@@ -4199,7 +4240,7 @@ function initShippingConfigListeners() {
         body: JSON.stringify(payload),
       });
       if (result && result.success) {
-        showSuccessToast("Shipping settings saved!");
+        showSuccessToast("Shipping & payment settings saved!");
         if (statusEl) {
           statusEl.textContent = "Saved ✓";
           statusEl.className = "text-sm text-green-600";
@@ -4209,7 +4250,7 @@ function initShippingConfigListeners() {
         throw new Error("Server returned failure");
       }
     } catch (err) {
-      showErrorToast(`Failed to save shipping settings: ${err.message}`);
+      showErrorToast(`Failed to save settings: ${err.message}`);
       if (statusEl) {
         statusEl.textContent = "Save failed";
         statusEl.className = "text-sm text-red-600";

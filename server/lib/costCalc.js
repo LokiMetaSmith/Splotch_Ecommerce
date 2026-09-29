@@ -134,6 +134,16 @@ export const DEFAULT_SHIPPING_CONFIG = {
   handlingFeePerItemCents: 0, // $0.00 per item
   envelopeShippingCents: 95, // $0.95 USPS letter envelope
   envelopeHandlingFeeCents: 30, // $0.30 letter envelope handling
+  // Shipping Method Toggles
+  parcelShippingEnabled: true,
+  envelopeShippingEnabled: true,
+  pickupEnabled: true,
+  // Payment Method Toggles
+  squareEnabled: true,
+  baseUsdcEnabled: true,
+  lightningEnabled: true,
+  // Payment Method Variables
+  baseMerchantWallet: "", // optional override, defaults to BASE_MERCHANT_WALLET env
 };
 
 /**
