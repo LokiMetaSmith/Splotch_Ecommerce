@@ -50,17 +50,22 @@ Content-Type: application/json
 ```
 
 ### Step 2: Submit Headless Order (Payment Challenge Negotiation)
-Send your order payload to initiate checkout:
+Send your order payload to initiate checkout.
+> **IMPORTANT:**
+> - `designUrl` is **REQUIRED**: A public HTTP/HTTPS URL to the artwork (PNG, JPG, SVG, WebP). Splotch downloads this file directly to print your stickers.
+> - `shippingAddress.email` is **REQUIRED**: A valid customer email for order confirmation and USPS tracking updates.
+
 ```http
 POST https://splotch.page/api/v1/orders
 Content-Type: application/json
 
 {
-  "quoteId": "quote_1790626000000",
-  "amount": "77.50",
+  "quoteId": "quo_1790626000000",
+  "amount": "0.35",
   "designUrl": "https://example.com/artwork.png",
   "shippingAddress": {
     "name": "Alex Agent",
+    "email": "alex@example.com",
     "street": "123 Autonomous Blvd",
     "city": "Oklahoma City",
     "state": "OK",
@@ -103,13 +108,20 @@ You can pay via **Direct On-Chain Transfer (Coinbase / Web3)** or **Delegated Ag
 1. Send the quote amount in USDC on **Base Mainnet** (Chain ID: `8453`) to:
    - **Recipient**: `0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23`
    - **Token Contract**: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
-2. Submit your order with `settlement` in the request body:
+2. Submit your order with `settlement`, `designUrl`, and `shippingAddress` (with `email`) in the request body:
    ```json
    POST /api/v1/orders
    {
      "quoteId": "quo_1790626000000",
      "designUrl": "https://example.com/artwork.png",
-     "shippingAddress": { ... },
+     "shippingAddress": {
+       "name": "Alex Agent",
+       "email": "alex@example.com",
+       "street": "123 Autonomous Blvd",
+       "city": "Oklahoma City",
+       "state": "OK",
+       "zip": "73102"
+     },
      "settlement": {
        "rail": "base_usdc",
        "tx_hash": "0xYourTxHashFromCoinbaseOrWallet",
@@ -117,7 +129,7 @@ You can pay via **Direct On-Chain Transfer (Coinbase / Web3)** or **Delegated Ag
      }
    }
    ```
-   *The server validates the on-chain transfer receipt via Base RPC.*
+   *The server downloads your artwork, validates the on-chain transfer receipt via Base RPC, and confirms your order.*
 
 #### Method B: Lightning Network (x402)
 Include the `authorization-x402` header containing base64-encoded JSON:

@@ -4,6 +4,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { verifyAP2Mandate, verifyMandateBindings } from "./lib/ap2_crypto.js";
 import { verifySettlementProof } from "./lib/settlement_verifier.js";
 import { DEFAULT_SHIPPING_CONFIG } from "./lib/costCalc.js";
+import { downloadAgentArtwork } from "./lib/artwork_downloader.js";
 import { execFile } from "child_process";
 import util from "util";
 import path from "path";
@@ -72,17 +73,18 @@ export function createMcpServer(db) {
             properties: {
               quoteId: { type: "string" },
               amount: { type: "string" },
-              designUrl: { type: "string" },
+              designUrl: { type: "string", description: "Public HTTP/HTTPS URL of the sticker artwork to print (Required)" },
               shippingAddress: {
                 type: "object",
                 properties: {
                   name: { type: "string" },
+                  email: { type: "string", description: "Customer email address for confirmation and USPS tracking updates (Required)" },
                   street: { type: "string" },
                   city: { type: "string" },
                   state: { type: "string" },
                   zip: { type: "string" }
                 },
-                required: ["name", "street", "city", "state", "zip"]
+                required: ["name", "email", "street", "city", "state", "zip"]
               }
             },
             required: ["quoteId", "amount", "designUrl", "shippingAddress"]
@@ -96,17 +98,18 @@ export function createMcpServer(db) {
             properties: {
               quoteId: { type: "string" },
               amount: { type: "string" },
-              designUrl: { type: "string" },
+              designUrl: { type: "string", description: "Public HTTP/HTTPS URL of the sticker artwork to print (Required)" },
               shippingAddress: {
                 type: "object",
                 properties: {
                   name: { type: "string" },
+                  email: { type: "string", description: "Customer email address for confirmation and USPS tracking updates (Required)" },
                   street: { type: "string" },
                   city: { type: "string" },
                   state: { type: "string" },
                   zip: { type: "string" }
                 },
-                required: ["name", "street", "city", "state", "zip"]
+                required: ["name", "email", "street", "city", "state", "zip"]
               }
             },
             required: ["quoteId", "amount", "designUrl", "shippingAddress"]
@@ -137,9 +140,22 @@ export function createMcpServer(db) {
               quoteId: { type: "string" },
               ap2_mandate_jws: { type: "string" },
               settlement: { type: "object" },
-              shipping_destination: { type: "object" },
-              designUrl: { type: "string" }
-            }
+              shipping_destination: {
+                type: "object",
+                properties: {
+                  recipient_name: { type: "string" },
+                  email: { type: "string", description: "Customer email address for tracking updates (Required)" },
+                  street_address: { type: "string" },
+                  city: { type: "string" },
+                  state: { type: "string" },
+                  postal_code: { type: "string" },
+                  country: { type: "string" }
+                },
+                required: ["email"]
+              },
+              designUrl: { type: "string", description: "Public HTTP/HTTPS URL of artwork to print (Required)" }
+            },
+            required: ["designUrl"]
           }
         },
         {
@@ -321,20 +337,31 @@ export function createMcpServer(db) {
           }
         }
 
-        const orderId = "ord_" + Date.now();
+        const rawShip = shipping || {};
+        const customerEmail = (rawShip.email || args.email || "").trim();
+        if (!customerEmail || !customerEmail.includes("@") || customerEmail.toLowerCase() === "agent@splotch.page") {
+          throw new Error("Missing required customer email: 'shippingAddress.email' is required for order confirmation and USPS tracking updates.");
+        }
+
         const rawItems = args.items || (storedQuote?.spec ? [storedQuote.spec] : []);
         const firstItem = (rawItems && rawItems[0]) || storedQuote?.spec || {};
-        const rawShip = shipping || {};
+        const rawDesignUrl = (designUrl || firstItem.designUrl || firstItem.artwork_url || "").trim();
+        if (!rawDesignUrl) {
+          throw new Error("Missing required order field: 'designUrl' (public HTTP/HTTPS image URL) is required to print custom stickers.");
+        }
+
+        const localDesignPath = await downloadAgentArtwork(rawDesignUrl);
+
+        const orderId = "ord_" + Date.now();
         const nameStr = (rawShip.name || rawShip.recipient_name || "").trim();
         const nameParts = nameStr ? nameStr.split(/\s+/) : ["Agent", "Customer"];
         const givenName = nameParts[0] || "Agent";
         const familyName = nameParts.slice(1).join(" ") || "";
-        const emailStr = rawShip.email || args.email || "agent@splotch.page";
 
         const contactObj = {
           givenName,
           familyName,
-          email: emailStr,
+          email: customerEmail,
           addressLines: [rawShip.street || rawShip.street_address || rawShip.address_line_1].filter(Boolean),
           locality: rawShip.city || rawShip.locality || "",
           administrativeDistrictLevel1: rawShip.state || rawShip.administrative_area || "",
@@ -373,7 +400,8 @@ export function createMcpServer(db) {
           shippingContact: contactObj,
           billingContact: contactObj,
           deliveryMethod: (args.shippingMethod === "pickup" || args.delivery?.method === "pickup") ? "pickup" : "ship",
-          designImagePath: designUrl || firstItem.designUrl || firstItem.artwork_url || null
+          designImagePath: localDesignPath,
+          designUrl: rawDesignUrl
         };
         await db.createOrder(orderRecord);
 

@@ -988,7 +988,10 @@ export function displayOrderRow(order) {
   const hasDistinctBilling = billingAddrStr && shippingAddrStr && (billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase());
 
   const serverPrefix = serverUrl;
-  const designImagePath = `${serverPrefix}${escapeHtml(order.designImagePath || "")}`;
+  const rawImagePath = order.designImagePath || order.designUrl || (Array.isArray(order.items) && order.items[0]?.artwork_url) || (Array.isArray(order.items) && order.items[0]?.designUrl) || "";
+  const designImagePath = rawImagePath.startsWith("http://") || rawImagePath.startsWith("https://") || rawImagePath.startsWith("data:")
+    ? escapeHtml(rawImagePath)
+    : (rawImagePath ? `${serverPrefix}${escapeHtml(rawImagePath)}` : "");
   const cutFilePath = escapeHtml(
     order.orderDetails?.cutLinePath || order.cutLinePath || "",
   );
@@ -1144,7 +1147,7 @@ export function displayOrderRow(order) {
       </td>
       <td class="px-4 py-3">
         <div class="flex items-center gap-2">
-            ${designImagePath && order.designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
+            ${designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
                 <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${specs.ppi}" loading="lazy" decoding="async">
             </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[10px] text-gray-500 font-semibold text-center leading-tight p-1">${order.artworkPruned ? 'Pruned' : 'N/A'}</div>`}
             <div>
@@ -1373,7 +1376,10 @@ export function displayOrder(order) {
   const statusClass =
     statusColors[status.toUpperCase()] || "bg-gray-500 text-white";
 
-  const designImagePath = `${serverUrl}${escapeHtml(order.designImagePath)}`;
+  const rawImagePath = order.designImagePath || order.designUrl || (Array.isArray(order.items) && order.items[0]?.artwork_url) || (Array.isArray(order.items) && order.items[0]?.designUrl) || "";
+  const designImagePath = rawImagePath.startsWith("http://") || rawImagePath.startsWith("https://") || rawImagePath.startsWith("data:")
+    ? escapeHtml(rawImagePath)
+    : (rawImagePath ? `${serverUrl}${escapeHtml(rawImagePath)}` : "");
   const cutFilePath = escapeHtml(
     order.orderDetails?.cutLinePath || order.cutLinePath || "",
   );
@@ -1551,7 +1557,7 @@ export function displayOrder(order) {
 
         <div class="mt-4">
             <dt>Sticker Design:</dt>
-            ${designImagePath && order.designImagePath ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank">
+            ${designImagePath ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank">
                 <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
             </a>` : `<div class="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 font-semibold p-2 text-center">${order.artworkPruned ? 'Artwork Pruned' : 'No Preview'}</div>`}
             ${cutFilePath ? `<div class="mt-2"><dt>Cut File:</dt><dd><a href="${serverUrl}${cutFilePath}" class="text-blue-500 underline text-sm" target="_blank" download>Download SVG / XML</a></dd></div>` : ""}

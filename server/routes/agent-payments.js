@@ -2,6 +2,7 @@ import express from "express";
 import { verifyAP2Mandate, verifyMandateBindings, computeCartDigest } from "../lib/ap2_crypto.js";
 import { verifySettlementProof, getActiveSettlementMethods, isLightningEnabled, isBaseUsdcEnabled } from "../lib/settlement_verifier.js";
 import { DEFAULT_SHIPPING_CONFIG } from "../lib/costCalc.js";
+import { downloadAgentArtwork } from "../lib/artwork_downloader.js";
 
 export default function createAgentPaymentsRouter(db) {
   const router = express.Router();
@@ -195,20 +196,42 @@ export default function createAgentPaymentsRouter(db) {
     }
 
     // Create real order record mapping incoming request
-    const orderId = "ord_" + Date.now();
+    const rawShip = body.shippingAddress || body.shipping_destination || {};
+    const customerEmail = (rawShip.email || body.email || "").trim();
+    if (!customerEmail || !customerEmail.includes("@") || customerEmail.toLowerCase() === "agent@splotch.page") {
+      return res.status(400).json({
+        error: "Missing required customer email: 'shippingAddress.email' is required for order confirmation and USPS tracking updates."
+      });
+    }
+
     const rawItems = body.items || (verified.quote.spec ? [verified.quote.spec] : []);
     const firstItem = (rawItems && rawItems[0]) || verified.quote.spec || {};
-    const rawShip = body.shippingAddress || body.shipping_destination || {};
+    const rawDesignUrl = (body.designUrl || body.design_url || firstItem.designUrl || firstItem.artwork_url || "").trim();
+    if (!rawDesignUrl) {
+      return res.status(400).json({
+        error: "Missing required order field: 'designUrl' (public HTTP/HTTPS image URL) is required to print custom stickers."
+      });
+    }
+
+    let localDesignPath;
+    try {
+      localDesignPath = await downloadAgentArtwork(rawDesignUrl);
+    } catch (dlErr) {
+      return res.status(400).json({
+        error: `Failed to retrieve artwork from 'designUrl': ${dlErr.message}`
+      });
+    }
+
+    const orderId = "ord_" + Date.now();
     const nameStr = (rawShip.name || rawShip.recipient_name || "").trim();
     const nameParts = nameStr ? nameStr.split(/\s+/) : ["Agent", "Customer"];
     const givenName = nameParts[0] || "Agent";
     const familyName = nameParts.slice(1).join(" ") || "";
-    const emailStr = rawShip.email || body.email || "agent@splotch.page";
 
     const contactObj = {
       givenName,
       familyName,
-      email: emailStr,
+      email: customerEmail,
       addressLines: [rawShip.street || rawShip.street_address || rawShip.address_line_1].filter(Boolean),
       locality: rawShip.city || rawShip.locality || "",
       administrativeDistrictLevel1: rawShip.state || rawShip.administrative_area || "",
@@ -247,7 +270,8 @@ export default function createAgentPaymentsRouter(db) {
       shippingContact: contactObj,
       billingContact: contactObj,
       deliveryMethod: (body.shippingMethod === "pickup" || body.delivery?.method === "pickup") ? "pickup" : "ship",
-      designImagePath: body.designUrl || body.design_url || firstItem.designUrl || firstItem.artwork_url || null
+      designImagePath: localDesignPath,
+      designUrl: rawDesignUrl
     };
 
     await db.createOrder(orderRecord);

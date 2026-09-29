@@ -234,7 +234,17 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
       .post("/api/v1/payments/ap2")
       .set("authorization-x402", paymentProof)
       .set("x-ap2-mandate", mandate)
-      .send({});
+      .send({
+        designUrl: "https://example.com/artwork.png",
+        shippingAddress: {
+          name: "Test Agent",
+          email: "agent@test.com",
+          street: "123 Main St",
+          city: "OKC",
+          state: "OK",
+          zip: "73101"
+        }
+      });
 
     expect(res.statusCode).toBe(201);
     expect(res.body.orderId).toBeDefined();
@@ -311,7 +321,16 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
       .set("x-ap2-mandate", mandate)
       .send({
         amount: "20.00",
-        quoteId: validQuoteId
+        quoteId: validQuoteId,
+        designUrl: "https://example.com/order-art.png",
+        shippingAddress: {
+          name: "Order Direct",
+          email: "buyer@example.com",
+          street: "456 Test Way",
+          city: "Tulsa",
+          state: "OK",
+          zip: "74103"
+        }
       });
 
     expect(res.statusCode).toBe(201);
@@ -382,8 +401,10 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
           amount: totalAmount.toFixed(2),
           payer_wallet: "0x49B3c11E866299bBfA689D8B4E15682C562f7D35"
         },
+        designUrl: "https://example.com/gemini-sticker.png",
         shipping_destination: {
           recipient_name: "Autonomous Agent Lab",
+          email: "lab@example.com",
           street_address: "7712 S. Penn Ave",
           city: "Oklahoma City",
           state: "OK",
@@ -494,8 +515,10 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
       .set("authorization-x402", paymentProof)
       .send({
         quoteId: validQuoteId,
+        designUrl: "https://example.com/direct-usdc.png",
         shippingAddress: {
           name: "Direct Buyer",
+          email: "buyer@direct.com",
           street: "123 Base St",
           city: "Oklahoma City",
           state: "OK",
@@ -518,5 +541,113 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     expect(res.body.settlement_details.base_usdc.token_address).toBe("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
     expect(res.body.settlement_details.base_usdc.recipient_address).toMatch(/^0x[a-fA-F0-9]{40}$/);
   });
+
+  it("should reject order with 400 if designUrl is missing", async () => {
+    const quoteId = "quo_no_art";
+    await mockDb.createQuote({
+      quoteId,
+      total: 0.35,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60000).toISOString()
+    });
+
+    const paymentProof = Buffer.from(JSON.stringify({
+      status: "PAID",
+      paymentId: "tx_no_art_123",
+      amount: "0.35"
+    })).toString("base64");
+
+    const res = await request(app)
+      .post("/api/v1/orders")
+      .set("authorization-x402", paymentProof)
+      .send({
+        quoteId,
+        shippingAddress: {
+          name: "No Art Buyer",
+          email: "buyer@example.com",
+          street: "123 Test St",
+          city: "OKC",
+          state: "OK",
+          zip: "73101"
+        }
+      });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toContain("Missing required order field: 'designUrl'");
+  });
+
+  it("should reject order with 400 if shippingAddress.email is missing or invalid", async () => {
+    const quoteId = "quo_no_email";
+    await mockDb.createQuote({
+      quoteId,
+      total: 0.35,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60000).toISOString()
+    });
+
+    const paymentProof = Buffer.from(JSON.stringify({
+      status: "PAID",
+      paymentId: "tx_no_email_123",
+      amount: "0.35"
+    })).toString("base64");
+
+    const res = await request(app)
+      .post("/api/v1/orders")
+      .set("authorization-x402", paymentProof)
+      .send({
+        quoteId,
+        designUrl: "https://example.com/valid-art.png",
+        shippingAddress: {
+          name: "No Email Buyer",
+          street: "123 Test St",
+          city: "OKC",
+          state: "OK",
+          zip: "73101"
+        }
+      });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toContain("Missing required customer email: 'shippingAddress.email'");
+  });
+
+  it("should download artwork and save local /uploads path on confirmed order", async () => {
+    const quoteId = "quo_dl_art";
+    await mockDb.createQuote({
+      quoteId,
+      total: 0.35,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60000).toISOString()
+    });
+
+    const paymentProof = Buffer.from(JSON.stringify({
+      status: "PAID",
+      paymentId: "tx_dl_art_123",
+      amount: "0.35"
+    })).toString("base64");
+
+    const res = await request(app)
+      .post("/api/v1/orders")
+      .set("authorization-x402", paymentProof)
+      .send({
+        quoteId,
+        designUrl: "https://example.com/mascot-art.png",
+        shippingAddress: {
+          name: "Artwork Tester",
+          email: "art@example.com",
+          street: "123 Design Blvd",
+          city: "OKC",
+          state: "OK",
+          zip: "73102"
+        }
+      });
+
+    expect(res.statusCode).toBe(201);
+    expect(mockDb.createOrder).toHaveBeenCalled();
+    const createdOrder = mockDb.createOrder.mock.calls[mockDb.createOrder.mock.calls.length - 1][0];
+    expect(createdOrder.designImagePath).toMatch(/^\/uploads\/designImage-/);
+    expect(createdOrder.designUrl).toBe("https://example.com/mascot-art.png");
+    expect(createdOrder.shippingContact.email).toBe("art@example.com");
+  });
 });
+
 
