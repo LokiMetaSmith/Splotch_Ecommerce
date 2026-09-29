@@ -831,7 +831,8 @@ export function getResolutionPpi(resolutionId) {
  */
 export function getOrderSpecs(order) {
   if (!order) return {};
-  const details = order.orderDetails || {};
+  const firstItem = (Array.isArray(order.items) && order.items[0]) || {};
+  const details = order.orderDetails || firstItem || {};
 
   // 1. Resolution & PPI
   const rawRes = details.resolution || order.resolution;
@@ -956,15 +957,27 @@ export function displayOrderRow(order) {
   const isExpanded = expandedOrderIds.has(orderId);
   const specs = getOrderSpecs(order);
   const receivedAt = new Date(order.receivedAt).toLocaleString();
-  const quantity = order.orderDetails?.quantity || order.quantity || 0;
-  const price = (order.amount / 100).toFixed(2);
+  const rawShipAddr = order.shippingAddress || {};
+  const quantity = order.orderDetails?.quantity || order.quantity || (Array.isArray(order.items) && order.items[0]?.quantity) || 0;
+  const rawAmt = typeof order.amount === "number" ? order.amount : parseFloat(order.amount || 0);
+  const price = (order.amountUsd !== undefined)
+    ? Number(order.amountUsd).toFixed(2)
+    : (rawAmt > 0 && rawAmt < 100 && String(rawAmt).includes('.'))
+      ? rawAmt.toFixed(2)
+      : (rawAmt / 100).toFixed(2);
 
-  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.billing?.name || "N/A");
-  const billingEmail = escapeHtml(order.billingContact?.email || order.customerDetails?.billing?.email || order.customerEmail || "N/A");
-  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.shipping?.name || billingName);
-  const shippingEmail = escapeHtml(order.shippingContact?.email || billingEmail);
+  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.billing?.name || rawShipAddr.name || "N/A");
+  const billingEmail = escapeHtml(order.billingContact?.email || order.customerDetails?.billing?.email || rawShipAddr.email || order.customerEmail || "N/A");
+  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.shipping?.name || rawShipAddr.name || billingName);
+  const shippingEmail = escapeHtml(order.shippingContact?.email || rawShipAddr.email || billingEmail);
 
   const formatAddress = (contact) => {
+    if (!contact && order.shippingAddress) {
+      const sa = order.shippingAddress;
+      const lines = [sa.street || sa.street_address || sa.address_line_1].filter(Boolean).join(", ");
+      const cityStateZip = [sa.city, sa.state, sa.zip || sa.postal_code].filter(Boolean).join(" ");
+      return [lines, cityStateZip].filter(Boolean).join(", ");
+    }
     if (!contact) return "";
     const lines = Array.isArray(contact.addressLines) ? contact.addressLines.filter(Boolean).join(", ") : (contact.addressLines || "");
     const cityStateZip = [contact.locality || contact.city, contact.administrativeDistrictLevel1 || contact.state, contact.postalCode].filter(Boolean).join(" ");
@@ -1300,18 +1313,30 @@ export function displayOrder(order) {
     return order._cachedHtml;
   }
 
-  const formattedAmount = order.amount
-    ? `$${(order.amount / 100).toFixed(2)}`
-    : "N/A";
+  const rawShipAddr = order.shippingAddress || {};
+  const rawAmt = typeof order.amount === "number" ? order.amount : parseFloat(order.amount || 0);
+  const formattedAmount = (order.amountUsd !== undefined)
+    ? `$${Number(order.amountUsd).toFixed(2)}`
+    : (rawAmt > 0 && rawAmt < 100 && String(rawAmt).includes('.'))
+      ? `$${rawAmt.toFixed(2)}`
+      : order.amount
+        ? `$${(order.amount / 100).toFixed(2)}`
+        : "N/A";
   const receivedDate = new Date(order.receivedAt).toLocaleString();
 
-  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`;
-  const billingEmail = escapeHtml(order.billingContact?.email || "N/A");
+  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.billing?.name || rawShipAddr.name || "N/A");
+  const billingEmail = escapeHtml(order.billingContact?.email || order.customerDetails?.billing?.email || rawShipAddr.email || order.customerEmail || "N/A");
 
-  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`;
-  const shippingEmail = escapeHtml(order.shippingContact?.email || "N/A");
+  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.shipping?.name || rawShipAddr.name || billingName);
+  const shippingEmail = escapeHtml(order.shippingContact?.email || rawShipAddr.email || billingEmail);
 
   const formatAddress = (contact) => {
+    if (!contact && order.shippingAddress) {
+      const sa = order.shippingAddress;
+      const lines = [sa.street || sa.street_address || sa.address_line_1].filter(Boolean).join(", ");
+      const cityStateZip = [sa.city, sa.state, sa.zip || sa.postal_code].filter(Boolean).join(" ");
+      return [lines, cityStateZip].filter(Boolean).join(", ");
+    }
     if (!contact) return "";
     const lines = Array.isArray(contact.addressLines) ? contact.addressLines.filter(Boolean).join(", ") : (contact.addressLines || "");
     const cityStateZip = [contact.locality || contact.city, contact.administrativeDistrictLevel1 || contact.state, contact.postalCode].filter(Boolean).join(" ");
@@ -1322,7 +1347,7 @@ export function displayOrder(order) {
   const hasDistinctBilling = billingAddrStr && shippingAddrStr && (billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase());
 
   const specs = getOrderSpecs(order);
-  const quantity = escapeHtml(order.orderDetails?.quantity || "N/A");
+  const quantity = escapeHtml(order.orderDetails?.quantity || order.quantity || (Array.isArray(order.items) && order.items[0]?.quantity) || "N/A");
   const ppi = specs.ppi || getResolutionPpi(order.orderDetails?.resolution || order.resolution);
   const status = escapeHtml(order.status);
   const orderId = escapeHtml(order.orderId);

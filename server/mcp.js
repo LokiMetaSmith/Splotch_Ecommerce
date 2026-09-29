@@ -3,6 +3,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { verifyAP2Mandate, verifyMandateBindings } from "./lib/ap2_crypto.js";
 import { verifySettlementProof } from "./lib/settlement_verifier.js";
+import { DEFAULT_SHIPPING_CONFIG } from "./lib/costCalc.js";
 import { execFile } from "child_process";
 import util from "util";
 import path from "path";
@@ -181,7 +182,31 @@ export function createMcpServer(db) {
 
       const isSpecial = material === "holographic" || material === "heavy_duty_pvc";
       const unitPrice = parseFloat(((width * height * 0.15) + (isSpecial ? 0.35 : 0.20)).toFixed(2));
-      const total = parseFloat((unitPrice * quantity).toFixed(2));
+      const printSubtotal = parseFloat((unitPrice * quantity).toFixed(2));
+
+      const savedShipping = db.data?.config?.shipping || {};
+      const shippingConfig = { ...DEFAULT_SHIPPING_CONFIG, ...savedShipping };
+
+      const isPickup = args.shippingMethod === "pickup";
+      const canUseEnvelope = shippingConfig.envelopeShippingEnabled !== false && quantity <= 10 && width <= 4.5 && height <= 6.5;
+      const isEnvelope = !isPickup && (args.shippingMethod === "envelope" || canUseEnvelope);
+
+      let shippingCents = 0;
+      let shippingMethodLabel = "pickup";
+
+      if (isPickup) {
+        shippingCents = 0;
+        shippingMethodLabel = "pickup";
+      } else if (isEnvelope) {
+        shippingCents = (shippingConfig.envelopeShippingCents ?? 125) + (shippingConfig.envelopeHandlingFeeCents ?? 25);
+        shippingMethodLabel = "usps_economy_envelope";
+      } else if (shippingConfig.parcelShippingEnabled !== false) {
+        shippingCents = 430 + (shippingConfig.baseHandlingFeeCents ?? 103);
+        shippingMethodLabel = "usps_tracked_parcel";
+      }
+
+      const shippingUsd = parseFloat((shippingCents / 100).toFixed(2));
+      const total = parseFloat((printSubtotal + shippingUsd).toFixed(2));
 
       const quoteId = `quo_${Date.now()}`;
       const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
@@ -193,7 +218,21 @@ export function createMcpServer(db) {
           total,
           currency: "USD",
           expiresAt,
-          status: "PENDING"
+          status: "PENDING",
+          pricing: {
+            print_subtotal_usd: printSubtotal.toFixed(2),
+            tradeoff_discount_usd: "0.00",
+            shipping_usd: shippingUsd.toFixed(2),
+            shipping_method: shippingMethodLabel,
+            total_usd: total.toFixed(2)
+          },
+          spec: {
+            widthInches: width,
+            heightInches: height,
+            quantity,
+            material,
+            shippingMethod: shippingMethodLabel
+          }
       });
 
       return {
@@ -209,9 +248,10 @@ export function createMcpServer(db) {
               total_usd: total.toFixed(2),
               currency: "USD",
               pricing: {
-                print_subtotal_usd: total.toFixed(2),
+                print_subtotal_usd: printSubtotal.toFixed(2),
                 tradeoff_discount_usd: "0.00",
-                shipping_usd: "0.00",
+                shipping_usd: shippingUsd.toFixed(2),
+                shipping_method: shippingMethodLabel,
                 total_usd: total.toFixed(2)
               },
               settlement_equivalents: {
@@ -282,18 +322,58 @@ export function createMcpServer(db) {
         }
 
         const orderId = "ord_" + Date.now();
+        const rawItems = args.items || (storedQuote?.spec ? [storedQuote.spec] : []);
+        const firstItem = (rawItems && rawItems[0]) || storedQuote?.spec || {};
+        const rawShip = shipping || {};
+        const nameStr = (rawShip.name || rawShip.recipient_name || "").trim();
+        const nameParts = nameStr ? nameStr.split(/\s+/) : ["Agent", "Customer"];
+        const givenName = nameParts[0] || "Agent";
+        const familyName = nameParts.slice(1).join(" ") || "";
+        const emailStr = rawShip.email || args.email || "agent@splotch.page";
+
+        const contactObj = {
+          givenName,
+          familyName,
+          email: emailStr,
+          addressLines: [rawShip.street || rawShip.street_address || rawShip.address_line_1].filter(Boolean),
+          locality: rawShip.city || rawShip.locality || "",
+          administrativeDistrictLevel1: rawShip.state || rawShip.administrative_area || "",
+          postalCode: rawShip.zip || rawShip.postal_code || "",
+          country: rawShip.country || "US"
+        };
+
+        const amountInCents = Math.round(settlementMeta.amount * 100);
         const orderRecord = {
           orderId,
           order_id: orderId,
-          status: "queued_for_print",
+          status: "NEW",
           receivedAt: new Date().toISOString(),
           paymentId: settlementMeta.paymentId,
-          amount: settlementMeta.amount,
+          amount: amountInCents,
+          amountCents: amountInCents,
+          amountUsd: settlementMeta.amount,
           buyerType: "agent",
           settlementRail: settlementMeta.rail,
           txHash: settlementMeta.tx_hash || null,
-          items: args.items || (storedQuote?.spec ? [storedQuote.spec] : []),
-          shippingAddress: shipping || {}
+          quantity: firstItem.quantity || storedQuote?.spec?.quantity || 1,
+          widthInches: firstItem.widthInches || storedQuote?.spec?.widthInches || null,
+          heightInches: firstItem.heightInches || storedQuote?.spec?.heightInches || null,
+          material: firstItem.material || storedQuote?.spec?.material || "vinyl_matte",
+          cutType: firstItem.cutType || firstItem.cut_type || storedQuote?.spec?.cutType || "die_cut",
+          orderDetails: {
+            quantity: firstItem.quantity || storedQuote?.spec?.quantity || 1,
+            widthInches: firstItem.widthInches || storedQuote?.spec?.widthInches || null,
+            heightInches: firstItem.heightInches || storedQuote?.spec?.heightInches || null,
+            material: firstItem.material || storedQuote?.spec?.material || "vinyl_matte",
+            cutType: firstItem.cutType || firstItem.cut_type || storedQuote?.spec?.cutType || "die_cut",
+            resolution: "dpi_300"
+          },
+          items: rawItems,
+          shippingAddress: rawShip,
+          shippingContact: contactObj,
+          billingContact: contactObj,
+          deliveryMethod: (args.shippingMethod === "pickup" || args.delivery?.method === "pickup") ? "pickup" : "ship",
+          designImagePath: designUrl || firstItem.designUrl || firstItem.artwork_url || null
         };
         await db.createOrder(orderRecord);
 

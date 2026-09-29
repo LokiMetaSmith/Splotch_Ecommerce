@@ -57,9 +57,14 @@ export function displayOrders(orders, container, noOrdersMessage) {
   const html = orders
     .map((order) => {
       const receivedDate = new Date(order.receivedAt).toLocaleDateString();
-      const formattedAmount = order.amount
-        ? `$${(order.amount / 100).toFixed(2)}`
-        : "N/A";
+      const rawAmt = typeof order.amount === "number" ? order.amount : parseFloat(order.amount || 0);
+      const formattedAmount = (order.amountUsd !== undefined)
+        ? `$${Number(order.amountUsd).toFixed(2)}`
+        : (rawAmt > 0 && rawAmt < 100 && String(rawAmt).includes('.'))
+          ? `$${rawAmt.toFixed(2)}`
+          : order.amount
+            ? `$${(rawAmt / 100).toFixed(2)}`
+            : "N/A";
 
       const safeOrderId = escapeHtml(order.orderId);
       const safeOrderIdShort = escapeHtml(order.orderId.substring(0, 8));

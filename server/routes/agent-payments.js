@@ -157,7 +157,7 @@ export default function createAgentPaymentsRouter(db) {
       }
 
       // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
-      const settlementMeta = await verifySettlementProof(paymentProof, storedQuote);
+      const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
 
       // 5. Verify payment amount matches quote
       const providedAmount = parseFloat(body.amount || (body.settlement && body.settlement.amount) || settlementMeta.amount);
@@ -196,18 +196,58 @@ export default function createAgentPaymentsRouter(db) {
 
     // Create real order record mapping incoming request
     const orderId = "ord_" + Date.now();
+    const rawItems = body.items || (verified.quote.spec ? [verified.quote.spec] : []);
+    const firstItem = (rawItems && rawItems[0]) || verified.quote.spec || {};
+    const rawShip = body.shippingAddress || body.shipping_destination || {};
+    const nameStr = (rawShip.name || rawShip.recipient_name || "").trim();
+    const nameParts = nameStr ? nameStr.split(/\s+/) : ["Agent", "Customer"];
+    const givenName = nameParts[0] || "Agent";
+    const familyName = nameParts.slice(1).join(" ") || "";
+    const emailStr = rawShip.email || body.email || "agent@splotch.page";
+
+    const contactObj = {
+      givenName,
+      familyName,
+      email: emailStr,
+      addressLines: [rawShip.street || rawShip.street_address || rawShip.address_line_1].filter(Boolean),
+      locality: rawShip.city || rawShip.locality || "",
+      administrativeDistrictLevel1: rawShip.state || rawShip.administrative_area || "",
+      postalCode: rawShip.zip || rawShip.postal_code || "",
+      country: rawShip.country || "US"
+    };
+
+    const amountInCents = Math.round(verified.amount * 100);
     const orderRecord = {
       orderId: orderId,
       order_id: orderId,
       status: "NEW",
       receivedAt: new Date().toISOString(),
       paymentId: verified.paymentId,
-      amount: verified.amount,
+      amount: amountInCents,
+      amountCents: amountInCents,
+      amountUsd: verified.amount,
       buyerType: "agent",
       settlementRail: verified.settlement?.rail || "x402",
       txHash: verified.settlement?.tx_hash || null,
-      items: body.items || (verified.quote.spec ? [verified.quote.spec] : []),
-      shippingAddress: body.shippingAddress || body.shipping_destination || {}
+      quantity: firstItem.quantity || verified.quote.spec?.quantity || 1,
+      widthInches: firstItem.widthInches || verified.quote.spec?.widthInches || null,
+      heightInches: firstItem.heightInches || verified.quote.spec?.heightInches || null,
+      material: firstItem.material || verified.quote.spec?.material || "vinyl_matte",
+      cutType: firstItem.cutType || firstItem.cut_type || verified.quote.spec?.cutType || "die_cut",
+      orderDetails: {
+        quantity: firstItem.quantity || verified.quote.spec?.quantity || 1,
+        widthInches: firstItem.widthInches || verified.quote.spec?.widthInches || null,
+        heightInches: firstItem.heightInches || verified.quote.spec?.heightInches || null,
+        material: firstItem.material || verified.quote.spec?.material || "vinyl_matte",
+        cutType: firstItem.cutType || firstItem.cut_type || verified.quote.spec?.cutType || "die_cut",
+        resolution: "dpi_300"
+      },
+      items: rawItems,
+      shippingAddress: rawShip,
+      shippingContact: contactObj,
+      billingContact: contactObj,
+      deliveryMethod: (body.shippingMethod === "pickup" || body.delivery?.method === "pickup") ? "pickup" : "ship",
+      designImagePath: body.designUrl || body.design_url || firstItem.designUrl || firstItem.artwork_url || null
     };
 
     await db.createOrder(orderRecord);
@@ -283,7 +323,7 @@ export default function createAgentPaymentsRouter(db) {
 
   // --- REST Quoting API: POST /v1/quotes ---
   router.post("/v1/quotes", async (req, res) => {
-    const { activeRails, merchantWallet, settlementDetails } = getSettlementContext();
+    const { activeRails, merchantWallet, settlementDetails, shippingConfig } = getSettlementContext();
     const body = req.body || {};
     let widthInches = body.widthInches;
     let heightInches = body.heightInches;
@@ -323,7 +363,28 @@ export default function createAgentPaymentsRouter(db) {
     const isSpecialMaterial = material === "holographic" || material === "heavy_duty_pvc";
     const materialSurcharge = isSpecialMaterial ? 0.35 : 0.20;
     const unitPrice = parseFloat(((width * height * baseRate) + materialSurcharge).toFixed(2));
-    const total = parseFloat((unitPrice * qty).toFixed(2));
+    const printSubtotal = parseFloat((unitPrice * qty).toFixed(2));
+
+    const isPickup = body.shippingMethod === "pickup" || body.delivery?.method === "pickup";
+    const canUseEnvelope = shippingConfig.envelopeShippingEnabled !== false && qty <= 10 && width <= 4.5 && height <= 6.5;
+    const isEnvelope = !isPickup && (body.shippingMethod === "envelope" || canUseEnvelope);
+
+    let shippingCents = 0;
+    let shippingMethodLabel = "pickup";
+
+    if (isPickup) {
+      shippingCents = 0;
+      shippingMethodLabel = "pickup";
+    } else if (isEnvelope) {
+      shippingCents = (shippingConfig.envelopeShippingCents ?? 125) + (shippingConfig.envelopeHandlingFeeCents ?? 25);
+      shippingMethodLabel = "usps_economy_envelope";
+    } else if (shippingConfig.parcelShippingEnabled !== false) {
+      shippingCents = 430 + (shippingConfig.baseHandlingFeeCents ?? 103);
+      shippingMethodLabel = "usps_tracked_parcel";
+    }
+
+    const shippingUsd = parseFloat((shippingCents / 100).toFixed(2));
+    const total = parseFloat((printSubtotal + shippingUsd).toFixed(2));
 
     const quoteId = `quo_${Date.now()}`;
     const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
@@ -336,13 +397,21 @@ export default function createAgentPaymentsRouter(db) {
       currency: "USD",
       expiresAt,
       status: "PENDING",
+      pricing: {
+        print_subtotal_usd: printSubtotal.toFixed(2),
+        tradeoff_discount_usd: "0.00",
+        shipping_usd: shippingUsd.toFixed(2),
+        shipping_method: shippingMethodLabel,
+        total_usd: total.toFixed(2)
+      },
       spec: {
         widthInches: width,
         heightInches: height,
         quantity: qty,
         material,
         cutType,
-        shape
+        shape,
+        shippingMethod: shippingMethodLabel
       }
     };
 
@@ -357,9 +426,10 @@ export default function createAgentPaymentsRouter(db) {
       total_usd: total.toFixed(2),
       currency: "USD",
       pricing: {
-        print_subtotal_usd: total.toFixed(2),
+        print_subtotal_usd: printSubtotal.toFixed(2),
         tradeoff_discount_usd: "0.00",
-        shipping_usd: "0.00",
+        shipping_usd: shippingUsd.toFixed(2),
+        shipping_method: shippingMethodLabel,
         total_usd: total.toFixed(2)
       },
       settlement_methods: getActiveSettlementMethods(),
@@ -407,7 +477,9 @@ export default function createAgentPaymentsRouter(db) {
       order_id: order.orderId,
       status: order.status,
       receivedAt: order.receivedAt,
-      amount: order.amount,
+      amount: order.amountUsd !== undefined ? order.amountUsd : (order.amount >= 100 ? parseFloat((order.amount / 100).toFixed(2)) : order.amount),
+      amountCents: order.amountCents || (order.amount >= 100 ? order.amount : Math.round(order.amount * 100)),
+      quantity: order.quantity || order.orderDetails?.quantity || 1,
       trackingUrl: `https://splotch.page/orders.html?id=${order.orderId}`,
       fulfillment_tracking_url: `https://splotch.page/api/v1/orders/${order.orderId}`
     });
