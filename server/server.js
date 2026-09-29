@@ -92,7 +92,7 @@ import { dispatchSecurityAlert, getClientIp } from "./lib/securityAlerts.js";
 import OdooClient from "./odoo.js";
 import { exec, execFile } from "child_process";
 import util from "util";
-import { mcpRequestHandler, mcpMessageHandler } from "./mcp.js";
+import { mcpRequestHandler, mcpMessageHandler, mcpStreamableHandler } from "./mcp.js";
 import createAgentPaymentsRouter from "./routes/agent-payments.js";
 
 const execPromise = util.promisify(exec);
@@ -920,6 +920,12 @@ async function startServer(
     const corsOptions = {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
+        if (
+          origin.includes("claude.ai") ||
+          origin.includes("anthropic.com")
+        ) {
+          return callback(null, true);
+        }
         const isAllowed = allowedOrigins.some((allowedOrigin) => {
           if (typeof allowedOrigin === "string") {
             return allowedOrigin === origin;
@@ -1150,6 +1156,7 @@ async function startServer(
             "/api/v1/payments/ap2",
             "/api/v1/quotes",
             "/api/v1/orders",
+            "/api/mcp",
             "/api/mcp/messages",
           ],
         },
@@ -1341,9 +1348,35 @@ async function startServer(
     // --- API Endpoints ---
     app.use("/api", apiLimiter);
 
-    // --- MCP Server Endpoints ---
-    app.get("/api/mcp", (req, res) => mcpRequestHandler(req, res, db));
-    app.post("/api/mcp/messages", (req, res) => mcpMessageHandler(req, res, db));
+    // --- MCP Server Endpoints (Dual Transport: Streamable HTTP & Legacy SSE) ---
+    app.options("/api/mcp", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, x-requested-with");
+      res.sendStatus(204);
+    });
+
+    app.options("/api/mcp/messages", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, x-requested-with");
+      res.sendStatus(204);
+    });
+
+    app.post("/api/mcp", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return mcpStreamableHandler(req, res, db);
+    });
+
+    app.get("/api/mcp", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return mcpRequestHandler(req, res, db);
+    });
+
+    app.post("/api/mcp/messages", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return mcpMessageHandler(req, res, db);
+    });
 
     // --- Agent Payments ---
     app.use("/api", createAgentPaymentsRouter(db));

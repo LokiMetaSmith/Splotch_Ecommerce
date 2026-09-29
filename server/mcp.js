@@ -443,7 +443,40 @@ export function createMcpServer(db) {
 }
 
 
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+
+export const mcpStreamableHandler = async (req, res, db) => {
+  try {
+    // Streamable HTTP requires Accept to include text/event-stream or application/json
+    const accept = req.headers.accept;
+    if (!accept || accept === "*/*") {
+      req.headers.accept = "application/json, text/event-stream";
+    }
+
+    const mcpServer = createMcpServer(db);
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined // Stateless per request
+    });
+    await mcpServer.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (err) {
+    console.error("[MCP] Streamable HTTP error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: err.message },
+        id: req.body?.id || null
+      });
+    }
+  }
+};
+
 export const mcpRequestHandler = async (req, res, db) => {
+  // Disable proxy buffering for SSE (Cloudflare, Nginx, Caddy)
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+
   const sseTransport = new SSEServerTransport("/api/mcp/messages", res);
   const mcpServer = createMcpServer(db);
   await mcpServer.connect(sseTransport);

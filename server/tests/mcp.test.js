@@ -1,6 +1,6 @@
 import request from "supertest";
 import express from "express";
-import { mcpRequestHandler, mcpMessageHandler, createMcpServer } from "../mcp.js";
+import { mcpRequestHandler, mcpMessageHandler, mcpStreamableHandler, createMcpServer } from "../mcp.js";
 import { jest } from "@jest/globals";
 import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
@@ -17,7 +17,27 @@ describe("MCP Server Endpoints and Tools", () => {
     };
 
     app.get("/api/mcp", (req, res) => mcpRequestHandler(req, res, mockDb));
+    app.post("/api/mcp", (req, res) => mcpStreamableHandler(req, res, mockDb));
     app.post("/api/mcp/messages", (req, res) => mcpMessageHandler(req, res, mockDb));
+  });
+
+  it("should handle Streamable HTTP initialize request at POST /api/mcp", async () => {
+    const res = await request(app)
+      .post("/api/mcp")
+      .set("Accept", "application/json, text/event-stream")
+      .send({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "claude-client", version: "1.0.0" }
+        }
+      });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.text).toContain('"name":"splotch-ecommerce-mcp"');
   });
 
   it("should return 404 for POST /api/mcp/messages without a valid session", async () => {
