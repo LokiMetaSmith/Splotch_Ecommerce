@@ -85,8 +85,44 @@ If payment proof and mandate headers are not supplied, the server returns an **H
 
 ### Step 3: Complete Settlement
 Re-submit the request with the required settlement headers:
-- `authorization-x402`: Base64 JSON containing `{ "status": "PAID", "amount": 77.50, "paymentId": "<unique_tx_id>" }`
-- `x-ap2-mandate`: Base64-encoded or raw signed JWT signed by user's delegated private key verifying `quoteId`, `intentId`, and `audience: "splotch-creative-settlement"`. Public key is discoverable at `GET https://splotch.page/.well-known/ap2`.
+- `authorization-x402`: Base64-encoded JSON payload verifying payment on one of the active settlement rails:
+  - **Lightning Network (Production)**:
+    ```json
+    {
+      "rail": "lightning",
+      "amount": 77.50,
+      "payment_hash": "<64_hex_payment_hash>",
+      "preimage": "<64_hex_payment_preimage>",
+      "payer": "<optional_node_or_payer_id>"
+    }
+    ```
+    *The server cryptographically validates `SHA256(preimage) == payment_hash`.*
+  - **Base USDC (Production)**:
+    ```json
+    {
+      "rail": "base_usdc",
+      "amount": 77.50,
+      "tx_hash": "0x<64_hex_tx_hash>",
+      "payer": "0x<payer_wallet_address>"
+    }
+    ```
+    *The server validates the on-chain ERC-20 transfer receipt via Base RPC.*
+  - **Simulated Test Rail (Sandbox / Dev Environments Only)**:
+    ```json
+    {
+      "status": "PAID",
+      "amount": 77.50,
+      "paymentId": "sim_pay_<unique_id>"
+    }
+    ```
+    *Note: Simulated payment proofs are strictly rejected in production environments (`NODE_ENV=production`).*
+
+- `x-ap2-mandate`: Base64-encoded or raw signed JWT signed by the agent/user's delegated key verifying:
+  - `quoteId`: The matching quote identifier
+  - `intentId`: The order intent identifier
+  - `amount`: `77.50`
+  - `audience`: `"splotch-creative-settlement"`
+  *The merchant public key and governance parameters are discoverable at `GET https://splotch.page/.well-known/ap2`.*
 
 **Response (201 Created):**
 ```json
@@ -112,6 +148,18 @@ Splotch exposes an MCP server over Server-Sent Events (SSE).
 
 - **Connection URL**: `GET https://splotch.page/api/mcp`
 - **Messages URL**: `POST https://splotch.page/api/mcp/messages?sessionId=<sessionId>`
+
+### Connecting MCP to AI Assistants (Claude Desktop, Cursor, etc.)
+Add Splotch as a custom connector in your client configuration:
+```json
+{
+  "mcpServers": {
+    "splotch": {
+      "url": "https://splotch.page/api/mcp"
+    }
+  }
+}
+```
 
 ### Available MCP Tools:
 1. `calculate_sticker_quote` (alias `get_quote`):
