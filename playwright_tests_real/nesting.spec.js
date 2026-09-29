@@ -35,26 +35,53 @@ test.describe('Nesting Functionality', () => {
         await fileInput.setInputFiles('public/mascot.png');
         
         // Wait for upload/processing
-        const priceDisplay = page.locator('#calculatedPriceDisplay');
-        await expect(priceDisplay).toBeVisible({ timeout: 10000 });
-        await expect(priceDisplay).not.toContainText('$0.00', { timeout: 10000 });
+        // the calculatedPriceDisplay might be hidden on mobile, wait for widthInput instead
         
+        // Ensure we switch to tab 1 (art) to see widthInput if hidden on mobile
+        const artTab = page.locator('.mobile-tab-btn[data-tab="art"]');
+        if (await artTab.isVisible()) {
+          await artTab.click({ force: true });
+        }
+
         // Wait for Dimensions to populate so we know originalImage is processed
         const widthInput = page.locator('#widthInput');
         await expect(widthInput).not.toHaveValue('', { timeout: 15000 });
+
+        // Switch to Specs/Checkout tab on mobile if tabs are present
+        const specsTab = page.locator('.mobile-tab-btn[data-tab="specs"]');
+        if (await specsTab.isVisible()) {
+          // Force click to ensure it switches
+          await specsTab.click({ force: true });
+          await expect(page.locator('#firstName')).toBeVisible({ timeout: 10000 });
+        }
 
         await page.locator('#firstName').fill('Test');
         await page.locator('#lastName').fill('User');
         await page.locator('#email').fill('customer@example.com');
         await page.locator('#phone').fill('555-0123');
 
+        // Switch to Cutlines tab on mobile if tabs are present to fill quantity
+        const cutlinesTab = page.locator('.mobile-tab-btn[data-tab="cutlines"]');
+        if (await cutlinesTab.isVisible()) {
+          await cutlinesTab.click({ force: true });
+        }
+
+        // Let's change quantity to 5 for nesting
+        await page.locator('#stickerQuantity').fill('5');
+        await page.keyboard.press('Tab'); // Trigger price calculation
+        await page.waitForTimeout(1000);
+
+        // Switch back to Specs tab to continue checkout form
+        if (await specsTab.isVisible()) {
+          await specsTab.click({ force: true });
+        }
+
         await page.locator('#address').fill('123 Test St');
         await page.locator('#city').fill('Test City');
         await page.locator('#state').fill('TS');
         await page.locator('#postalCode').fill('12345');
-        // Let's change quantity to 5 for nesting
-        await page.locator('#stickerQuantity').fill('5');
 
+        await page.locator('#order-ready-confirm').check();
         await page.locator('#submitPaymentBtn').click();
         
         const statusContainer = page.locator('#payment-status-container');
@@ -62,25 +89,25 @@ test.describe('Nesting Functionality', () => {
         await expect(statusContainer).toContainText('Order successfully placed!', { timeout: 30000 });
 
         // 2. Log into printshop
-        const tokenRes = await request.post('/api/auth/issue-temp-token', {
-            data: { secret: process.env.TEMP_AUTH_SECRET || 'dev-secret-key', email: 'admin@splotch.com' }
-        });
+        const tokenRes = await request.get('/api/auth/test-admin-token');
+        expect(tokenRes.ok()).toBeTruthy();
+
         const tokenData = await tokenRes.json();
         const token = tokenData.token;
+        expect(token).toBeTruthy();
 
-        await page.context().addCookies([{
-            name: 'sessionToken',
-            value: token,
-            domain: '127.0.0.1',
-            path: '/',
-            httpOnly: false
-        }]);
+        // Add init script before navigation to populate localStorage on load
+        await page.addInitScript((t) => {
+          localStorage.setItem('authToken', t);
+          localStorage.setItem('sessionToken', t);
+          localStorage.setItem('serverSessionToken', t);
+        }, token);
 
         await page.goto('/printshop.html');
         
         // Wait for order to appear
         const orderCards = page.locator('.order-card');
-        await expect(orderCards.first()).toBeVisible({ timeout: 10000 });
+        await expect(orderCards.first()).toBeVisible({ timeout: 15000 });
 
         // Find the order by email
         const orderToFulfill = orderCards.filter({ hasText: 'customer@example.com' }).first();

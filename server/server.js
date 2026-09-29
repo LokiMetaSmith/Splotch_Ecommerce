@@ -5525,6 +5525,38 @@ async function startServer(
       });
     });
 
+    if (process.env.NODE_ENV === 'test') {
+      app.get('/api/auth/test-admin-token', (req, res) => {
+        try {
+          const keyInfo = getCurrentSigningKey();
+          if (!keyInfo || !keyInfo.privateKey) {
+            return res.status(500).json({ error: "No signing key available" });
+          }
+          const { privateKey, kid } = keyInfo;
+          const token = jwt.sign(
+            {
+              email: 'admin@example.com',
+              username: 'admin@example.com',
+              role: 'admin',
+              isGuest: false,
+              isPrintShop: true,
+              isAdmin: true
+            },
+            privateKey,
+            {
+              algorithm: 'RS256',
+              expiresIn: '1h',
+              keyid: kid // Pass keyid here, not inside header: { kid }
+            }
+          );
+          res.json({ success: true, token });
+        } catch (e) {
+          console.error("Error generating test admin token:", e);
+          res.status(500).json({ error: "Failed to generate test token" });
+        }
+      });
+    }
+
     app.post(
       "/api/auth/issue-temp-token",
       emailTriggerLimiter,
