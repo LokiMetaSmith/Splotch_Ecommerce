@@ -216,7 +216,9 @@ export function createMcpServer(db) {
               },
               settlement_equivalents: {
                 usdc: total.toFixed(2),
-                chain_id: 8453
+                chain_id: 8453,
+                token_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                recipient_address: process.env.BASE_MERCHANT_WALLET || "0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23"
               },
               digest_sha256: Buffer.from(`${quoteId}:${total}`).toString("hex"),
               validUntilMinutes: 30,
@@ -233,18 +235,20 @@ export function createMcpServer(db) {
       const designUrl = args.designUrl || (args.items && args.items[0]?.artwork_url);
       const shipping = args.shippingAddress || args.shipping_destination;
 
-      // Direct AP2 execution tool branch (when signed mandate is provided in args)
-      if (args.ap2_mandate_jws) {
-        let parsedMandate = {};
-        try {
-          parsedMandate = await verifyAP2Mandate(args.ap2_mandate_jws, { audience: "splotch-creative-settlement" });
-        } catch (err) {
-          if (process.env.NODE_ENV === "production") {
-            throw new Error(`AP2 Mandate validation failed: ${err.message}`);
+      // Settlement execution tool branch (when signed mandate OR on-chain settlement is provided in args)
+      if (args.ap2_mandate_jws || args.settlement) {
+        let parsedMandate = null;
+        if (args.ap2_mandate_jws) {
+          try {
+            parsedMandate = await verifyAP2Mandate(args.ap2_mandate_jws, { audience: "splotch-creative-settlement" });
+          } catch (err) {
+            if (process.env.NODE_ENV === "production") {
+              throw new Error(`AP2 Mandate validation failed: ${err.message}`);
+            }
           }
         }
 
-        const targetQuoteId = quoteId || parsedMandate.quoteId || parsedMandate.quote_id || parsedMandate.cart_binding?.quote_id;
+        const targetQuoteId = quoteId || (parsedMandate && (parsedMandate.quoteId || parsedMandate.quote_id || parsedMandate.cart_binding?.quote_id));
         let storedQuote = null;
         if (targetQuoteId && typeof db.getQuote === "function") {
           storedQuote = await db.getQuote(targetQuoteId);
@@ -257,7 +261,9 @@ export function createMcpServer(db) {
           if (new Date() > new Date(storedQuote.expiresAt)) {
             throw new Error("Quote has expired");
           }
-          verifyMandateBindings(parsedMandate, storedQuote, shipping);
+          if (parsedMandate) {
+            verifyMandateBindings(parsedMandate, storedQuote, shipping);
+          }
         }
 
         const settlementInput = args.settlement || {
@@ -305,11 +311,15 @@ export function createMcpServer(db) {
                 orderId: orderId,
                 quote_id: targetQuoteId,
                 status: "queued_for_print",
-                mandate_verification: {
+                mandate_verification: parsedMandate ? {
                   valid: true,
                   mandate_id: parsedMandate.mandateId || parsedMandate.mandate_id || ("man_" + Date.now()),
                   agent_rules_enforced: true,
                   within_budget: true
+                } : {
+                  valid: true,
+                  type: "direct_x402_onchain",
+                  mandate_id: "direct_x402_settlement"
                 },
                 settlement_verification: {
                   rail: settlementMeta.rail,
@@ -393,6 +403,7 @@ export function createMcpServer(db) {
           throw new Error(`Preflight Failed: Asset validation routines failed. ${execErr.message}`);
       }
 
+      const merchantWallet = process.env.BASE_MERCHANT_WALLET || "0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23";
       // In a real system, you would save this intent mapping the quote/design/shipping to the order intent ID
       return {
         content: [
@@ -404,13 +415,22 @@ export function createMcpServer(db) {
               designUrl: args.designUrl,
               shippingAddress: args.shippingAddress,
               paymentStatus: "REQUIRES_PAYMENT",
+              settlementDetails: {
+                network: "base",
+                chainId: 8453,
+                tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                recipientAddress: merchantWallet
+              },
               ap2Challenge: {
                 paymentEndpoint: "https://splotch.page/api/v1/payments/ap2",
                 ordersEndpoint: "https://splotch.page/api/v1/orders",
                 requiredAmount: args.amount,
                 currency: "USD",
-                instructions: "Sign an AP2 Cart Mandate with maxSpendCents >= requiredAmount, and submit it along with an x402 payment proof.",
-                supportedMethods: ["x402"]
+                recipientAddress: merchantWallet,
+                tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                chainId: 8453,
+                instructions: "Send USDC on Base (chain 8453) to recipientAddress and call place_order/splotch_execute_ap2_payment with settlement.tx_hash. AP2 Cart Mandates are optional.",
+                supportedMethods: ["x402", "base_usdc", "lightning"]
               }
             })
           }

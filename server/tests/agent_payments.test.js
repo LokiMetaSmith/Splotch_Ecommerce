@@ -471,5 +471,52 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
       }
     }
   });
+
+  it("should confirm order on POST /api/v1/orders with direct x402 payment proof WITHOUT an AP2 mandate", async () => {
+    const validQuoteId = "quo_direct_x402";
+    await mockDb.createQuote({
+      quoteId: validQuoteId,
+      total: 0.35,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60000).toISOString()
+    });
+
+    const paymentProof = Buffer.from(JSON.stringify({
+      status: "PAID",
+      paymentId: "tx_direct_test_123",
+      amount: "0.35",
+      rail: "base_usdc",
+      tx_hash: "0x1234567890123456789012345678901234567890123456789012345678901234"
+    })).toString("base64");
+
+    const res = await request(app)
+      .post("/api/v1/orders")
+      .set("authorization-x402", paymentProof)
+      .send({
+        quoteId: validQuoteId,
+        shippingAddress: {
+          name: "Direct Buyer",
+          street: "123 Base St",
+          city: "Oklahoma City",
+          state: "OK",
+          zip: "73120"
+        }
+      });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body.status).toBe("CONFIRMED");
+    expect(res.body.mandate_verification.type).toBe("direct_x402_onchain");
+    expect(mockDb.createOrder).toHaveBeenCalled();
+  });
+
+  it("should return detailed Base USDC settlement metadata in 402 challenge", async () => {
+    const res = await request(app).post("/api/v1/orders").send({});
+    expect(res.statusCode).toBe(402);
+    expect(res.body.settlement_details).toBeDefined();
+    expect(res.body.settlement_details.base_usdc).toBeDefined();
+    expect(res.body.settlement_details.base_usdc.chain_id).toBe(8453);
+    expect(res.body.settlement_details.base_usdc.token_address).toBe("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+    expect(res.body.settlement_details.base_usdc.recipient_address).toMatch(/^0x[a-fA-F0-9]{40}$/);
+  });
 });
 
