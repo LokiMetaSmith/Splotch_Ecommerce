@@ -25,30 +25,40 @@ export function createMcpServer(db) {
       tools: [
         {
           name: "calculate_sticker_quote",
-          description: "Calculate sticker cost based on dimensions, cut type, quantity, and material.",
+          description: "Calculate sticker cost based on dimensions, cut type, quantity, and material. Single stickers (quantity = 1) and small batches are fully supported on-demand with NO minimum order quantity requirement.",
           inputSchema: {
             type: "object",
             properties: {
-              widthInches: { type: "number" },
-              heightInches: { type: "number" },
-              quantity: { type: "integer" },
-              material: { type: "string", enum: ["vinyl_matte", "vinyl_gloss", "holographic"] },
-              cutType: { type: "string", enum: ["die_cut", "kiss_cut"] }
+              widthInches: { type: "number", description: "Width in inches (e.g. 1.0, 2.0, 3.0)" },
+              heightInches: { type: "number", description: "Height in inches (e.g. 1.0, 2.0, 3.0)" },
+              quantity: {
+                type: "integer",
+                minimum: 1,
+                default: 1,
+                description: "Number of stickers to order. Single stickers (quantity = 1) are fully supported on-demand. Minimum is 1."
+              },
+              material: { type: "string", enum: ["vinyl_matte", "vinyl_gloss", "holographic"], default: "vinyl_matte" },
+              cutType: { type: "string", enum: ["die_cut", "kiss_cut"], default: "die_cut" }
             },
             required: ["widthInches", "heightInches", "quantity", "material"]
           }
         },
         {
           name: "get_quote",
-          description: "Alias for calculate_sticker_quote. Computes price for custom stickers.",
+          description: "Alias for calculate_sticker_quote. Computes price for custom stickers. Single stickers (quantity = 1) are fully supported with no minimum batch size.",
           inputSchema: {
             type: "object",
             properties: {
-              widthInches: { type: "number" },
-              heightInches: { type: "number" },
-              quantity: { type: "integer" },
-              material: { type: "string", enum: ["vinyl_matte", "vinyl_gloss", "holographic"] },
-              cutType: { type: "string", enum: ["die_cut", "kiss_cut"] }
+              widthInches: { type: "number", description: "Width in inches (e.g. 1.0, 2.0, 3.0)" },
+              heightInches: { type: "number", description: "Height in inches (e.g. 1.0, 2.0, 3.0)" },
+              quantity: {
+                type: "integer",
+                minimum: 1,
+                default: 1,
+                description: "Number of stickers to order. Single stickers (quantity = 1) are fully supported on-demand. Minimum is 1."
+              },
+              material: { type: "string", enum: ["vinyl_matte", "vinyl_gloss", "holographic"], default: "vinyl_matte" },
+              cutType: { type: "string", enum: ["die_cut", "kiss_cut"], default: "die_cut" }
             },
             required: ["widthInches", "heightInches", "quantity", "material"]
           }
@@ -103,15 +113,15 @@ export function createMcpServer(db) {
         },
         {
           name: "splotch_get_sticker_quote",
-          description: "Calculates deterministic pricing, material discounts, production tradeoffs, and shipping costs for custom sticker print runs on Splotch. Returns a quote ID, pricing breakdown, and a cart digest required for constructing an AP2 Cart Mandate.",
+          description: "Calculates deterministic pricing, material discounts, production tradeoffs, and shipping costs for custom sticker print runs on Splotch. Single stickers (quantity = 1) and small batches are fully supported with NO minimum order size. Returns a quote ID, pricing breakdown, and a cart digest required for constructing an AP2 Cart Mandate.",
           inputSchema: {
             type: "object",
             properties: {
               items: { type: "array" },
-              widthInches: { type: "number" },
-              heightInches: { type: "number" },
-              quantity: { type: "integer" },
-              material: { type: "string" },
+              widthInches: { type: "number", description: "Width in inches (e.g. 1.0, 2.0, 3.0)" },
+              heightInches: { type: "number", description: "Height in inches (e.g. 1.0, 2.0, 3.0)" },
+              quantity: { type: "integer", minimum: 1, default: 1, description: "Number of stickers to order (supports single stickers, minimum 1)." },
+              material: { type: "string", description: "Material type: vinyl_matte, vinyl_gloss, holographic" },
               delivery: { type: "object" }
             }
           }
@@ -167,7 +177,7 @@ export function createMcpServer(db) {
 
       width = parseFloat(width || 3.0);
       height = parseFloat(height || 3.0);
-      quantity = parseInt(quantity || 10, 10);
+      quantity = Math.max(1, parseInt(quantity || 1, 10));
 
       const isSpecial = material === "holographic" || material === "heavy_duty_pvc";
       const unitPrice = parseFloat(((width * height * 0.15) + (isSpecial ? 0.35 : 0.20)).toFixed(2));

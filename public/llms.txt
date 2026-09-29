@@ -20,15 +20,17 @@ Autonomous agents can complete a purchase using **Option A (REST API / x402 / AP
 ## Option A: Headless REST Ordering (HTTP 402 & AP2)
 
 ### Step 1: Request Sticker Quote
+> **No Minimum Order Quantity**: Splotch prints custom stickers on-demand with **no minimum order size**. Agents can order a single custom sticker (`"quantity": 1`) or batch runs (`"quantity": 10`, `50`, `100`, etc.).
+
 Send an HTTP POST request to calculate pricing:
 ```http
 POST https://splotch.page/api/v1/quotes
 Content-Type: application/json
 
 {
-  "widthInches": 3.0,
-  "heightInches": 3.0,
-  "quantity": 50,
+  "widthInches": 2.0,
+  "heightInches": 2.0,
+  "quantity": 1,
   "material": "vinyl_matte",
   "cutType": "die_cut"
 }
@@ -36,12 +38,12 @@ Content-Type: application/json
 **Response (201 Created):**
 ```json
 {
-  "quoteId": "quote_1790626000000",
-  "unitPrice": 1.55,
-  "total": 77.50,
+  "quoteId": "quo_1790626000000",
+  "unitPrice": 0.80,
+  "total": 0.80,
   "currency": "USD",
   "validUntilMinutes": 30,
-  "expiresAt": "2026-09-28T21:00:00.000Z",
+  "expiresAt": "2026-09-29T21:00:00.000Z",
   "ap2_payment_endpoint": "/api/v1/payments/ap2",
   "orders_endpoint": "/api/v1/orders"
 }
@@ -163,7 +165,8 @@ Add Splotch as a custom connector in your client configuration:
 
 ### Available MCP Tools:
 1. `calculate_sticker_quote` (alias `get_quote`):
-   - Parameters: `widthInches` (float), `heightInches` (float), `quantity` (int), `material` ("vinyl_matte"|"vinyl_gloss"|"holographic"), `cutType` ("die_cut"|"kiss_cut")
+   - Description: Calculate price for custom stickers. Single stickers (`quantity: 1`) and small custom runs are fully supported on-demand with NO minimum order quantity.
+   - Parameters: `widthInches` (float), `heightInches` (float), `quantity` (int, default: 1, minimum: 1 — single stickers supported), `material` ("vinyl_matte"|"vinyl_gloss"|"holographic"), `cutType` ("die_cut"|"kiss_cut")
    - Returns: `{ quoteId, unitPrice, total, currency: "USD", validUntilMinutes: 30 }`
 
 2. `create_agent_checkout` (alias `place_order`):

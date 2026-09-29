@@ -1390,6 +1390,10 @@ async function startServer(
         description: "Autonomous agent printing & purchasing protocol server (MCP & AP2 / x402)",
         endpoints: [
           {
+            transport: "streamable_http",
+            url: "/api/mcp"
+          },
+          {
             transport: "sse",
             url: "/api/mcp",
             messages_url: "/api/mcp/messages"
@@ -1401,15 +1405,15 @@ async function startServer(
         tools: [
           {
             name: "calculate_sticker_quote",
-            description: "Calculate sticker pricing based on width, height, quantity, and material"
+            description: "Calculate sticker pricing based on width, height, quantity, and material. Single stickers (quantity = 1) and small batches supported with NO minimum order quantity."
           },
           {
             name: "get_quote",
-            description: "Alias for calculate_sticker_quote"
+            description: "Alias for calculate_sticker_quote. Supports single-sticker orders (minimum 1)."
           },
           {
             name: "splotch_get_sticker_quote",
-            description: "Calculates deterministic pricing and cart digest for custom sticker print runs"
+            description: "Calculates deterministic pricing and cart digest for custom sticker print runs (supports single stickers with no minimum)."
           },
           {
             name: "create_agent_checkout",
