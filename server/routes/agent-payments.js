@@ -1,8 +1,34 @@
 import express from "express";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
+import multer from "multer";
 import { verifyAP2Mandate, verifyMandateBindings, computeCartDigest } from "../lib/ap2_crypto.js";
 import { verifySettlementProof, getActiveSettlementMethods, isLightningEnabled, isBaseUsdcEnabled } from "../lib/settlement_verifier.js";
 import { DEFAULT_SHIPPING_CONFIG } from "../lib/costCalc.js";
-import { downloadAgentArtwork } from "../lib/artwork_downloader.js";
+import { downloadAgentArtwork, detectImageBufferType } from "../lib/artwork_downloader.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DEFAULT_UPLOADS_DIR = path.resolve(__dirname, "../uploads");
+
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (!fs.existsSync(DEFAULT_UPLOADS_DIR)) {
+      fs.mkdirSync(DEFAULT_UPLOADS_DIR, { recursive: true });
+    }
+    cb(null, DEFAULT_UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || ".png";
+    cb(null, `designImage-agent-${Date.now()}-${randomUUID().slice(0, 8)}${ext}`);
+  }
+});
+const upload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }
+});
 
 export default function createAgentPaymentsRouter(db) {
   const router = express.Router();
@@ -206,10 +232,21 @@ export default function createAgentPaymentsRouter(db) {
 
     const rawItems = body.items || (verified.quote.spec ? [verified.quote.spec] : []);
     const firstItem = (rawItems && rawItems[0]) || verified.quote.spec || {};
-    const rawDesignUrl = (body.designUrl || body.design_url || firstItem.designUrl || firstItem.artwork_url || "").trim();
+    const rawDesignUrl = (
+      body.designUrl ||
+      body.design_url ||
+      body.artwork ||
+      body.artworkBase64 ||
+      body.designBase64 ||
+      body.image ||
+      firstItem.designUrl ||
+      firstItem.artwork_url ||
+      firstItem.artwork ||
+      ""
+    ).trim();
     if (!rawDesignUrl) {
       return res.status(400).json({
-        error: "Missing required order field: 'designUrl' (public HTTP/HTTPS image URL) is required to print custom stickers."
+        error: "Missing required order field: 'designUrl' (URL, Base64 data URI, raw Base64, or SVG) is required to print custom stickers."
       });
     }
 
@@ -508,6 +545,84 @@ export default function createAgentPaymentsRouter(db) {
       fulfillment_tracking_url: `https://splotch.page/api/v1/orders/${order.orderId}`
     });
   });
+
+  // --- Headless Direct Artwork Upload: POST /v1/upload ---
+  router.post(
+    "/v1/upload",
+    (req, res, next) => {
+      if (req.is("multipart/form-data")) {
+        return upload.any()(req, res, (err) => {
+          if (err) {
+            return res.status(400).json({ error: `Upload error: ${err.message}` });
+          }
+          const file = req.files && req.files[0];
+          if (!file) {
+            return res.status(400).json({ error: "No file provided in multipart upload" });
+          }
+          const designUrl = `/uploads/${file.filename}`;
+          return res.status(201).json({
+            success: true,
+            designUrl,
+            url: `https://splotch.page${designUrl}`,
+            filename: file.filename,
+            sizeBytes: file.size
+          });
+        });
+      }
+      next();
+    },
+    express.raw({ type: ["image/*", "application/octet-stream"], limit: "25mb" }),
+    async (req, res) => {
+      try {
+        // 1. Raw binary buffer
+        if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+          const detected = detectImageBufferType(req.body) || { ext: ".png", mime: "image/png" };
+          const filename = `designImage-agent-${Date.now()}-${randomUUID().slice(0, 8)}${detected.ext}`;
+          const targetPath = path.join(DEFAULT_UPLOADS_DIR, filename);
+          if (!fs.existsSync(DEFAULT_UPLOADS_DIR)) fs.mkdirSync(DEFAULT_UPLOADS_DIR, { recursive: true });
+          await fs.promises.writeFile(targetPath, req.body);
+          const designUrl = `/uploads/${filename}`;
+          return res.status(201).json({
+            success: true,
+            designUrl,
+            url: `https://splotch.page${designUrl}`,
+            filename,
+            sizeBytes: req.body.length
+          });
+        }
+
+        // 2. JSON body or string
+        const body = req.body || {};
+        const rawArtwork = (
+          (typeof body === "string" ? body : "") ||
+          body.artwork ||
+          body.artworkBase64 ||
+          body.designUrl ||
+          body.designBase64 ||
+          body.image ||
+          body.svg ||
+          ""
+        ).trim();
+
+        if (!rawArtwork) {
+          return res.status(400).json({
+            error: "Missing artwork in upload. Send binary image bytes, multipart file, or JSON with 'artwork' (Base64 data URI, raw Base64, raw SVG markup, or URL)."
+          });
+        }
+
+        const designUrl = await downloadAgentArtwork(rawArtwork, DEFAULT_UPLOADS_DIR);
+        const filename = path.basename(designUrl);
+        return res.status(201).json({
+          success: true,
+          designUrl,
+          url: `https://splotch.page${designUrl}`,
+          filename
+        });
+      } catch (err) {
+        return res.status(400).json({ error: `Upload failed: ${err.message}` });
+      }
+    }
+  );
 
   return router;
 }

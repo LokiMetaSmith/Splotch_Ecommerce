@@ -1492,10 +1492,19 @@ async function startServer(
               }
             }
           },
+          "/api/v1/upload": {
+            post: {
+              summary: "Direct Headless Artwork Upload",
+              description: "Upload sticker artwork directly via multipart form, raw binary image bytes, or JSON with Base64/SVG. Returns a local designUrl for orders.",
+              responses: {
+                "201": { description: "Artwork uploaded successfully" }
+              }
+            }
+          },
           "/api/v1/orders": {
             post: {
               summary: "Headless Order & Payment Execution",
-              description: "Execute headless purchase using AP2 Cart Mandate and x402 payment proof. Returns 402 if unauthenticated/unpaid.",
+              description: "Execute headless purchase using AP2 Cart Mandate and x402 payment proof. Returns 402 if unauthenticated/unpaid. Accepts Base64, SVG, or public URLs for artwork.",
               parameters: [
                 { in: "header", name: "authorization-x402", required: false, schema: { type: "string" }, description: "Base64 JSON x402 payment proof" },
                 { in: "header", name: "x-ap2-mandate", required: false, schema: { type: "string" }, description: "Signed AP2 Cart Mandate JWT" }
@@ -1510,12 +1519,20 @@ async function startServer(
                       properties: {
                         quoteId: { type: "string" },
                         amount: { type: "string", example: "15.00" },
-                        designUrl: { type: "string", format: "uri" },
+                        designUrl: {
+                          type: "string",
+                          description: "Artwork to print. Accepts Base64 data URI ('data:image/png;base64,...'), raw Base64 string, raw SVG markup ('<svg>...</svg>'), local /uploads path, or public HTTP(S) URL"
+                        },
+                        artwork: {
+                          type: "string",
+                          description: "Alternative direct field for Base64 data URI, raw Base64, or raw SVG markup"
+                        },
                         shippingAddress: {
                           type: "object",
-                          required: ["name", "street", "city", "state", "zip"],
+                          required: ["name", "email", "street", "city", "state", "zip"],
                           properties: {
                             name: { type: "string" },
+                            email: { type: "string" },
                             street: { type: "string" },
                             city: { type: "string" },
                             state: { type: "string" },
