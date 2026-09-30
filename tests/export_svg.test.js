@@ -24,7 +24,7 @@ describe("generateMultiLayerSvg", () => {
         const svg = generateMultiLayerSvg(stickers, sheetBoundary, bounds);
 
         expect(svg).toContain('<?xml version="1.0" encoding="UTF-8"?>');
-        expect(svg).toContain('<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">');
+        expect(svg).toContain('<svg width="100" height="100" viewBox="0 0 100 100" data-ppi="300" xmlns="http://www.w3.org/2000/svg">');
         expect(svg).toContain('<g id="Kiss-Cut" stroke="cyan" fill="none" stroke-width="1">');
         expect(svg).toContain('<g id="Die-Cut" stroke="red" fill="none" stroke-width="1">');
 
