@@ -80,61 +80,55 @@
       }
       .menu-item {
         pointer-events: auto;
-        background: rgba(255, 255, 255, 0.15);
+        background: transparent;
         color: white;
         padding: 0.35rem 0.75rem;
-        border-radius: 9999px;
+        border-radius: 4px;
         font-family: var(--font-baumans, sans-serif);
         font-weight: bold;
         font-size: 0.8rem;
         line-height: 1.2;
         text-decoration: none;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        box-shadow: none;
         white-space: nowrap;
-        border: 1px solid rgba(255, 255, 255, 0.25);
+        border: 1px solid transparent;
         transition:
-          transform 0.2s,
-          background-color 0.2s,
-          border-color 0.2s;
+          color 0.2s,
+          opacity 0.2s;
       }
       .menu-item:hover {
-        background: var(--splotch-teal, #00a99d);
-        border-color: var(--splotch-teal, #00a99d);
+        opacity: 0.8;
       }
       .menu-item:focus-visible {
-        outline: 3px solid var(--splotch-red, #ff003a);
+        outline: 2px solid white;
         outline-offset: 2px;
       }
 
-      /* Desktop: Floating Pills with transparent bar */
+      /* Desktop: Clean Navigation Links */
       @media (min-width: 640px) {
         .top-menu-bar {
-          height: auto;
-          background: transparent;
-          box-shadow: none;
-          padding: 1rem 1.5rem;
-          pointer-events: none;
+          height: 3.5rem;
+          background: var(--splotch-navy, #2a284d);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          padding: 0 1.5rem;
+          pointer-events: auto;
         }
         .top-menu-brand {
           pointer-events: auto;
         }
         .top-menu-brand .brand-link span {
-          display: none;
+          display: inline-block;
         }
         .top-menu-actions {
           pointer-events: auto;
           gap: 1rem;
         }
         .menu-item {
-          background: var(--splotch-navy, #2a284d);
-          padding: 0.75rem 1.5rem;
+          padding: 0.5rem 1rem;
           font-size: 1rem;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-          border: none;
         }
         .menu-item:hover {
-          transform: translateY(-2px);
-          background: var(--splotch-teal, #00a99d);
+          text-decoration: underline;
         }
       }
 
@@ -274,7 +268,7 @@
           >
             <button
               type="button"
-              class="mobile-tab-btn flex-1 py-1.5 px-2 text-center rounded-full bg-white text-indigo-700 shadow-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+              class="mobile-tab-btn flex-1 py-1.5 px-2 text-center rounded-full bg-splotch-navy text-white shadow-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
               data-tab="art"
             >
               1. Art

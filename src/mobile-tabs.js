@@ -13,7 +13,7 @@ export function switchTab(tabId) {
   });
 
   tabs.forEach((t) => {
-    t.classList.remove("bg-white", "text-indigo-700", "shadow-sm");
+    t.classList.remove("bg-splotch-navy", "text-white", "shadow-sm");
     t.classList.add("text-gray-600", "hover:text-gray-900");
   });
 
@@ -26,7 +26,7 @@ export function switchTab(tabId) {
   );
   if (activeTab) {
     activeTab.classList.remove("text-gray-600", "hover:text-gray-900");
-    activeTab.classList.add("bg-white", "text-indigo-700", "shadow-sm");
+    activeTab.classList.add("bg-splotch-navy", "text-white", "shadow-sm");
   }
 }
 
