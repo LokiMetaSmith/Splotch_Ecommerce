@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 /**
  * Computes a deterministic SHA-256 hash of a normalized shipping destination.
- * @param {object} shippingAddress 
+ * @param {object} shippingAddress
  * @returns {string|null} Hex encoded SHA-256 hash or null if empty
  */
 export function computeShippingAddressHash(shippingAddress) {
@@ -21,7 +21,7 @@ export function computeShippingAddressHash(shippingAddress) {
 
 /**
  * Computes a deterministic canonical digest for a quote.
- * @param {object} quote 
+ * @param {object} quote
  * @returns {string} Hex encoded SHA-256 digest
  */
 export function computeCartDigest(quote) {

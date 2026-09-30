@@ -208,4 +208,3 @@ Add Splotch as a custom connector in your client configuration:
 ## Human Ordering Interface
 - Website: `https://splotch.page`
 - Interactive sticker designer canvas with real-time smart cutline generation, instant proofing, and card checkout.
-

@@ -17,4 +17,3 @@ Allow: /openapi.json
 # Model Context Protocol: https://splotch.page/.well-known/mcp.json
 # OpenAPI Specification: https://splotch.page/openapi.json
 # AP2 Governance: https://splotch.page/.well-known/ap2
-
