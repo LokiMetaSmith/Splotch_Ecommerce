@@ -69,7 +69,7 @@ test.describe('Nesting Functionality', () => {
         // Let's change quantity to 5 for nesting
         await page.locator('#stickerQuantity').fill('5');
         await page.keyboard.press('Tab'); // Trigger price calculation
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(2500);
 
         // Switch back to Specs tab to continue checkout form
         if (await specsTab.isVisible()) {
