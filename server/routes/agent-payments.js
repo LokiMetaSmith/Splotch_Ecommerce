@@ -8,6 +8,18 @@ import { verifyAP2Mandate, verifyMandateBindings, computeCartDigest } from "../l
 import { verifySettlementProof, getActiveSettlementMethods, isLightningEnabled, isBaseUsdcEnabled } from "../lib/settlement_verifier.js";
 import { DEFAULT_SHIPPING_CONFIG } from "../lib/costCalc.js";
 import { downloadAgentArtwork, detectImageBufferType } from "../lib/artwork_downloader.js";
+import { generateProductionCutlineSvg, generateStickerProofSvg } from "../lib/cutline_generator.js";
+import { dispatchOrderWebhook } from "../lib/webhook_dispatcher.js";
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,8 +42,9 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 }
 });
 
-export default function createAgentPaymentsRouter(db) {
+export default function createAgentPaymentsRouter(db, options = {}) {
   const router = express.Router();
+  const { scheduleEmail, scheduleTelegram, storageProvider, processIncomingOrderToDropBox } = options;
 
   function getSettlementContext() {
     const savedShipping = db.data?.config?.shipping || {};
@@ -277,6 +290,8 @@ export default function createAgentPaymentsRouter(db) {
     };
 
     const amountInCents = Math.round(verified.amount * 100);
+    const webhookUrl = (body.webhook_url || body.webhookUrl || "").trim();
+
     const orderRecord = {
       orderId: orderId,
       order_id: orderId,
@@ -289,6 +304,16 @@ export default function createAgentPaymentsRouter(db) {
       buyerType: "agent",
       settlementRail: verified.settlement?.rail || "x402",
       txHash: verified.settlement?.tx_hash || null,
+      webhookUrl: webhookUrl || null,
+      webhook_url: webhookUrl || null,
+      customerEmail: customerEmail,
+      email: customerEmail,
+      customerDetails: {
+        billing: {
+          email: customerEmail,
+          name: nameStr
+        }
+      },
       quantity: firstItem.quantity || verified.quote.spec?.quantity || 1,
       widthInches: firstItem.widthInches || verified.quote.spec?.widthInches || null,
       heightInches: firstItem.heightInches || verified.quote.spec?.heightInches || null,
@@ -311,11 +336,122 @@ export default function createAgentPaymentsRouter(db) {
       designUrl: rawDesignUrl
     };
 
+    // Auto-generate standardized Roland/Graphtec production cutline SVG (White_Layer, Kiss-Cut, Die-Cut)
+    try {
+      const cutlineResult = await generateProductionCutlineSvg({
+        artworkPath: localDesignPath,
+        widthInches: orderRecord.widthInches || 2.0,
+        heightInches: orderRecord.heightInches || 2.0,
+        cutType: orderRecord.cutType || "die_cut",
+        material: orderRecord.material || "vinyl_matte",
+        uploadsDir: DEFAULT_UPLOADS_DIR
+      });
+      orderRecord.orderDetails.cutLinePath = cutlineResult.cutLinePath;
+      orderRecord.cutLinePath = cutlineResult.cutLinePath;
+    } catch (cutErr) {
+      console.warn(`[AGENT-PAYMENTS] Auto-cutline generation skipped: ${cutErr.message}`);
+    }
+
     await db.createOrder(orderRecord);
 
     // Mark quote as consumed
     verified.quote.status = "CONSUMED";
     await db.updateQuote(verified.quote);
+
+    // Physical USB drop box processing for print shop hardware
+    if (processIncomingOrderToDropBox && storageProvider) {
+      processIncomingOrderToDropBox(orderRecord, storageProvider).catch((err) => {
+        console.warn(`[DropBox] Agent order USB copy failed: ${err.message}`);
+      });
+    }
+
+    // Schedule Order Confirmation Email to customerEmail
+    if (scheduleEmail) {
+      const orderDate = new Date(orderRecord.receivedAt).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+      const formattedAmount = (orderRecord.amountUsd !== undefined ? orderRecord.amountUsd : (orderRecord.amount / 100)).toFixed(2);
+      const qty = orderRecord.quantity || 1;
+      const mat = orderRecord.material || "matte vinyl";
+      const cut = orderRecord.cutType || "die cut";
+      const w = orderRecord.widthInches || 2.0;
+      const h = orderRecord.heightInches || 2.0;
+
+      const emailData = {
+        to: customerEmail,
+        subject: `Order Confirmed! Your Splotch Sticker Order #${orderRecord.orderId}`,
+        text: `Hey ${givenName},\n\nThank you for ordering with Splotch! We've received your order and payment ($${formattedAmount}).\n\nOrder Details:\n• Order ID: ${orderRecord.orderId}\n• Date: ${orderDate}\n• Product: ${qty}x Custom Stickers (${w}" × ${h}", ${mat}, ${cut})\n• Status: Confirmed & Queued for Printing\n\nShipping Address:\n${rawShip.name || givenName}\n${rawShip.street || ""}\n${rawShip.city || ""}, ${rawShip.state || ""} ${rawShip.zip || ""}\n\nYou can track your order status anytime here:\nhttps://splotch.page/orders.html?id=${orderRecord.orderId}\n\nWe'll send you another email with USPS tracking as soon as your stickers ship!\n\nBest,\nSplotch Print Shop Team`,
+        html: `
+          <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
+            <h2 style="color: #0f172a; margin-bottom: 8px;">Order Confirmed! 🎉</h2>
+            <p style="font-size: 16px; margin-top: 0;">Hey <strong>${escapeHtml(givenName)}</strong>, thank you for ordering with Splotch!</p>
+            <p>We've received your order and confirmed payment of <strong>$${escapeHtml(formattedAmount)}</strong>. Your stickers have been queued for production at our print shop.</p>
+            
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <h3 style="margin-top: 0; margin-bottom: 12px; color: #0f172a; font-size: 15px;">Order Summary</h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Order ID:</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right;">${escapeHtml(orderRecord.orderId)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Item:</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right;">${qty}× ${escapeHtml(w)}" × ${escapeHtml(h)}" ${escapeHtml(cut)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Material:</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right;">${escapeHtml(mat)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Total Paid:</td>
+                  <td style="padding: 6px 0; font-weight: 700; text-align: right; color: #047857;">$${escapeHtml(formattedAmount)}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <h3 style="margin-top: 0; margin-bottom: 8px; color: #0f172a; font-size: 15px;">Shipping Destination</h3>
+              <p style="margin: 0; font-size: 14px; line-height: 1.5;">
+                ${escapeHtml(rawShip.name || givenName)}<br>
+                ${escapeHtml(rawShip.street || "")}<br>
+                ${escapeHtml(rawShip.city || "")}, ${escapeHtml(rawShip.state || "")} ${escapeHtml(rawShip.zip || "")}
+              </p>
+            </div>
+
+            <p style="font-size: 14px; color: #475569;">
+              You can track your order status in real time anytime at:<br>
+              <a href="https://splotch.page/orders.html?id=${orderRecord.orderId}" style="color: #2563eb; font-weight: 600;">https://splotch.page/orders.html?id=${orderRecord.orderId}</a>
+            </p>
+
+            <p style="font-size: 14px; color: #475569;">
+              We'll send you an update with your USPS tracking link as soon as your stickers are printed and packed.
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="font-size: 13px; color: #94a3b8; margin: 0;">Splotch Print Shop • 7712 S. Penn Ave, Oklahoma City, OK 73159</p>
+          </div>
+        `
+      };
+      try {
+        await scheduleEmail("order-confirmation", emailData);
+      } catch (eErr) {
+        console.warn(`[AGENT-PAYMENTS] Confirmation email dispatch failed: ${eErr.message}`);
+      }
+    }
+
+    // Trigger Agent Webhook if registered
+    if (orderRecord.webhookUrl) {
+      dispatchOrderWebhook(orderRecord, "order.created").catch((wErr) => {
+        console.warn(`[AGENT-PAYMENTS] Webhook creation dispatch failed: ${wErr.message}`);
+      });
+    }
+
+    // Trigger Telegram notification
+    if (scheduleTelegram) {
+      scheduleTelegram("send-new-order", { orderId: orderRecord.orderId }).catch(() => {});
+    }
 
     return res.status(201).json({
       status: "CONFIRMED",
@@ -339,7 +475,9 @@ export default function createAgentPaymentsRouter(db) {
         tx_hash: verified.settlement?.tx_hash
       },
       trackingUrl: `https://splotch.page/orders.html?id=${orderRecord.orderId}`,
-      fulfillment_tracking_url: `https://splotch.page/api/v1/orders/${orderRecord.orderId}`
+      fulfillment_tracking_url: `https://splotch.page/api/v1/orders/${orderRecord.orderId}`,
+      cutline_path: orderRecord.orderDetails?.cutLinePath || null,
+      webhook_url: orderRecord.webhookUrl || null
     });
   }
 
@@ -620,6 +758,86 @@ export default function createAgentPaymentsRouter(db) {
         });
       } catch (err) {
         return res.status(400).json({ error: `Upload failed: ${err.message}` });
+      }
+    }
+  );
+
+  // --- Sticker Proof / Preview Endpoint: POST /v1/preview ---
+  router.post(
+    "/v1/preview",
+    (req, res, next) => {
+      if (req.is("multipart/form-data")) {
+        return upload.any()(req, res, (err) => {
+          if (err) {
+            return res.status(400).json({ error: `Upload error: ${err.message}` });
+          }
+          next();
+        });
+      }
+      next();
+    },
+    express.raw({ type: ["image/*", "application/octet-stream"], limit: "25mb" }),
+    async (req, res) => {
+      try {
+        let localArtPath = "";
+        const body = req.body || {};
+
+        if (req.files && req.files[0]) {
+          localArtPath = path.join(DEFAULT_UPLOADS_DIR, req.files[0].filename);
+        } else if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+          const detected = detectImageBufferType(req.body) || { ext: ".png", mime: "image/png" };
+          const filename = `previewArt-${Date.now()}-${randomUUID().slice(0, 8)}${detected.ext}`;
+          localArtPath = path.join(DEFAULT_UPLOADS_DIR, filename);
+          if (!fs.existsSync(DEFAULT_UPLOADS_DIR)) fs.mkdirSync(DEFAULT_UPLOADS_DIR, { recursive: true });
+          await fs.promises.writeFile(localArtPath, req.body);
+        } else {
+          const rawArtwork = (
+            (typeof body === "string" ? body : "") ||
+            body.artwork ||
+            body.artworkBase64 ||
+            body.designUrl ||
+            body.design_url ||
+            body.designBase64 ||
+            body.image ||
+            body.svg ||
+            ""
+          ).trim();
+
+          if (!rawArtwork) {
+            return res.status(400).json({
+              error: "Missing artwork for preview. Provide 'artwork' (Base64 data URI, raw Base64, SVG markup, or URL), binary image bytes, or multipart upload."
+            });
+          }
+
+          const designUrl = await downloadAgentArtwork(rawArtwork, DEFAULT_UPLOADS_DIR);
+          localArtPath = path.join(DEFAULT_UPLOADS_DIR, path.basename(designUrl));
+        }
+
+        const widthInches = parseFloat(body.widthInches || body.width_inches || body.width) || 2.0;
+        const heightInches = parseFloat(body.heightInches || body.height_inches || body.height) || 2.0;
+        const material = body.material || "vinyl_matte";
+        const cutType = body.cutType || body.cut_type || "die_cut";
+
+        const proof = await generateStickerProofSvg({
+          artworkPath: localArtPath,
+          widthInches,
+          heightInches,
+          material,
+          cutType,
+          uploadsDir: DEFAULT_UPLOADS_DIR
+        });
+
+        return res.status(200).json({
+          success: true,
+          previewUrl: proof.previewUrl,
+          url: proof.url,
+          widthInches: proof.widthInches,
+          heightInches: proof.heightInches,
+          material: proof.material,
+          cutType: proof.cutType
+        });
+      } catch (err) {
+        return res.status(400).json({ error: `Failed to generate sticker preview: ${err.message}` });
       }
     }
   );

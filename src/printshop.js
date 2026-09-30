@@ -2551,15 +2551,16 @@ async function handleNesting(e) {
       }
     }
 
-    let rawSpacing = parseFloat(ui.spacingInput ? ui.spacingInput.value : 0.15);
+    const cutSettings = getCutSettings();
+    let rawSpacing = parseFloat(ui.spacingInput ? ui.spacingInput.value : cutSettings.webbingSpacingInches || 0.15);
     if (isNaN(rawSpacing) || rawSpacing <= 0) {
-      rawSpacing = 0.15;
+      rawSpacing = cutSettings.webbingSpacingInches || 0.15;
     }
     // If value is <= 2.5, treat as inches and convert to 96 DPI screen/SVG pixels.
     // If value > 2.5, treat as direct pixel value.
     let spacingInPx = rawSpacing <= 2.5 ? rawSpacing * 96 : rawSpacing;
-    // Enforce safe minimum of at least 12px (~0.125" / 3.2mm) to guarantee web structural stability
-    spacingInPx = Math.max(12, Math.round(spacingInPx * 10) / 10);
+    // Enforce safe minimum of at least 6px (~0.06" / 1.5mm) for tight die-cut presets
+    spacingInPx = Math.max(6, Math.round(spacingInPx * 10) / 10);
 
     const options = { 
       spacing: spacingInPx, 
@@ -2845,6 +2846,8 @@ export const DEFAULT_CUT_SETTINGS = {
   kissCutColor: "#00FFFF",
   edgeCutLayerName: "Die-Cut",
   edgeCutColor: "#FF0000",
+  webbingSpacingInches: 0.15,
+  sheetMarginInches: 0.25,
 };
 
 export function getCutSettings() {
@@ -2855,11 +2858,21 @@ export function getCutSettings() {
   const kissColor = document.getElementById("kissCutColor") || document.getElementById("settings-kiss-cut-color");
   const edgeLayer = document.getElementById("edgeCutLayerName") || document.getElementById("settings-edge-cut-layer");
   const edgeColor = document.getElementById("edgeCutColor") || document.getElementById("settings-edge-cut-color");
+  const webbingInput = document.getElementById("settings-webbing-spacing") || document.getElementById("spacingInput");
+  const marginInput = document.getElementById("settings-sheet-margin");
 
   if (kissLayer?.value) settings.kissCutLayerName = kissLayer.value.trim();
   if (kissColor?.value) settings.kissCutColor = kissColor.value.trim();
   if (edgeLayer?.value) settings.edgeCutLayerName = edgeLayer.value.trim();
   if (edgeColor?.value) settings.edgeCutColor = edgeColor.value.trim();
+  if (webbingInput?.value) {
+    const val = parseFloat(webbingInput.value);
+    if (!isNaN(val) && val > 0) settings.webbingSpacingInches = val;
+  }
+  if (marginInput?.value) {
+    const val = parseFloat(marginInput.value);
+    if (!isNaN(val) && val > 0) settings.sheetMarginInches = val;
+  }
 
   // Saved localStorage settings take precedence over static HTML defaults
   try {
@@ -2904,6 +2917,7 @@ export function syncCutSettingsUI(settings) {
   setVal("edgeCutLayerName", s.edgeCutLayerName);
   setVal("edgeCutColor", s.edgeCutColor);
   setVal("edgeCutColorPicker", s.edgeCutColor);
+  setVal("spacingInput", s.webbingSpacingInches);
 
   // Settings View controls
   setVal("settings-kiss-cut-layer", s.kissCutLayerName);
@@ -2912,12 +2926,42 @@ export function syncCutSettingsUI(settings) {
   setVal("settings-edge-cut-layer", s.edgeCutLayerName);
   setVal("settings-edge-cut-color", s.edgeCutColor);
   setVal("settings-edge-cut-color-picker", s.edgeCutColor);
+  setVal("settings-webbing-spacing", s.webbingSpacingInches);
+  setVal("settings-sheet-margin", s.sheetMarginInches);
 
   // Color Indicator Dots
   const kissDot = document.getElementById("settings-kiss-cut-indicator");
   if (kissDot) kissDot.style.backgroundColor = s.kissCutColor;
   const edgeDot = document.getElementById("settings-edge-cut-indicator");
   if (edgeDot) edgeDot.style.backgroundColor = s.edgeCutColor;
+
+  // Webbing Matrix Indicators
+  const sp = parseFloat(s.webbingSpacingInches) || 0.15;
+  const mg = parseFloat(s.sheetMarginInches) || 0.25;
+
+  const spMmEl = document.getElementById("settings-webbing-spacing-mm");
+  if (spMmEl) spMmEl.textContent = `~${(sp * 25.4).toFixed(1)} mm`;
+
+  const mgMmEl = document.getElementById("settings-sheet-margin-mm");
+  if (mgMmEl) mgMmEl.textContent = `~${(mg * 25.4).toFixed(1)} mm`;
+
+  const statusDot = document.getElementById("webbing-status-indicator");
+  const statusLabel = document.getElementById("webbing-status-label");
+  const statusDesc = document.getElementById("webbing-status-desc");
+
+  if (sp >= 0.20) {
+    if (statusDot) statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-xs";
+    if (statusLabel) statusLabel.textContent = "Easy Webbing Pull (Tear-Proof)";
+    if (statusDesc) statusDesc.textContent = "Wide matrix bridges allow peeling the entire waste skeleton in one smooth pull.";
+  } else if (sp >= 0.12) {
+    if (statusDot) statusDot.className = "w-3 h-3 rounded-full bg-blue-500 shadow-xs";
+    if (statusLabel) statusLabel.textContent = "Standard Production Spacing";
+    if (statusDesc) statusDesc.textContent = "Balanced layout. Webbing can be pulled with moderate care; optimal sticker density.";
+  } else {
+    if (statusDot) statusDot.className = "w-3 h-3 rounded-full bg-amber-500 shadow-xs";
+    if (statusLabel) statusLabel.textContent = "Tight Die-Cut (Fragile Webbing)";
+    if (statusDesc) statusDesc.textContent = "Maximum sheet density. Webbing bridges are thin and may snap if pulled as a continuous sheet.";
+  }
 }
 
 export function initCutSettingsListeners() {
@@ -2978,7 +3022,57 @@ export function initCutSettingsListeners() {
   bindLayerInput("settings-kiss-cut-layer", "kissCutLayerName");
   bindLayerInput("settings-edge-cut-layer", "edgeCutLayerName");
 
-  // Presets
+  // Webbing Spacing 2-way sync
+  const webbingInput = document.getElementById("settings-webbing-spacing");
+  const spacingSidebarInput = document.getElementById("spacingInput");
+  const marginInput = document.getElementById("settings-sheet-margin");
+
+  if (webbingInput) {
+    webbingInput.addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        if (spacingSidebarInput) spacingSidebarInput.value = val;
+        saveCutSettings({ webbingSpacingInches: val });
+      }
+    });
+  }
+
+  if (spacingSidebarInput) {
+    spacingSidebarInput.addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        if (webbingInput) webbingInput.value = val;
+        saveCutSettings({ webbingSpacingInches: val });
+      }
+    });
+  }
+
+  if (marginInput) {
+    marginInput.addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        saveCutSettings({ sheetMarginInches: val });
+      }
+    });
+  }
+
+  // Webbing Presets
+  document.getElementById("webbing-preset-pull")?.addEventListener("click", () => {
+    saveCutSettings({ webbingSpacingInches: 0.25, sheetMarginInches: 0.25 });
+    showSuccessToast("Easy Webbing Pull preset applied (0.25 in / 6.4 mm).");
+  });
+
+  document.getElementById("webbing-preset-standard")?.addEventListener("click", () => {
+    saveCutSettings({ webbingSpacingInches: 0.15, sheetMarginInches: 0.25 });
+    showSuccessToast("Standard Production spacing applied (0.15 in / 3.8 mm).");
+  });
+
+  document.getElementById("webbing-preset-tight")?.addEventListener("click", () => {
+    saveCutSettings({ webbingSpacingInches: 0.08, sheetMarginInches: 0.15 });
+    showSuccessToast("Tight Die-Cut preset applied (0.08 in / 2.0 mm).");
+  });
+
+  // Layer Presets
   document.getElementById("preset-roland-btn")?.addEventListener("click", () => {
     const preset = {
       kissCutLayerName: "CutContour",
@@ -3011,14 +3105,18 @@ export function initCutSettingsListeners() {
     const kissColor = document.getElementById("settings-kiss-cut-color")?.value.trim() || "#00FFFF";
     const edgeLayer = document.getElementById("settings-edge-cut-layer")?.value.trim() || "Die-Cut";
     const edgeColor = document.getElementById("settings-edge-cut-color")?.value.trim() || "#FF0000";
+    const webbingVal = parseFloat(document.getElementById("settings-webbing-spacing")?.value) || 0.15;
+    const marginVal = parseFloat(document.getElementById("settings-sheet-margin")?.value) || 0.25;
 
     saveCutSettings({
       kissCutLayerName: kissLayer,
       kissCutColor: kissColor,
       edgeCutLayerName: edgeLayer,
       edgeCutColor: edgeColor,
+      webbingSpacingInches: webbingVal,
+      sheetMarginInches: marginVal,
     });
-    showSuccessToast("Cut Line & Layer settings saved.");
+    showSuccessToast("Cut Line & Webbing settings saved.");
   });
 }
 

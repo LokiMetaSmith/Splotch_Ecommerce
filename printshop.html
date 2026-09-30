@@ -785,9 +785,95 @@
             </div>
           </div>
 
+          <!-- Automatic Packing & Webbing (Weed Matrix) Controls -->
+          <div class="mt-6 pt-6 border-t">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                  Automatic Packing &amp; Webbing Spacing
+                </h3>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  Adjust the cut gap between stickers and the sheet border so operators can peel the excess vinyl webbing (weed matrix) cleanly in one continuous motion without tearing.
+                </p>
+              </div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-xs text-gray-500 font-semibold uppercase">Presets:</span>
+                <button type="button" id="webbing-preset-pull" class="text-xs px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-medium transition shadow-xs">
+                  Easy Webbing Pull (0.25 in)
+                </button>
+                <button type="button" id="webbing-preset-standard" class="text-xs px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border rounded font-medium transition shadow-xs">
+                  Standard (0.15 in)
+                </button>
+                <button type="button" id="webbing-preset-tight" class="text-xs px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border rounded font-medium transition shadow-xs">
+                  Tight Die-Cut (0.08 in)
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg border">
+              <div>
+                <label for="settings-webbing-spacing" class="block text-xs font-semibold text-gray-700 mb-1">
+                  Cut Gap / Webbing Width (Inches)
+                </label>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="number"
+                    id="settings-webbing-spacing"
+                    value="0.15"
+                    step="0.01"
+                    min="0.04"
+                    max="1.50"
+                    class="w-full p-2 border rounded-md text-sm font-semibold bg-white font-mono"
+                  />
+                  <span class="text-xs text-gray-500 font-mono whitespace-nowrap bg-white px-2 py-1.5 border rounded" id="settings-webbing-spacing-mm">~3.8 mm</span>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1">
+                  Controls bridge thickness between kiss cuts. 0.20"+ allows peeling the entire sheet waste in one piece.
+                </p>
+              </div>
+
+              <div>
+                <label for="settings-sheet-margin" class="block text-xs font-semibold text-gray-700 mb-1">
+                  Sheet Perimeter Margin (Inches)
+                </label>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="number"
+                    id="settings-sheet-margin"
+                    value="0.25"
+                    step="0.01"
+                    min="0.05"
+                    max="2.00"
+                    class="w-full p-2 border rounded-md text-sm font-semibold bg-white font-mono"
+                  />
+                  <span class="text-xs text-gray-500 font-mono whitespace-nowrap bg-white px-2 py-1.5 border rounded" id="settings-sheet-margin-mm">~6.4 mm</span>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1">
+                  Outer margin around the sheet border providing edge grip to start the webbing pull.
+                </p>
+              </div>
+
+              <div class="sm:col-span-2 lg:col-span-1 bg-white p-3 rounded-md border border-gray-200 flex flex-col justify-between">
+                <div>
+                  <span class="text-xs font-bold text-gray-700 block mb-1">Weed Matrix Behavior:</span>
+                  <div class="flex items-center gap-2">
+                    <span id="webbing-status-indicator" class="w-3 h-3 rounded-full bg-green-500"></span>
+                    <span id="webbing-status-label" class="text-xs font-semibold text-gray-800">Pullable Webbing Matrix</span>
+                  </div>
+                  <p id="webbing-status-desc" class="text-[11px] text-gray-500 mt-1">
+                    Spacing is wide enough to peel the waste skeleton continuously while leaving stickers on the liner.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="pt-4 border-t mt-6 flex justify-end">
             <button type="button" id="save-cut-settings-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition shadow-sm">
-              Save Cut Settings
+              Save Cut &amp; Webbing Settings
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { escapeHtml } from './utils.js';
+import { dispatchOrderWebhook } from './lib/webhook_dispatcher.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -161,12 +162,29 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
 
   // Helper to send shipping email notification
   async function sendShipmentNotification(order, trackingNumber, courier) {
-    if (!order.billingContact?.email) return;
+    const recipientEmail =
+      order.billingContact?.email ||
+      order.shippingContact?.email ||
+      order.customerEmail ||
+      order.customerDetails?.billing?.email ||
+      order.shippingAddress?.email;
+
+    // Trigger Agent Webhook if registered
+    if (order.webhookUrl || order.webhook_url) {
+      dispatchOrderWebhook(order, 'order.shipped', {
+        trackingNumber,
+        courier
+      }).catch(err => {
+        logger.warn(`[WOOCOMMERCE] Webhook shipment dispatch failed: ${err.message}`);
+      });
+    }
+
+    if (!recipientEmail) return;
 
     try {
-      const customerName = order.billingContact.givenName || 'Valued Customer';
-      const shippingAddress = order.shippingContact || {};
-      const addressLines = shippingAddress.addressLines || [];
+      const customerName = order.billingContact?.givenName || order.shippingContact?.givenName || 'Valued Customer';
+      const shippingAddress = order.shippingContact || order.shippingAddress || {};
+      const addressLines = shippingAddress.addressLines || (shippingAddress.street ? [shippingAddress.street] : []);
       const orderDate = order.receivedAt
         ? new Date(order.receivedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
         : 'recently';
@@ -176,8 +194,8 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
         <address>
             ${escapeHtml(shippingAddress.givenName || '')} ${escapeHtml(shippingAddress.familyName || '')}<br>
             ${safeAddressLines}<br>
-            ${escapeHtml(shippingAddress.locality || '')}, ${escapeHtml(shippingAddress.administrativeDistrictLevel1 || '')} ${escapeHtml(shippingAddress.postalCode || '')}<br>
-            ${escapeHtml(shippingAddress.country || '')}<br>
+            ${escapeHtml(shippingAddress.locality || shippingAddress.city || '')}, ${escapeHtml(shippingAddress.administrativeDistrictLevel1 || shippingAddress.state || '')} ${escapeHtml(shippingAddress.postalCode || shippingAddress.zip || '')}<br>
+            ${escapeHtml(shippingAddress.country || 'US')}<br>
             ${escapeHtml(shippingAddress.phoneNumber || '')}
         </address>
       `;
@@ -185,15 +203,15 @@ export function createWooCommerceRouter({ db, scheduleEmail, scheduleTelegram, g
       const productDetailsHtml = `
         <tr>
             <td style="padding: 10px; border-bottom: 1px solid #ddd;">Stickers</td>
-            <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails?.quantity || 0}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails?.quantity || order.quantity || 1}</td>
         </tr>
       `;
 
       if (scheduleEmail) {
         await scheduleEmail('send-shipping-email', {
-          to: order.billingContact.email,
+          to: recipientEmail,
           subject: `Your Splotch order #${order.orderId} has shipped!`,
-          text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || 0}\n\nShipping address:\n${shippingAddress.givenName || ''} ${shippingAddress.familyName || ''}\n${addressLines.join('\n')}\n${shippingAddress.locality || ''}, ${shippingAddress.administrativeDistrictLevel1 || ''} ${shippingAddress.postalCode || ''}\n${shippingAddress.country || ''}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
+          text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || order.quantity || 1}\n\nShipping address:\n${shippingAddress.givenName || ''} ${shippingAddress.familyName || ''}\n${addressLines.join('\n')}\n${shippingAddress.locality || shippingAddress.city || ''}, ${shippingAddress.administrativeDistrictLevel1 || shippingAddress.state || ''} ${shippingAddress.postalCode || shippingAddress.zip || ''}\n${shippingAddress.country || 'US'}\n${shippingAddress.phoneNumber || ''}\n\nStay in touch!\nSplotch`,
           html: `
             <p>Hey ${customerName},</p>
             <p>Heads up—your order has been sent out!</p>
