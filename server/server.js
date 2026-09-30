@@ -1156,6 +1156,7 @@ async function startServer(
             "/api/v1/payments/ap2",
             "/api/v1/quotes",
             "/api/v1/orders",
+            "/api/v1/upload",
             "/api/mcp",
             "/api/mcp/messages",
           ],
