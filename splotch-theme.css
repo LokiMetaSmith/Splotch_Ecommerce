@@ -58,17 +58,15 @@ main.container {
 main.container h1.text-3xl,
 main.container h1 {
   /* Main Page Title: "Custom Sticker Editor & Secure Pay" */
-  font-family: var(--font-baumans) !important;
+  font-family: var(--font-modak) !important;
   color: var(--splotch-navy) !important;
   font-size: var(--step-5) !important; /* FLUID TYPOGRAPHY */
   line-height: 1.15 !important;
-  /* Reduced spacing */
-  margin-bottom: 1rem !important;
+  margin-bottom: 1.25rem !important;
   padding-bottom: 0 !important;
-  /* Removed retro 3D styles */
-  -webkit-text-stroke: 0 !important;
-  text-shadow: none !important;
-  letter-spacing: 0;
+  -webkit-text-stroke: 2.5px var(--splotch-white) !important;
+  text-shadow: 3px 3px 0px var(--splotch-teal) !important;
+  letter-spacing: 0.5px;
 }
 
 h3[style*="var(--font-modak)"],
@@ -608,10 +606,10 @@ main.container > div:first-of-type {
   main.container h1.text-2xl,
   main.container h1 {
     color: var(--splotch-navy, #2a284d) !important;
-    -webkit-text-stroke: 0 !important;
-    text-shadow: none !important;
-    font-family: var(--font-baumans, sans-serif) !important;
-    letter-spacing: 0 !important;
+    -webkit-text-stroke: 1.5px var(--splotch-white) !important;
+    text-shadow: 2px 2px 0px var(--splotch-teal) !important;
+    font-family: var(--font-modak, cursive) !important;
+    letter-spacing: 0.75px !important;
     font-size: clamp(1.25rem, 5.5vw, 1.5rem) !important;
     margin-bottom: 0 !important;
     padding-bottom: 0 !important;
