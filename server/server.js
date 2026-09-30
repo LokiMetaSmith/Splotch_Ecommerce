@@ -92,7 +92,7 @@ import { dispatchSecurityAlert, getClientIp } from "./lib/securityAlerts.js";
 import OdooClient from "./odoo.js";
 import { exec, execFile } from "child_process";
 import util from "util";
-import { mcpRequestHandler, mcpMessageHandler } from "./mcp.js";
+import { mcpRequestHandler, mcpMessageHandler, mcpStreamableHandler } from "./mcp.js";
 import createAgentPaymentsRouter from "./routes/agent-payments.js";
 
 const execPromise = util.promisify(exec);
@@ -920,6 +920,12 @@ async function startServer(
     const corsOptions = {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
+        if (
+          origin.includes("claude.ai") ||
+          origin.includes("anthropic.com")
+        ) {
+          return callback(null, true);
+        }
         const isAllowed = allowedOrigins.some((allowedOrigin) => {
           if (typeof allowedOrigin === "string") {
             return allowedOrigin === origin;
@@ -1150,6 +1156,7 @@ async function startServer(
             "/api/v1/payments/ap2",
             "/api/v1/quotes",
             "/api/v1/orders",
+            "/api/mcp",
             "/api/mcp/messages",
           ],
         },
@@ -1341,9 +1348,35 @@ async function startServer(
     // --- API Endpoints ---
     app.use("/api", apiLimiter);
 
-    // --- MCP Server Endpoints ---
-    app.get("/api/mcp", (req, res) => mcpRequestHandler(req, res, db));
-    app.post("/api/mcp/messages", (req, res) => mcpMessageHandler(req, res, db));
+    // --- MCP Server Endpoints (Dual Transport: Streamable HTTP & Legacy SSE) ---
+    app.options("/api/mcp", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, x-requested-with");
+      res.sendStatus(204);
+    });
+
+    app.options("/api/mcp/messages", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, x-requested-with");
+      res.sendStatus(204);
+    });
+
+    app.post("/api/mcp", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return mcpStreamableHandler(req, res, db);
+    });
+
+    app.get("/api/mcp", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return mcpRequestHandler(req, res, db);
+    });
+
+    app.post("/api/mcp/messages", (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return mcpMessageHandler(req, res, db);
+    });
 
     // --- Agent Payments ---
     app.use("/api", createAgentPaymentsRouter(db));
@@ -1357,6 +1390,10 @@ async function startServer(
         description: "Autonomous agent printing & purchasing protocol server (MCP & AP2 / x402)",
         endpoints: [
           {
+            transport: "streamable_http",
+            url: "/api/mcp"
+          },
+          {
             transport: "sse",
             url: "/api/mcp",
             messages_url: "/api/mcp/messages"
@@ -1368,15 +1405,15 @@ async function startServer(
         tools: [
           {
             name: "calculate_sticker_quote",
-            description: "Calculate sticker pricing based on width, height, quantity, and material"
+            description: "Calculate sticker pricing based on width, height, quantity, and material. Single stickers (quantity = 1) and small batches supported with NO minimum order quantity."
           },
           {
             name: "get_quote",
-            description: "Alias for calculate_sticker_quote"
+            description: "Alias for calculate_sticker_quote. Supports single-sticker orders (minimum 1)."
           },
           {
             name: "splotch_get_sticker_quote",
-            description: "Calculates deterministic pricing and cart digest for custom sticker print runs"
+            description: "Calculates deterministic pricing and cart digest for custom sticker print runs (supports single stickers with no minimum)."
           },
           {
             name: "create_agent_checkout",
@@ -1994,6 +2031,36 @@ async function startServer(
           .optional()
           .isInt({ min: 0 })
           .withMessage("pickupDiscountCents must be a non-negative integer"),
+        body("envelopeShippingCents")
+          .optional()
+          .isInt({ min: 0 })
+          .withMessage("envelopeShippingCents must be a non-negative integer"),
+        body("envelopeHandlingFeeCents")
+          .optional()
+          .isInt({ min: 0 })
+          .withMessage("envelopeHandlingFeeCents must be a non-negative integer"),
+        body("parcelShippingEnabled")
+          .optional()
+          .isBoolean(),
+        body("envelopeShippingEnabled")
+          .optional()
+          .isBoolean(),
+        body("pickupEnabled")
+          .optional()
+          .isBoolean(),
+        body("squareEnabled")
+          .optional()
+          .isBoolean(),
+        body("baseUsdcEnabled")
+          .optional()
+          .isBoolean(),
+        body("lightningEnabled")
+          .optional()
+          .isBoolean(),
+        body("baseMerchantWallet")
+          .optional()
+          .isString()
+          .trim(),
       ],
       async (req, res) => {
         if (!(await isAdmin(req.user)))
@@ -2017,6 +2084,42 @@ async function startServer(
             req.body.pickupDiscountCents !== undefined
               ? Number(req.body.pickupDiscountCents)
               : DEFAULT_SHIPPING_CONFIG.pickupDiscountCents || 300,
+          envelopeShippingCents:
+            req.body.envelopeShippingCents !== undefined
+              ? Number(req.body.envelopeShippingCents)
+              : DEFAULT_SHIPPING_CONFIG.envelopeShippingCents || 95,
+          envelopeHandlingFeeCents:
+            req.body.envelopeHandlingFeeCents !== undefined
+              ? Number(req.body.envelopeHandlingFeeCents)
+              : DEFAULT_SHIPPING_CONFIG.envelopeHandlingFeeCents || 30,
+          parcelShippingEnabled:
+            req.body.parcelShippingEnabled !== undefined
+              ? Boolean(req.body.parcelShippingEnabled)
+              : true,
+          envelopeShippingEnabled:
+            req.body.envelopeShippingEnabled !== undefined
+              ? Boolean(req.body.envelopeShippingEnabled)
+              : true,
+          pickupEnabled:
+            req.body.pickupEnabled !== undefined
+              ? Boolean(req.body.pickupEnabled)
+              : true,
+          squareEnabled:
+            req.body.squareEnabled !== undefined
+              ? Boolean(req.body.squareEnabled)
+              : true,
+          baseUsdcEnabled:
+            req.body.baseUsdcEnabled !== undefined
+              ? Boolean(req.body.baseUsdcEnabled)
+              : true,
+          lightningEnabled:
+            req.body.lightningEnabled !== undefined
+              ? Boolean(req.body.lightningEnabled)
+              : true,
+          baseMerchantWallet:
+            req.body.baseMerchantWallet !== undefined
+              ? String(req.body.baseMerchantWallet).trim()
+              : "",
         };
 
         await db.setConfig("shipping", newConfig);

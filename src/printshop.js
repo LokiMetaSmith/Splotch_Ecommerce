@@ -831,7 +831,8 @@ export function getResolutionPpi(resolutionId) {
  */
 export function getOrderSpecs(order) {
   if (!order) return {};
-  const details = order.orderDetails || {};
+  const firstItem = (Array.isArray(order.items) && order.items[0]) || {};
+  const details = order.orderDetails || firstItem || {};
 
   // 1. Resolution & PPI
   const rawRes = details.resolution || order.resolution;
@@ -956,15 +957,27 @@ export function displayOrderRow(order) {
   const isExpanded = expandedOrderIds.has(orderId);
   const specs = getOrderSpecs(order);
   const receivedAt = new Date(order.receivedAt).toLocaleString();
-  const quantity = order.orderDetails?.quantity || order.quantity || 0;
-  const price = (order.amount / 100).toFixed(2);
+  const rawShipAddr = order.shippingAddress || {};
+  const quantity = order.orderDetails?.quantity || order.quantity || (Array.isArray(order.items) && order.items[0]?.quantity) || 0;
+  const rawAmt = typeof order.amount === "number" ? order.amount : parseFloat(order.amount || 0);
+  const price = (order.amountUsd !== undefined)
+    ? Number(order.amountUsd).toFixed(2)
+    : (rawAmt > 0 && rawAmt < 100 && String(rawAmt).includes('.'))
+      ? rawAmt.toFixed(2)
+      : (rawAmt / 100).toFixed(2);
 
-  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.billing?.name || "N/A");
-  const billingEmail = escapeHtml(order.billingContact?.email || order.customerDetails?.billing?.email || order.customerEmail || "N/A");
-  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.shipping?.name || billingName);
-  const shippingEmail = escapeHtml(order.shippingContact?.email || billingEmail);
+  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.billing?.name || rawShipAddr.name || "N/A");
+  const billingEmail = escapeHtml(order.billingContact?.email || order.customerDetails?.billing?.email || rawShipAddr.email || order.customerEmail || "N/A");
+  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.shipping?.name || rawShipAddr.name || billingName);
+  const shippingEmail = escapeHtml(order.shippingContact?.email || rawShipAddr.email || billingEmail);
 
   const formatAddress = (contact) => {
+    if (!contact && order.shippingAddress) {
+      const sa = order.shippingAddress;
+      const lines = [sa.street || sa.street_address || sa.address_line_1].filter(Boolean).join(", ");
+      const cityStateZip = [sa.city, sa.state, sa.zip || sa.postal_code].filter(Boolean).join(" ");
+      return [lines, cityStateZip].filter(Boolean).join(", ");
+    }
     if (!contact) return "";
     const lines = Array.isArray(contact.addressLines) ? contact.addressLines.filter(Boolean).join(", ") : (contact.addressLines || "");
     const cityStateZip = [contact.locality || contact.city, contact.administrativeDistrictLevel1 || contact.state, contact.postalCode].filter(Boolean).join(" ");
@@ -975,7 +988,10 @@ export function displayOrderRow(order) {
   const hasDistinctBilling = billingAddrStr && shippingAddrStr && (billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase());
 
   const serverPrefix = serverUrl;
-  const designImagePath = `${serverPrefix}${escapeHtml(order.designImagePath || "")}`;
+  const rawImagePath = order.designImagePath || order.designUrl || (Array.isArray(order.items) && order.items[0]?.artwork_url) || (Array.isArray(order.items) && order.items[0]?.designUrl) || "";
+  const designImagePath = rawImagePath.startsWith("http://") || rawImagePath.startsWith("https://") || rawImagePath.startsWith("data:")
+    ? escapeHtml(rawImagePath)
+    : (rawImagePath ? `${serverPrefix}${escapeHtml(rawImagePath)}` : "");
   const cutFilePath = escapeHtml(
     order.orderDetails?.cutLinePath || order.cutLinePath || "",
   );
@@ -1131,7 +1147,7 @@ export function displayOrderRow(order) {
       </td>
       <td class="px-4 py-3">
         <div class="flex items-center gap-2">
-            ${designImagePath && order.designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
+            ${designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
                 <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${specs.ppi}" loading="lazy" decoding="async">
             </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[10px] text-gray-500 font-semibold text-center leading-tight p-1">${order.artworkPruned ? 'Pruned' : 'N/A'}</div>`}
             <div>
@@ -1300,18 +1316,30 @@ export function displayOrder(order) {
     return order._cachedHtml;
   }
 
-  const formattedAmount = order.amount
-    ? `$${(order.amount / 100).toFixed(2)}`
-    : "N/A";
+  const rawShipAddr = order.shippingAddress || {};
+  const rawAmt = typeof order.amount === "number" ? order.amount : parseFloat(order.amount || 0);
+  const formattedAmount = (order.amountUsd !== undefined)
+    ? `$${Number(order.amountUsd).toFixed(2)}`
+    : (rawAmt > 0 && rawAmt < 100 && String(rawAmt).includes('.'))
+      ? `$${rawAmt.toFixed(2)}`
+      : order.amount
+        ? `$${(order.amount / 100).toFixed(2)}`
+        : "N/A";
   const receivedDate = new Date(order.receivedAt).toLocaleString();
 
-  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`;
-  const billingEmail = escapeHtml(order.billingContact?.email || "N/A");
+  const billingName = `${escapeHtml(order.billingContact?.givenName || "")} ${escapeHtml(order.billingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.billing?.name || rawShipAddr.name || "N/A");
+  const billingEmail = escapeHtml(order.billingContact?.email || order.customerDetails?.billing?.email || rawShipAddr.email || order.customerEmail || "N/A");
 
-  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`;
-  const shippingEmail = escapeHtml(order.shippingContact?.email || "N/A");
+  const shippingName = `${escapeHtml(order.shippingContact?.givenName || "")} ${escapeHtml(order.shippingContact?.familyName || "")}`.trim() || escapeHtml(order.customerDetails?.shipping?.name || rawShipAddr.name || billingName);
+  const shippingEmail = escapeHtml(order.shippingContact?.email || rawShipAddr.email || billingEmail);
 
   const formatAddress = (contact) => {
+    if (!contact && order.shippingAddress) {
+      const sa = order.shippingAddress;
+      const lines = [sa.street || sa.street_address || sa.address_line_1].filter(Boolean).join(", ");
+      const cityStateZip = [sa.city, sa.state, sa.zip || sa.postal_code].filter(Boolean).join(" ");
+      return [lines, cityStateZip].filter(Boolean).join(", ");
+    }
     if (!contact) return "";
     const lines = Array.isArray(contact.addressLines) ? contact.addressLines.filter(Boolean).join(", ") : (contact.addressLines || "");
     const cityStateZip = [contact.locality || contact.city, contact.administrativeDistrictLevel1 || contact.state, contact.postalCode].filter(Boolean).join(" ");
@@ -1322,7 +1350,7 @@ export function displayOrder(order) {
   const hasDistinctBilling = billingAddrStr && shippingAddrStr && (billingAddrStr.toLowerCase() !== shippingAddrStr.toLowerCase());
 
   const specs = getOrderSpecs(order);
-  const quantity = escapeHtml(order.orderDetails?.quantity || "N/A");
+  const quantity = escapeHtml(order.orderDetails?.quantity || order.quantity || (Array.isArray(order.items) && order.items[0]?.quantity) || "N/A");
   const ppi = specs.ppi || getResolutionPpi(order.orderDetails?.resolution || order.resolution);
   const status = escapeHtml(order.status);
   const orderId = escapeHtml(order.orderId);
@@ -1348,7 +1376,10 @@ export function displayOrder(order) {
   const statusClass =
     statusColors[status.toUpperCase()] || "bg-gray-500 text-white";
 
-  const designImagePath = `${serverUrl}${escapeHtml(order.designImagePath)}`;
+  const rawImagePath = order.designImagePath || order.designUrl || (Array.isArray(order.items) && order.items[0]?.artwork_url) || (Array.isArray(order.items) && order.items[0]?.designUrl) || "";
+  const designImagePath = rawImagePath.startsWith("http://") || rawImagePath.startsWith("https://") || rawImagePath.startsWith("data:")
+    ? escapeHtml(rawImagePath)
+    : (rawImagePath ? `${serverUrl}${escapeHtml(rawImagePath)}` : "");
   const cutFilePath = escapeHtml(
     order.orderDetails?.cutLinePath || order.cutLinePath || "",
   );
@@ -1526,7 +1557,7 @@ export function displayOrder(order) {
 
         <div class="mt-4">
             <dt>Sticker Design:</dt>
-            ${designImagePath && order.designImagePath ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank">
+            ${designImagePath ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank">
                 <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
             </a>` : `<div class="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 font-semibold p-2 text-center">${order.artworkPruned ? 'Artwork Pruned' : 'No Preview'}</div>`}
             ${cutFilePath ? `<div class="mt-2"><dt>Cut File:</dt><dd><a href="${serverUrl}${cutFilePath}" class="text-blue-500 underline text-sm" target="_blank" download>Download SVG / XML</a></dd></div>` : ""}
@@ -4151,19 +4182,43 @@ async function loadShippingConfig() {
       const el = document.getElementById(id);
       if (el) el.value = val;
     };
+    const setChecked = (id, checked) => {
+      const el = document.getElementById(id);
+      if (el) el.checked = Boolean(checked);
+    };
 
-    // Tax rate stored as decimal (0.085), display as percentage (8.5)
-    setVal("shipping-tax-rate",      ((c.taxRate || 0) * 100).toFixed(2));
-    // Handling fee stored in cents, display as dollars
-    setVal("shipping-handling-fee",  ((c.handlingFeeCents || 0) / 100).toFixed(2));
-    // Per-sticker handling fee stored in cents, display as dollars
+    // Shipping Toggles
+    setChecked("shipping-parcel-enabled", c.parcelShippingEnabled !== false);
+    setChecked("shipping-envelope-enabled", c.envelopeShippingEnabled !== false);
+    setChecked("shipping-pickup-enabled", c.pickupEnabled !== false);
+
+    // Payment Toggles
+    setChecked("payment-square-enabled", c.squareEnabled !== false);
+    setChecked("payment-base-usdc-enabled", c.baseUsdcEnabled !== false);
+    setChecked("payment-lightning-enabled", c.lightningEnabled !== false);
+
+    // Shipping Fees
+    setVal("shipping-handling-fee", ((c.handlingFeeCents || 0) / 100).toFixed(2));
     setVal("shipping-handling-fee-per-item", ((c.handlingFeePerItemCents || 0) / 100).toFixed(2));
-    // Square % stored as decimal (0.029), display as percentage (2.9)
-    setVal("shipping-square-pct",    ((c.squareFeePercent || 0) * 100).toFixed(3));
-    // Square fixed stored in cents, display as dollars
-    setVal("shipping-square-fixed",  ((c.squareFeeFixedCents || 0) / 100).toFixed(2));
+    setVal("shipping-tare-grams", (c.packageTareGrams || 0).toFixed(0));
+
+    // Envelope Fees
+    setVal("shipping-envelope-fee", ((c.envelopeShippingCents ?? 95) / 100).toFixed(2));
+    setVal("shipping-envelope-handling", ((c.envelopeHandlingFeeCents ?? 30) / 100).toFixed(2));
+
+    // Pickup Discount
+    setVal("shipping-pickup-discount", ((c.pickupDiscountCents ?? 300) / 100).toFixed(2));
+
+    // Square Fees
+    setVal("shipping-square-pct", ((c.squareFeePercent || 0) * 100).toFixed(3));
+    setVal("shipping-square-fixed", ((c.squareFeeFixedCents || 0) / 100).toFixed(2));
+
+    // Base Wallet
+    setVal("payment-base-merchant-wallet", c.baseMerchantWallet || "");
+
+    // Tax & Material
+    setVal("shipping-tax-rate", ((c.taxRate || 0) * 100).toFixed(2));
     setVal("shipping-grams-per-sqin", (c.gramsPerSqIn || 0).toFixed(3));
-    setVal("shipping-tare-grams",     (c.packageTareGrams || 0).toFixed(0));
   } catch (err) {
     console.warn("[PRINTSHOP] Failed to load shipping config:", err);
   }
@@ -4178,19 +4233,36 @@ function initShippingConfigListeners() {
     const statusEl = document.getElementById("shipping-config-status");
 
     const getNum = (id) => parseFloat(document.getElementById(id)?.value || "0");
+    const getChecked = (id) => Boolean(document.getElementById(id)?.checked);
+    const getStr = (id) => (document.getElementById(id)?.value || "").trim();
 
     const payload = {
-      // Input is %, convert back to decimal for storage
-      taxRate:            getNum("shipping-tax-rate") / 100,
-      // Input is $, convert to cents
-      handlingFeeCents:   Math.round(getNum("shipping-handling-fee") * 100),
+      // Toggles
+      parcelShippingEnabled: getChecked("shipping-parcel-enabled"),
+      envelopeShippingEnabled: getChecked("shipping-envelope-enabled"),
+      pickupEnabled: getChecked("shipping-pickup-enabled"),
+      squareEnabled: getChecked("payment-square-enabled"),
+      baseUsdcEnabled: getChecked("payment-base-usdc-enabled"),
+      lightningEnabled: getChecked("payment-lightning-enabled"),
+
+      // Shipping & Handling Fees ($ to cents)
+      handlingFeeCents: Math.round(getNum("shipping-handling-fee") * 100),
       handlingFeePerItemCents: Math.round(getNum("shipping-handling-fee-per-item") * 100),
-      // Input is %, convert back to decimal
-      squareFeePercent:   getNum("shipping-square-pct") / 100,
-      // Input is $, convert to cents
+      packageTareGrams: getNum("shipping-tare-grams"),
+      envelopeShippingCents: Math.round(getNum("shipping-envelope-fee") * 100),
+      envelopeHandlingFeeCents: Math.round(getNum("shipping-envelope-handling") * 100),
+      pickupDiscountCents: Math.round(getNum("shipping-pickup-discount") * 100),
+
+      // Square Fees
+      squareFeePercent: getNum("shipping-square-pct") / 100,
       squareFeeFixedCents: Math.round(getNum("shipping-square-fixed") * 100),
-      gramsPerSqIn:       getNum("shipping-grams-per-sqin"),
-      packageTareGrams:   getNum("shipping-tare-grams"),
+
+      // Base Merchant Wallet Override
+      baseMerchantWallet: getStr("payment-base-merchant-wallet"),
+
+      // Tax & Material
+      taxRate: getNum("shipping-tax-rate") / 100,
+      gramsPerSqIn: getNum("shipping-grams-per-sqin"),
     };
 
     try {
@@ -4199,7 +4271,7 @@ function initShippingConfigListeners() {
         body: JSON.stringify(payload),
       });
       if (result && result.success) {
-        showSuccessToast("Shipping settings saved!");
+        showSuccessToast("Shipping & payment settings saved!");
         if (statusEl) {
           statusEl.textContent = "Saved ✓";
           statusEl.className = "text-sm text-green-600";
@@ -4209,7 +4281,7 @@ function initShippingConfigListeners() {
         throw new Error("Server returned failure");
       }
     } catch (err) {
-      showErrorToast(`Failed to save shipping settings: ${err.message}`);
+      showErrorToast(`Failed to save settings: ${err.message}`);
       if (statusEl) {
         statusEl.textContent = "Save failed";
         statusEl.className = "text-sm text-red-600";

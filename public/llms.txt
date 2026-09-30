@@ -20,15 +20,17 @@ Autonomous agents can complete a purchase using **Option A (REST API / x402 / AP
 ## Option A: Headless REST Ordering (HTTP 402 & AP2)
 
 ### Step 1: Request Sticker Quote
+> **No Minimum Order Quantity**: Splotch prints custom stickers on-demand with **no minimum order size**. Agents can order a single custom sticker (`"quantity": 1`) or batch runs (`"quantity": 10`, `50`, `100`, etc.).
+
 Send an HTTP POST request to calculate pricing:
 ```http
 POST https://splotch.page/api/v1/quotes
 Content-Type: application/json
 
 {
-  "widthInches": 3.0,
-  "heightInches": 3.0,
-  "quantity": 50,
+  "widthInches": 2.0,
+  "heightInches": 2.0,
+  "quantity": 1,
   "material": "vinyl_matte",
   "cutType": "die_cut"
 }
@@ -36,29 +38,34 @@ Content-Type: application/json
 **Response (201 Created):**
 ```json
 {
-  "quoteId": "quote_1790626000000",
-  "unitPrice": 1.55,
-  "total": 77.50,
+  "quoteId": "quo_1790626000000",
+  "unitPrice": 0.80,
+  "total": 0.80,
   "currency": "USD",
   "validUntilMinutes": 30,
-  "expiresAt": "2026-09-28T21:00:00.000Z",
+  "expiresAt": "2026-09-29T21:00:00.000Z",
   "ap2_payment_endpoint": "/api/v1/payments/ap2",
   "orders_endpoint": "/api/v1/orders"
 }
 ```
 
 ### Step 2: Submit Headless Order (Payment Challenge Negotiation)
-Send your order payload to initiate checkout:
+Send your order payload to initiate checkout.
+> **IMPORTANT:**
+> - `designUrl` is **REQUIRED**: A public HTTP/HTTPS URL to the artwork (PNG, JPG, SVG, WebP). Splotch downloads this file directly to print your stickers.
+> - `shippingAddress.email` is **REQUIRED**: A valid customer email for order confirmation and USPS tracking updates.
+
 ```http
 POST https://splotch.page/api/v1/orders
 Content-Type: application/json
 
 {
-  "quoteId": "quote_1790626000000",
-  "amount": "77.50",
+  "quoteId": "quo_1790626000000",
+  "amount": "0.35",
   "designUrl": "https://example.com/artwork.png",
   "shippingAddress": {
     "name": "Alex Agent",
+    "email": "alex@example.com",
     "street": "123 Autonomous Blvd",
     "city": "Oklahoma City",
     "state": "OK",
@@ -67,26 +74,76 @@ Content-Type: application/json
 }
 ```
 
-If payment proof and mandate headers are not supplied, the server returns an **HTTP 402 Payment Required** challenge:
+If payment proof is not supplied, the server returns an **HTTP 402 Payment Required** challenge with full settlement details:
 ```json
 {
   "error": "Payment Required",
   "protocol": "x402",
   "ap2_support": true,
   "quote": {
-    "amount": "77.50",
+    "amount": "0.35",
     "currency": "USD",
-    "recipient": "splotch-creative-settlement",
+    "recipient": "0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23",
     "settlement_methods": ["lightning", "base_usdc"]
   },
-  "instructions": "Include authorization header 'authorization-x402' for payment proof and 'x-ap2-mandate' for the signed AP2 Cart Mandate."
+  "settlement_details": {
+    "base_usdc": {
+      "network": "base",
+      "chain_id": 8453,
+      "token_symbol": "USDC",
+      "token_address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "recipient_address": "0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23",
+      "decimals": 6
+    }
+  },
+  "instructions": "For direct Base USDC settlement (Coinbase / web3), transfer funds to recipient_address and provide transaction hash in 'authorization-x402' header or body.settlement.tx_hash. AP2 Cart Mandates ('x-ap2-mandate') are optional."
 }
 ```
 
 ### Step 3: Complete Settlement
-Re-submit the request with the required settlement headers:
-- `authorization-x402`: Base64 JSON containing `{ "status": "PAID", "amount": 77.50, "paymentId": "<unique_tx_id>" }`
-- `x-ap2-mandate`: Base64-encoded or raw signed JWT signed by user's delegated private key verifying `quoteId`, `intentId`, and `audience: "splotch-creative-settlement"`. Public key is discoverable at `GET https://splotch.page/.well-known/ap2`.
+
+You can pay via **Direct On-Chain Transfer (Coinbase / Web3)** or **Delegated Agent Mandate (AP2)**:
+
+#### Method A: Direct Base USDC Settlement (No AP2 Mandate Required)
+1. Send the quote amount in USDC on **Base Mainnet** (Chain ID: `8453`) to:
+   - **Recipient**: `0x7F4d2a0518cC74835fa55dBA271A02d4f18cAE23`
+   - **Token Contract**: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+2. Submit your order with `settlement`, `designUrl`, and `shippingAddress` (with `email`) in the request body:
+   ```json
+   POST /api/v1/orders
+   {
+     "quoteId": "quo_1790626000000",
+     "designUrl": "https://example.com/artwork.png",
+     "shippingAddress": {
+       "name": "Alex Agent",
+       "email": "alex@example.com",
+       "street": "123 Autonomous Blvd",
+       "city": "Oklahoma City",
+       "state": "OK",
+       "zip": "73102"
+     },
+     "settlement": {
+       "rail": "base_usdc",
+       "tx_hash": "0xYourTxHashFromCoinbaseOrWallet",
+       "payer_wallet": "0xYourWalletAddress"
+     }
+   }
+   ```
+   *The server downloads your artwork, validates the on-chain transfer receipt via Base RPC, and confirms your order.*
+
+#### Method B: Lightning Network (x402)
+Include the `authorization-x402` header containing base64-encoded JSON:
+```json
+{
+  "rail": "lightning",
+  "amount": 0.35,
+  "payment_hash": "<64_hex_payment_hash>",
+  "preimage": "<64_hex_payment_preimage>"
+}
+```
+
+#### Method C: Delegated Agent Mandate (AP2 JWT)
+If you are an agent acting with delegated spend authority, attach the signed AP2 Cart Mandate JWT in the `x-ap2-mandate` header. Splotch will verify the signature, mandate bindings, and spend limits.
 
 **Response (201 Created):**
 ```json
@@ -113,9 +170,22 @@ Splotch exposes an MCP server over Server-Sent Events (SSE).
 - **Connection URL**: `GET https://splotch.page/api/mcp`
 - **Messages URL**: `POST https://splotch.page/api/mcp/messages?sessionId=<sessionId>`
 
+### Connecting MCP to AI Assistants (Claude Desktop, Cursor, etc.)
+Add Splotch as a custom connector in your client configuration:
+```json
+{
+  "mcpServers": {
+    "splotch": {
+      "url": "https://splotch.page/api/mcp"
+    }
+  }
+}
+```
+
 ### Available MCP Tools:
 1. `calculate_sticker_quote` (alias `get_quote`):
-   - Parameters: `widthInches` (float), `heightInches` (float), `quantity` (int), `material` ("vinyl_matte"|"vinyl_gloss"|"holographic"), `cutType` ("die_cut"|"kiss_cut")
+   - Description: Calculate price for custom stickers. Single stickers (`quantity: 1`) and small custom runs are fully supported on-demand with NO minimum order quantity.
+   - Parameters: `widthInches` (float), `heightInches` (float), `quantity` (int, default: 1, minimum: 1 — single stickers supported), `material` ("vinyl_matte"|"vinyl_gloss"|"holographic"), `cutType` ("die_cut"|"kiss_cut")
    - Returns: `{ quoteId, unitPrice, total, currency: "USD", validUntilMinutes: 30 }`
 
 2. `create_agent_checkout` (alias `place_order`):

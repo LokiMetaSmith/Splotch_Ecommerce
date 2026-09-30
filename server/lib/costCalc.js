@@ -132,6 +132,18 @@ export const DEFAULT_SHIPPING_CONFIG = {
   packageTareGrams: 28, // ~1 oz envelope + backing
   pickupDiscountCents: 300, // $3.00 local pickup discount
   handlingFeePerItemCents: 0, // $0.00 per item
+  envelopeShippingCents: 95, // $0.95 USPS letter envelope
+  envelopeHandlingFeeCents: 30, // $0.30 letter envelope handling
+  // Shipping Method Toggles
+  parcelShippingEnabled: true,
+  envelopeShippingEnabled: true,
+  pickupEnabled: true,
+  // Payment Method Toggles
+  squareEnabled: true,
+  baseUsdcEnabled: true,
+  lightningEnabled: true,
+  // Payment Method Variables
+  baseMerchantWallet: "", // optional override, defaults to BASE_MERCHANT_WALLET env
 };
 
 /**
@@ -255,11 +267,12 @@ export function calcOrderBreakdown({
 }) {
   const cfg = { ...DEFAULT_SHIPPING_CONFIG, ...config };
   const isPickup = deliveryMethod === "pickup";
+  const isEnvelope = deliveryMethod === "envelope" || deliveryMethod === "letter";
 
   const weight = calcWeight({
     areaInSqIn,
     gramsPerSqIn: cfg.gramsPerSqIn,
-    tareGrams: cfg.packageTareGrams,
+    tareGrams: isEnvelope ? 5 : cfg.packageTareGrams,
   });
 
   // Calculate tradeoffs against the initial subtotal
@@ -308,6 +321,12 @@ export function calcOrderBreakdown({
         ? cfg.pickupDiscountCents
         : 300;
     pickupDiscountCents = Math.min(adjustedSubtotalCents, configuredDiscount);
+  } else if (isEnvelope) {
+    shippingCents =
+      typeof cfg.envelopeShippingCents === "number"
+        ? cfg.envelopeShippingCents
+        : 95;
+    shippingLabel = "USPS Economy Envelope (Letter Mail)";
   } else {
     const est = calcShippingEstimate({
       weightOz: weight.weightOz,
@@ -365,17 +384,24 @@ export function calcOrderBreakdown({
         taxRate: cfg.taxRate,
       })
     : 0;
-  const handlingCents =
-    cfg.handlingFeeCents +
-    (cfg.handlingFeePerItemCents || 0) * (quantity || 1);
+  const handlingCents = isEnvelope
+    ? (typeof cfg.envelopeHandlingFeeCents === "number" ? cfg.envelopeHandlingFeeCents : 30)
+    : (cfg.handlingFeeCents + (cfg.handlingFeePerItemCents || 0) * (quantity || 1));
+
+  const isCryptoPayment =
+    deliveryMethod === "crypto" ||
+    promoCode === "CRYPTO" ||
+    (typeof destinationState === "string" && destinationState.toLowerCase() === "crypto");
 
   const preTotalCents =
     discountedSubtotal + shippingCents + taxCents + handlingCents;
-  const squareFeeCents = calcSquareFee({
-    amountCents: preTotalCents,
-    feePercent: cfg.squareFeePercent,
-    feeFixedCents: cfg.squareFeeFixedCents,
-  });
+  const squareFeeCents = isCryptoPayment
+    ? 0
+    : calcSquareFee({
+        amountCents: preTotalCents,
+        feePercent: cfg.squareFeePercent,
+        feeFixedCents: cfg.squareFeeFixedCents,
+      });
 
   const totalCents = calcTotal({
     subtotalCents: adjustedSubtotalCents,

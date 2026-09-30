@@ -120,7 +120,7 @@ export async function verifySettlementProof(proofInput, quoteDetails, options = 
       }
     }
 
-    const rpcUrl = options.rpcUrl || process.env.BASE_RPC_URL;
+    const rpcUrl = options.rpcUrl || process.env.BASE_RPC_URL || "https://mainnet.base.org";
     const PLACEHOLDER_WALLET = "0x3233E3f7bFEb1eA9B0a5d4d3F8dC90209420072F".toLowerCase();
     let merchantWallet = options.merchantWallet || process.env.BASE_MERCHANT_WALLET;
 
