@@ -36,8 +36,10 @@ export class PlacementWorker {
         const binBoundsArea = binBounds.width * binBounds.height;
         const isBinRect = Math.abs(binArea - binBoundsArea) < (binBoundsArea * 0.001);
 
-        // Use a larger step for performance
-        const step = this.config.spacing > 10 ? this.config.spacing : 20;
+        const spacing = (this.config && typeof this.config.spacing === 'number') ? this.config.spacing : 0;
+        const halfSpacing = spacing > 0 ? spacing / 2 : 0;
+        // Use a balanced step size for grid search
+        const step = spacing > 0 ? Math.max(4, Math.min(10, Math.round(spacing / 2))) : (this.config.spacing > 10 ? this.config.spacing : 20);
 
         // Bolt Optimization: Lift Clipper instantiation out of the loop.
         // We reuse these instances to avoid thousands of allocations/deallocations.
@@ -60,7 +62,8 @@ export class PlacementWorker {
             // Bolt Optimization: Combine rotation, bounding box calculation, zeroing, and clipper conversion
             // into a single 2-pass O(N) operation to avoid creating intermediate O(N) arrays and objects.
             const { clipperPath: zeroedClipperPath, bounds: partBounds } = this.createRotatedZeroedClipperPath(part, rotation, scale);
-            const candidateClipper = zeroedClipperPath.map(p => ({ X: p.X, Y: p.Y })); // Initial allocation
+            const obstacle = this.createObstaclePath(zeroedClipperPath, halfSpacing, scale, partBounds);
+            const candidateClipper = obstacle.obstaclePath.map(p => ({ X: p.X, Y: p.Y })); // Initial allocation
 
             let placed = false;
             let counter = 0;
@@ -68,10 +71,11 @@ export class PlacementWorker {
             // Grid Search
             const potentialColliders = [];
 
-            // Bolt Optimization: Calculate loop limits once to avoid checking inside the loop and avoid iterating over impossible positions.
-            // If the part is larger than the bin, these loops will simply not execute.
-            const maxY = binBounds.y + binBounds.height - partBounds.height;
-            const maxX = binBounds.x + binBounds.width - partBounds.width;
+            // Bolt Optimization: Calculate loop limits once using obstacle bounds to guarantee cutline margins
+            const obsWidth = obstacle.width;
+            const obsHeight = obstacle.height;
+            const maxY = binBounds.y + binBounds.height - obsHeight;
+            const maxX = binBounds.x + binBounds.width - obsWidth;
 
             // Bolt Optimization: Reusable array for Active List (Scanline optimization)
             const activePlacedItems = [];
@@ -80,10 +84,10 @@ export class PlacementWorker {
                 const startY = Math.round(y * scale);
 
                 // Bolt Optimization: Update Active List for current Y-band
-                // We only need to check items that vertically overlap [y, y + partHeight]
+                // We only need to check items that vertically overlap [y, y + obsHeight]
                 activePlacedItems.length = 0;
-                const pHeight = partBounds.height;
-                const pWidth = partBounds.width;
+                const pHeight = obsHeight;
+                const pWidth = obsWidth;
 
                 for (let k = 0; k < placedItems.length; k++) {
                     const ib = placedItems[k].bounds;
@@ -92,17 +96,14 @@ export class PlacementWorker {
                     }
                 }
 
-                // Bolt Optimization: Sort active items by X coordinate to enable early break in the inner loop
-                // Removed redundant sort: activePlacedItems is populated from placedItems which is maintained in X-sorted order.
-
                 for (let x = binBounds.x; x <= maxX; x += step) {
                     counter++;
 
                     // Update candidateClipper in-place with the current grid position
                     const startX = Math.round(x * scale);
-                    for (let k = 0; k < zeroedClipperPath.length; k++) {
-                        candidateClipper[k].X = zeroedClipperPath[k].X + startX;
-                        candidateClipper[k].Y = zeroedClipperPath[k].Y + startY;
+                    for (let k = 0; k < obstacle.obstaclePath.length; k++) {
+                        candidateClipper[k].X = obstacle.obstaclePath[k].X + startX;
+                        candidateClipper[k].Y = obstacle.obstaclePath[k].Y + startY;
                     }
 
                     // Check 1: Is candidate inside bin?
@@ -135,10 +136,7 @@ export class PlacementWorker {
                         // Bolt Optimization: Early exit if remaining items are too far right
                         if (itemBounds.x >= x + pWidth) break;
 
-                        // Inline intersect check: x < r2.x + r2.width && x + width > r2.x ...
-                        // We already know Y overlaps from the active list filter.
-                        // We checked the "right" boundary via break above.
-                        // So we only need to check the "left" boundary: is current x left of item's right edge?
+                        // Inline intersect check
                         if (x < itemBounds.x + itemBounds.width) {
                             potentialColliders.push(activePlacedItems[k].path);
                         }
@@ -161,8 +159,8 @@ export class PlacementWorker {
 
                     // Valid placement!
                     placements.push({
-                        x: x - partBounds.x,
-                        y: y - partBounds.y,
+                        x: (x + obstacle.shiftX) - partBounds.x,
+                        y: (y + obstacle.shiftY) - partBounds.y,
                         id,
                         rotation
                     });
@@ -170,8 +168,8 @@ export class PlacementWorker {
                     // Bolt Optimization: Must clone candidateClipper because we reuse the instance in the loop
                     const placedPath = candidateClipper.map(p => ({ X: p.X, Y: p.Y }));
 
-                    // Bolt Optimization: Create candidateRect only on successful placement
-                    const candidateRect = { x: x, y: y, width: partBounds.width, height: partBounds.height };
+                    // Bolt Optimization: Store obstacle bounds on successful placement
+                    const candidateRect = { x: x, y: y, width: obsWidth, height: obsHeight };
                     placedItems.push({ path: placedPath, bounds: candidateRect });
 
                     // Bolt Optimization: Keep placedItems sorted by X so activePlacedItems is automatically sorted
@@ -237,6 +235,75 @@ export class PlacementWorker {
         }
 
         return { clipperPath, bounds };
+    }
+
+    createObstaclePath(zeroedClipperPath, halfSpacing, scale, partBounds) {
+        if (!halfSpacing || halfSpacing <= 0 || !window.ClipperLib || !window.ClipperLib.ClipperOffset) {
+            return {
+                obstaclePath: zeroedClipperPath,
+                shiftX: 0,
+                shiftY: 0,
+                width: partBounds.width,
+                height: partBounds.height
+            };
+        }
+
+        try {
+            const co = new window.ClipperLib.ClipperOffset(2, 250);
+            co.AddPath(zeroedClipperPath, window.ClipperLib.JoinType.jtRound, window.ClipperLib.EndType.etClosedPolygon);
+            const offsetPaths = new window.ClipperLib.Paths();
+            co.Execute(offsetPaths, halfSpacing * scale);
+
+            if (!offsetPaths || offsetPaths.length === 0 || !offsetPaths[0] || offsetPaths[0].length === 0) {
+                return {
+                    obstaclePath: zeroedClipperPath,
+                    shiftX: 0,
+                    shiftY: 0,
+                    width: partBounds.width,
+                    height: partBounds.height
+                };
+            }
+
+            const obsBounds = window.ClipperLib.Clipper.GetBounds(offsetPaths);
+            const shiftX = -obsBounds.left / scale;
+            const shiftY = -obsBounds.top / scale;
+            const obsWidth = (obsBounds.right - obsBounds.left) / scale;
+            const obsHeight = (obsBounds.bottom - obsBounds.top) / scale;
+
+            let mainPath = offsetPaths[0];
+            if (offsetPaths.length > 1) {
+                let maxArea = -1;
+                for (let p = 0; p < offsetPaths.length; p++) {
+                    const area = Math.abs(window.ClipperLib.Clipper.Area(offsetPaths[p]));
+                    if (area > maxArea) {
+                        maxArea = area;
+                        mainPath = offsetPaths[p];
+                    }
+                }
+            }
+
+            const shifted = mainPath.map(pt => ({
+                X: pt.X - obsBounds.left,
+                Y: pt.Y - obsBounds.top
+            }));
+
+            return {
+                obstaclePath: shifted,
+                shiftX,
+                shiftY,
+                width: obsWidth,
+                height: obsHeight
+            };
+        } catch (err) {
+            console.warn("PlacementWorker: ClipperOffset failed, falling back to uninflated path", err);
+            return {
+                obstaclePath: zeroedClipperPath,
+                shiftX: 0,
+                shiftY: 0,
+                width: partBounds.width,
+                height: partBounds.height
+            };
+        }
     }
 
     getBounds(placements) {

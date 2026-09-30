@@ -94,6 +94,7 @@ import { exec, execFile } from "child_process";
 import util from "util";
 import { mcpRequestHandler, mcpMessageHandler, mcpStreamableHandler } from "./mcp.js";
 import createAgentPaymentsRouter from "./routes/agent-payments.js";
+import { dispatchOrderWebhook } from "./lib/webhook_dispatcher.js";
 
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
@@ -1020,8 +1021,8 @@ async function startServer(
       }),
     );
 
-    app.use(express.json({ limit: "100kb" }));
-    app.use(express.urlencoded({ extended: true, limit: "100kb" }));
+    app.use(express.json({ limit: "25mb" }));
+    app.use(express.urlencoded({ extended: true, limit: "25mb" }));
     app.use(wafMiddleware);
     app.disable("x-powered-by");
 
@@ -1156,6 +1157,8 @@ async function startServer(
             "/api/v1/payments/ap2",
             "/api/v1/quotes",
             "/api/v1/orders",
+            "/api/v1/upload",
+            "/api/v1/preview",
             "/api/mcp",
             "/api/mcp/messages",
           ],
@@ -1379,7 +1382,16 @@ async function startServer(
     });
 
     // --- Agent Payments ---
-    app.use("/api", createAgentPaymentsRouter(db));
+    app.use(
+      "/api",
+      createAgentPaymentsRouter(db, {
+        scheduleEmail,
+        scheduleTelegram,
+        storageProvider,
+        logger,
+        processIncomingOrderToDropBox,
+      }),
+    );
 
     // --- Agent Discovery & Specifications ---
     app.get(["/.well-known/mcp.json", "/.well-known/mcp"], (req, res) => {
@@ -1492,10 +1504,19 @@ async function startServer(
               }
             }
           },
+          "/api/v1/upload": {
+            post: {
+              summary: "Direct Headless Artwork Upload",
+              description: "Upload sticker artwork directly via multipart form, raw binary image bytes, or JSON with Base64/SVG. Returns a local designUrl for orders.",
+              responses: {
+                "201": { description: "Artwork uploaded successfully" }
+              }
+            }
+          },
           "/api/v1/orders": {
             post: {
               summary: "Headless Order & Payment Execution",
-              description: "Execute headless purchase using AP2 Cart Mandate and x402 payment proof. Returns 402 if unauthenticated/unpaid.",
+              description: "Execute headless purchase using AP2 Cart Mandate and x402 payment proof. Returns 402 if unauthenticated/unpaid. Accepts Base64, SVG, or public URLs for artwork.",
               parameters: [
                 { in: "header", name: "authorization-x402", required: false, schema: { type: "string" }, description: "Base64 JSON x402 payment proof" },
                 { in: "header", name: "x-ap2-mandate", required: false, schema: { type: "string" }, description: "Signed AP2 Cart Mandate JWT" }
@@ -1510,12 +1531,20 @@ async function startServer(
                       properties: {
                         quoteId: { type: "string" },
                         amount: { type: "string", example: "15.00" },
-                        designUrl: { type: "string", format: "uri" },
+                        designUrl: {
+                          type: "string",
+                          description: "Artwork to print. Accepts Base64 data URI ('data:image/png;base64,...'), raw Base64 string, raw SVG markup ('<svg>...</svg>'), local /uploads path, or public HTTP(S) URL"
+                        },
+                        artwork: {
+                          type: "string",
+                          description: "Alternative direct field for Base64 data URI, raw Base64, or raw SVG markup"
+                        },
                         shippingAddress: {
                           type: "object",
-                          required: ["name", "street", "city", "state", "zip"],
+                          required: ["name", "email", "street", "city", "state", "zip"],
                           properties: {
                             name: { type: "string" },
+                            email: { type: "string" },
                             street: { type: "string" },
                             city: { type: "string" },
                             state: { type: "string" },
@@ -4571,7 +4600,9 @@ async function startServer(
             const customerEmail =
               order.customerDetails?.billing?.email ||
               order.customerEmail ||
-              order.billingContact?.email;
+              order.billingContact?.email ||
+              order.shippingContact?.email ||
+              order.shippingAddress?.email;
             if (customerEmail) {
               if (status === "CANCELED") {
                 emailQueue.add("order-canceled", {
@@ -4609,6 +4640,19 @@ async function startServer(
                 });
               }
             }
+          }
+
+          // Trigger Agent Webhook if registered
+          if (oldStatus !== status && (order.webhookUrl || order.webhook_url)) {
+            const eventName = status === "SHIPPED" ? "order.shipped" : "order.status_updated";
+            dispatchOrderWebhook(order, eventName, {
+              oldStatus,
+              newStatus: status,
+              trackingNumber: order.trackingNumber || null,
+              courier: order.courier || null,
+            }).catch((err) => {
+              logger.warn(`[WEBHOOK] Order status webhook failed: ${err.message}`);
+            });
           }
 
           res.status(200).json({ success: true, order: order });
@@ -4943,25 +4987,35 @@ async function startServer(
         logger.info(`[SERVER] Tracking info added to order ID ${orderId}.`);
 
         // Send shipment notification email
-        if (order.billingContact && order.billingContact.email) {
+        const recipientEmail =
+          order.billingContact?.email ||
+          order.shippingContact?.email ||
+          order.customerEmail ||
+          order.customerDetails?.billing?.email ||
+          order.shippingAddress?.email;
+
+        if (recipientEmail) {
           try {
             const customerName =
-              order.billingContact.givenName || "Valued Customer";
-            const shippingAddress = order.shippingContact;
-            const orderDate = new Date(order.receivedAt).toLocaleDateString(
+              order.billingContact?.givenName ||
+              order.shippingContact?.givenName ||
+              "Valued Customer";
+            const shippingAddress = order.shippingContact || order.shippingAddress || {};
+            const addressLines = shippingAddress.addressLines || (shippingAddress.street ? [shippingAddress.street] : []);
+            const orderDate = new Date(order.receivedAt || Date.now()).toLocaleDateString(
               "en-US",
               { year: "numeric", month: "long", day: "numeric" },
             );
             // FIX: Sanitize address lines to prevent XSS
-            const safeAddressLines = shippingAddress.addressLines
+            const safeAddressLines = addressLines
               .map((line) => escapeHtml(line))
               .join("<br>");
             const addressHtml = `
                     <address>
-                        ${escapeHtml(shippingAddress.givenName)} ${escapeHtml(shippingAddress.familyName)}<br>
+                        ${escapeHtml(shippingAddress.givenName || "")} ${escapeHtml(shippingAddress.familyName || "")}<br>
                         ${safeAddressLines}<br>
-                        ${escapeHtml(shippingAddress.locality)}, ${escapeHtml(shippingAddress.administrativeDistrictLevel1)} ${escapeHtml(shippingAddress.postalCode)}<br>
-                        ${escapeHtml(shippingAddress.country)}<br>
+                        ${escapeHtml(shippingAddress.locality || shippingAddress.city || "")}, ${escapeHtml(shippingAddress.administrativeDistrictLevel1 || shippingAddress.state || "")} ${escapeHtml(shippingAddress.postalCode || shippingAddress.zip || "")}<br>
+                        ${escapeHtml(shippingAddress.country || "US")}<br>
                         ${escapeHtml(shippingAddress.phoneNumber || "")}
                     </address>
                 `;
@@ -4971,14 +5025,14 @@ async function startServer(
             const productDetailsHtml = `
                     <tr>
                         <td style="padding: 10px; border-bottom: 1px solid #ddd;">Stickers</td>
-                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails?.quantity || 0}</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${order.orderDetails?.quantity || order.quantity || 1}</td>
                     </tr>
                 `;
 
             await scheduleEmail("send-shipping-email", {
-              to: order.billingContact.email,
+              to: recipientEmail,
               subject: `Your Splotch order #${order.orderId} has shipped!`,
-              text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || 0}\n\nShipping address:\n${shippingAddress.givenName} ${shippingAddress.familyName}\n${shippingAddress.addressLines.join("\n")}\n${shippingAddress.locality}, ${shippingAddress.administrativeDistrictLevel1} ${shippingAddress.postalCode}\n${shippingAddress.country}\n${shippingAddress.phoneNumber || ""}\n\nStay in touch!\nSplotch`,
+              text: `Hey ${customerName},\n\nHeads up—your order has been sent out!\n\nOrdered: ${orderDate}\n\nHere’s the tracking number:\n${trackingNumber}\n${courier}\n\nHere’s what’s in your Shipment:\nProduct: Stickers, Quantity: ${order.orderDetails?.quantity || order.quantity || 1}\n\nShipping address:\n${shippingAddress.givenName || ""} ${shippingAddress.familyName || ""}\n${addressLines.join("\n")}\n${shippingAddress.locality || shippingAddress.city || ""}, ${shippingAddress.administrativeDistrictLevel1 || shippingAddress.state || ""} ${shippingAddress.postalCode || shippingAddress.zip || ""}\n${shippingAddress.country || "US"}\n${shippingAddress.phoneNumber || ""}\n\nStay in touch!\nSplotch`,
               html: `
                         <p>Hey ${customerName},</p>
                         <p>Heads up—your order has been sent out!</p>
@@ -5014,6 +5068,16 @@ async function startServer(
               emailError,
             );
           }
+        }
+
+        // Trigger Agent Webhook if registered
+        if (order.webhookUrl || order.webhook_url) {
+          dispatchOrderWebhook(order, "order.shipped", {
+            trackingNumber,
+            courier,
+          }).catch((err) => {
+            logger.warn(`[WEBHOOK] Tracking update webhook failed: ${err.message}`);
+          });
         }
 
         res.status(200).json({ success: true, order: order });

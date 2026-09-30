@@ -51,8 +51,15 @@ Content-Type: application/json
 
 ### Step 2: Submit Headless Order (Payment Challenge Negotiation)
 Send your order payload to initiate checkout.
-> **IMPORTANT:**
-> - `designUrl` is **REQUIRED**: A public HTTP/HTTPS URL to the artwork (PNG, JPG, SVG, WebP). Splotch downloads this file directly to print your stickers.
+> **Artwork Flexibility (No Third-Party Hosting Required)**:
+> Splotch supports direct artwork ingestion without needing third-party image hosters:
+> - **Base64 Data URI**: `"designUrl": "data:image/png;base64,iVBORw0KGgo..."`
+> - **Raw Base64 String**: `"artwork": "iVBORw0KGgo..."` or `"designUrl": "iVBORw0KGgo..."`
+> - **Direct SVG Markup**: `"designUrl": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>...</svg>"`
+> - **Direct Headless Upload**: `POST /api/v1/upload` (accepts raw image bytes, multipart, or Base64 JSON and returns `{"designUrl": "/uploads/..."}`)
+> - **Public HTTP/HTTPS URL**: `"designUrl": "https://example.com/artwork.png"`
+>
+> **Customer Email Required**:
 > - `shippingAddress.email` is **REQUIRED**: A valid customer email for order confirmation and USPS tracking updates.
 
 ```http
@@ -62,7 +69,7 @@ Content-Type: application/json
 {
   "quoteId": "quo_1790626000000",
   "amount": "0.35",
-  "designUrl": "https://example.com/artwork.png",
+  "designUrl": "data:image/png;base64,iVBORw0KGgo...",
   "shippingAddress": {
     "name": "Alex Agent",
     "email": "alex@example.com",

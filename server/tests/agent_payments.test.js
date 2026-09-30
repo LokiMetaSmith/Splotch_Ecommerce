@@ -430,7 +430,7 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     });
 
     const paymentProof = Buffer.from(JSON.stringify({ status: "PAID", paymentId: "pay_ship_123", amount: "15.00" })).toString("base64");
-
+    
     // Mandate authorizes shipment to original address hash
     const mandate = await generateMandate({
       intentId: "intent_ship_test",
@@ -649,3 +649,5 @@ describe("Agent Payments API (/v1/payments/ap2)", () => {
     expect(createdOrder.shippingContact.email).toBe("art@example.com");
   });
 });
+
+

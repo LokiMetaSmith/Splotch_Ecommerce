@@ -216,3 +216,4 @@ test.describe('Sheet Sticker Drag and Click Alignment', () => {
     expect(ratio).toBeGreaterThan(0.5);
   });
 });
+

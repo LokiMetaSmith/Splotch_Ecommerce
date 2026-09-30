@@ -66,8 +66,16 @@ export function generateCutFile(svgString, options = {}) {
             }
         });
     } else {
-        // Flat SVG fallback
+        // Flat SVG or Organized Layer fallback
         svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline').forEach(el => {
+            const parentId = (el.parentElement?.getAttribute('id') || '').toLowerCase();
+            const id = (el.getAttribute('id') || '').toLowerCase();
+            const gpId = (el.parentElement?.parentElement?.getAttribute('id') || '').toLowerCase();
+            if (parentId.includes('cmyk') || parentId.includes('white') || parentId.includes('inlay') || parentId.includes('clear') ||
+                gpId.includes('cmyk') || gpId.includes('white') || gpId.includes('inlay') || gpId.includes('clear') ||
+                id.includes('cmyk') || id.includes('white') || id.includes('inlay') || id.includes('clear')) {
+                return;
+            }
             const type = classifyType(el);
             const strokeColor = type === 'edge' ? edgeColor : kissColor;
             const newEl = el.cloneNode(true);
@@ -134,7 +142,14 @@ export function generatePltFile(svgString, options = {}) {
             });
         });
     } else {
-        elements = Array.from(svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline'));
+        elements = Array.from(svgElement.querySelectorAll('path, rect, circle, ellipse, polygon, polyline')).filter(el => {
+            const parentId = (el.parentElement?.getAttribute('id') || '').toLowerCase();
+            const id = (el.getAttribute('id') || '').toLowerCase();
+            const gpId = (el.parentElement?.parentElement?.getAttribute('id') || '').toLowerCase();
+            return !parentId.includes('cmyk') && !parentId.includes('white') && !parentId.includes('inlay') && !parentId.includes('clear') &&
+                   !gpId.includes('cmyk') && !gpId.includes('white') && !gpId.includes('inlay') && !gpId.includes('clear') &&
+                   !id.includes('cmyk') && !id.includes('white') && !id.includes('inlay') && !id.includes('clear');
+        });
     }
     
     elements.forEach(el => {

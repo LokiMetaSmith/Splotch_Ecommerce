@@ -42,8 +42,9 @@ main.container {
     --splotch-yellow
   ) !important; /* Main content area yellow */
   color: var(--splotch-navy) !important;
-  border: 4px solid var(--splotch-navy) !important;
-  box-shadow: 0 8px 16px rgba(42, 40, 77, 0.3) !important; /* Navy shadow */
+  /* Removed heavy border and strong shadow */
+  /* border: 4px solid var(--splotch-navy) !important; */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; /* Tailwind shadow-md */
   border-radius: 25px !important; /* Playful rounded corners */
   margin-top: 3rem !important; /* More space from top */
   margin-bottom: 3rem !important; /* More space at bottom */
@@ -61,8 +62,8 @@ main.container h1 {
   color: var(--splotch-navy) !important;
   font-size: var(--step-5) !important; /* FLUID TYPOGRAPHY */
   line-height: 1.15 !important;
-  margin-bottom: 2.5rem !important;
-  padding-bottom: 1rem;
+  margin-bottom: 1.25rem !important;
+  padding-bottom: 0 !important;
   -webkit-text-stroke: 2.5px var(--splotch-white) !important;
   text-shadow: 3px 3px 0px var(--splotch-teal) !important;
   letter-spacing: 0.5px;
@@ -92,10 +93,12 @@ form h2.text-xl {
 main.container > div:first-of-type {
   /* Targets the first div child of main, usually the canvas wrapper */
   background-color: var(--splotch-white) !important;
-  border: 3px solid var(--splotch-teal) !important;
+  /* Removed heavy teal border */
+  /* border: 3px solid var(--splotch-teal) !important; */
   border-radius: 20px !important;
   padding: 1.5rem !important;
-  box-shadow: inset 0 0 10px rgba(0, 169, 157, 0.2) !important;
+  /* Replaced with a subtle shadow */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important; /* Tailwind shadow-sm */
 }
 
 #imageCanvas {
@@ -106,10 +109,12 @@ main.container > div:first-of-type {
 /* --- Editing Controls --- */
 #editing-controls {
   background-color: rgba(0, 169, 157, 0.1) !important; /* Very light teal bg */
-  border: 3px solid var(--splotch-teal) !important;
+  /* Removed heavy teal border */
+  /* border: 3px solid var(--splotch-teal) !important; */
   padding: 1.5rem !important;
   border-radius: 20px !important;
   gap: 0.85rem !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important; /* Tailwind shadow-sm */
 }
 
 #editing-controls button,
@@ -193,10 +198,12 @@ main.container > div:first-of-type {
     255,
     0.7
   ) !important; /* Semi-transparent white on the yellow main bg */
-  border: 3px solid var(--splotch-red) !important; /* Red border for form */
+  /* Removed heavy red border */
+  /* border: 3px solid var(--splotch-red) !important; /* Red border for form */
   padding: 2rem 2.5rem !important;
   border-radius: 20px !important;
-  box-shadow: 0 5px 15px rgba(42, 40, 77, 0.15) !important;
+  /* Used standard shadow-md */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
 }
 
 #payment-form .label {
@@ -582,18 +589,18 @@ main.container > div:first-of-type {
   main.container {
     margin-top: 0.75rem !important;
     margin-bottom: 1.5rem !important;
-    border-width: 3px !important;
+    border-width: 0 !important;
     border-radius: 18px !important;
     padding: 0.75rem !important;
-    box-shadow: 0 4px 12px rgba(42, 40, 77, 0.2) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
   }
   main.container > div:first-of-type {
     padding: 0.65rem 0.85rem !important;
-    border: 2px solid var(--splotch-navy, #2a284d) !important;
+    border-width: 0 !important;
     border-radius: 14px !important;
     margin-bottom: 0.65rem !important;
     background-color: var(--splotch-white) !important;
-    box-shadow: 2px 2px 0px var(--splotch-navy, #2a284d) !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
   }
   main.container h1.text-3xl,
   main.container h1.text-2xl,

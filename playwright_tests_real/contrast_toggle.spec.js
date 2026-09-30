@@ -130,3 +130,4 @@ test('tick marks and size indicator adapt to dark background with drop shadow an
   expect(magentaTheme.isDark).toBe(true);
   expect(magentaTheme.textColor).toContain('255, 255, 255');
 });
+

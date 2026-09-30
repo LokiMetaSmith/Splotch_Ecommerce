@@ -165,7 +165,7 @@ export async function verifySettlementProof(proofInput, quoteDetails, options = 
           const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
           const merchantPadded = "0x" + merchantWallet.replace(/^0x/, "").padStart(64, "0").toLowerCase();
 
-          const hasMerchantTransfer = receipt.logs.some(log =>
+          const hasMerchantTransfer = receipt.logs.some(log => 
             Array.isArray(log.topics) &&
             log.topics[0]?.toLowerCase() === transferTopic &&
             log.topics[2]?.toLowerCase() === merchantPadded

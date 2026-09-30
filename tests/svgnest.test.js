@@ -127,6 +127,37 @@ describe('PlacementWorker', () => {
         expect(p2.y).toBe(0);
     });
 
+    it('should strictly enforce minimum spacing between placed parts', async () => {
+        // Bin: 500x500
+        const bin = [{x:0, y:0}, {x:500, y:0}, {x:500, y:500}, {x:0, y:500}];
+        // Two 100x100 parts
+        const part = [{x:0, y:0}, {x:100, y:0}, {x:100, y:100}, {x:0, y:100}];
+        const parts = [part];
+        const ids = [0, 0];
+        const rotations = [0, 0];
+        const spacing = 20;
+
+        const worker = new PlacementWorker(bin, parts, ids, rotations, { spacing }, {});
+        const result = await worker.placePaths([part, part]);
+
+        expect(result.placements[0]).toHaveLength(2);
+        const p1 = result.placements[0][0];
+        const p2 = result.placements[0][1];
+
+        // Part 1 bounds: [p1.x, p1.x + 100], [p1.y, p1.y + 100]
+        // Part 2 bounds: [p2.x, p2.x + 100], [p2.y, p2.y + 100]
+        const p1Right = p1.x + 100;
+        const p1Bottom = p1.y + 100;
+        const p2Right = p2.x + 100;
+        const p2Bottom = p2.y + 100;
+
+        const xDist = Math.max(0, Math.max(p1.x - p2Right, p2.x - p1Right));
+        const yDist = Math.max(0, Math.max(p1.y - p2Bottom, p2.y - p1Bottom));
+        const minDist = (xDist > 0 && yDist > 0) ? Math.sqrt(xDist * xDist + yDist * yDist) : Math.max(xDist, yDist);
+
+        expect(minDist).toBeGreaterThanOrEqual(spacing);
+    });
+
     it('should handle complex nesting with multiple parts ensuring bounding box collision check is effective', async () => {
          // Bin: 500x500
          const bin = [{x:0, y:0}, {x:500, y:0}, {x:500, y:500}, {x:0, y:500}];

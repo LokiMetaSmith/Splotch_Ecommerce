@@ -2551,9 +2551,19 @@ async function handleNesting(e) {
       }
     }
 
-    const spacing = parseInt(ui.spacingInput.value, 10) || 0;
+    const cutSettings = getCutSettings();
+    let rawSpacing = parseFloat(ui.spacingInput ? ui.spacingInput.value : cutSettings.webbingSpacingInches || 0.15);
+    if (isNaN(rawSpacing) || rawSpacing <= 0) {
+      rawSpacing = cutSettings.webbingSpacingInches || 0.15;
+    }
+    // If value is <= 2.5, treat as inches and convert to 96 DPI screen/SVG pixels.
+    // If value > 2.5, treat as direct pixel value.
+    let spacingInPx = rawSpacing <= 2.5 ? rawSpacing * 96 : rawSpacing;
+    // Enforce safe minimum of at least 6px (~0.06" / 1.5mm) for tight die-cut presets
+    spacingInPx = Math.max(6, Math.round(spacingInPx * 10) / 10);
+
     const options = { 
-      spacing, 
+      spacing: spacingInPx, 
       rotations: 4, 
       addPrintingMarks, // Generates corner crop marks around placed stickers
       onProgress: (msg) => {
@@ -2716,8 +2726,11 @@ async function handleNesting(e) {
             }
         }
 
+        // Re-organize layers (White -> Inlay -> CMYK -> Clear -> Cutlines -> Marks) to guarantee proper stacking
+        const organizedSvgDoc = prepareVectorPrintCutSvg(rootSvg, getCutSettings());
+
         // Serialize back to string
-        let finalSvg = new XMLSerializer().serializeToString(svgDoc);
+        let finalSvg = new XMLSerializer().serializeToString(organizedSvgDoc);
 
         // 5. Display result
         const sanitizedSvg = DOMPurify.sanitize(finalSvg, {
@@ -2833,6 +2846,8 @@ export const DEFAULT_CUT_SETTINGS = {
   kissCutColor: "#00FFFF",
   edgeCutLayerName: "Die-Cut",
   edgeCutColor: "#FF0000",
+  webbingSpacingInches: 0.15,
+  sheetMarginInches: 0.25,
 };
 
 export function getCutSettings() {
@@ -2843,11 +2858,21 @@ export function getCutSettings() {
   const kissColor = document.getElementById("kissCutColor") || document.getElementById("settings-kiss-cut-color");
   const edgeLayer = document.getElementById("edgeCutLayerName") || document.getElementById("settings-edge-cut-layer");
   const edgeColor = document.getElementById("edgeCutColor") || document.getElementById("settings-edge-cut-color");
+  const webbingInput = document.getElementById("settings-webbing-spacing") || document.getElementById("spacingInput");
+  const marginInput = document.getElementById("settings-sheet-margin");
 
   if (kissLayer?.value) settings.kissCutLayerName = kissLayer.value.trim();
   if (kissColor?.value) settings.kissCutColor = kissColor.value.trim();
   if (edgeLayer?.value) settings.edgeCutLayerName = edgeLayer.value.trim();
   if (edgeColor?.value) settings.edgeCutColor = edgeColor.value.trim();
+  if (webbingInput?.value) {
+    const val = parseFloat(webbingInput.value);
+    if (!isNaN(val) && val > 0) settings.webbingSpacingInches = val;
+  }
+  if (marginInput?.value) {
+    const val = parseFloat(marginInput.value);
+    if (!isNaN(val) && val > 0) settings.sheetMarginInches = val;
+  }
 
   // Saved localStorage settings take precedence over static HTML defaults
   try {
@@ -2892,6 +2917,7 @@ export function syncCutSettingsUI(settings) {
   setVal("edgeCutLayerName", s.edgeCutLayerName);
   setVal("edgeCutColor", s.edgeCutColor);
   setVal("edgeCutColorPicker", s.edgeCutColor);
+  setVal("spacingInput", s.webbingSpacingInches);
 
   // Settings View controls
   setVal("settings-kiss-cut-layer", s.kissCutLayerName);
@@ -2900,12 +2926,42 @@ export function syncCutSettingsUI(settings) {
   setVal("settings-edge-cut-layer", s.edgeCutLayerName);
   setVal("settings-edge-cut-color", s.edgeCutColor);
   setVal("settings-edge-cut-color-picker", s.edgeCutColor);
+  setVal("settings-webbing-spacing", s.webbingSpacingInches);
+  setVal("settings-sheet-margin", s.sheetMarginInches);
 
   // Color Indicator Dots
   const kissDot = document.getElementById("settings-kiss-cut-indicator");
   if (kissDot) kissDot.style.backgroundColor = s.kissCutColor;
   const edgeDot = document.getElementById("settings-edge-cut-indicator");
   if (edgeDot) edgeDot.style.backgroundColor = s.edgeCutColor;
+
+  // Webbing Matrix Indicators
+  const sp = parseFloat(s.webbingSpacingInches) || 0.15;
+  const mg = parseFloat(s.sheetMarginInches) || 0.25;
+
+  const spMmEl = document.getElementById("settings-webbing-spacing-mm");
+  if (spMmEl) spMmEl.textContent = `~${(sp * 25.4).toFixed(1)} mm`;
+
+  const mgMmEl = document.getElementById("settings-sheet-margin-mm");
+  if (mgMmEl) mgMmEl.textContent = `~${(mg * 25.4).toFixed(1)} mm`;
+
+  const statusDot = document.getElementById("webbing-status-indicator");
+  const statusLabel = document.getElementById("webbing-status-label");
+  const statusDesc = document.getElementById("webbing-status-desc");
+
+  if (sp >= 0.20) {
+    if (statusDot) statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-xs";
+    if (statusLabel) statusLabel.textContent = "Easy Webbing Pull (Tear-Proof)";
+    if (statusDesc) statusDesc.textContent = "Wide matrix bridges allow peeling the entire waste skeleton in one smooth pull.";
+  } else if (sp >= 0.12) {
+    if (statusDot) statusDot.className = "w-3 h-3 rounded-full bg-blue-500 shadow-xs";
+    if (statusLabel) statusLabel.textContent = "Standard Production Spacing";
+    if (statusDesc) statusDesc.textContent = "Balanced layout. Webbing can be pulled with moderate care; optimal sticker density.";
+  } else {
+    if (statusDot) statusDot.className = "w-3 h-3 rounded-full bg-amber-500 shadow-xs";
+    if (statusLabel) statusLabel.textContent = "Tight Die-Cut (Fragile Webbing)";
+    if (statusDesc) statusDesc.textContent = "Maximum sheet density. Webbing bridges are thin and may snap if pulled as a continuous sheet.";
+  }
 }
 
 export function initCutSettingsListeners() {
@@ -2966,7 +3022,57 @@ export function initCutSettingsListeners() {
   bindLayerInput("settings-kiss-cut-layer", "kissCutLayerName");
   bindLayerInput("settings-edge-cut-layer", "edgeCutLayerName");
 
-  // Presets
+  // Webbing Spacing 2-way sync
+  const webbingInput = document.getElementById("settings-webbing-spacing");
+  const spacingSidebarInput = document.getElementById("spacingInput");
+  const marginInput = document.getElementById("settings-sheet-margin");
+
+  if (webbingInput) {
+    webbingInput.addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        if (spacingSidebarInput) spacingSidebarInput.value = val;
+        saveCutSettings({ webbingSpacingInches: val });
+      }
+    });
+  }
+
+  if (spacingSidebarInput) {
+    spacingSidebarInput.addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        if (webbingInput) webbingInput.value = val;
+        saveCutSettings({ webbingSpacingInches: val });
+      }
+    });
+  }
+
+  if (marginInput) {
+    marginInput.addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        saveCutSettings({ sheetMarginInches: val });
+      }
+    });
+  }
+
+  // Webbing Presets
+  document.getElementById("webbing-preset-pull")?.addEventListener("click", () => {
+    saveCutSettings({ webbingSpacingInches: 0.25, sheetMarginInches: 0.25 });
+    showSuccessToast("Easy Webbing Pull preset applied (0.25 in / 6.4 mm).");
+  });
+
+  document.getElementById("webbing-preset-standard")?.addEventListener("click", () => {
+    saveCutSettings({ webbingSpacingInches: 0.15, sheetMarginInches: 0.25 });
+    showSuccessToast("Standard Production spacing applied (0.15 in / 3.8 mm).");
+  });
+
+  document.getElementById("webbing-preset-tight")?.addEventListener("click", () => {
+    saveCutSettings({ webbingSpacingInches: 0.08, sheetMarginInches: 0.15 });
+    showSuccessToast("Tight Die-Cut preset applied (0.08 in / 2.0 mm).");
+  });
+
+  // Layer Presets
   document.getElementById("preset-roland-btn")?.addEventListener("click", () => {
     const preset = {
       kissCutLayerName: "CutContour",
@@ -2999,14 +3105,18 @@ export function initCutSettingsListeners() {
     const kissColor = document.getElementById("settings-kiss-cut-color")?.value.trim() || "#00FFFF";
     const edgeLayer = document.getElementById("settings-edge-cut-layer")?.value.trim() || "Die-Cut";
     const edgeColor = document.getElementById("settings-edge-cut-color")?.value.trim() || "#FF0000";
+    const webbingVal = parseFloat(document.getElementById("settings-webbing-spacing")?.value) || 0.15;
+    const marginVal = parseFloat(document.getElementById("settings-sheet-margin")?.value) || 0.25;
 
     saveCutSettings({
       kissCutLayerName: kissLayer,
       kissCutColor: kissColor,
       edgeCutLayerName: edgeLayer,
       edgeCutColor: edgeColor,
+      webbingSpacingInches: webbingVal,
+      sheetMarginInches: marginVal,
     });
-    showSuccessToast("Cut Line & Layer settings saved.");
+    showSuccessToast("Cut Line & Webbing settings saved.");
   });
 }
 
@@ -3104,74 +3214,80 @@ export function prepareVectorPrintCutSvg(svgElement, layerNameOrConfig = "CutCon
     return true;
   };
 
-  const nestGroups = vectorSvgElement.querySelectorAll(".nest-group");
+  const nestGroups = Array.from(vectorSvgElement.querySelectorAll(".nest-group"));
 
   if (nestGroups.length > 0) {
-    if (kissCutLayerName === edgeCutLayerName) {
-      // Coalesced into a single layer
-      const cutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      cutLayer.setAttribute("id", kissCutLayerName);
-      cutLayer.setAttribute("data-name", kissCutLayerName);
+    const whiteLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    whiteLayer.setAttribute("id", "White_Layer");
+    whiteLayer.setAttribute("data-name", "White_Layer");
 
-      nestGroups.forEach((nestGroup) => {
-        let cutEls = Array.from(
-          nestGroup.querySelectorAll(".cut-line-element, [id*='kiss' i], [id*='die' i]"),
-        );
-        if (cutEls.length === 0) {
-          cutEls = Array.from(nestGroup.querySelectorAll("path, polygon, polyline"));
-        }
-        const validCutEls = cutEls.filter(isCutCandidate);
-        const topCutEls = validCutEls.filter(
-          (el) => !validCutEls.some((other) => other !== el && other.contains(el)),
-        );
+    const inlayLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    inlayLayer.setAttribute("id", "Inlay");
+    inlayLayer.setAttribute("data-name", "Inlay");
 
+    const cmykLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    cmykLayer.setAttribute("id", "Cmyk_art_Layer");
+    cmykLayer.setAttribute("data-name", "Cmyk_art_Layer");
+
+    const clearLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    clearLayer.setAttribute("id", "Clear");
+    clearLayer.setAttribute("data-name", "Clear");
+
+    const kissCutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    kissCutLayer.setAttribute("id", kissCutLayerName);
+    kissCutLayer.setAttribute("data-name", kissCutLayerName);
+
+    const edgeCutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    edgeCutLayer.setAttribute("id", edgeCutLayerName);
+    edgeCutLayer.setAttribute("data-name", edgeCutLayerName);
+
+    const coalescedCutLayer = (kissCutLayerName === edgeCutLayerName)
+      ? document.createElementNS("http://www.w3.org/2000/svg", "g")
+      : null;
+    if (coalescedCutLayer) {
+      coalescedCutLayer.setAttribute("id", kissCutLayerName);
+      coalescedCutLayer.setAttribute("data-name", kissCutLayerName);
+    }
+
+    nestGroups.forEach((nestGroup) => {
+      const transform = nestGroup.getAttribute("transform");
+      const scaleAttr = nestGroup.getAttribute("data-scale");
+
+      const createSubGroup = () => {
+        const sg = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        if (transform) sg.setAttribute("transform", transform);
+        if (scaleAttr) sg.setAttribute("data-scale", scaleAttr);
+        return sg;
+      };
+
+      // 1. Cutlines
+      let cutEls = Array.from(
+        nestGroup.querySelectorAll(".cut-line-element, [id*='kiss' i], [id*='die' i]")
+      );
+      if (cutEls.length === 0) {
+        cutEls = Array.from(nestGroup.querySelectorAll("path, polygon, polyline"));
+      }
+      const validCutEls = cutEls.filter(isCutCandidate);
+      const topCutEls = validCutEls.filter(
+        (el) => !validCutEls.some((other) => other !== el && other.contains(el))
+      );
+
+      const cutSet = new Set(topCutEls);
+
+      if (coalescedCutLayer) {
         if (topCutEls.length > 0) {
-          const cutSubGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-          if (nestGroup.hasAttribute("transform")) {
-            cutSubGroup.setAttribute("transform", nestGroup.getAttribute("transform"));
-          }
-          if (nestGroup.hasAttribute("data-scale")) {
-            cutSubGroup.setAttribute("data-scale", nestGroup.getAttribute("data-scale"));
-          }
-
+          const cutSubGroup = createSubGroup();
           topCutEls.forEach((el) => {
             const type = classifyCutElement(el);
             const color = type === "edge" ? edgeCutColor : kissCutColor;
             styleCutElement(el, color);
             cutSubGroup.appendChild(el);
           });
-
           if (cutSubGroup.childNodes.length > 0) {
-            cutLayer.appendChild(cutSubGroup);
+            coalescedCutLayer.appendChild(cutSubGroup);
           }
         }
-      });
-
-      if (cutLayer.childNodes.length > 0) {
-        vectorSvgElement.appendChild(cutLayer);
-      }
-    } else {
-      // Distinct layers for Kiss Cut and Edge Cut
-      const kissCutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      kissCutLayer.setAttribute("id", kissCutLayerName);
-      kissCutLayer.setAttribute("data-name", kissCutLayerName);
-
-      const edgeCutLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      edgeCutLayer.setAttribute("id", edgeCutLayerName);
-      edgeCutLayer.setAttribute("data-name", edgeCutLayerName);
-
-      nestGroups.forEach((nestGroup) => {
-        let cutEls = Array.from(
-          nestGroup.querySelectorAll(".cut-line-element, [id*='kiss' i], [id*='die' i]"),
-        );
-        if (cutEls.length === 0) {
-          cutEls = Array.from(nestGroup.querySelectorAll("path, polygon, polyline"));
-        }
-        const validCutEls = cutEls.filter(isCutCandidate);
-        const topCutEls = validCutEls.filter(
-          (el) => !validCutEls.some((other) => other !== el && other.contains(el)),
-        );
-
+      } else {
         const kissEls = [];
         const edgeEls = [];
         topCutEls.forEach((el) => {
@@ -3183,13 +3299,7 @@ export function prepareVectorPrintCutSvg(svgElement, layerNameOrConfig = "CutCon
         });
 
         if (kissEls.length > 0) {
-          const kissSubGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-          if (nestGroup.hasAttribute("transform")) {
-            kissSubGroup.setAttribute("transform", nestGroup.getAttribute("transform"));
-          }
-          if (nestGroup.hasAttribute("data-scale")) {
-            kissSubGroup.setAttribute("data-scale", nestGroup.getAttribute("data-scale"));
-          }
+          const kissSubGroup = createSubGroup();
           kissEls.forEach((el) => {
             styleCutElement(el, kissCutColor);
             kissSubGroup.appendChild(el);
@@ -3200,13 +3310,7 @@ export function prepareVectorPrintCutSvg(svgElement, layerNameOrConfig = "CutCon
         }
 
         if (edgeEls.length > 0) {
-          const edgeSubGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-          if (nestGroup.hasAttribute("transform")) {
-            edgeSubGroup.setAttribute("transform", nestGroup.getAttribute("transform"));
-          }
-          if (nestGroup.hasAttribute("data-scale")) {
-            edgeSubGroup.setAttribute("data-scale", nestGroup.getAttribute("data-scale"));
-          }
+          const edgeSubGroup = createSubGroup();
           edgeEls.forEach((el) => {
             styleCutElement(el, edgeCutColor);
             edgeSubGroup.appendChild(el);
@@ -3215,15 +3319,85 @@ export function prepareVectorPrintCutSvg(svgElement, layerNameOrConfig = "CutCon
             edgeCutLayer.appendChild(edgeSubGroup);
           }
         }
+      }
+
+      // 2. Print Layers: White, Inlay, CMYK, Clear
+      const remainingChildren = Array.from(nestGroup.childNodes).filter((node) => {
+        if (node.nodeType !== 1) return false;
+        return !cutSet.has(node) && !Array.from(cutSet).some((cutEl) => node.contains(cutEl));
       });
 
-      if (kissCutLayer.childNodes.length > 0) {
-        vectorSvgElement.appendChild(kissCutLayer);
+      const whiteEls = [];
+      const inlayEls = [];
+      const clearEls = [];
+      const cmykEls = [];
+
+      remainingChildren.forEach((child) => {
+        const id = (child.getAttribute("id") || "").toLowerCase();
+        const cls = (child.getAttribute("class") || "").toLowerCase();
+
+        if (id.includes("white") || cls.includes("white")) {
+          whiteEls.push(child);
+        } else if (id.includes("inlay") || cls.includes("inlay")) {
+          inlayEls.push(child);
+        } else if (id.includes("clear") || cls.includes("clear")) {
+          clearEls.push(child);
+        } else {
+          cmykEls.push(child);
+        }
+      });
+
+      if (whiteEls.length > 0) {
+        const whiteSubGroup = createSubGroup();
+        whiteEls.forEach((el) => whiteSubGroup.appendChild(el));
+        whiteLayer.appendChild(whiteSubGroup);
       }
-      if (edgeCutLayer.childNodes.length > 0) {
-        vectorSvgElement.appendChild(edgeCutLayer);
+
+      if (inlayEls.length > 0) {
+        const inlaySubGroup = createSubGroup();
+        inlayEls.forEach((el) => inlaySubGroup.appendChild(el));
+        inlayLayer.appendChild(inlaySubGroup);
       }
+
+      if (cmykEls.length > 0) {
+        const cmykSubGroup = createSubGroup();
+        cmykEls.forEach((el) => cmykSubGroup.appendChild(el));
+        cmykLayer.appendChild(cmykSubGroup);
+      }
+
+      if (clearEls.length > 0) {
+        const clearSubGroup = createSubGroup();
+        clearEls.forEach((el) => clearSubGroup.appendChild(el));
+        clearLayer.appendChild(clearSubGroup);
+      }
+
+      nestGroup.remove();
+    });
+
+    // Collect any remaining root non-nestGroup elements (e.g. crop marks, fiducials, QR codes)
+    const existingRootElements = Array.from(vectorSvgElement.childNodes).filter(
+      (node) => node.nodeType === 1 && node.tagName.toLowerCase() !== "defs"
+    );
+    existingRootElements.forEach((el) => el.remove());
+
+    // Layer stack strictly according to Roland VersaWorks & UV printing order:
+    // White underbase (1) -> Inlay (2) -> CMYK art (3) -> Clear coat (4) -> Kiss-Cut (10) -> Die-Cut (11)
+    if (whiteLayer.childNodes.length > 0) vectorSvgElement.appendChild(whiteLayer);
+    if (inlayLayer.childNodes.length > 0) vectorSvgElement.appendChild(inlayLayer);
+    if (cmykLayer.childNodes.length > 0) vectorSvgElement.appendChild(cmykLayer);
+    if (clearLayer.childNodes.length > 0) vectorSvgElement.appendChild(clearLayer);
+
+    if (coalescedCutLayer) {
+      if (coalescedCutLayer.childNodes.length > 0) {
+        vectorSvgElement.appendChild(coalescedCutLayer);
+      }
+    } else {
+      if (kissCutLayer.childNodes.length > 0) vectorSvgElement.appendChild(kissCutLayer);
+      if (edgeCutLayer.childNodes.length > 0) vectorSvgElement.appendChild(edgeCutLayer);
     }
+
+    // Re-append root marks/fiducials/QR codes on top of print & cut layers
+    existingRootElements.forEach((el) => vectorSvgElement.appendChild(el));
   } else {
     // Flat un-nested SVG fallback
     const cutEls = Array.from(
