@@ -2325,9 +2325,16 @@ async function startServer(
       const inputFile = req.file.path;
       const outputFile = `${inputFile}.png`;
 
+      // Security check: Make sure inputFile is an actual uploaded file in the temp/uploads directory
+      // req.file.path is typically controlled by multer, but we should make sure it doesn't contain unexpected sequences
+      const normalizedPath = path.normalize(inputFile);
+      if (normalizedPath.includes("..") || !normalizedPath.startsWith(path.normalize(path.join(__dirname, "uploads")))) {
+         return res.status(400).json({ error: "Invalid file path" });
+      }
+
       try {
         // Using [0] to extract the first layer/page of multi-page formats (PDF/TIFF/AI)
-        await execFilePromise("convert", [`${inputFile}[0]`, outputFile]);
+        await execFilePromise("convert", [`${normalizedPath}[0]`, outputFile]);
 
         res.sendFile(outputFile, async (err) => {
           if (err) {
@@ -2856,21 +2863,23 @@ async function startServer(
           .withMessage("Design image is required")
           .isString()
           .custom((value) => {
-            if (value.includes(".."))
+            if (value.startsWith("http")) return true;
+            const normalizedPath = path.normalize(value);
+            if (normalizedPath.includes("..") || !normalizedPath.startsWith("/uploads/")) {
               throw new Error("Path cannot contain directory traversal");
-            if (value.startsWith("/uploads/")) return true;
-            if (value.startsWith("http")) return true; // Allow URLs
-            throw new Error("Path must start with /uploads/ or be a valid URL");
+            }
+            return true;
           }),
         body("cutLinePath")
           .optional()
           .isString()
           .custom((value) => {
-            if (value.includes(".."))
+            if (value.startsWith("http")) return true;
+            const normalizedPath = path.normalize(value);
+            if (normalizedPath.includes("..") || !normalizedPath.startsWith("/uploads/")) {
               throw new Error("Path cannot contain directory traversal");
-            if (value.startsWith("/uploads/")) return true;
-            if (value.startsWith("http")) return true; // Allow URLs
-            throw new Error("Path must start with /uploads/ or be a valid URL");
+            }
+            return true;
           }),
         body("defaults").optional().isObject(),
         body("creatorProfitCents")
@@ -2987,11 +2996,12 @@ async function startServer(
           .notEmpty()
           .withMessage("designImagePath is required")
           .custom((value) => {
-            if (value.includes(".."))
+            if (value.startsWith("http")) return true;
+            const normalizedPath = path.normalize(value);
+            if (normalizedPath.includes("..") || !normalizedPath.startsWith("/uploads/")) {
               throw new Error("Path cannot contain directory traversal");
-            if (value.startsWith("/uploads/")) return true;
-            if (value.startsWith("http")) return true; // Allow URLs
-            throw new Error("Path must start with /uploads/ or be a valid URL");
+            }
+            return true;
           }),
         // Security Fix: Validate orderDetails structure
         body("orderDetails")
@@ -3042,11 +3052,12 @@ async function startServer(
           .isString()
           .withMessage("cutLinePath must be a string")
           .custom((value) => {
-            if (value.includes(".."))
+            if (value.startsWith("http")) return true;
+            const normalizedPath = path.normalize(value);
+            if (normalizedPath.includes("..") || !normalizedPath.startsWith("/uploads/")) {
               throw new Error("Path cannot contain directory traversal");
-            if (value.startsWith("/uploads/")) return true;
-            if (value.startsWith("http")) return true; // Allow URLs
-            throw new Error("Path must start with /uploads/ or be a valid URL");
+            }
+            return true;
           }),
 
         // Security & Integrity: Validate Billing Contact

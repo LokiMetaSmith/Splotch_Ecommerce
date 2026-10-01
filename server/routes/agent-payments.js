@@ -184,24 +184,22 @@ export default function createAgentPaymentsRouter(db, options = {}) {
       // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
       const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
 
-        if (maxSpendCents !== undefined) {
-          const storedQuoteCents = Math.round(storedQuote.total * 100);
-          if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
-            return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
-          }
-        }
-
-        const customExpiryStr = parsedMandate.agentRules?.expiresAt || parsedMandate.agent_rules?.valid_until;
-        if (customExpiryStr) {
-          const customExpiry = new Date(customExpiryStr);
-          if (isNaN(customExpiry.getTime()) || new Date() > customExpiry) {
-            return res.status(403).json({ error: "Agent mandate expired" });
-          }
+      if (maxSpendCents !== undefined) {
+        const storedQuoteCents = Math.round(storedQuote.total * 100);
+        if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
+          return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
         }
       }
 
-      // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
-      const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
+      const customExpiryStr = parsedMandate.agentRules?.expiresAt || parsedMandate.agent_rules?.valid_until;
+      if (customExpiryStr) {
+        const customExpiry = new Date(customExpiryStr);
+        if (isNaN(customExpiry.getTime()) || new Date() > customExpiry) {
+          return res.status(403).json({ error: "Agent mandate expired" });
+        }
+      }
+
+
 
       // 5. Verify payment amount matches quote
       const providedAmount = parseFloat(body.amount || (body.settlement && body.settlement.amount) || settlementMeta.amount);
