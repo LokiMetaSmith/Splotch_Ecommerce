@@ -44,3 +44,8 @@
 
 **Learning:** Even though `updateEditingButtonsState` centrally managed most disabled states, `resetBtnEl` was historically omitted. This created a subtle UX issue where users could click "Reset" without an image loaded.
 **Action:** When auditing or adding controls, double-check that every relevant button/slider is included in `updateEditingButtonsState`.
+
+## 2026-10-01 - Explicit Label Association via "for" Attribute
+
+**Learning:** While `aria-label` is useful for icon-only buttons, explicitly connecting `<label>` elements to their corresponding `<input>` fields using the `for` attribute (matching the input's `id`) is a powerful, non-ARIA UX enhancement. This dramatically improves accessibility for screen readers and increases the tap target size on mobile devices, allowing users to tap the text to focus or toggle the input.
+**Action:** Always ensure that `<label>` tags have a `for` attribute explicitly linking them to their target input's ID, particularly for sliders (`type="range"`), checkboxes, and complex form fields.
