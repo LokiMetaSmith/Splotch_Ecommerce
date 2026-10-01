@@ -181,9 +181,6 @@ export default function createAgentPaymentsRouter(db, options = {}) {
         }
       }
 
-      // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
-      const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
-
         if (maxSpendCents !== undefined) {
           const storedQuoteCents = Math.round(storedQuote.total * 100);
           if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
@@ -198,7 +195,6 @@ export default function createAgentPaymentsRouter(db, options = {}) {
             return res.status(403).json({ error: "Agent mandate expired" });
           }
         }
-      }
 
       // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
       const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
