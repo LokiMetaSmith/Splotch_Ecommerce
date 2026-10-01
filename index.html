@@ -1243,7 +1243,7 @@
                   </div>
                   <div>
                     <label
-                      for="boundaryMarginInput"
+                      for="boundaryMarginSlider"
                       id="boundaryMarginLabel"
                       class="block text-sm font-medium text-gray-700 mb-1"
                       >Bleed Margin (inches)</label
@@ -1304,7 +1304,7 @@
                   </div>
                   <div>
                     <label
-                      for="textSizeInput"
+                      for="textSizeSlider"
                       class="block text-sm font-medium text-splotch-navy"
                       style="font-family: var(--font-baumans)"
                       >Size (px):</label
@@ -2064,6 +2064,7 @@
               <!-- Billing Address Option -->
               <div class="field md:col-span-2 pt-2" id="same-billing-wrapper">
                 <label
+                  for="sameAsShipping"
                   class="flex items-center gap-2.5 text-sm font-medium text-gray-700 cursor-pointer select-none"
                 >
                   <input
@@ -2288,6 +2289,7 @@
 
             <!-- Confirmation Checkbox -->
             <label
+              for="order-ready-confirm"
               class="flex items-start gap-3 mb-4 cursor-pointer select-none"
               id="order-confirm-label"
             >
@@ -2505,11 +2507,12 @@
         </p>
 
         <div class="space-y-4">
-          <label class="flex items-start gap-3 cursor-pointer">
+          <label for="tradeoff_no_reprints" class="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               name="tradeoff"
               value="no_reprints"
+              id="tradeoff_no_reprints"
               class="mt-1 tradeoff-checkbox"
             />
             <div>
@@ -2522,11 +2525,12 @@
             </div>
           </label>
 
-          <label class="flex items-start gap-3 cursor-pointer">
+          <label for="tradeoff_flexible_window" class="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               name="tradeoff"
               value="flexible_window"
+              id="tradeoff_flexible_window"
               class="mt-1 tradeoff-checkbox"
             />
             <div>
@@ -2539,11 +2543,12 @@
             </div>
           </label>
 
-          <label class="flex items-start gap-3 cursor-pointer">
+          <label for="tradeoff_print_ready" class="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               name="tradeoff"
               value="print_ready"
+              id="tradeoff_print_ready"
               class="mt-1 tradeoff-checkbox"
             />
             <div>
@@ -2556,11 +2561,12 @@
             </div>
           </label>
 
-          <label class="flex items-start gap-3 cursor-pointer">
+          <label for="tradeoff_consolidated_shipping" class="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               name="tradeoff"
               value="consolidated_shipping"
+              id="tradeoff_consolidated_shipping"
               class="mt-1 tradeoff-checkbox"
             />
             <div>
@@ -2573,11 +2579,12 @@
             </div>
           </label>
 
-          <label class="flex items-start gap-3 cursor-pointer">
+          <label for="tradeoff_rush_queue" class="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               name="tradeoff"
               value="rush_queue"
+              id="tradeoff_rush_queue"
               class="mt-1 tradeoff-checkbox"
             />
             <div>

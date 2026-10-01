@@ -503,7 +503,7 @@
                   </div>
                 </div>
                 <div class="mt-2">
-                  <label class="inline-flex items-center cursor-pointer">
+                  <label for="rollMedia" class="inline-flex items-center cursor-pointer">
                     <input type="checkbox" id="rollMedia" class="form-checkbox h-5 w-5 text-blue-600" />
                     <span class="ml-2 text-sm text-gray-700 font-bold">Roll Media (Auto-Length)</span>
                   </label>
@@ -527,7 +527,7 @@
                 </p>
               </div>
               <div class="mt-2 flex flex-col space-y-2">
-                <label class="inline-flex items-center cursor-pointer">
+                <label for="addPrintingMarks" class="inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     id="addPrintingMarks"
@@ -634,7 +634,7 @@
                 <button id="nestStickersBtn" class="flex-1 mr-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-bold text-lg">
                   Nest Stickers
                 </button>
-                <label class="inline-flex items-center cursor-pointer">
+                <label for="previewCutlinesToggle" class="inline-flex items-center cursor-pointer">
                   <input type="checkbox" id="previewCutlinesToggle" checked class="form-checkbox h-5 w-5 text-red-600" />
                   <span class="ml-2 text-sm text-gray-700">Preview Cutlines</span>
                 </label>
@@ -1210,7 +1210,7 @@
               <!-- Parcel Tracked Shipping -->
               <div class="mb-4 pb-4 border-b border-gray-200">
                 <div class="flex items-center justify-between mb-2">
-                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                  <label for="shipping-parcel-enabled" class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="shipping-parcel-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
                     <span>USPS Ground Advantage (Tracked Parcel)</span>
                   </label>
@@ -1235,7 +1235,7 @@
               <!-- Economy Envelope Mail -->
               <div class="mb-4 pb-4 border-b border-gray-200">
                 <div class="flex items-center justify-between mb-2">
-                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                  <label for="shipping-envelope-enabled" class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="shipping-envelope-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
                     <span>USPS Economy Envelope (Letter Mail)</span>
                   </label>
@@ -1258,7 +1258,7 @@
               <!-- Local Store Pickup -->
               <div>
                 <div class="flex items-center justify-between mb-2">
-                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                  <label for="shipping-pickup-enabled" class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="shipping-pickup-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
                     <span>Local Store Pickup</span>
                   </label>
@@ -1282,7 +1282,7 @@
               <!-- Square Processing -->
               <div class="mb-4 pb-4 border-b border-gray-200">
                 <div class="flex items-center justify-between mb-2">
-                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                  <label for="payment-square-enabled" class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="payment-square-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
                     <span>Square Credit / Debit Cards</span>
                   </label>
@@ -1303,7 +1303,7 @@
               <!-- Base USDC (x402) -->
               <div class="mb-4 pb-4 border-b border-gray-200">
                 <div class="flex items-center justify-between mb-2">
-                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                  <label for="payment-base-usdc-enabled" class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="payment-base-usdc-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
                     <span>Base USDC (Autonomous Agents &amp; x402 / Coinbase)</span>
                   </label>
@@ -1319,7 +1319,7 @@
               <!-- Lightning Network (x402) -->
               <div>
                 <div class="flex items-center justify-between">
-                  <label class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
+                  <label for="payment-lightning-enabled" class="font-bold text-sm text-gray-800 flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="payment-lightning-enabled" class="w-4 h-4 text-blue-600 rounded" checked />
                     <span>Lightning Network (x402 Sats)</span>
                   </label>
