@@ -168,10 +168,10 @@ export default function createAgentPaymentsRouter(db, options = {}) {
       const shippingAddress = body.shippingAddress || body.shipping_destination || {};
 
       // 3. Cryptographically verify mandate bindings if mandate was supplied
+      let maxSpendCents;
       if (parsedMandate) {
         verifyMandateBindings(parsedMandate, storedQuote, shippingAddress);
 
-        let maxSpendCents;
         if (parsedMandate.maxSpendCents !== undefined) {
           maxSpendCents = parseInt(parsedMandate.maxSpendCents, 10);
         } else if (parsedMandate.agentRules && parsedMandate.agentRules.maxSpendCents !== undefined) {
@@ -179,7 +179,6 @@ export default function createAgentPaymentsRouter(db, options = {}) {
         } else if (parsedMandate.agent_rules?.max_amount?.amount !== undefined) {
           maxSpendCents = Math.round(parseFloat(parsedMandate.agent_rules.max_amount.amount) * 100);
         }
-      }
 
         if (maxSpendCents !== undefined) {
           const storedQuoteCents = Math.round(storedQuote.total * 100);
@@ -195,6 +194,7 @@ export default function createAgentPaymentsRouter(db, options = {}) {
             return res.status(403).json({ error: "Agent mandate expired" });
           }
         }
+      }
 
       // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
       const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
