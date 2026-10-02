@@ -3,6 +3,7 @@ import { formatOrderPrintDetails, getOrderStatusKeyboard } from '../telegramHelp
 export const DEFAULT_TELEGRAM_CONFIG = {
   enabled: true,
   stalledThresholdHours: 4,
+  holdForPickupStalledThresholdHours: 168, // 1 week
   checkIntervalMinutes: 60,
   repeatReminderHours: 0, // 0 = send once until status changes; > 0 = re-nag every X hours
 };
@@ -18,6 +19,10 @@ export function getTelegramConfig(db) {
 
   return {
     enabled: config.enabled !== false,
+    holdForPickupStalledThresholdHours:
+      typeof config.holdForPickupStalledThresholdHours === 'number' && config.holdForPickupStalledThresholdHours > 0
+        ? config.holdForPickupStalledThresholdHours
+        : DEFAULT_TELEGRAM_CONFIG.holdForPickupStalledThresholdHours,
     stalledThresholdHours:
       typeof config.stalledThresholdHours === 'number' && config.stalledThresholdHours > 0
         ? config.stalledThresholdHours
@@ -69,10 +74,19 @@ export async function checkStalledOrders({ db, bot, getSecret, logger }) {
 
   const stalledOrders = ordersToCheck.filter(order => {
     if (!order) return false;
+
+    if (order.snoozedUntil && nowMs < Date.parse(order.snoozedUntil)) {
+      return false;
+    }
+
     const lastUpdateStr = order.lastUpdatedAt || order.receivedAt;
     const lastUpdateMs = typeof lastUpdateStr === 'number' ? lastUpdateStr : Date.parse(lastUpdateStr);
 
-    if (isNaN(lastUpdateMs) || (nowMs - lastUpdateMs) <= stalledThresholdMs) {
+    const thresholdMs = order.status === 'HOLD_FOR_PICKUP'
+      ? config.holdForPickupStalledThresholdHours * 60 * 60 * 1000
+      : stalledThresholdMs;
+
+    if (isNaN(lastUpdateMs) || (nowMs - lastUpdateMs) <= thresholdMs) {
       return false;
     }
 

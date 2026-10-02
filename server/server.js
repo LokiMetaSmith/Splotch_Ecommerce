@@ -5400,6 +5400,7 @@ async function startServer(
           enabled: enabled !== undefined ? enabled : currentConfig.enabled,
           stalledThresholdHours:
             parsedThreshold !== undefined ? parsedThreshold : currentConfig.stalledThresholdHours,
+          holdForPickupStalledThresholdHours: currentConfig.holdForPickupStalledThresholdHours,
           checkIntervalMinutes:
             parsedInterval !== undefined ? parsedInterval : currentConfig.checkIntervalMinutes,
           repeatReminderHours:
@@ -5415,6 +5416,41 @@ async function startServer(
 
         res.json({ success: true, telegram: lowdb.data.config.telegram });
       },
+    );
+
+    // --- Snooze Endpoint ---
+    app.post(
+      "/api/admin/telegram/snooze",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res.status(403).json({ error: "Forbidden: Admin access required." });
+        }
+
+        const { orderId } = req.body;
+        if (!orderId) return res.status(400).json({ error: "Missing orderId" });
+
+        const lowdb = db.db || db;
+        const order = lowdb.data.orders[orderId];
+        if (!order) return res.status(404).json({ error: "Order not found" });
+
+        order.snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+        // Append an audit note
+        logOrderTransition({
+            order,
+            fromStatus: order.status,
+            toStatus: order.status,
+            actor: { type: "admin", id: req.user.id },
+            note: "Alert snoozed for 24 hours"
+        });
+
+        if (typeof db.write === "function") await db.write();
+        else if (typeof lowdb.write === "function") await lowdb.write();
+
+        logger.info(`[TELEGRAM] Order ${orderId} snoozed for 24h by admin ${req.user.email}`);
+        res.json({ success: true, snoozedUntil: order.snoozedUntil });
+      }
     );
 
     // --- Auth Endpoints ---

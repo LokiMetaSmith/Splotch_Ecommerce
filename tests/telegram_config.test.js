@@ -130,6 +130,7 @@ describe('Telegram Bot Alert Cadence Configuration & Stalled Orders', () => {
       expect(res.body).toEqual({
         enabled: true,
         stalledThresholdHours: 4,
+        holdForPickupStalledThresholdHours: 168,
         checkIntervalMinutes: 60,
         repeatReminderHours: 0,
       });
@@ -173,6 +174,7 @@ describe('Telegram Bot Alert Cadence Configuration & Stalled Orders', () => {
       const payload = {
         enabled: true,
         stalledThresholdHours: 2,
+        holdForPickupStalledThresholdHours: 168,
         checkIntervalMinutes: 15,
         repeatReminderHours: 8,
       };
@@ -198,6 +200,83 @@ describe('Telegram Bot Alert Cadence Configuration & Stalled Orders', () => {
   });
 
   describe('Stalled Orders Checker Logic', () => {
+    it('should respect snoozedUntil and skip snoozed orders', async () => {
+      await db.read();
+      db.data.config.telegram = {
+        enabled: true,
+        stalledThresholdHours: 1,
+        checkIntervalMinutes: 15,
+        repeatReminderHours: 0,
+      };
+
+      const orderId = 'order-snoozed';
+      db.data.orders[orderId] = {
+        orderId,
+        status: 'PRINTING',
+        receivedAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+        snoozedUntil: new Date(Date.now() + 2 * 3600 * 1000).toISOString(), // snoozed for 2 hours
+      };
+      await db.write();
+
+      bot.telegram.sendMessage.mockClear();
+
+      const notified = await checkStalledOrders({
+        db,
+        bot,
+        getSecret: (k) => process.env[k],
+        logger: console,
+      });
+
+      expect(notified).not.toContain(orderId);
+      expect(bot.telegram.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should apply custom HOLD_FOR_PICKUP threshold', async () => {
+      await db.read();
+      db.data.config.telegram = {
+        enabled: true,
+        stalledThresholdHours: 1,
+        holdForPickupStalledThresholdHours: 48, // higher threshold
+        checkIntervalMinutes: 15,
+        repeatReminderHours: 0,
+      };
+
+      const orderId1 = 'order-printing-stalled';
+      const orderId2 = 'order-pickup-not-stalled';
+      const orderId3 = 'order-pickup-stalled';
+
+      const now = Date.now();
+      db.data.orders[orderId1] = {
+        orderId: orderId1,
+        status: 'PRINTING',
+        receivedAt: new Date(now - 2 * 3600 * 1000).toISOString(), // 2 hrs old
+      };
+      db.data.orders[orderId2] = {
+        orderId: orderId2,
+        status: 'HOLD_FOR_PICKUP',
+        receivedAt: new Date(now - 24 * 3600 * 1000).toISOString(), // 24 hrs old
+      };
+      db.data.orders[orderId3] = {
+        orderId: orderId3,
+        status: 'HOLD_FOR_PICKUP',
+        receivedAt: new Date(now - 50 * 3600 * 1000).toISOString(), // 50 hrs old
+      };
+      await db.write();
+
+      bot.telegram.sendMessage.mockClear();
+      bot.telegram.sendMessage.mockResolvedValue({ message_id: 888 });
+
+      const notified = await checkStalledOrders({
+        db,
+        bot,
+        getSecret: (k) => process.env[k],
+        logger: console,
+      });
+
+      expect(notified).toContain(orderId1); // printing > 1hr
+      expect(notified).not.toContain(orderId2); // pickup < 48hrs
+      expect(notified).toContain(orderId3); // pickup > 48hrs
+    });
     it('should skip sending notifications when disabled', async () => {
       // Disable in DB
       await db.read();
@@ -514,7 +593,7 @@ describe('Telegram Bot Alert Cadence Configuration & Stalled Orders', () => {
     });
 
     it('should update weight, dimensions and queue label via POST /api/orders/:orderId/order-label', async () => {
-      const orderId = 'label-order-test-1';
+      const orderId = '550e8400-e29b-41d4-a716-446655440000';
       await db.read();
       db.data.orders[orderId] = {
         orderId,
