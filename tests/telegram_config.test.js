@@ -405,7 +405,7 @@ describe('Telegram Bot Alert Cadence Configuration & Stalled Orders', () => {
     });
 
     it('should include print settings and job link in sendNewOrderNotification', async () => {
-      const orderId = 'notif-order-1';
+      const orderId = '90164966-c692-4dc8-a231-54bdec543b14';
       await db.read();
       db.data.orders[orderId] = {
         orderId,
@@ -429,7 +429,7 @@ describe('Telegram Bot Alert Cadence Configuration & Stalled Orders', () => {
       expect(bot.telegram.sendMessage).toHaveBeenCalled();
       const [channelId, message, extra] = bot.telegram.sendMessage.mock.calls[0];
       expect(channelId).toBe('mock-channel');
-      expect(message).toContain('New Order: notif-order-1');
+      expect(message).toContain('New Order: 90164966-c692-4dc8-a231-54bdec543b14');
       expect(message).toContain('📐 Size: 2.5" × 2.5"');
       expect(message).toContain('🖨 Resolution: 300 DPI');
       expect(message).toContain('🏷 Material: Vinyl');

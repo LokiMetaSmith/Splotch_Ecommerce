@@ -3909,6 +3909,7 @@ async function startServer(
 
           const newOrder = {
             orderId: randomUUID(),
+            provenance: "ecommerce",
             paymentId: paymentResult.payment.id,
             squareOrderId: paymentResult.payment.orderId,
             amount: Number(amountCents), // Grand total charged

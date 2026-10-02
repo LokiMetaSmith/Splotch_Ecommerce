@@ -395,7 +395,7 @@ describe('PDF Export Functionality', () => {
         // Now select an order card
         const ordersList = document.getElementById('orders-list');
         ordersList.innerHTML = `
-            <div class="order-card" data-order-id="order-123">
+            <div class="order-card" data-order-id="de9965d4-b852-42a4-b6a2-6c6a2effcc15">
                 <input type="checkbox" class="order-select-checkbox" checked />
                 <img class="sticker-design" src="data:image/svg+xml;base64,mock" data-quantity="1" />
             </div>

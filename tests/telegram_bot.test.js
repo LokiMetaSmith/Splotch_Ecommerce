@@ -27,16 +27,16 @@ describe('Telegram Bot Commands', () => {
         db = await JSONFilePreset(testDbPath, { orders: {}, users: {}, credentials: {}, config: {} });
 
         // Seed some data
-        db.data.orders['order-new'] = {
-            orderId: 'order-new',
+        db.data.orders['ce3c7b3e-399e-4dd9-a5c6-81f1e11404e1'] = {
+            orderId: 'ce3c7b3e-399e-4dd9-a5c6-81f1e11404e1',
             status: 'NEW',
             amount: 1000,
             currency: 'USD',
             billingContact: { givenName: 'John', familyName: 'Doe', email: 'john@example.com' },
             orderDetails: { quantity: 10 }
         };
-        db.data.orders['order-printing'] = {
-            orderId: 'order-printing',
+        db.data.orders['6dcd93ea-8587-470e-9816-f2f4309de7b4'] = {
+            orderId: '6dcd93ea-8587-470e-9816-f2f4309de7b4',
             status: 'PRINTING',
             amount: 2000,
             currency: 'USD',
@@ -81,12 +81,12 @@ describe('Telegram Bot Commands', () => {
         );
         expect(bot.telegram.sendMessage).toHaveBeenCalledWith(
             123,
-            expect.stringContaining('order-new'),
+            expect.stringContaining('ce3c7b3e-399e-4dd9-a5c6-81f1e11404e1'),
             expect.anything()
         );
         expect(bot.telegram.sendMessage).toHaveBeenCalledWith(
             123,
-            expect.stringContaining('order-printing'),
+            expect.stringContaining('6dcd93ea-8587-470e-9816-f2f4309de7b4'),
             expect.anything()
         );
     });
@@ -115,12 +115,12 @@ describe('Telegram Bot Commands', () => {
         );
         expect(bot.telegram.sendMessage).toHaveBeenCalledWith(
             123,
-            expect.stringContaining('order-new'),
+            expect.stringContaining('ce3c7b3e-399e-4dd9-a5c6-81f1e11404e1'),
             expect.anything()
         );
         expect(bot.telegram.sendMessage).toHaveBeenCalledWith(
             123,
-            expect.not.stringContaining('order-printing'),
+            expect.not.stringContaining('6dcd93ea-8587-470e-9816-f2f4309de7b4'),
             expect.anything()
         );
     });
@@ -132,7 +132,7 @@ describe('Telegram Bot Commands', () => {
                 id: 'cb1',
                 from: { id: 123, is_bot: false, first_name: 'TestUser' },
                 message: { message_id: 999, chat: { id: 123 } },
-                data: 'accept_order-new'
+                data: 'accept_ce3c7b3e-399e-4dd9-a5c6-81f1e11404e1'
             }
         };
 
@@ -140,7 +140,7 @@ describe('Telegram Bot Commands', () => {
         await bot.middleware()(ctx, () => Promise.resolve());
 
         // Verify DB update
-        const order = db.data.orders['order-new'];
+        const order = db.data.orders['ce3c7b3e-399e-4dd9-a5c6-81f1e11404e1'];
         expect(order.status).toBe('ACCEPTED');
 
         // Verify message edit
@@ -160,14 +160,14 @@ describe('Telegram Bot Commands', () => {
                 id: 'cb2',
                 from: { id: 123, is_bot: false, first_name: 'TestUser' },
                 message: { message_id: 999, chat: { id: 123 } },
-                data: 'print_order-new'
+                data: 'print_ce3c7b3e-399e-4dd9-a5c6-81f1e11404e1'
             }
         };
 
         const ctx = new Context(update, bot.telegram, bot.botInfo);
         await bot.middleware()(ctx, () => Promise.resolve());
 
-        const order = db.data.orders['order-new'];
+        const order = db.data.orders['ce3c7b3e-399e-4dd9-a5c6-81f1e11404e1'];
         expect(order.status).toBe('PRINTING');
 
         expect(bot.telegram.editMessageText).toHaveBeenCalled();

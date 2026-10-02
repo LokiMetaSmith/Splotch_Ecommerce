@@ -205,6 +205,10 @@ export class LowDbAdapter {
     }
 
     async createOrder(order) {
+        const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!order.orderId || !uuidv4Regex.test(order.orderId)) {
+            throw new Error(`Invalid order ID format: ${order.orderId}. Must be a valid UUID v4.`);
+        }
         this.db.data.orders[order.orderId] = order;
         this._updateCaches(order);
         await this.write();
@@ -248,6 +252,10 @@ export class LowDbAdapter {
     }
 
     async updateOrder(order) {
+        const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!order.orderId || !uuidv4Regex.test(order.orderId)) {
+            throw new Error(`Invalid order ID format: ${order.orderId}. Must be a valid UUID v4.`);
+        }
         // Cache Maintenance
 
         // Shipped Orders
