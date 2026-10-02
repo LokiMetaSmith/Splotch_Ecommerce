@@ -83,7 +83,7 @@ describe('Shipment Tracker', () => {
         process.env.EASYPOST_API_KEY = 'test_key';
 
         // Setup Order
-        const orderId = 'order_1';
+        const orderId = 'fa128d29-7145-48d5-b388-b438d1c9a0bb';
         const order = {
             orderId,
             status: 'SHIPPED',
@@ -114,7 +114,7 @@ describe('Shipment Tracker', () => {
     it('should not update status if tracker says not delivered', async () => {
         process.env.EASYPOST_API_KEY = 'test_key';
 
-        const orderId = 'order_2';
+        const orderId = '38c6d38c-15dd-48d2-9058-d07743b8665f';
         const order = {
             orderId,
             status: 'SHIPPED',

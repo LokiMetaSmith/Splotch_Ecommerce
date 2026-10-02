@@ -49,11 +49,19 @@ export class MongoDbAdapter {
     }
 
     async createOrder(order) {
+        const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!order.orderId || !uuidv4Regex.test(order.orderId)) {
+            throw new Error(`Invalid order ID format: ${order.orderId}. Must be a valid UUID v4.`);
+        }
         await this.db.collection('orders').insertOne({ ...order });
         return order;
     }
 
     async updateOrder(order) {
+        const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!order.orderId || !uuidv4Regex.test(order.orderId)) {
+            throw new Error(`Invalid order ID format: ${order.orderId}. Must be a valid UUID v4.`);
+        }
         // eslint-disable-next-line no-unused-vars
         const { _id, ...doc } = order;
         await this.db.collection('orders').replaceOne({ orderId: order.orderId }, doc);

@@ -9,6 +9,7 @@ import { execFile } from "child_process";
 import util from "util";
 import path from "path";
 import fs from "fs";
+import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 
 const execFilePromise = util.promisify(execFile);
@@ -373,7 +374,7 @@ export function createMcpServer(db) {
 
         const localDesignPath = await downloadAgentArtwork(rawDesignUrl);
 
-        const orderId = "ord_" + Date.now();
+        const orderId = randomUUID();
         const nameStr = (rawShip.name || rawShip.recipient_name || "").trim();
         const nameParts = nameStr ? nameStr.split(/\s+/) : ["Agent", "Customer"];
         const givenName = nameParts[0] || "Agent";
@@ -394,6 +395,7 @@ export function createMcpServer(db) {
         const orderRecord = {
           orderId,
           order_id: orderId,
+          provenance: "agentic",
           status: "NEW",
           receivedAt: new Date().toISOString(),
           paymentId: settlementMeta.paymentId,
@@ -437,6 +439,7 @@ export function createMcpServer(db) {
               type: "text",
               text: JSON.stringify({
                 order_id: orderId,
+          provenance: "agentic",
                 orderId: orderId,
                 quote_id: targetQuoteId,
                 status: "queued_for_print",

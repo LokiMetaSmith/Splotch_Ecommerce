@@ -274,7 +274,7 @@ export default function createAgentPaymentsRouter(db, options = {}) {
       });
     }
 
-    const orderId = "ord_" + Date.now();
+    const orderId = randomUUID();
     const nameStr = (rawShip.name || rawShip.recipient_name || "").trim();
     const nameParts = nameStr ? nameStr.split(/\s+/) : ["Agent", "Customer"];
     const givenName = nameParts[0] || "Agent";
@@ -297,6 +297,7 @@ export default function createAgentPaymentsRouter(db, options = {}) {
     const orderRecord = {
       orderId: orderId,
       order_id: orderId,
+      provenance: "agentic",
       status: "NEW",
       receivedAt: new Date().toISOString(),
       paymentId: verified.paymentId,

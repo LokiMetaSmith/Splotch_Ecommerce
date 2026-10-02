@@ -90,7 +90,7 @@ describe('Input Validation Security Tests', () => {
 
     describe('POST /api/orders/:orderId/status', () => {
         it('should return 400 for invalid status', async () => {
-            const orderId = 'order_1';
+            const orderId = 'fa128d29-7145-48d5-b388-b438d1c9a0bb';
             db.data.orders[orderId] = { orderId, billingContact: { email: 'user@example.com' }, status: 'NEW' };
             await db.write();
 
@@ -111,7 +111,7 @@ describe('Input Validation Security Tests', () => {
 
     describe('POST /api/orders/:orderId/tracking', () => {
         it('should return 400 for empty courier', async () => {
-            const orderId = 'order_2';
+            const orderId = '38c6d38c-15dd-48d2-9058-d07743b8665f';
             db.data.orders[orderId] = { orderId, billingContact: { email: 'user@example.com' }, status: 'SHIPPED' };
             await db.write();
 
