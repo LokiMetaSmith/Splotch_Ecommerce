@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="600" height="500" viewBox="0 0 600 500">
+  <defs>
+    <!-- Soft Drop Shadow Filter for Realistic Sticker Mockup -->
+    <filter id="sticker-shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0F172A" flood-opacity="0.18" />
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0F172A" flood-opacity="0.10" />
+    </filter>
+    <!-- Subtle Vinyl Gloss Highlight -->
+    <linearGradient id="vinyl-glare" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.15" />
+      <stop offset="40%" stop-color="#FFFFFF" stop-opacity="0.03" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.05" />
+    </linearGradient>
+  </defs>
+
+  <!-- Modern Studio Mockup Background -->
+  <rect width="600" height="500" fill="#F8FAFC" rx="12" />
+  <rect x="1" y="1" width="598" height="498" fill="none" stroke="#E2E8F0" stroke-width="1.5" rx="11" />
+
+  <!-- Grid Pattern Subtle Underlay -->
+  <pattern id="dot-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+    <circle cx="10" cy="10" r="1" fill="#CBD5E1" />
+  </pattern>
+  <rect width="600" height="430" fill="url(#dot-grid)" opacity="0.6" rx="12" />
+
+  <!-- Sticker Group with Die-Cut Border & Drop Shadow -->
+  <g filter="url(#sticker-shadow)">
+    <!-- White Die-Cut Vinyl Border -->
+    <rect x="104" y="107.33333333333333" width="392" height="265.33333333333337" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="0.75" />
+    <!-- Embedded Artwork -->
+    <image x="110" y="113.33333333333333" width="380" height="253.33333333333334" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" preserveAspectRatio="xMidYMid meet" />
+    <!-- Surface Sheen Overlay -->
+    <rect x="104" y="107.33333333333333" width="392" height="265.33333333333337" rx="14" fill="url(#vinyl-glare)" pointer-events="none" />
+  </g>
+
+  <!-- Footer Information Bar -->
+  <rect y="430" width="600" height="70}" fill="#FFFFFF" rx="0" />
+  <line x1="0" y1="430" x2="600" y2="430" stroke="#E2E8F0" stroke-width="1" />
+
+  <text x="24" y="458" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700" fill="#0F172A">
+    Splotch Print Proof
+  </text>
+  <text x="24" y="478" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#64748B">
+    3" × 2" • Die Cut
+  </text>
+
+  <!-- Material & Cut Badges -->
+  <rect x="390" y="450" width="95" height="26" rx="6" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1" />
+  <text x="438" y="467" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#1D4ED8" text-anchor="middle">
+    Holographic Vinyl
+  </text>
+
+  <rect x="495" y="450" width="85" height="26" rx="6" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1" />
+  <text x="538" y="467" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#047857" text-anchor="middle">
+    Die Cut
+  </text>
+</svg>

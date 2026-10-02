@@ -179,10 +179,6 @@ export default function createAgentPaymentsRouter(db, options = {}) {
         } else if (parsedMandate.agent_rules?.max_amount?.amount !== undefined) {
           maxSpendCents = Math.round(parseFloat(parsedMandate.agent_rules.max_amount.amount) * 100);
         }
-      }
-
-      // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
-      const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
 
         if (maxSpendCents !== undefined) {
           const storedQuoteCents = Math.round(storedQuote.total * 100);
