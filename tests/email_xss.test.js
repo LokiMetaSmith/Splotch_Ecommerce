@@ -55,7 +55,7 @@ describe('Email Stored XSS Vulnerability Check', () => {
                 create: jest.fn().mockResolvedValue({
                     payment: {
                         id: 'payment_123',
-                        orderId: 'square_order_123',
+                        orderId: 'd24de4da-0fe4-4f57-9ef1-8807aec948a1',
                         status: 'COMPLETED'
                     }
                 })

@@ -33,7 +33,7 @@ describe('XSS Patch Verification', () => {
     test('should render malicious input as text, not HTML', () => {
         const maliciousPayload = `<img src=x onerror="document.body.setAttribute('data-xss', 'true')">`;
         const order = {
-            orderId: 'test-xss-order',
+            orderId: '73c7e4bc-b101-44d1-832b-d24365e813c7',
             status: 'NEW',
             amount: 1000,
             billingContact: {
@@ -49,7 +49,7 @@ describe('XSS Patch Verification', () => {
         const cardHtml = displayOrder(order);
         ui.ordersList.innerHTML = cardHtml;
 
-        const orderCard = document.querySelector('#order-card-test-xss-order');
+        const orderCard = document.querySelector('#order-card-73c7e4bc-b101-44d1-832b-d24365e813c7');
 
         // 1. Check that no img tag was created from the payload
         // Note: The real displayOrder logic might structure things differently than the mock in the old test,

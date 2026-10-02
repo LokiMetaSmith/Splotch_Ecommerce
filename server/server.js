@@ -2325,9 +2325,16 @@ async function startServer(
       const inputFile = req.file.path;
       const outputFile = `${inputFile}.png`;
 
+      // Security check: Make sure inputFile is an actual uploaded file in the temp/uploads directory
+      // req.file.path is typically controlled by multer, but we should make sure it doesn't contain unexpected sequences
+      const normalizedPath = path.normalize(inputFile);
+      if (normalizedPath.includes("..") || !normalizedPath.startsWith(path.normalize(path.join(__dirname, "uploads")))) {
+         return res.status(400).json({ error: "Invalid file path" });
+      }
+
       try {
         // Using [0] to extract the first layer/page of multi-page formats (PDF/TIFF/AI)
-        await execFilePromise("convert", [`${inputFile}[0]`, outputFile]);
+        await execFilePromise("convert", [`${normalizedPath}[0]`, outputFile]);
 
         res.sendFile(outputFile, async (err) => {
           if (err) {
@@ -2856,21 +2863,23 @@ async function startServer(
           .withMessage("Design image is required")
           .isString()
           .custom((value) => {
-            if (value.includes(".."))
+            if (value.startsWith("http")) return true;
+            const normalizedPath = path.normalize(value);
+            if (normalizedPath.includes("..") || !normalizedPath.startsWith("/uploads/")) {
               throw new Error("Path cannot contain directory traversal");
-            if (value.startsWith("/uploads/")) return true;
-            if (value.startsWith("http")) return true; // Allow URLs
-            throw new Error("Path must start with /uploads/ or be a valid URL");
+            }
+            return true;
           }),
         body("cutLinePath")
           .optional()
           .isString()
           .custom((value) => {
-            if (value.includes(".."))
+            if (value.startsWith("http")) return true;
+            const normalizedPath = path.normalize(value);
+            if (normalizedPath.includes("..") || !normalizedPath.startsWith("/uploads/")) {
               throw new Error("Path cannot contain directory traversal");
-            if (value.startsWith("/uploads/")) return true;
-            if (value.startsWith("http")) return true; // Allow URLs
-            throw new Error("Path must start with /uploads/ or be a valid URL");
+            }
+            return true;
           }),
         body("defaults").optional().isObject(),
         body("creatorProfitCents")
@@ -2987,11 +2996,12 @@ async function startServer(
           .notEmpty()
           .withMessage("designImagePath is required")
           .custom((value) => {
-            if (value.includes(".."))
+            if (value.startsWith("http")) return true;
+            const normalizedPath = path.normalize(value);
+            if (normalizedPath.includes("..") || !normalizedPath.startsWith("/uploads/")) {
               throw new Error("Path cannot contain directory traversal");
-            if (value.startsWith("/uploads/")) return true;
-            if (value.startsWith("http")) return true; // Allow URLs
-            throw new Error("Path must start with /uploads/ or be a valid URL");
+            }
+            return true;
           }),
         // Security Fix: Validate orderDetails structure
         body("orderDetails")
@@ -3042,11 +3052,12 @@ async function startServer(
           .isString()
           .withMessage("cutLinePath must be a string")
           .custom((value) => {
-            if (value.includes(".."))
+            if (value.startsWith("http")) return true;
+            const normalizedPath = path.normalize(value);
+            if (normalizedPath.includes("..") || !normalizedPath.startsWith("/uploads/")) {
               throw new Error("Path cannot contain directory traversal");
-            if (value.startsWith("/uploads/")) return true;
-            if (value.startsWith("http")) return true; // Allow URLs
-            throw new Error("Path must start with /uploads/ or be a valid URL");
+            }
+            return true;
           }),
 
         // Security & Integrity: Validate Billing Contact
@@ -3898,6 +3909,7 @@ async function startServer(
 
           const newOrder = {
             orderId: randomUUID(),
+            provenance: "ecommerce",
             paymentId: paymentResult.payment.id,
             squareOrderId: paymentResult.payment.orderId,
             amount: Number(amountCents), // Grand total charged
@@ -5388,6 +5400,7 @@ async function startServer(
           enabled: enabled !== undefined ? enabled : currentConfig.enabled,
           stalledThresholdHours:
             parsedThreshold !== undefined ? parsedThreshold : currentConfig.stalledThresholdHours,
+          holdForPickupStalledThresholdHours: currentConfig.holdForPickupStalledThresholdHours,
           checkIntervalMinutes:
             parsedInterval !== undefined ? parsedInterval : currentConfig.checkIntervalMinutes,
           repeatReminderHours:
@@ -5403,6 +5416,41 @@ async function startServer(
 
         res.json({ success: true, telegram: lowdb.data.config.telegram });
       },
+    );
+
+    // --- Snooze Endpoint ---
+    app.post(
+      "/api/admin/telegram/snooze",
+      authenticateToken,
+      async (req, res) => {
+        if (!(await isAdmin(req.user))) {
+          return res.status(403).json({ error: "Forbidden: Admin access required." });
+        }
+
+        const { orderId } = req.body;
+        if (!orderId) return res.status(400).json({ error: "Missing orderId" });
+
+        const lowdb = db.db || db;
+        const order = lowdb.data.orders[orderId];
+        if (!order) return res.status(404).json({ error: "Order not found" });
+
+        order.snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+        // Append an audit note
+        logOrderTransition({
+            order,
+            fromStatus: order.status,
+            toStatus: order.status,
+            actor: { type: "admin", id: req.user.id },
+            note: "Alert snoozed for 24 hours"
+        });
+
+        if (typeof db.write === "function") await db.write();
+        else if (typeof lowdb.write === "function") await lowdb.write();
+
+        logger.info(`[TELEGRAM] Order ${orderId} snoozed for 24h by admin ${req.user.email}`);
+        res.json({ success: true, snoozedUntil: order.snoozedUntil });
+      }
     );
 
     // --- Auth Endpoints ---

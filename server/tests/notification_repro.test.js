@@ -19,7 +19,7 @@ describe('Notification Logic Reproduction', () => {
         };
 
         order = {
-            orderId: 'order-1',
+            orderId: 'e39c0e71-83fe-4be8-a8d6-dca66ebf372a',
             status: 'NEW',
             amount: 1000,
             billingContact: { givenName: 'John', familyName: 'Doe', email: 'john@example.com' },

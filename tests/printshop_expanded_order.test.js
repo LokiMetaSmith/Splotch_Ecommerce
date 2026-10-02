@@ -42,7 +42,7 @@ describe('Print Shop Expanded Order Specifications & List Expansion', () => {
   describe('getOrderSpecs helper', () => {
     test('extracts direct widthInches and heightInches', () => {
       const order = {
-        orderId: 'test-direct-inches',
+        orderId: '771ab29e-92a5-49df-98ad-bb195f12aac9',
         orderDetails: {
           widthInches: 3.5,
           heightInches: 4.2,

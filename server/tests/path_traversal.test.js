@@ -53,7 +53,7 @@ const mockSquareClient = {
         create: jest.fn().mockResolvedValue({
             payment: {
                 id: 'payment-id',
-                orderId: 'square-order-id',
+                orderId: '5ccbd7b0-93ff-4009-b432-5ca7b27b6e42',
                 status: 'COMPLETED'
             }
         })

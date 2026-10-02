@@ -21,7 +21,7 @@ describe('Security: Input Limits in Create Order', () => {
     locations: {},
     payments: {
       create: jest.fn().mockResolvedValue({
-        payment: { id: 'mock_payment_id', orderId: 'mock_square_order_id' }
+        payment: { id: 'mock_payment_id', orderId: '306e03ca-5af5-4345-9135-20bb9672c8c8' }
       })
     }
   };

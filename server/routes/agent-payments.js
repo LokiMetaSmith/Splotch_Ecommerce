@@ -168,10 +168,10 @@ export default function createAgentPaymentsRouter(db, options = {}) {
       const shippingAddress = body.shippingAddress || body.shipping_destination || {};
 
       // 3. Cryptographically verify mandate bindings if mandate was supplied
-      let maxSpendCents;
       if (parsedMandate) {
         verifyMandateBindings(parsedMandate, storedQuote, shippingAddress);
 
+        let maxSpendCents;
         if (parsedMandate.maxSpendCents !== undefined) {
           maxSpendCents = parseInt(parsedMandate.maxSpendCents, 10);
         } else if (parsedMandate.agentRules && parsedMandate.agentRules.maxSpendCents !== undefined) {
@@ -179,25 +179,27 @@ export default function createAgentPaymentsRouter(db, options = {}) {
         } else if (parsedMandate.agent_rules?.max_amount?.amount !== undefined) {
           maxSpendCents = Math.round(parseFloat(parsedMandate.agent_rules.max_amount.amount) * 100);
         }
-
-        if (maxSpendCents !== undefined) {
-          const storedQuoteCents = Math.round(storedQuote.total * 100);
-          if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
-            return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
-          }
-        }
-
-        const customExpiryStr = parsedMandate.agentRules?.expiresAt || parsedMandate.agent_rules?.valid_until;
-        if (customExpiryStr) {
-          const customExpiry = new Date(customExpiryStr);
-          if (isNaN(customExpiry.getTime()) || new Date() > customExpiry) {
-            return res.status(403).json({ error: "Agent mandate expired" });
-          }
-        }
       }
 
       // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
       const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
+
+      if (maxSpendCents !== undefined) {
+        const storedQuoteCents = Math.round(storedQuote.total * 100);
+        if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
+          return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
+        }
+      }
+
+      const customExpiryStr = parsedMandate.agentRules?.expiresAt || parsedMandate.agent_rules?.valid_until;
+      if (customExpiryStr) {
+        const customExpiry = new Date(customExpiryStr);
+        if (isNaN(customExpiry.getTime()) || new Date() > customExpiry) {
+          return res.status(403).json({ error: "Agent mandate expired" });
+        }
+      }
+
+
 
       // 5. Verify payment amount matches quote
       const providedAmount = parseFloat(body.amount || (body.settlement && body.settlement.amount) || settlementMeta.amount);
@@ -272,7 +274,7 @@ export default function createAgentPaymentsRouter(db, options = {}) {
       });
     }
 
-    const orderId = "ord_" + Date.now();
+    const orderId = randomUUID();
     const nameStr = (rawShip.name || rawShip.recipient_name || "").trim();
     const nameParts = nameStr ? nameStr.split(/\s+/) : ["Agent", "Customer"];
     const givenName = nameParts[0] || "Agent";
@@ -295,6 +297,7 @@ export default function createAgentPaymentsRouter(db, options = {}) {
     const orderRecord = {
       orderId: orderId,
       order_id: orderId,
+      provenance: "agentic",
       status: "NEW",
       receivedAt: new Date().toISOString(),
       paymentId: verified.paymentId,
