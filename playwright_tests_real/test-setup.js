@@ -74,6 +74,22 @@ export const test = base.extend({
                 });
             }
 
+            if (pathname.includes('/api/test/last-magic-link')) {
+                return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ success: true, token: "mock-auth-token-12345" }),
+                });
+            }
+
+            if (pathname.endsWith('/api/auth/user/data')) {
+                return route.fulfill({
+                status: 404,
+                contentType: 'application/json',
+                body: JSON.stringify({ success: false, message: "User not found" }),
+                });
+            }
+
             if (pathname.endsWith('/api/pricing-info')) {
                 return route.fulfill({
                 status: 200,
@@ -90,6 +106,22 @@ export const test = base.extend({
                 });
             }
 
+            if (pathname.endsWith('/api/auth/verify-magic-link')) {
+                return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ success: true, token: "mock-auth-token-12345" }),
+                });
+            }
+
+            if (pathname.endsWith('/api/auth/verify-magic-link')) {
+                return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ success: true, token: "mock-auth-token-12345" }),
+                });
+            }
+
             if (pathname.endsWith('/api/upload-design')) {
                 return route.fulfill({
                 status: 200,
@@ -99,6 +131,17 @@ export const test = base.extend({
                     designImagePath: '/uploads/mocked-design.png',
                     cutLinePath: null
                 }),
+                });
+            }
+
+            if (pathname.endsWith('/api/convert-image')) {
+                return route.fulfill({
+                status: 200,
+                contentType: 'image/png',
+                body: Buffer.from(
+                    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+                    'base64'
+                )
                 });
             }
 
@@ -118,6 +161,27 @@ export const test = base.extend({
                 });
             }
 
+            if (pathname.endsWith('/api/order/estimate')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        subtotalCents: 1000,
+                        shippingCents: 0,
+                        taxCents: 0,
+                        grandTotalCents: 1000
+                    })
+                });
+            }
+
+            if (pathname.endsWith('/api/config')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ squareAppId: 'sandbox-mock-id', squareLocationId: 'mock-location-id', enableStripe: false })
+                });
+            }
+
             if (pathname.endsWith('/api/server-info')) {
                 return route.fulfill({
                     status: 200,
@@ -134,11 +198,61 @@ export const test = base.extend({
                 });
             }
 
+            if (pathname.endsWith('/api/auth/test-admin-token')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ token: 'mock-admin-token-123' })
+                });
+            }
+
             if (pathname.endsWith('/api/inventory')) {
                 return route.fulfill({
                     status: 200,
                     contentType: 'application/json',
                     body: JSON.stringify({})
+                });
+            }
+
+            // Default handlers for other endpoints
+            if (pathname.includes('/api/orders')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ orders: [{
+                        orderId: 'mock-order-id-67890',
+                        friendlyName: 'Mock-Order',
+                        status: 'RECEIVED',
+                        email: 'customer@example.com',
+                        grandTotalCents: 1000,
+                        deliveryMethod: 'shipping',
+                        firstName: 'Test',
+                        lastName: 'User',
+                        address: '123 Test St',
+                        city: 'Test City',
+                        state: 'TS',
+                        postalCode: '12345',
+                        items: [{
+                            designImagePath: '/uploads/mocked-design.png',
+                            cutLinePath: null,
+                            widthInches: 2,
+                            heightInches: 2,
+                            quantity: 5,
+                            cutShape: 'trace',
+                            materialId: 'pvc_laminated',
+                            resolutionId: 'dpi_300',
+                            isGrayscale: false,
+                            isSepia: false
+                        }]
+                    }] })
+                });
+            }
+
+            if (pathname.includes('/api/admin/printshops') || pathname.includes('/api/admin/sales-metrics')) {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ })
                 });
             }
 
@@ -151,12 +265,12 @@ export const test = base.extend({
             });
         }
 
-        // Continue regular requests (CSS, JS, etc.)
+        // If not an API request, let the mock router try to fulfill missing files if needed, or just continue
         return route.continue();
     });
 
     // Run the actual test
-    await use();
+    await use(page);
   }, { auto: true }],
 });
 

@@ -981,6 +981,7 @@ async function BootStrap() {
     window.__getActiveSticker = getActiveSticker;
     window.__addSticker = addSticker;
     window.__doRedrawAll = doRedrawAll;
+    window.__calculateAndUpdatePrice = calculateAndUpdatePrice;
   }
 
   await Promise.all([fetchPricingInfo(), fetchInventory()]);

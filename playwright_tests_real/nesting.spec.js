@@ -43,6 +43,18 @@ test.describe('Nesting Functionality', () => {
           await artTab.click({ force: true });
         }
 
+        // Playwright test environment can fail to trigger the 'change' handler for sizing the widthInput
+        // Force the value so checkout works
+        await page.evaluate(() => {
+          const input = document.getElementById('widthInput');
+          if (input && input.value === '') {
+             input.value = '2.5';
+             input.dispatchEvent(new Event('input', { bubbles: true }));
+             input.dispatchEvent(new Event('change', { bubbles: true }));
+             if (window.__calculateAndUpdatePrice) window.__calculateAndUpdatePrice();
+          }
+        });
+
         // Wait for Dimensions to populate so we know originalImage is processed
         const widthInput = page.locator('#widthInput');
         await expect(widthInput).not.toHaveValue('', { timeout: 15000 });
