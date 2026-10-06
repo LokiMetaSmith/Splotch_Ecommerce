@@ -214,3 +214,154 @@ The current architecture is suitable for an initial MVP or beta release (< 50 co
 # To Do List
 
 - [x] Squash the images down into a single image file when exporting. What that will look like is in the printshop software; it will need to generate cut files for the print server. We're using Mimaki's software which in theory has network constraints.
+
+---
+<br>
+
+# Print Shop Manager Operations & Usability Backlog
+
+This section tracks operational enhancements requested by the print shop manager to optimize floor throughput, operator ergonomics, and order processing speed.
+
+## High-Priority: Workstation Usability & Order Handling
+
+- [ ] **1. High-Legibility Body Typography for Print Shop (`printshop.html`):**
+  - **Issue:** The stylized "Baumans" font makes dense order data, addresses, and specs difficult to read quickly on shop monitors.
+  - **Specification:** Change the body font in `printshop.html` to a clean, modern sans-serif font stack (e.g., `Inter`, `Roboto`, `system-ui`). Keep `Modak` exclusively for primary brand headers. Add Google Font stylesheet link for `Inter` (`wght@400;500;600;700`).
+  - **Target Files:** `printshop.html`, `src/printshop.js`.
+
+- [ ] **2. "Touch-up vs. Just Print" Customer Intent Flag:**
+  - **Issue:** Print manager needs to know immediately whether a customer uploaded production-ready art or expects pre-press touch-ups/proofs.
+  - **Specification:**
+    - *Customer Checkout (`index.html`, `src/index.js`):* Add an explicit selection during the artwork/checkout step: `"Print As Is (Fastest turnaround)"` vs. `"Needs Touch-up / Pre-Press Review"`.
+    - *Backend (`server/server.js`):* Persist `order.orderDetails.touchUpPreference` (`"print_as_is"` | `"needs_touchup"`).
+    - *Print Shop Card (`src/printshop.js`, `printshop.html`):* Display a high-visibility badge on the order card:
+      - Green Badge: `[✓ Print As-Is]`
+      - Amber Badge: `[⚠️ Needs Touch-up / Proof]`
+    - Allow the print manager to click the badge to toggle or approve touch-up status.
+  - **Target Files:** `index.html`, `src/index.js`, `server/server.js`, `src/printshop.js`, `printshop.html`.
+
+- [ ] **3. 12-Hour Operator Session Duration & Sliding Activity Refresh:**
+  - **Issue:** Operators are logged out mid-shift (after 1h), disrupting plotter and press workflows.
+  - **Specification:**
+    - Increase JWT token duration for print shop operator sessions to **12 hours** to cover full operational shifts.
+    - Implement a client-side sliding activity listener in `src/printshop.js` (detecting user clicks, mouse movement, keyboard input, or API calls) that automatically refreshes the session before expiration so active operators are never interrupted.
+    - Provide an optional visual indicator in the header showing session status with an "Extend Session" action.
+  - **Target Files:** `server/server.js`, `src/printshop.js`.
+
+- [ ] **4. "Sloptipus" Mascot Graphic:**
+  - **Issue:** Empty queue states and headers lack brand personality.
+  - **Specification:**
+    - Add an official "Sloptipus" mascot SVG illustration to the empty orders state in `printshop.html` (e.g., *"All caught up! Sloptipus has cleared the print queue."*).
+    - Include a subtle small Sloptipus badge in the print shop header.
+  - **Target Files:** `printshop.html`, `src/printshop.js`.
+
+- [ ] **5. Phonetic / Friendly Order Names (Adjective-Noun):**
+  - **Issue:** Calling out raw UUIDv4 strings (e.g. `550e8400...`) across the noisy shop floor is impossible.
+  - **Specification:**
+    - Generate a memorable, pronounceable friendly name in `adjective-noun` format (e.g., `purple-fox`, `spicy-cactus`, `velvet-otter`) assigned to each order on creation.
+    - Store on order record as `friendlyName` / `orderCode` while keeping UUIDv4 for all database and API keys.
+    - Display prominently on the order card header: `Order #purple-fox (550e8400...)`.
+    - Update the print shop search bar to support filtering by friendly name.
+  - **Target Files:** `server/server.js`, `server/utils/...`, `src/printshop.js`, `printshop.html`.
+
+- [ ] **6. "Copy Name & Address" Button Clarification:**
+  - **Issue:** The button currently says "Copy Address", causing confusion about whether the recipient's name is included.
+  - **Specification:**
+    - Update button text and tooltip to explicitly state: `"Copy Name & Address"`.
+    - Ensure clipboard payload includes:
+      ```
+      [Recipient Name]
+      [Street Line 1]
+      [Street Line 2 (if present)]
+      [City], [State] [Zip]
+      [Country]
+      [Phone (if present)]
+      ```
+    - Show an instant visual confirmation toast: `"Name & Address copied to clipboard!"`.
+  - **Target Files:** `src/printshop.js`.
+
+- [ ] **7. Manual Shipping & Tracking Entry on Order Cards:**
+  - **Issue:** Orders shipped outside Pirate Ship / WooCommerce automated sync need manual tracking entry directly from the order card.
+  - **Specification:**
+    - When an operator changes an order status to `"SHIPPED"` (or clicks "Add Tracking"), provide inline input fields:
+      - Carrier dropdown (`USPS`, `UPS`, `FedEx`, `DHL`, `Courier/Local Delivery`).
+      - Tracking number input field.
+      - "Save & Notify Customer" button.
+    - Automatically updates the order record via `POST /api/orders/:orderId/tracking`, triggers the customer tracking email, and dispatches any registered agent webhooks.
+  - **Target Files:** `src/printshop.js`, `printshop.html`.
+
+- [ ] **8. Cross-Workstation Layout Consistency (Fix Boxes vs. Continuous Flow):**
+  - **Issue:** On certain monitor resolutions/DPIs, the order list layout breaks from structured cards into an unbroken, overlapping flow.
+  - **Specification:**
+    - Enforce a strict CSS Grid / Flexbox card container with explicit borders, background colors, and margin gaps (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3` with fallback).
+    - Ensure `.order-card` elements have explicit `min-width`, overflow containment, and box styling across all screen sizes and browser zoom levels.
+  - **Target Files:** `printshop.html`, `src/printshop.js`.
+
+---
+
+## Medium-Priority: Layout Density & Asset Management
+
+- [ ] **9. Dedicated "Download Artwork" Button Alongside Cutline Download:**
+  - **Issue:** Operators currently only have a cutline download button, requiring extra steps to extract raw artwork for manual touch-ups.
+  - **Specification:**
+    - Place two primary download buttons on every order card:
+      1. `[⬇ Download Artwork]`: Downloads the original untouched user uploaded image/vector with clean naming (`[orderId]-artwork.[ext]`).
+      2. `[✂ Download Cutline]`: Downloads the multi-layer production SVG (`[orderId]-cutline.svg`).
+  - **Target Files:** `src/printshop.js`, `printshop.html`.
+
+- [ ] **10. Consolidated Dimensions Input Group (Width × Height):**
+  - **Issue:** Media width and height inputs take up duplicate vertical rows in the nesting settings.
+  - **Specification:**
+    - Combine width and height into a single compact horizontal unit under label `"Dimensions (W × H)"`:
+      - Side-by-side inputs: `[ Width in ] × [ Height in ]` with unified mm conversion display.
+      - Support optional single-string parsing (e.g. typing `12x12` or `24x36`).
+  - **Target Files:** `printshop.html`, `src/printshop.js`.
+
+- [ ] **11. Consolidated Billing Address (Hide Duplicate Information):**
+  - **Issue:** Redundant billing address blocks clutter the card when identical to the shipping destination.
+  - **Specification:**
+    - Compare shipping and billing address objects.
+    - If identical (or billing is empty/same): render a compact badge: `[Billing: Same as Shipping]`.
+    - Only render the full secondary billing address block if the details differ.
+  - **Target Files:** `src/printshop.js`.
+
+- [ ] **12. Default 300 DPI & Collapsible "Secret Menu" (Advanced Settings):**
+  - **Issue:** Manual DPI adjustment inputs clutter the main view for everyday jobs.
+  - **Specification:**
+    - Enforce 300 DPI by default for all nesting, rasterization, and exports.
+    - Move manual DPI overrides, threshold adjustments, and experimental settings into a collapsible `"Advanced Settings"` accordion or modal gear menu ("Secret Menu"), keeping the default UI clean.
+  - **Target Files:** `printshop.html`, `src/printshop.js`.
+
+- [ ] **13. Order Notes & Internal Shop Memos:**
+  - **Issue:** Customer notes are easy to miss, and operators have no place to log internal shop memos (reprint reasons, customer calls).
+  - **Specification:**
+    - Display customer order notes in a prominent callout block immediately below customer details.
+    - Add an internal `"Shop Notes"` textarea on the card allowing operators to add timestamped internal notes stored on `order.internalNotes` (never exposed to customer tracking pages).
+  - **Target Files:** `server/server.js`, `src/printshop.js`, `printshop.html`.
+
+- [ ] **14. Compact / Feature-Dense View (Column & Padding Optimization):**
+  - **Issue:** Excessive whitespace forces constant scrolling on 1080p monitors.
+  - **Specification:**
+    - Tighten padding, line-heights, and spacing across the order card grid.
+    - Add a `Dense / Standard` display toggle to let operators fit 2-3x more orders per screen.
+  - **Target Files:** `printshop.html`, `src/printshop.js`.
+
+- [ ] **15. Direct Single-Order Export (PDF & Production SVG):**
+  - **Issue:** Exporting print files currently requires adding items to a batch and running sheet nesting.
+  - **Specification:**
+    - Add an `"Export Single Order"` button to each order card.
+    - Immediately generates and downloads:
+      - 300 DPI print-ready PDF with registration marks.
+      - Roland/Graphtec contour cut SVG.
+      - Production spec sheet JSON/text summary.
+  - **Target Files:** `src/printshop.js`, `server/server.js`.
+
+---
+
+## Future / Architecture Epic
+
+- [ ] **16. RIP & Print Server Software Integration:**
+  - **Scope:**
+    - Automated RIP hot-folder submission (Wasatch, Roland VersaWorks, Mimaki RasterLink).
+    - ICC color profile embedding and media-specific printer definition files.
+    - Network print queue spooling via SMB/FTP hot folders directly from the print shop dashboard.
