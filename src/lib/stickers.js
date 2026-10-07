@@ -39,7 +39,11 @@ export function addSticker(image, name, x, y, width, height) {
     lazyLassoRadius: 50,
     isGrayscale: false,
     isSepia: false,
-    cutShape: 'trace'
+    isTransparentBorder: false,
+    cutShape: 'trace',
+    material: null,
+    baseColor: null,
+    hasCustomBleed: false
   };
   stickers.push(newSticker);
   activeStickerIndex = stickers.length - 1;

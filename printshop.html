@@ -8,13 +8,15 @@
     <link rel="icon" href="/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" href="/favicon192.png" />
     <link href="./styles.css" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Modak&family=Monofett&family=Baumans&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Modak&family=Monofett&family=Baumans&display=swap"
       rel="stylesheet"
     />
     <style>
       body {
-        font-family: "Baumans", sans-serif;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
       h1,
       h2,
@@ -22,17 +24,48 @@
         font-family: "Modak", cursive;
       }
       .order-card {
-        border: 1px solid #ddd;
+        border: 1px solid #e2e8f0;
         border-radius: 8px;
         padding: 16px;
         margin-bottom: 16px;
-        background-color: #f9f9f9;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease-in-out;
+        background-color: #ffffff;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease-in-out;
+        box-sizing: border-box;
+        overflow: hidden;
+        min-width: 0;
+        position: relative;
       }
       .order-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+      }
+      /* Feature-Dense Mode for Shop Monitors */
+      #orders-list.dense-mode .order-card {
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+      }
+      #orders-list.dense-mode .order-card h3 {
+        font-size: 1.1rem;
+      }
+      #orders-list.dense-mode .order-card .order-details {
+        margin-top: 6px;
+        gap: 8px;
+        font-size: 0.75rem;
+      }
+      #orders-list.dense-mode .order-card .order-details dd {
+        margin-bottom: 0.2rem;
+      }
+      #orders-list.dense-mode .order-card img.sticker-design {
+        max-width: 100px;
+        max-height: 100px;
+      }
+      #orders-list.dense-mode .order-card .package-panel {
+        margin-top: 6px;
+        padding: 6px 8px;
+      }
+      #orders-list.dense-mode table tr.order-row td {
+        padding: 4px 8px;
       }
       .sticker-peel-container {
         display: inline-block;
@@ -150,7 +183,28 @@
     <header class="bg-white shadow-md">
       <nav class="container mx-auto px-4 sm:px-6 py-3">
         <div class="flex flex-wrap justify-between items-center">
-          <a href="#" class="text-xl font-semibold text-gray-700">Print Shop</a>
+          <div class="flex items-center gap-2">
+            <a href="#" class="text-xl font-semibold text-gray-700 flex items-center gap-2">
+              <svg class="w-7 h-7 text-teal-600 inline-block" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">
+                <circle cx="32" cy="24" r="18" fill="#0d9488"/>
+                <circle cx="25" cy="22" r="4" fill="#ffffff"/>
+                <circle cx="26" cy="22" r="2" fill="#0f172a"/>
+                <circle cx="39" cy="22" r="4" fill="#ffffff"/>
+                <circle cx="40" cy="22" r="2" fill="#0f172a"/>
+                <path d="M28 30 Q32 34 36 30" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none"/>
+                <!-- Tentacles -->
+                <path d="M18 36 Q14 48 20 54 Q24 58 26 50 Q28 42 26 36" fill="#0f766e"/>
+                <path d="M25 38 Q24 50 30 56 Q34 60 34 48 Q34 40 32 38" fill="#14b8a6"/>
+                <path d="M32 38 Q34 50 38 56 Q42 60 40 48 Q38 40 36 38" fill="#0f766e"/>
+                <path d="M38 36 Q42 44 44 52 Q48 58 46 48 Q44 40 40 36" fill="#14b8a6"/>
+              </svg>
+              <span>Print Shop</span>
+            </a>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200" title="Sloptipus Queue Monitor">
+              <span class="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span>
+              Sloptipus Active
+            </span>
+          </div>
           <div
             id="connection-status"
             class="text-sm w-full md:w-auto md:mr-4 text-center md:text-left my-2 md:my-0 flex items-center"
@@ -390,6 +444,10 @@
                 </svg>
                 View
             </button>
+            <button id="density-toggle-btn" class="px-2 py-1 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 inline-flex items-center gap-1" title="Toggle Compact / Standard Spacing">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
+                <span id="density-toggle-label">Dense</span>
+            </button>
             <div class="h-6 border-l border-gray-300 mx-1"></div>
             <button id="selectAllOrdersBtn" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">Select All</button>
             <button id="deselectAllOrdersBtn" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">Deselect All</button>
@@ -438,31 +496,29 @@
                 class="text-center py-12 px-4 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50"
               >
                 <div
-                  class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4 text-blue-600"
+                  class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-teal-50 mb-3 border border-teal-200 shadow-sm"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-8 w-8"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                    />
+                  <svg class="w-12 h-12 text-teal-600" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">
+                    <circle cx="32" cy="24" r="18" fill="#0d9488"/>
+                    <circle cx="25" cy="22" r="4" fill="#ffffff"/>
+                    <circle cx="26" cy="22" r="2" fill="#0f172a"/>
+                    <circle cx="39" cy="22" r="4" fill="#ffffff"/>
+                    <circle cx="40" cy="22" r="2" fill="#0f172a"/>
+                    <path d="M28 30 Q32 34 36 30" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none"/>
+                    <!-- Tentacles -->
+                    <path d="M18 36 Q14 48 20 54 Q24 58 26 50 Q28 42 26 36" fill="#0f766e"/>
+                    <path d="M25 38 Q24 50 30 56 Q34 60 34 48 Q34 40 32 38" fill="#14b8a6"/>
+                    <path d="M32 38 Q34 50 38 56 Q42 60 40 48 Q38 40 36 38" fill="#0f766e"/>
+                    <path d="M38 36 Q42 44 44 52 Q48 58 46 48 Q44 40 40 36" fill="#14b8a6"/>
                   </svg>
                 </div>
                 <h3
-                  class="text-lg font-medium text-gray-900 mb-1"
+                  class="text-xl font-bold text-gray-900 mb-1"
                   style="font-family: var(--font-modak); letter-spacing: 0.05em"
                 >
-                  Order Status
+                  Sloptipus Print Queue
                 </h3>
-                <p id="no-orders-text" class="text-gray-500 max-w-sm mx-auto">
+                <p id="no-orders-text" class="text-gray-600 max-w-sm mx-auto text-sm">
                   Loading orders...
                 </p>
               </div>
@@ -491,21 +547,31 @@
                 </div>
               </div>
               <div class="mt-4 border-b pb-4">
-                <h3 class="text-lg font-bold mb-2">Sheet Dimensions (Inches)</h3>
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label for="sheetWidth" class="block text-sm text-gray-600">Width</label>
-                    <input type="number" id="sheetWidth" step="0.1" value="12" class="w-full p-1 border rounded-md" />
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-lg font-bold">Dimensions (W × H)</h3>
+                  <span class="text-xs text-gray-500 font-medium">Inches</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="flex-1">
+                    <label for="sheetWidth" class="block text-xs font-semibold text-gray-600 mb-0.5">Width</label>
+                    <div class="relative">
+                      <input type="number" id="sheetWidth" step="0.1" value="12" class="w-full p-1.5 border rounded-md text-sm pr-6 focus:ring-1 focus:ring-blue-500" placeholder="Width" />
+                      <span class="absolute right-2 top-1.5 text-xs text-gray-400 font-medium pointer-events-none">in</span>
+                    </div>
                   </div>
-                  <div>
-                    <label for="sheetHeight" class="block text-sm text-gray-600">Height</label>
-                    <input type="number" id="sheetHeight" step="0.1" value="12" class="w-full p-1 border rounded-md" />
+                  <div class="pt-4 text-gray-400 font-bold text-sm select-none">&times;</div>
+                  <div class="flex-1">
+                    <label for="sheetHeight" class="block text-xs font-semibold text-gray-600 mb-0.5">Height</label>
+                    <div class="relative">
+                      <input type="number" id="sheetHeight" step="0.1" value="12" class="w-full p-1.5 border rounded-md text-sm pr-6 focus:ring-1 focus:ring-blue-500" placeholder="Height" />
+                      <span class="absolute right-2 top-1.5 text-xs text-gray-400 font-medium pointer-events-none">in</span>
+                    </div>
                   </div>
                 </div>
                 <div class="mt-2">
                   <label for="rollMedia" class="inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="rollMedia" class="form-checkbox h-5 w-5 text-blue-600" />
-                    <span class="ml-2 text-sm text-gray-700 font-bold">Roll Media (Auto-Length)</span>
+                    <input type="checkbox" id="rollMedia" class="form-checkbox h-4 w-4 text-blue-600 rounded" />
+                    <span class="ml-2 text-xs text-gray-700 font-semibold">Roll Media (Auto-Length)</span>
                   </label>
                 </div>
               </div>
@@ -543,93 +609,61 @@
                   </select>
                 </div>
               </div>
-              <div class="mt-4 border-t pt-4">
-                <h3 class="text-lg font-bold mb-2">Media Margins (Inches)</h3>
-                <div class="grid grid-cols-2 gap-2">
+              <!-- Collapsible Advanced Settings (Secret Menu) -->
+              <details class="mt-4 border-t pt-3 group">
+                <summary class="flex items-center justify-between cursor-pointer font-bold text-sm text-gray-700 hover:text-blue-600 select-none py-1">
+                  <span class="flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span>Advanced Settings &amp; Overrides</span>
+                  </span>
+                  <span class="text-[11px] font-normal text-gray-400">Default: 300 DPI</span>
+                </summary>
+                
+                <div class="mt-3 space-y-4 pt-2 border-t border-gray-100">
                   <div>
-                    <label for="marginTop" class="block text-sm text-gray-600">Top:</label>
-                    <input type="number" id="marginTop" step="0.1" value="0.5" class="w-full p-1 border rounded-md" />
-                  </div>
-                  <div>
-                    <label for="marginBottom" class="block text-sm text-gray-600">Bottom:</label>
-                    <input type="number" id="marginBottom" step="0.1" value="0.5" class="w-full p-1 border rounded-md" />
-                  </div>
-                  <div>
-                    <label for="marginLeft" class="block text-sm text-gray-600">Left:</label>
-                    <input type="number" id="marginLeft" step="0.1" value="0.5" class="w-full p-1 border rounded-md" />
-                  </div>
-                  <div>
-                    <label for="marginRight" class="block text-sm text-gray-600">Right:</label>
-                    <input type="number" id="marginRight" step="0.1" value="0.5" class="w-full p-1 border rounded-md" />
-                  </div>
-                </div>
-              </div>
-              <div class="mt-4 border-t pt-4">
-                <h3 class="text-lg font-bold mb-2">Cut Settings</h3>
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label for="mediaType" class="block text-sm text-gray-600">Media Type</label>
-                    <select id="mediaType" class="w-full p-1 border rounded-md text-sm">
-                      <option value="vinyl">Vinyl</option>
-                      <option value="paper">Paper</option>
-                      <option value="cardstock">Cardstock</option>
-                      <option value="pet">PET / Polyester</option>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Target Export Resolution</label>
+                    <select id="exportDpiSetting" class="w-full p-1.5 border rounded-md text-xs bg-white text-gray-800">
+                      <option value="300" selected>300 DPI (Production Standard - High Res)</option>
+                      <option value="600">600 DPI (Ultra Fine Detail)</option>
+                      <option value="150">150 DPI (Fast Draft / Proof)</option>
                     </select>
                   </div>
-                  <div>
-                    <label for="mediaThickness" class="block text-sm text-gray-600">Thickness (mm)</label>
-                    <input type="number" id="mediaThickness" step="0.1" value="0.1" class="w-full p-1 border rounded-md" />
-                  </div>
-                  <div>
-                    <label for="cutPressure" class="block text-sm text-gray-600">Cut Pressure (Force)</label>
-                    <input type="number" id="cutPressure" value="10" class="w-full p-1 border rounded-md" />
-                  </div>
-                  <div>
-                    <label for="cutType" class="block text-sm text-gray-600">Cut Type</label>
-                    <select id="cutType" class="w-full p-1 border rounded-md text-sm">
-                      <option value="kiss_cut">Kiss Cut</option>
-                      <option value="normal_cut">Normal (Die) Cut</option>
-                    </select>
-                  </div>
-                </div>
 
-                <div class="mt-3 pt-3 border-t border-gray-200">
-                  <div class="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide flex justify-between items-center">
-                    <span>Cut Layers &amp; Colors</span>
-                    <span class="text-[10px] text-gray-400 font-normal">Auto-saved</span>
+                  <div>
+                    <h4 class="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Media Margins (Inches)</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label for="marginTop" class="block text-xs text-gray-600">Top:</label>
+                        <input type="number" id="marginTop" step="0.1" value="0.5" class="w-full p-1 border rounded-md text-xs" />
+                      </div>
+                      <div>
+                        <label for="marginBottom" class="block text-xs text-gray-600">Bottom:</label>
+                        <input type="number" id="marginBottom" step="0.1" value="0.5" class="w-full p-1 border rounded-md text-xs" />
+                      </div>
+                      <div>
+                        <label for="marginLeft" class="block text-xs text-gray-600">Left:</label>
+                        <input type="number" id="marginLeft" step="0.1" value="0.5" class="w-full p-1 border rounded-md text-xs" />
+                      </div>
+                      <div>
+                        <label for="marginRight" class="block text-xs text-gray-600">Right:</label>
+                        <input type="number" id="marginRight" step="0.1" value="0.5" class="w-full p-1 border rounded-md text-xs" />
+                      </div>
+                    </div>
                   </div>
-                  <div class="space-y-2">
-                    <!-- Kiss Cut Layer & Color -->
-                    <div class="flex items-center gap-2 text-xs">
-                      <span class="w-16 text-gray-600 font-medium">Kiss Cut:</span>
-                      <input type="text" id="kissCutLayerName" value="Kiss-Cut" class="flex-1 p-1 border rounded text-xs font-mono" title="Kiss Cut Layer Name" placeholder="Layer Name" />
-                      <input type="color" id="kissCutColorPicker" value="#00FFFF" class="w-7 h-7 border rounded cursor-pointer p-0" title="Kiss Cut Color" />
-                      <input type="text" id="kissCutColor" value="#00FFFF" class="w-16 p-1 border rounded text-xs font-mono uppercase text-center" title="Kiss Cut Hex Color" maxlength="7" />
-                    </div>
-                    <!-- Edge Cut Layer & Color -->
-                    <div class="flex items-center gap-2 text-xs">
-                      <span class="w-16 text-gray-600 font-medium">Edge Cut:</span>
-                      <input type="text" id="edgeCutLayerName" value="Die-Cut" class="flex-1 p-1 border rounded text-xs font-mono" title="Edge Cut Layer Name" placeholder="Layer Name" />
-                      <input type="color" id="edgeCutColorPicker" value="#FF0000" class="w-7 h-7 border rounded cursor-pointer p-0" title="Edge Cut Color" />
-                      <input type="text" id="edgeCutColor" value="#FF0000" class="w-16 p-1 border rounded text-xs font-mono uppercase text-center" title="Edge Cut Hex Color" maxlength="7" />
-                    </div>
+
+                  <div>
+                    <label for="keepoutAreas" class="text-xs font-bold text-gray-700 mb-1 block">Internal Keep-outs</label>
+                    <p class="text-[11px] text-gray-500 mb-1.5">
+                      Enter as JSON array of objects: [{"x":0, "y":0, "width":100, "height":100}]
+                    </p>
+                    <textarea
+                      id="keepoutAreas"
+                      class="w-full p-1.5 border rounded-md text-xs font-mono"
+                      rows="3"
+                    >[]</textarea>
                   </div>
                 </div>
-              </div>
-              <div class="mt-4 border-t pt-4">
-                <label for="keepoutAreas" class="text-lg font-bold mb-2 block"
-                  >Internal Keep-outs</label
-                >
-                <p class="text-xs text-gray-500 mb-2">
-                  Enter as JSON array of objects: [{"x":0, "y":0, "width":100,
-                  "height":100}]
-                </p>
-                <textarea
-                  id="keepoutAreas"
-                  class="w-full p-1 border rounded-md"
-                  rows="4"
-                >[]</textarea>
-              </div>
+              </details>
               <div class="mt-4 flex items-center justify-between">
                 <button id="nestStickersBtn" class="flex-1 mr-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-bold text-lg">
                   Nest Stickers

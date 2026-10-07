@@ -54,6 +54,7 @@ import {
 } from "./lib/costCalc.js";
 import { logOrderTransition, readAuditLogForOrder } from "./lib/auditLogger.js";
 import { getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from "./lib/telegramReminder.js";
+import { generateFriendlyName } from "./utils/friendly-name.js";
 
 import { Markup } from "telegraf";
 import { getOrderStatusKeyboard } from "./telegramHelpers.js";
@@ -3302,6 +3303,7 @@ async function startServer(
             tradeoffs: Array.isArray(orderDetails.tradeoffs) ? orderDetails.tradeoffs : [],
             standbyBidCents: typeof orderDetails.standbyBidCents === "number" ? orderDetails.standbyBidCents : null,
             promoCode: typeof orderDetails.promoCode === "string" ? orderDetails.promoCode.trim() : null,
+            touchUpPreference: orderDetails.touchUpPreference === "needs_touchup" ? "needs_touchup" : "print_as_is",
           };
 
           // --- Product / Creator Payout Logic ---
@@ -3907,8 +3909,10 @@ async function startServer(
             }
           }
 
+          const orderUuid = randomUUID();
           const newOrder = {
-            orderId: randomUUID(),
+            orderId: orderUuid,
+            friendlyName: generateFriendlyName(orderUuid),
             provenance: "ecommerce",
             paymentId: paymentResult.payment.id,
             squareOrderId: paymentResult.payment.orderId,
@@ -3945,6 +3949,7 @@ async function startServer(
             packageWeightOz: orderBreakdown?.weightOz ?? null,
             widthInches: inputSafeOrderDetails.widthInches || null,
             heightInches: inputSafeOrderDetails.heightInches || null,
+            touchUpPreference: inputSafeOrderDetails.touchUpPreference || "print_as_is",
           };
 
           // --- Process Payout ---
@@ -4389,6 +4394,67 @@ async function startServer(
           await logAndEmailError(error, "Error queuing time log");
           res.status(500).json({ error: "Internal Server Error" });
         }
+      },
+    );
+
+    // Save internal shop memo / notes
+    app.post(
+      "/api/orders/:orderId/internal-notes",
+      authenticateToken,
+      [
+        ...validateId("orderId"),
+        body("note").isString().trim().notEmpty().withMessage("Note content is required"),
+      ],
+      async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+        if (!(await isAdmin(req.user))) {
+          return res.status(403).json({ error: "Admin access required" });
+        }
+        const { orderId } = req.params;
+        const { note } = req.body;
+        const order = await db.getOrder(orderId);
+        if (!order) {
+          return res.status(404).json({ error: "Order not found" });
+        }
+
+        if (!Array.isArray(order.internalNotes)) {
+          order.internalNotes = [];
+        }
+        const noteEntry = {
+          id: randomUUID(),
+          text: note,
+          author: req.user.username || req.user.email || "operator",
+          createdAt: new Date().toISOString(),
+        };
+        order.internalNotes.push(noteEntry);
+        await db.updateOrder(order);
+        res.status(201).json({ success: true, note: noteEntry, internalNotes: order.internalNotes });
+      },
+    );
+
+    // Toggle / update touch-up preference
+    app.patch(
+      "/api/orders/:orderId/touch-up",
+      authenticateToken,
+      validateId("orderId"),
+      async (req, res) => {
+        const { orderId } = req.params;
+        const { touchUpPreference } = req.body;
+        const order = await db.getOrder(orderId);
+        if (!order) {
+          return res.status(404).json({ error: "Order not found" });
+        }
+        const updatedPref = touchUpPreference === "needs_touchup" ? "needs_touchup" : "print_as_is";
+        order.touchUpPreference = updatedPref;
+        if (order.orderDetails) {
+          order.orderDetails.touchUpPreference = updatedPref;
+        }
+        await db.updateOrder(order);
+        logger.info(`[SERVER] Order ${orderId} touchUpPreference updated to ${updatedPref}`);
+        res.json({ success: true, touchUpPreference: updatedPref });
       },
     );
 
@@ -5545,7 +5611,7 @@ async function startServer(
         }
         const token = jwt.sign(payload, privateKey, {
           algorithm: "RS256",
-          expiresIn: "1h",
+          expiresIn: "12h",
           header: { kid },
         });
         res.json({ token });
@@ -5711,7 +5777,7 @@ async function startServer(
             const { privateKey, kid } = getCurrentSigningKey();
             const authToken = jwt.sign({ email: user.email }, privateKey, {
               algorithm: "RS256",
-              expiresIn: "1h",
+              expiresIn: "12h",
               header: { kid },
             });
             res.json({ success: true, token: authToken });
@@ -5738,6 +5804,23 @@ async function startServer(
         username: username,
         ...userPayload,
       });
+    });
+
+    app.post("/api/auth/refresh", authenticateToken, (req, res) => {
+      if (req.user.isGuest) {
+        return res.status(403).json({ error: "Guests cannot refresh sessions" });
+      }
+      const { privateKey, kid } = getCurrentSigningKey();
+      const payload = { ...req.user };
+      delete payload.iat;
+      delete payload.exp;
+      delete payload.nbf;
+      const refreshedToken = jwt.sign(payload, privateKey, {
+        algorithm: "RS256",
+        expiresIn: "12h",
+        header: { kid },
+      });
+      res.json({ success: true, token: refreshedToken });
     });
 
     if (process.env.NODE_ENV === 'test') {
@@ -6198,7 +6281,7 @@ async function startServer(
             }
             const token = jwt.sign(payload, privateKey, {
               algorithm: "RS256",
-              expiresIn: "1h",
+              expiresIn: "12h",
               header: { kid },
             });
             res.json({ verified, token });

@@ -62,6 +62,30 @@ describe('Print Shop Expanded Order Specifications & List Expansion', () => {
       expect(specs.ppi).toBe(300);
       expect(specs.cutTypeName).toBe('Die Cut');
       expect(specs.materialName).toBe('Standard White Vinyl');
+      expect(specs.baseColor).toBe('#ffffff');
+    });
+
+    test('extracts transparent baseColor for clear cling and flat acrylic', () => {
+      const orderClear = {
+        orderId: 'clear-cling-test',
+        orderDetails: {
+          material: 'clear_cling',
+          baseColor: 'transparent',
+          resolution: 'dpi_300',
+        }
+      };
+      const specsClear = getOrderSpecs(orderClear);
+      expect(specsClear.baseColor).toBe('transparent');
+
+      const orderAcrylic = {
+        orderId: 'flat-acrylic-test',
+        orderDetails: {
+          material: 'flat_acrylic',
+          resolution: 'dpi_300',
+        }
+      };
+      const specsAcrylic = getOrderSpecs(orderAcrylic);
+      expect(specsAcrylic.baseColor).toBe('transparent');
     });
 
     test('calculates inches from pixel dimensions and resolution PPI', () => {

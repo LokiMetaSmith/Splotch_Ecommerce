@@ -1156,6 +1156,20 @@ async function BootStrap() {
       calculateAndUpdatePrice();
       populateLayerDropdown(e.target.value);
       checkInventoryStatus(e.target.value);
+      updateMaterialBaseBadge(e.target.value);
+
+      const mat = pricingConfig?.materials?.find((m) => m.id === e.target.value);
+      const bColor = mat?.baseColor !== undefined ? mat.baseColor : "#ffffff";
+      if (activeBase) {
+        activeBase.material = e.target.value;
+        activeBase.baseColor = bColor;
+      }
+      const activeSticker = getActiveSticker();
+      if (activeSticker) {
+        activeSticker.material = e.target.value;
+        activeSticker.baseColor = bColor;
+      }
+      redrawAll();
     });
   }
   if (stickerResolutionSelect) {
@@ -1312,8 +1326,38 @@ async function BootStrap() {
 
   const bleedColor1 = document.getElementById("bleedColor1");
   const bleedColor2 = document.getElementById("bleedColor2");
-  if (bleedColor1) bleedColor1.addEventListener("input", redrawAll);
-  if (bleedColor2) bleedColor2.addEventListener("input", redrawAll);
+  if (bleedColor1) {
+    bleedColor1.addEventListener("input", (e) => {
+      const active = getActiveSticker();
+      if (active) {
+        active.bleedColor1 = e.target.value;
+        active.isTransparentBorder = false;
+        active.hasCustomBleed = true;
+      }
+      if (activeBase) {
+        activeBase.bleedColor1 = e.target.value;
+        activeBase.isTransparentBorder = false;
+        activeBase.hasCustomBleed = true;
+      }
+      redrawAll();
+    });
+  }
+  if (bleedColor2) {
+    bleedColor2.addEventListener("input", (e) => {
+      const active = getActiveSticker();
+      if (active) {
+        active.bleedColor2 = e.target.value;
+        active.isTransparentBorder = false;
+        active.hasCustomBleed = true;
+      }
+      if (activeBase) {
+        activeBase.bleedColor2 = e.target.value;
+        activeBase.isTransparentBorder = false;
+        activeBase.hasCustomBleed = true;
+      }
+      redrawAll();
+    });
+  }
 
   const generateCutlineBtn = document.getElementById("generateCutlineBtn");
   if (generateCutlineBtn)
@@ -2624,6 +2668,28 @@ function populateResolutionDropdown() {
   stickerResolutionSelect.value = "dpi_300";
 }
 
+function updateMaterialBaseBadge(materialId) {
+  const badge = document.getElementById("material-base-badge");
+  if (!badge) return;
+  const mat = pricingConfig?.materials?.find((m) => m.id === materialId);
+  const baseColor =
+    mat?.baseColor !== undefined
+      ? mat.baseColor
+      : materialId &&
+          (materialId.includes("clear") || materialId.includes("acrylic"))
+        ? "transparent"
+        : "#ffffff";
+  if (baseColor === "transparent") {
+    badge.textContent = "Clear / Transparent Base";
+    badge.className =
+      "text-[11px] font-medium px-2 py-0.5 rounded border bg-cyan-50 text-cyan-800 border-cyan-200";
+  } else {
+    badge.textContent = "White Film Substrate";
+    badge.className =
+      "text-[11px] font-medium px-2 py-0.5 rounded border bg-gray-100 text-gray-700 border-gray-200";
+  }
+}
+
 function populateMaterialDropdown() {
   if (!pricingConfig || !pricingConfig.materials || !stickerMaterialSelect)
     return;
@@ -2633,12 +2699,19 @@ function populateMaterialDropdown() {
     const option = document.createElement("option");
     option.value = mat.id;
     let displayName = mat.name;
-    if (mat.id.toLowerCase().includes("pvc")) {
+    if (!displayName) {
+      if (mat.id.toLowerCase().includes("pvc")) {
         displayName = "Heavy-Duty Laminated Vinyl";
-    } else if (mat.id.toLowerCase().includes("pp")) {
+      } else if (mat.id.toLowerCase().includes("pp")) {
         displayName = "Standard Weatherproof Film";
+      } else {
+        displayName = mat.id;
+      }
     }
     option.textContent = displayName;
+    if (mat.baseColor) {
+      option.dataset.baseColor = mat.baseColor;
+    }
     stickerMaterialSelect.appendChild(option);
   });
   // Set selection: preserve if valid, else pp_standard, else first material
@@ -2654,6 +2727,7 @@ function populateMaterialDropdown() {
   populateLayerDropdown(stickerMaterialSelect.value);
   // Update material helper text and inventory warning
   checkInventoryStatus(stickerMaterialSelect.value);
+  updateMaterialBaseBadge(stickerMaterialSelect.value);
 }
 
 async function fetchPricingInfo(retries = 3, delay = 500) {
@@ -3133,6 +3207,10 @@ async function handlePaymentFormSubmit(event) {
         ? parseInt(stickerQuantityInput.value, 10)
         : 0,
       material: stickerMaterialSelect ? stickerMaterialSelect.value : "unknown",
+      baseColor:
+        pricingConfig?.materials?.find(
+          (m) => m.id === (stickerMaterialSelect?.value),
+        )?.baseColor || "#ffffff",
       cutType: cutTypeSelect ? cutTypeSelect.value : "die_cut",
       stickerName: stickerName,
       promoAddon: promoAddonCheckbox ? promoAddonCheckbox.checked : false,
@@ -3144,6 +3222,9 @@ async function handlePaymentFormSubmit(event) {
         ? "OK"
         : shippingContact.administrativeDistrictLevel1 || "",
       promoCode: appliedPromoCode || null,
+      touchUpPreference:
+        document.querySelector('input[name="touchup-preference"]:checked')?.value ||
+        "print_as_is",
     };
     if (cutLinePath) {
       orderDetails.cutLinePath = cutLinePath;
@@ -3630,7 +3711,7 @@ function getSamplingImageData(source, maxDim = 400) {
 function applyPerimeterEdgeColor(currentImageData) {
   if (!currentImageData) return null;
   const dominant = getDominantPerimeterColor(currentImageData, 0.25);
-  if (dominant && dominant.detected) {
+  if (dominant && dominant.detected && !dominant.isTransparent) {
     const hex = dominant.hex || dominant.color;
     const bleedColor1 = document.getElementById("bleedColor1");
     const bleedColor2 = document.getElementById("bleedColor2");
@@ -3644,7 +3725,8 @@ function applyPerimeterEdgeColor(currentImageData) {
       activeBase.edgeCutColor = dominant.rgba || hex;
       activeBase.edgeCutHex = hex;
       activeBase.edgeCutAlpha = dominant.alphaRatio;
-      activeBase.isTransparentBorder = dominant.isTransparent;
+      activeBase.isTransparentBorder = false;
+      activeBase.hasCustomBleed = true;
       activeBase.bleedColor1 = hex;
       activeBase.bleedColor2 = hex;
     }
@@ -3653,11 +3735,29 @@ function applyPerimeterEdgeColor(currentImageData) {
       activeSticker.edgeCutColor = dominant.rgba || hex;
       activeSticker.edgeCutHex = hex;
       activeSticker.edgeCutAlpha = dominant.alphaRatio;
-      activeSticker.isTransparentBorder = dominant.isTransparent;
+      activeSticker.isTransparentBorder = false;
+      activeSticker.hasCustomBleed = true;
       activeSticker.bleedColor1 = hex;
       activeSticker.bleedColor2 = hex;
     }
     return dominant;
+  }
+  if (dominant && dominant.isTransparent) {
+    if (activeBase) {
+      activeBase.isTransparentBorder = true;
+      activeBase.hasCustomBleed = false;
+      activeBase.edgeCutColor = "rgba(0, 0, 0, 0)";
+      activeBase.edgeCutHex = null;
+      activeBase.edgeCutAlpha = 0;
+    }
+    const activeSticker = getActiveSticker();
+    if (activeSticker) {
+      activeSticker.isTransparentBorder = true;
+      activeSticker.hasCustomBleed = false;
+      activeSticker.edgeCutColor = "rgba(0, 0, 0, 0)";
+      activeSticker.edgeCutHex = null;
+      activeSticker.edgeCutAlpha = 0;
+    }
   }
   return null;
 }
@@ -3977,8 +4077,14 @@ function loadFileAsImage(file, isMascot = false) {
             // Generate cutline based on image transparency & perimeter color sampling
             const samplingData = getSamplingImageData(activeBase.originalImage || canvas, 400);
             const dominantColor = applyPerimeterEdgeColor(samplingData);
+            const hasTransparentBorder = samplingData && imageHasTransparentBorder(samplingData);
+            if (hasTransparentBorder) {
+              activeBase.isTransparentBorder = true;
+              const activeSticker = getActiveSticker();
+              if (activeSticker) activeSticker.isTransparentBorder = true;
+            }
 
-            if (dominantColor || (samplingData && imageHasTransparentBorder(samplingData))) {
+            if (dominantColor || hasTransparentBorder) {
               if (cutShapeSelect) cutShapeSelect.value = "trace";
             } else {
               if (cutShapeSelect) cutShapeSelect.value = "square";
@@ -4791,15 +4897,28 @@ function drawCanvasDecorations(
 
   const dpr = window.devicePixelRatio || 1;
 
-  // Combine Pass 1 (White Vinyl) and Pass 2 (Base Images) to fix stacking order
-  const bColor1 = document.getElementById("bleedColor1")?.value || "#000000";
-  const bColor2 = document.getElementById("bleedColor2")?.value || "#000000";
+  // Combine Pass 1 (Substrate / Base Color) and Pass 2 (Base Images) to fix stacking order
+  const curMatId = stickerMaterialSelect ? stickerMaterialSelect.value : "pp_standard";
+  const curMat = pricingConfig?.materials?.find((m) => m.id === curMatId);
+  const globalBaseColor = curMat?.baseColor !== undefined ? curMat.baseColor : "#ffffff";
 
   stickers.forEach((layer) => {
     if (layer.visible !== false) {
-      // 1. Draw White Vinyl Background (Bleed)
+      const layerBaseColor =
+        layer.baseColor ||
+        pricingConfig?.materials?.find((m) => m.id === layer.material)?.baseColor ||
+        globalBaseColor;
+      const isClear =
+        layerBaseColor === "transparent" ||
+        layerBaseColor === "rgba(0,0,0,0)" ||
+        layerBaseColor === "none";
+
+      // 1. Draw Substrate / Base Color (Pass 1)
+      // If the material is clear (clear cling, flat acrylic), do not draw an opaque substrate.
+      // If the material is opaque (e.g. white film #ffffff), draw the substrate fill inside the cutline.
       if (
         !isExporting &&
+        !isClear &&
         layer.currentCutline &&
         layer.currentCutline.length > 0
       ) {
@@ -4820,22 +4939,27 @@ function drawCanvasDecorations(
           ctx.closePath();
         });
 
-        // Fill with white first
-        ctx.fillStyle = "white";
+        // Determine substrate fill:
+        // If layer has custom bleed colors explicitly set, use that gradient;
+        // otherwise, fill with layerBaseColor (e.g. white film #ffffff)
+        let fillStyle = layerBaseColor;
+        if (layer.hasCustomBleed && layer.bleedColor1 && layer.bleedColor2) {
+          const cutBounds = getPolygonsBounds(layer.currentCutline);
+          const gradient = ctx.createLinearGradient(
+            cutBounds.left + offset.x + (layer.x || 0),
+            cutBounds.top + offset.y + (layer.y || 0),
+            cutBounds.right + offset.x + (layer.x || 0),
+            cutBounds.bottom + offset.y + (layer.y || 0),
+          );
+          gradient.addColorStop(0, layer.bleedColor1);
+          gradient.addColorStop(1, layer.bleedColor2);
+          fillStyle = gradient;
+        }
+
+        ctx.fillStyle = fillStyle;
         ctx.fill();
 
-        // Stroke with bleed gradient
-        const cutBounds = getPolygonsBounds(layer.currentCutline);
-        const gradient = ctx.createLinearGradient(
-          cutBounds.left + offset.x + (layer.x || 0),
-          cutBounds.top + offset.y + (layer.y || 0),
-          cutBounds.right + offset.x + (layer.x || 0),
-          cutBounds.bottom + offset.y + (layer.y || 0),
-        );
-        gradient.addColorStop(0, bColor1);
-        gradient.addColorStop(1, bColor2);
-
-        ctx.strokeStyle = gradient;
+        ctx.strokeStyle = fillStyle;
         ctx.lineWidth = 20;
         ctx.stroke();
         ctx.restore();
@@ -4854,7 +4978,7 @@ function drawCanvasDecorations(
         if (img) {
           ctx.save();
           // Clip the image to its cutline so any JPEG white background outside the cutline is hidden
-          if (layer.currentCutline && layer.currentCutline.length > 0) {
+          if (!layer.isTransparentBorder && layer.currentCutline && layer.currentCutline.length > 0) {
             ctx.beginPath();
             layer.currentCutline.forEach((poly) => {
               if (!poly || poly.length === 0) return;
@@ -5845,8 +5969,14 @@ function handleResetImage() {
       // Generate cutline based on image transparency & perimeter color sampling
       const samplingData = getSamplingImageData(activeBase.originalImage || canvas, 400);
       const dominantColor = applyPerimeterEdgeColor(samplingData);
+      const hasTransparentBorder = samplingData && imageHasTransparentBorder(samplingData);
+      if (hasTransparentBorder) {
+        activeBase.isTransparentBorder = true;
+        const activeSticker = getActiveSticker();
+        if (activeSticker) activeSticker.isTransparentBorder = true;
+      }
 
-      if (dominantColor || (samplingData && imageHasTransparentBorder(samplingData))) {
+      if (dominantColor || hasTransparentBorder) {
         if (cutShapeSelect) cutShapeSelect.value = "trace";
       } else {
         if (cutShapeSelect) cutShapeSelect.value = "square";
@@ -6932,8 +7062,14 @@ async function handleRemoteImageLoad(imageUrl) {
     const logicalHeight = canvas.height / dpr;
 
     const dominantColor = applyPerimeterEdgeColor(samplingData);
+    const hasTransparentBorder = samplingData && imageHasTransparentBorder(samplingData);
+    if (hasTransparentBorder) {
+      activeBase.isTransparentBorder = true;
+      const activeSticker = getActiveSticker();
+      if (activeSticker) activeSticker.isTransparentBorder = true;
+    }
 
-    if (dominantColor || (samplingData && imageHasTransparentBorder(samplingData))) {
+    if (dominantColor || hasTransparentBorder) {
       if (cutShapeSelect) cutShapeSelect.value = "trace";
       setTimeout(() => {
         handleGenerateCutline(true);
@@ -7027,8 +7163,14 @@ async function loadProductForBuyer(productId) {
       const samplingData = getSamplingImageData(activeBase.originalImage || canvas, 400);
 
       const dominantColor = applyPerimeterEdgeColor(samplingData);
+      const hasTransparentBorder = samplingData && imageHasTransparentBorder(samplingData);
+      if (hasTransparentBorder) {
+        activeBase.isTransparentBorder = true;
+        const activeSticker = getActiveSticker();
+        if (activeSticker) activeSticker.isTransparentBorder = true;
+      }
 
-      if (dominantColor || (samplingData && imageHasTransparentBorder(samplingData))) {
+      if (dominantColor || hasTransparentBorder) {
         if (cutShapeSelect) cutShapeSelect.value = "trace";
       } else {
         if (cutShapeSelect) cutShapeSelect.value = "square";

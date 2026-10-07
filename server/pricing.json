@@ -23,10 +23,27 @@
   "materials": [
     {
       "id": "pp_standard",
-      "name": "Gloss White Air Release",
+      "name": "Gloss White Air Release (White Film)",
       "costMultiplier": 1,
+      "baseColor": "#ffffff",
       "supportedLayers": ["white", "cmyk", "clear"],
       "description": "Gloss white 2mil thick wrap vinyl. Outdoor rated, air release adhesive for easy bubble-free application over flat and curved surfaces alike. 3 Year Outdoor Rated Ink and Vinyl"
+    },
+    {
+      "id": "clear_cling",
+      "name": "Clear Static Cling",
+      "costMultiplier": 1.15,
+      "baseColor": "transparent",
+      "supportedLayers": ["white", "cmyk", "clear"],
+      "description": "Transparent self-clinging film for glass and smooth surfaces."
+    },
+    {
+      "id": "flat_acrylic",
+      "name": "Flat Acrylic",
+      "costMultiplier": 1.4,
+      "baseColor": "transparent",
+      "supportedLayers": ["white", "cmyk", "clear"],
+      "description": "Rigid clear flat acrylic sheet, laser-cut to custom shape."
     }
   ],
   "layers": [

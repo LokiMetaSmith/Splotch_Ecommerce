@@ -10,6 +10,7 @@ import { DEFAULT_SHIPPING_CONFIG } from "../lib/costCalc.js";
 import { downloadAgentArtwork, detectImageBufferType } from "../lib/artwork_downloader.js";
 import { generateProductionCutlineSvg, generateStickerProofSvg } from "../lib/cutline_generator.js";
 import { dispatchOrderWebhook } from "../lib/webhook_dispatcher.js";
+import { generateFriendlyName } from "../utils/friendly-name.js";
 
 function escapeHtml(str) {
   if (!str) return "";
@@ -296,6 +297,7 @@ export default function createAgentPaymentsRouter(db, options = {}) {
     const orderRecord = {
       orderId: orderId,
       order_id: orderId,
+      friendlyName: generateFriendlyName(orderId),
       provenance: "agentic",
       status: "NEW",
       receivedAt: new Date().toISOString(),

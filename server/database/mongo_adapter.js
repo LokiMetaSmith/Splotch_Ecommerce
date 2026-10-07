@@ -125,10 +125,14 @@ export class MongoDbAdapter {
     }
 
     async searchOrders(query, email) {
-        const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const cleanQ = String(query).replace(/^#/, "");
+        const safeQuery = cleanQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const orders = await this.db.collection('orders').find({
             'billingContact.email': email,
-            orderId: { $regex: safeQuery, $options: 'i' }
+            $or: [
+                { orderId: { $regex: safeQuery, $options: 'i' } },
+                { friendlyName: { $regex: safeQuery, $options: 'i' } }
+            ]
         }).toArray();
         return orders.map(o => { delete o._id; return o; });
     }

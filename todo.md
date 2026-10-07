@@ -224,12 +224,12 @@ This section tracks operational enhancements requested by the print shop manager
 
 ## High-Priority: Workstation Usability & Order Handling
 
-- [ ] **1. High-Legibility Body Typography for Print Shop (`printshop.html`):**
+- [x] **1. High-Legibility Body Typography for Print Shop (`printshop.html`):**
   - **Issue:** The stylized "Baumans" font makes dense order data, addresses, and specs difficult to read quickly on shop monitors.
   - **Specification:** Change the body font in `printshop.html` to a clean, modern sans-serif font stack (e.g., `Inter`, `Roboto`, `system-ui`). Keep `Modak` exclusively for primary brand headers. Add Google Font stylesheet link for `Inter` (`wght@400;500;600;700`).
   - **Target Files:** `printshop.html`, `src/printshop.js`.
 
-- [ ] **2. "Touch-up vs. Just Print" Customer Intent Flag:**
+- [x] **2. "Touch-up vs. Just Print" Customer Intent Flag:**
   - **Issue:** Print manager needs to know immediately whether a customer uploaded production-ready art or expects pre-press touch-ups/proofs.
   - **Specification:**
     - *Customer Checkout (`index.html`, `src/index.js`):* Add an explicit selection during the artwork/checkout step: `"Print As Is (Fastest turnaround)"` vs. `"Needs Touch-up / Pre-Press Review"`.
@@ -240,7 +240,7 @@ This section tracks operational enhancements requested by the print shop manager
     - Allow the print manager to click the badge to toggle or approve touch-up status.
   - **Target Files:** `index.html`, `src/index.js`, `server/server.js`, `src/printshop.js`, `printshop.html`.
 
-- [ ] **3. 12-Hour Operator Session Duration & Sliding Activity Refresh:**
+- [x] **3. 12-Hour Operator Session Duration & Sliding Activity Refresh:**
   - **Issue:** Operators are logged out mid-shift (after 1h), disrupting plotter and press workflows.
   - **Specification:**
     - Increase JWT token duration for print shop operator sessions to **12 hours** to cover full operational shifts.
@@ -248,14 +248,14 @@ This section tracks operational enhancements requested by the print shop manager
     - Provide an optional visual indicator in the header showing session status with an "Extend Session" action.
   - **Target Files:** `server/server.js`, `src/printshop.js`.
 
-- [ ] **4. "Sloptipus" Mascot Graphic:**
+- [x] **4. "Sloptipus" Mascot Graphic:**
   - **Issue:** Empty queue states and headers lack brand personality.
   - **Specification:**
     - Add an official "Sloptipus" mascot SVG illustration to the empty orders state in `printshop.html` (e.g., *"All caught up! Sloptipus has cleared the print queue."*).
     - Include a subtle small Sloptipus badge in the print shop header.
   - **Target Files:** `printshop.html`, `src/printshop.js`.
 
-- [ ] **5. Phonetic / Friendly Order Names (Adjective-Noun):**
+- [x] **5. Phonetic / Friendly Order Names (Adjective-Noun):**
   - **Issue:** Calling out raw UUIDv4 strings (e.g. `550e8400...`) across the noisy shop floor is impossible.
   - **Specification:**
     - Generate a memorable, pronounceable friendly name in `adjective-noun` format (e.g., `purple-fox`, `spicy-cactus`, `velvet-otter`) assigned to each order on creation.
@@ -264,7 +264,7 @@ This section tracks operational enhancements requested by the print shop manager
     - Update the print shop search bar to support filtering by friendly name.
   - **Target Files:** `server/server.js`, `server/utils/...`, `src/printshop.js`, `printshop.html`.
 
-- [ ] **6. "Copy Name & Address" Button Clarification:**
+- [x] **6. "Copy Name & Address" Button Clarification:**
   - **Issue:** The button currently says "Copy Address", causing confusion about whether the recipient's name is included.
   - **Specification:**
     - Update button text and tooltip to explicitly state: `"Copy Name & Address"`.
@@ -280,7 +280,7 @@ This section tracks operational enhancements requested by the print shop manager
     - Show an instant visual confirmation toast: `"Name & Address copied to clipboard!"`.
   - **Target Files:** `src/printshop.js`.
 
-- [ ] **7. Manual Shipping & Tracking Entry on Order Cards:**
+- [x] **7. Manual Shipping & Tracking Entry on Order Cards:**
   - **Issue:** Orders shipped outside Pirate Ship / WooCommerce automated sync need manual tracking entry directly from the order card.
   - **Specification:**
     - When an operator changes an order status to `"SHIPPED"` (or clicks "Add Tracking"), provide inline input fields:
@@ -290,7 +290,7 @@ This section tracks operational enhancements requested by the print shop manager
     - Automatically updates the order record via `POST /api/orders/:orderId/tracking`, triggers the customer tracking email, and dispatches any registered agent webhooks.
   - **Target Files:** `src/printshop.js`, `printshop.html`.
 
-- [ ] **8. Cross-Workstation Layout Consistency (Fix Boxes vs. Continuous Flow):**
+- [x] **8. Cross-Workstation Layout Consistency (Fix Boxes vs. Continuous Flow):**
   - **Issue:** On certain monitor resolutions/DPIs, the order list layout breaks from structured cards into an unbroken, overlapping flow.
   - **Specification:**
     - Enforce a strict CSS Grid / Flexbox card container with explicit borders, background colors, and margin gaps (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3` with fallback).
@@ -301,7 +301,7 @@ This section tracks operational enhancements requested by the print shop manager
 
 ## Medium-Priority: Layout Density & Asset Management
 
-- [ ] **9. Dedicated "Download Artwork" Button Alongside Cutline Download:**
+- [x] **9. Dedicated "Download Artwork" Button Alongside Cutline Download:**
   - **Issue:** Operators currently only have a cutline download button, requiring extra steps to extract raw artwork for manual touch-ups.
   - **Specification:**
     - Place two primary download buttons on every order card:
@@ -309,7 +309,7 @@ This section tracks operational enhancements requested by the print shop manager
       2. `[✂ Download Cutline]`: Downloads the multi-layer production SVG (`[orderId]-cutline.svg`).
   - **Target Files:** `src/printshop.js`, `printshop.html`.
 
-- [ ] **10. Consolidated Dimensions Input Group (Width × Height):**
+- [x] **10. Consolidated Dimensions Input Group (Width × Height):**
   - **Issue:** Media width and height inputs take up duplicate vertical rows in the nesting settings.
   - **Specification:**
     - Combine width and height into a single compact horizontal unit under label `"Dimensions (W × H)"`:
@@ -317,7 +317,7 @@ This section tracks operational enhancements requested by the print shop manager
       - Support optional single-string parsing (e.g. typing `12x12` or `24x36`).
   - **Target Files:** `printshop.html`, `src/printshop.js`.
 
-- [ ] **11. Consolidated Billing Address (Hide Duplicate Information):**
+- [x] **11. Consolidated Billing Address (Hide Duplicate Information):**
   - **Issue:** Redundant billing address blocks clutter the card when identical to the shipping destination.
   - **Specification:**
     - Compare shipping and billing address objects.
@@ -325,28 +325,28 @@ This section tracks operational enhancements requested by the print shop manager
     - Only render the full secondary billing address block if the details differ.
   - **Target Files:** `src/printshop.js`.
 
-- [ ] **12. Default 300 DPI & Collapsible "Secret Menu" (Advanced Settings):**
+- [x] **12. Default 300 DPI & Collapsible "Secret Menu" (Advanced Settings):**
   - **Issue:** Manual DPI adjustment inputs clutter the main view for everyday jobs.
   - **Specification:**
     - Enforce 300 DPI by default for all nesting, rasterization, and exports.
     - Move manual DPI overrides, threshold adjustments, and experimental settings into a collapsible `"Advanced Settings"` accordion or modal gear menu ("Secret Menu"), keeping the default UI clean.
   - **Target Files:** `printshop.html`, `src/printshop.js`.
 
-- [ ] **13. Order Notes & Internal Shop Memos:**
+- [x] **13. Order Notes & Internal Shop Memos:**
   - **Issue:** Customer notes are easy to miss, and operators have no place to log internal shop memos (reprint reasons, customer calls).
   - **Specification:**
     - Display customer order notes in a prominent callout block immediately below customer details.
     - Add an internal `"Shop Notes"` textarea on the card allowing operators to add timestamped internal notes stored on `order.internalNotes` (never exposed to customer tracking pages).
   - **Target Files:** `server/server.js`, `src/printshop.js`, `printshop.html`.
 
-- [ ] **14. Compact / Feature-Dense View (Column & Padding Optimization):**
+- [x] **14. Compact / Feature-Dense View (Column & Padding Optimization):**
   - **Issue:** Excessive whitespace forces constant scrolling on 1080p monitors.
   - **Specification:**
     - Tighten padding, line-heights, and spacing across the order card grid.
     - Add a `Dense / Standard` display toggle to let operators fit 2-3x more orders per screen.
   - **Target Files:** `printshop.html`, `src/printshop.js`.
 
-- [ ] **15. Direct Single-Order Export (PDF & Production SVG):**
+- [x] **15. Direct Single-Order Export (PDF & Production SVG):**
   - **Issue:** Exporting print files currently requires adding items to a batch and running sheet nesting.
   - **Specification:**
     - Add an `"Export Single Order"` button to each order card.

@@ -13,6 +13,7 @@ import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import "svg2pdf.js";
 import { Html5Qrcode } from "html5-qrcode";
+import { generateFriendlyName } from "../server/utils/friendly-name.js";
 
 // --- Global Variables ---
 const serverUrl = ""; // Use relative paths for API calls
@@ -21,8 +22,10 @@ let csrfToken;
 let allOrders = []; // To store a complete list of orders for filtering
 let JWKS; // To hold the remote key set verifier
 let currentViewMode = 'card';
+let isDenseMode = false;
 try {
   currentViewMode = localStorage.getItem('splotchViewMode') || 'card';
+  isDenseMode = localStorage.getItem('splotchDenseMode') === 'true';
 } catch {
   // Storage restricted
 }
@@ -349,12 +352,72 @@ function setLoggedInState(token, username) {
 
   hideLoginModal();
   loadPrintshops().then(() => fetchAndDisplayOrders());
+  initSessionKeepAlive();
+}
+
+let lastRefreshTime = Date.now();
+let refreshTimeoutId = null;
+
+async function refreshSession() {
+  if (!authToken) return;
+  try {
+    const res = await fetch(`${serverUrl}/api/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+        "X-CSRF-Token": csrfToken,
+      },
+      credentials: "include",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.token) {
+        authToken = data.token;
+        localStorage.setItem("authToken", data.token);
+        lastRefreshTime = Date.now();
+        console.log("[AUTH] Session extended successfully (12-hour operator window)");
+      }
+    }
+  } catch (err) {
+    console.warn("[AUTH] Silent session refresh failed:", err.message);
+  }
+}
+
+function handleUserActivity() {
+  if (!authToken) return;
+  // Debounce activity refresh: refresh at most once every 30 minutes of active use
+  const now = Date.now();
+  if (now - lastRefreshTime > 30 * 60 * 1000) {
+    refreshSession();
+  }
+}
+
+function initSessionKeepAlive() {
+  window.removeEventListener("mousemove", handleUserActivity);
+  window.removeEventListener("keydown", handleUserActivity);
+  window.removeEventListener("click", handleUserActivity);
+  window.addEventListener("mousemove", handleUserActivity, { passive: true });
+  window.addEventListener("keydown", handleUserActivity, { passive: true });
+  window.addEventListener("click", handleUserActivity, { passive: true });
+
+  if (refreshTimeoutId) clearInterval(refreshTimeoutId);
+  // Periodic check every hour to refresh token if active
+  refreshTimeoutId = setInterval(() => {
+    if (authToken) {
+      refreshSession();
+    }
+  }, 60 * 60 * 1000);
 }
 
 /**
  * Sets the application to a logged-out state.
  */
 function logout() {
+  if (refreshTimeoutId) clearInterval(refreshTimeoutId);
+  window.removeEventListener("mousemove", handleUserActivity);
+  window.removeEventListener("keydown", handleUserActivity);
+  window.removeEventListener("click", handleUserActivity);
   authToken = null;
   localStorage.removeItem("authToken");
 
@@ -439,10 +502,13 @@ async function handleWebAuthnLogin(e) {
 }
 
 async function handleAddTracking(orderId, btn) {
-  const trackingNumber = document.getElementById(
-    `tracking-number-${orderId}`,
-  ).value;
-  const courier = document.getElementById(`courier-${orderId}`).value;
+  const trackingInput = document.getElementById(`tracking-number-${orderId}`) ||
+    document.querySelector(`.tracking-number[data-order-id="${orderId}"]`);
+  const courierSelect = document.getElementById(`courier-${orderId}`) ||
+    document.querySelector(`.tracking-courier[data-order-id="${orderId}"]`);
+
+  const trackingNumber = (trackingInput?.value || "").trim();
+  const courier = courierSelect?.value || "USPS";
 
   if (!trackingNumber) {
     showErrorToast("Please enter a tracking number.");
@@ -455,9 +521,227 @@ async function handleAddTracking(orderId, btn) {
       method: "POST",
       body: JSON.stringify({ trackingNumber, courier }),
     });
-    showSuccessToast("Tracking information added successfully.");
+
+    const order = allOrders.find((o) => o.orderId === orderId);
+    if (order) {
+      order.trackingNumber = trackingNumber;
+      order.courier = courier;
+      if (order.status !== "SHIPPED" && order.status !== "DELIVERED" && order.status !== "COMPLETED") {
+        order.status = "SHIPPED";
+      }
+    }
+
+    showSuccessToast("Tracking information saved & customer notified!");
   } catch (error) {
     showErrorToast(`Failed to add tracking info: ${error.message}`);
+    console.error(error);
+  } finally {
+    setButtonLoading(btn, false);
+  }
+}
+
+async function handleAddShopNote(orderId, btn) {
+  const inputEl = document.querySelector(`.shop-note-input[data-order-id="${orderId}"]`);
+  const note = (inputEl?.value || "").trim();
+  if (!note) {
+    showErrorToast("Please enter note text.");
+    return;
+  }
+
+  setButtonLoading(btn, true, "Saving...");
+  try {
+    const res = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/internal-notes`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    });
+
+    const order = allOrders.find((o) => o.orderId === orderId);
+    if (order) {
+      if (!Array.isArray(order.internalNotes)) order.internalNotes = [];
+      if (res && res.note) {
+        order.internalNotes.push(res.note);
+      }
+    }
+
+    const listEl = document.getElementById(`internal-notes-${orderId}`);
+    if (listEl) {
+      const emptyMsg = listEl.querySelector("p");
+      if (emptyMsg) emptyMsg.remove();
+      const noteDiv = document.createElement("div");
+      noteDiv.className = "p-1.5 bg-white rounded border border-slate-200 text-slate-700 flex items-start justify-between gap-2";
+      noteDiv.innerHTML = `
+        <span class="flex-1">${escapeHtml(note)}</span>
+        <span class="text-[10px] text-slate-400 whitespace-nowrap">You • ${new Date().toLocaleDateString()}</span>
+      `;
+      listEl.appendChild(noteDiv);
+    }
+    if (inputEl) inputEl.value = "";
+    showSuccessToast("Internal shop note saved.");
+  } catch (error) {
+    showErrorToast(`Failed to save note: ${error.message}`);
+  } finally {
+    setButtonLoading(btn, false);
+  }
+}
+
+/**
+ * Toggles the Touch-up / Print As-Is status for an order
+ */
+async function handleToggleTouchUp(orderId, badgeEl) {
+  const order = allOrders.find((o) => o.orderId === orderId);
+  if (!order) return;
+
+  const currentPref = order.touchUpPreference || order.orderDetails?.touchUpPreference || "print_as_is";
+  const newPref = currentPref === "needs_touchup" ? "print_as_is" : "needs_touchup";
+
+  try {
+    const res = await fetchWithAuth(`${serverUrl}/api/orders/${orderId}/touch-up`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ touchUpPreference: newPref }),
+    });
+
+    if (res && res.success) {
+      order.touchUpPreference = newPref;
+      if (order.orderDetails) {
+        order.orderDetails.touchUpPreference = newPref;
+      }
+      delete order._cachedHtml;
+
+      const activeFilter =
+        document.querySelector("#filter-container .filter-btn.active")?.dataset
+          .status || "ALL";
+      filterAndDisplayOrders(activeFilter);
+      showSuccessToast(
+        newPref === "needs_touchup"
+          ? "Flagged for Pre-Press Touch-up."
+          : "Flagged as Print As-Is (Ready)."
+      );
+    }
+  } catch (err) {
+    showErrorToast(`Failed to update review status: ${err.message}`);
+  }
+}
+
+/**
+ * Exports single order production package:
+ * 300 DPI Print PDF with registration marks + Cutline SVG + Spec Summary JSON
+ */
+async function handleExportSingleOrder(orderId, btn) {
+  const order = allOrders.find((o) => o.orderId === orderId);
+  if (!order) return;
+
+  const specs = getOrderSpecs(order);
+  const friendlyName = order.friendlyName || generateFriendlyName(orderId);
+  const baseName = `order-${friendlyName}-${orderId.substring(0, 8)}`;
+  const cutFilePath = order.orderDetails?.cutLinePath || order.cutLinePath || "";
+  const designImagePath = order.designImagePath || order.designUrl || (Array.isArray(order.items) && order.items[0]?.artwork_url) || "";
+
+  setButtonLoading(btn, true, "Exporting...");
+  try {
+    const zip = new JSZip();
+
+    // 1. Export production spec summary JSON
+    const specSummary = {
+      orderId: order.orderId,
+      friendlyName: friendlyName,
+      receivedAt: order.receivedAt,
+      touchUpPreference: order.touchUpPreference || order.orderDetails?.touchUpPreference || "print_as_is",
+      customer: {
+        billingName: `${order.billingContact?.givenName || ''} ${order.billingContact?.familyName || ''}`.trim(),
+        billingEmail: order.billingContact?.email || order.customerEmail || '',
+        shippingName: `${order.shippingContact?.givenName || ''} ${order.shippingContact?.familyName || ''}`.trim(),
+        shippingAddress: order.shippingAddress || null,
+      },
+      specifications: {
+        widthInches: specs.widthInches,
+        heightInches: specs.heightInches,
+        size: specs.formattedSize,
+        areaSqIn: specs.areaSqIn,
+        quantity: specs.quantity || order.orderDetails?.quantity || 1,
+        resolutionDpi: specs.ppi || 300,
+        resolutionName: specs.resolutionName,
+        material: specs.materialName,
+        cutType: specs.cutTypeName,
+      },
+      internalNotes: order.internalNotes || [],
+      customerNotes: order.orderDetails?.notes || order.customerNotes || null,
+    };
+    zip.file(`${baseName}-specs.json`, JSON.stringify(specSummary, null, 2));
+
+    // 2. Fetch or generate SVG cutline if available
+    let cutSvgContent = null;
+    if (cutFilePath) {
+      try {
+        const fullCutUrl = cutFilePath.startsWith("http") ? cutFilePath : `${serverUrl}${cutFilePath}`;
+        const cutRes = await fetch(fullCutUrl);
+        if (cutRes.ok) {
+          cutSvgContent = await cutRes.text();
+          zip.file(`${baseName}-cutline.svg`, cutSvgContent);
+        }
+      } catch (e) {
+        console.warn("[PRINTSHOP] Could not fetch cut SVG for single export:", e);
+      }
+    }
+
+    // 3. Generate 300 DPI Single-Order Print-Ready PDF
+    let printPdfGenerated = false;
+    if (designImagePath) {
+      try {
+        const fullImgUrl = designImagePath.startsWith("http") || designImagePath.startsWith("data:") ? designImagePath : `${serverUrl}${designImagePath}`;
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        await new Promise((res, rej) => {
+          img.onload = res;
+          img.onerror = () => rej(new Error("Failed to load design image"));
+          img.src = fullImgUrl;
+        });
+
+        // Determine canvas dimensions at 300 DPI
+        const ppi = specs.ppi || 300;
+        const widthInches = specs.widthInches || (img.naturalWidth / ppi) || 3;
+        const heightInches = specs.heightInches || (img.naturalHeight / ppi) || 3;
+        const ptWidth = widthInches * 72;
+        const ptHeight = heightInches * 72;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(widthInches * 300);
+        canvas.height = Math.round(heightInches * 300);
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const imgDataUrl = canvas.toDataURL("image/jpeg", 0.95);
+        const orientation = ptWidth > ptHeight ? "landscape" : "portrait";
+        const pdf = new jsPDF({
+          unit: "pt",
+          format: [ptWidth, ptHeight],
+          orientation,
+        });
+        pdf.addImage(imgDataUrl, "JPEG", 0, 0, ptWidth, ptHeight);
+        const pdfBlob = pdf.output("blob");
+        zip.file(`${baseName}-300dpi-print.pdf`, pdfBlob);
+        printPdfGenerated = true;
+      } catch (err) {
+        console.warn("[PRINTSHOP] Single order PDF generation error:", err);
+      }
+    }
+
+    // 4. Download zip or single file
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    const zipUrl = URL.createObjectURL(zipBlob);
+    a.href = zipUrl;
+    a.download = `${baseName}-export.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(zipUrl);
+
+    showSuccessToast(`Exported production package for #${friendlyName}!`);
+  } catch (error) {
+    showErrorToast(`Single Order Export Failed: ${error.message}`);
     console.error(error);
   } finally {
     setButtonLoading(btn, false);
@@ -732,8 +1016,13 @@ function filterAndDisplayOrders(status) {
     ui.ordersList.innerHTML = "";
     ui.ordersList.appendChild(ui.noOrdersMessage);
 
-    if (noOrdersText)
-      noOrdersText.textContent = `No orders found with status: ${status}.`;
+    if (noOrdersText) {
+      if (status === "ACTIVE" || status === "NEW") {
+        noOrdersText.textContent = "All caught up! Sloptipus has cleared the print queue.";
+      } else {
+        noOrdersText.textContent = `No orders found with status: ${status}.`;
+      }
+    }
     ui.noOrdersMessage.style.display = "block";
     renderPagination(0);
   } else {
@@ -783,6 +1072,16 @@ function filterAndDisplayOrders(status) {
     ui.ordersList.innerHTML = html;
     ui.ordersList.appendChild(ui.noOrdersMessage);
     
+    if (isDenseMode) {
+      ui.ordersList.classList.add("dense-mode");
+    } else {
+      ui.ordersList.classList.remove("dense-mode");
+    }
+    const densityLabel = document.getElementById("density-toggle-label");
+    if (densityLabel) {
+      densityLabel.textContent = isDenseMode ? "Standard" : "Dense";
+    }
+
     renderPagination(sortedOrders.length);
 
     // Render QR codes for all displayed orders
@@ -919,9 +1218,14 @@ export function getOrderSpecs(order) {
   // Material
   const rawMat = details.material || order.material || "Standard";
   let materialName = rawMat;
+  let baseColor = details.baseColor;
   if (currentPricingConfig && Array.isArray(currentPricingConfig.materials)) {
     const foundMat = currentPricingConfig.materials.find((m) => m.id === rawMat);
     if (foundMat && foundMat.name) materialName = foundMat.name;
+    if (!baseColor && foundMat && foundMat.baseColor) baseColor = foundMat.baseColor;
+  }
+  if (!baseColor) {
+    baseColor = (rawMat.includes("clear") || rawMat.includes("acrylic")) ? "transparent" : "#ffffff";
   }
   if (materialName === "pp_standard") materialName = "Standard White Vinyl";
   if (materialName === "vinyl_gloss") materialName = "Glossy Vinyl";
@@ -945,6 +1249,7 @@ export function getOrderSpecs(order) {
     resolutionName,
     ppi,
     materialName,
+    baseColor,
     cutTypeName,
     customLayers,
     numLayers,
@@ -954,6 +1259,7 @@ export function getOrderSpecs(order) {
 // --- Start Table Row View ---
 export function displayOrderRow(order) {
   const orderId = order.orderId;
+  const friendlyName = escapeHtml(order.friendlyName || generateFriendlyName(orderId));
   const isExpanded = expandedOrderIds.has(orderId);
   const specs = getOrderSpecs(order);
   const receivedAt = new Date(order.receivedAt).toLocaleString();
@@ -1044,6 +1350,11 @@ export function displayOrderRow(order) {
     retentionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200" title="Canceled orders are automatically archived after 30 days. Order metadata is permanently preserved.">Archives in ${remainingDays}d</span>`;
   }
 
+  const touchUpPref = order.touchUpPreference || order.orderDetails?.touchUpPreference || "print_as_is";
+  const touchUpBadge = touchUpPref === "needs_touchup"
+    ? `<button type="button" class="touchup-toggle-btn inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer" data-order-id="${orderId}" title="Customer requested pre-press review / touch-up. Click to toggle."><span>⚠️</span> Needs Touch-up</button>`
+    : `<button type="button" class="touchup-toggle-btn inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 transition-colors cursor-pointer" data-order-id="${orderId}" title="Customer requested fast print without proofs. Click to toggle."><span>✓</span> Print As-Is</button>`;
+
   const dropdownHtml = `
     <select class="action-dropdown border rounded-md p-1 text-sm bg-white ${statusClass}" data-order-id="${orderId}">
         ${statuses.map((s) => `<option value="${s}" ${order.status === s ? "selected" : ""}>${formatStatusLabel(s)}</option>`).join("")}
@@ -1125,12 +1436,16 @@ export function displayOrderRow(order) {
         </div>
       </td>
       <td class="px-4 py-3">
-        <div class="font-bold text-gray-900 flex items-center gap-1">
-          <span>${orderId.substring(0, 8)}...</span>
+        <div class="font-bold text-gray-900 flex flex-col gap-0.5">
+          <span class="inline-flex items-center gap-1.5">
+            <span class="text-xs font-mono font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded shadow-xs" title="Phonetic Order Name">#${friendlyName}</span>
+          </span>
+          <span class="text-[11px] text-gray-500 font-mono">${orderId.substring(0, 8)}...</span>
         </div>
-        <div class="text-xs text-gray-500">${receivedAt}</div>
-        <div class="flex items-center gap-1.5 mt-1">
+        <div class="text-xs text-gray-500 mt-0.5">${receivedAt}</div>
+        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
           ${deliveryBadge}
+          ${touchUpBadge}
           ${alertHtml}
         </div>
         <div class="mt-1 font-semibold text-green-600">$${price}</div>
@@ -1139,22 +1454,35 @@ export function displayOrderRow(order) {
         <div class="font-medium text-gray-900">${billingName}</div>
         <div class="text-xs text-gray-500"><a href="mailto:${billingEmail}" class="hover:underline">${billingEmail}</a></div>
         <div class="mt-1">
-          <button type="button" class="copy-address-btn text-[11px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy formatted shipping address">
+          <button type="button" class="copy-address-btn text-[11px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy full name and formatted shipping address">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-            Copy Address
+            Copy Name &amp; Address
           </button>
         </div>
       </td>
       <td class="px-4 py-3">
         <div class="flex items-center gap-2">
-            ${designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container">
+            ${designImagePath ? `<a href="${designImagePath}" target="_blank" class="block w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0 sticker-peel-container" title="View Full Artwork">
                 <img src="${designImagePath}" alt="Design" class="sticker-design w-full h-full object-contain" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${specs.ppi}" loading="lazy" decoding="async">
             </a>` : `<div class="block w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-[10px] text-gray-500 font-semibold text-center leading-tight p-1">${order.artworkPruned ? 'Pruned' : 'N/A'}</div>`}
             <div>
                 <div class="text-xs font-semibold">Qty: ${quantity}</div>
                 <div class="text-[11px] text-gray-500 mt-0.5">${specs.formattedSize}</div>
-                ${cutFilePath ? `<a href="${serverPrefix}${cutFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block mt-1">Download SVG</a>` : ""}
-                ${pltFilePath ? `<a href="${pltFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block ml-1 mt-1">Download PLT</a>` : ""}
+                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                  ${designImagePath ? `<a href="${designImagePath}" target="_blank" download="${orderId}-artwork" class="text-[10px] font-semibold text-teal-600 hover:text-teal-800 hover:underline inline-flex items-center gap-0.5" title="Download original artwork file">
+                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Artwork
+                  </a>` : ""}
+                  ${cutFilePath ? `<a href="${serverPrefix}${cutFilePath}" target="_blank" download="${orderId}-cutline.svg" class="text-[10px] font-semibold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-0.5" title="Download cutline SVG">
+                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Cutline
+                  </a>` : ""}
+                  ${pltFilePath ? `<a href="${pltFilePath}" target="_blank" download class="text-[10px] text-blue-600 hover:underline inline-block">PLT</a>` : ""}
+                  <button type="button" class="export-single-order-btn text-[10px] font-semibold text-purple-600 hover:text-purple-800 hover:underline inline-flex items-center gap-0.5 cursor-pointer" data-order-id="${orderId}" title="Export 300 DPI PDF + cutline SVG + specs package">
+                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Export
+                  </button>
+                </div>
             </div>
         </div>
       </td>
@@ -1194,11 +1522,13 @@ export function displayOrderRow(order) {
         <div class="p-4 sm:p-6 border-l-4 border-blue-500 bg-gradient-to-r from-blue-50/40 via-white to-white space-y-4 shadow-inner">
           <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-gray-200">
             <div class="flex items-center gap-3">
-              <h4 class="text-base font-bold text-gray-900">
-                Order <span class="font-mono text-splotch-red font-semibold">${orderId}</span>
+              <h4 class="text-base font-bold text-gray-900 flex items-center gap-2">
+                <span>Order <span class="text-xs font-mono font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded shadow-xs">#${friendlyName}</span></span>
+                <span class="font-mono text-xs text-gray-500 font-normal">(${orderId})</span>
               </h4>
               <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">${order.status === 'HOLD_FOR_PICKUP' ? 'Hold for Pickup' : order.status}</span>
               ${deliveryBadge}
+              ${touchUpBadge}
             </div>
             <div class="flex items-center gap-2">
               <span class="text-xs text-gray-500">Ordered: ${receivedAt}</span>
@@ -1234,6 +1564,7 @@ export function displayOrderRow(order) {
               <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
                 <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Material</span>
                 <span class="text-xs font-semibold text-gray-800 block truncate" title="${escapeHtml(specs.materialName)}">${escapeHtml(specs.materialName)}</span>
+                <span class="text-[10px] ${specs.baseColor === 'transparent' ? 'text-cyan-700 font-semibold' : 'text-gray-500'} block">${specs.baseColor === 'transparent' ? 'Clear / Transparent Base' : 'White Base Film'}</span>
               </div>
               <div class="bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
                 <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block">Cut Type</span>
@@ -1260,7 +1591,10 @@ export function displayOrderRow(order) {
           <!-- Customer and Delivery Info -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-white p-3.5 rounded-lg border border-gray-200">
             <div>
-              <h6 class="font-bold text-gray-800 mb-1">Billing Details</h6>
+              <div class="flex items-center justify-between mb-1">
+                <h6 class="font-bold text-gray-800">Billing Details</h6>
+                ${!hasDistinctBilling ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">Same as Shipping</span>' : ''}
+              </div>
               <p><span class="text-gray-500">Name:</span> <strong>${billingName}</strong></p>
               <p><span class="text-gray-500">Email:</span> <a href="mailto:${billingEmail}" class="text-blue-600 hover:underline">${billingEmail}</a></p>
               ${hasDistinctBilling ? `<div class="mt-1 p-1.5 bg-amber-50 rounded border border-amber-200 text-gray-700"><span class="font-semibold text-amber-900">Billing Address:</span> ${billingAddrStr}</div>` : ''}
@@ -1269,9 +1603,9 @@ export function displayOrderRow(order) {
               <div class="flex items-center justify-between mb-1">
                 <h6 class="font-bold text-gray-800">${isLocalPickup ? 'Pickup Details' : 'Shipping Details'}</h6>
                 ${!isLocalPickup && shippingAddrStr ? `
-                  <button type="button" class="copy-address-btn text-[11px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy formatted shipping address">
+                  <button type="button" class="copy-address-btn text-[11px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy full name and formatted shipping address">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                    Copy Address
+                    Copy Name &amp; Address
                   </button>
                 ` : ''}
               </div>
@@ -1354,6 +1688,7 @@ export function displayOrder(order) {
   const ppi = specs.ppi || getResolutionPpi(order.orderDetails?.resolution || order.resolution);
   const status = escapeHtml(order.status);
   const orderId = escapeHtml(order.orderId);
+  const friendlyName = escapeHtml(order.friendlyName || generateFriendlyName(order.orderId));
   // Truncate BEFORE escaping would be safer for logic, but since orderId is UUID (safe chars),
   // and escapeHtml changes '&' to '&amp;', we should truncate the raw ID if we want exactly 8 chars.
   const orderIdShort = escapeHtml(order.orderId.substring(0, 8));
@@ -1408,9 +1743,17 @@ export function displayOrder(order) {
     `;
 
   // Tracking section
-  const trackingDisplay = order.status === "SHIPPED" ? "block" : "none";
-  const courierOptions = ["usps", "ups", "fedex"]
-    .map((c) => `<option value="${c}">${c.toUpperCase()}</option>`)
+  const trackingDisplay = (order.status === "SHIPPED" || order.status === "DELIVERED" || order.status === "COMPLETED") ? "block" : "none";
+  const courierList = [
+    { value: "usps", label: "USPS" },
+    { value: "ups", label: "UPS" },
+    { value: "fedex", label: "FedEx" },
+    { value: "dhl", label: "DHL" },
+    { value: "local", label: "Courier / Local Delivery" }
+  ];
+  const currentCourier = (order.courier || "usps").toLowerCase();
+  const courierOptions = courierList
+    .map((c) => `<option value="${c.value}" ${currentCourier === c.value ? "selected" : ""}>${c.label}</option>`)
     .join("");
 
   const isLocalPickup = order.deliveryMethod === 'pickup' || order.orderDetails?.deliveryMethod === 'pickup';
@@ -1430,6 +1773,11 @@ export function displayOrder(order) {
     const remainingDays = Math.max(0, 30 - elapsedDays);
     retentionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 shadow-sm" title="Canceled orders are automatically archived after 30 days. Order metadata is permanently preserved.">Archives in ${remainingDays}d</span>`;
   }
+
+  const touchUpPref = order.touchUpPreference || order.orderDetails?.touchUpPreference || "print_as_is";
+  const touchUpBadge = touchUpPref === "needs_touchup"
+    ? `<button type="button" class="touchup-toggle-btn inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer shadow-xs" data-order-id="${orderId}" title="Customer requested pre-press review / touch-up. Click to toggle."><span>⚠️</span> Needs Touch-up</button>`
+    : `<button type="button" class="touchup-toggle-btn inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 transition-colors cursor-pointer shadow-xs" data-order-id="${orderId}" title="Customer requested fast print without proofs. Click to toggle."><span>✓</span> Print As-Is</button>`;
 
   const isShippable = !isLocalPickup && status !== "CANCELED" && status !== "COMPLETED" && status !== "DELIVERED" && status !== "ARCHIVED" && !order.isArchived;
   const defaultWeight = order.packageWeightOz ?? (order.orderDetails?.quantity ? Math.max(1, Math.round(order.orderDetails.quantity * 0.05 * 10) / 10) : 1);
@@ -1498,10 +1846,14 @@ export function displayOrder(order) {
             <div class="flex items-start">
                 <input type="checkbox" class="order-select-checkbox mt-1 mr-3 w-5 h-5 cursor-pointer rounded text-blue-600 focus:ring-blue-500 shadow-sm" data-order-id="${orderId}">
                 <div>
-                    <h3 class="text-xl text-splotch-red">Order ID: <span class="font-mono text-sm">${orderIdShort}...</span></h3>
+                    <h3 class="text-xl text-splotch-red flex items-center gap-2">
+                        <span>Order <span class="text-sm font-mono font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded shadow-xs">#${friendlyName}</span></span>
+                        <span class="font-mono text-xs text-gray-400 font-normal">(${orderIdShort}...)</span>
+                    </h3>
                     <p class="text-sm text-gray-600">Received: ${escapeHtml(receivedDate)}</p>
-                    <div class="flex items-center gap-2 mt-1">
+                    <div class="flex items-center gap-2 mt-1 flex-wrap">
                         ${deliveryBadge}
+                        ${touchUpBadge}
                         ${alertHtml}
                         ${retentionBadge}
                     </div>
@@ -1519,7 +1871,11 @@ export function displayOrder(order) {
 
         <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 order-details">
             <div>
-                <dt>Billing Name:</dt><dd>${billingName}</dd>
+                <dt class="flex items-center justify-between">
+                    <span>Billing Name:</span>
+                    ${!hasDistinctBilling ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">Billing: Same as Shipping</span>' : ''}
+                </dt>
+                <dd>${billingName}</dd>
                 <dt>Billing Email:</dt><dd>${billingEmail}</dd>
                 ${hasDistinctBilling ? `<dt class="mt-1 font-semibold text-amber-800">Billing Address:</dt><dd class="text-xs text-gray-700 bg-amber-50 p-1.5 rounded border border-amber-200 mt-0.5">${billingAddrStr}</dd>` : ""}
             </div>
@@ -1530,9 +1886,9 @@ export function displayOrder(order) {
                   <dt class="mt-1 font-semibold text-blue-800 flex items-center justify-between">
                     <span>${isLocalPickup ? 'Pickup Location:' : 'Shipping Address:'}</span>
                     ${!isLocalPickup ? `
-                      <button type="button" class="copy-address-btn text-xs text-blue-600 hover:text-blue-800 font-normal hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy formatted shipping address">
+                      <button type="button" class="copy-address-btn text-xs text-blue-600 hover:text-blue-800 font-normal hover:underline inline-flex items-center gap-1 cursor-pointer" data-order-id="${orderId}" title="Copy full name and formatted shipping address">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                        Copy Address
+                        Copy Name &amp; Address
                       </button>` : ''}
                   </dt>
                   <dd class="text-xs text-gray-700 bg-blue-50/50 p-1.5 rounded border border-blue-100 mt-0.5">${shippingAddrStr}</dd>
@@ -1555,12 +1911,56 @@ export function displayOrder(order) {
             </div>
         </div>
 
+        ${(order.orderDetails?.notes || order.customerNotes || order.notes) ? `
+          <div class="mt-3 p-2.5 bg-amber-50/70 border-l-4 border-amber-400 rounded-r text-xs text-amber-900 shadow-xs">
+            <span class="font-bold flex items-center gap-1 mb-0.5">
+              <span>📝</span> Customer Order Notes:
+            </span>
+            <p class="whitespace-pre-line text-gray-800 font-medium">${escapeHtml(order.orderDetails?.notes || order.customerNotes || (Array.isArray(order.notes) ? order.notes.map(n => n.note).join('\n') : order.notes))}</p>
+          </div>
+        ` : ''}
+
+        <!-- Internal Shop Notes -->
+        <div class="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md text-xs">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="font-bold text-slate-700 flex items-center gap-1">
+              <span>📌</span> Internal Shop Memos
+            </span>
+            <span class="text-[10px] text-slate-400">Not visible to customer</span>
+          </div>
+          <div class="space-y-1 mb-2 internal-notes-list" id="internal-notes-${orderId}">
+            ${Array.isArray(order.internalNotes) && order.internalNotes.length > 0 ? order.internalNotes.map(n => `
+              <div class="p-1.5 bg-white rounded border border-slate-200 text-slate-700 flex items-start justify-between gap-2">
+                <span class="flex-1">${escapeHtml(n.text)}</span>
+                <span class="text-[10px] text-slate-400 whitespace-nowrap">${escapeHtml(n.author || 'staff')} • ${new Date(n.createdAt).toLocaleDateString()}</span>
+              </div>
+            `).join('') : '<p class="text-[11px] text-slate-400 italic">No shop memos recorded yet.</p>'}
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" placeholder="Add internal operator note..." class="border rounded p-1 text-xs flex-grow bg-white shop-note-input" data-order-id="${orderId}">
+            <button type="button" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs font-semibold add-shop-note-btn shadow-xs transition-colors" data-order-id="${orderId}">Add Note</button>
+          </div>
+        </div>
+
         <div class="mt-4">
             <dt>Sticker Design:</dt>
-            ${designImagePath ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank">
+            ${designImagePath ? `<a class="sticker-peel-container" href="${designImagePath}" target="_blank" title="View Full Artwork">
                 <img class="sticker-design" src="${designImagePath}" alt="Sticker Design" data-cut-file-path="${cutFilePath}" data-quantity="${quantity}" data-ppi="${ppi}" loading="lazy" decoding="async">
             </a>` : `<div class="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 font-semibold p-2 text-center">${order.artworkPruned ? 'Artwork Pruned' : 'No Preview'}</div>`}
-            ${cutFilePath ? `<div class="mt-2"><dt>Cut File:</dt><dd><a href="${serverUrl}${cutFilePath}" class="text-blue-500 underline text-sm" target="_blank" download>Download SVG / XML</a></dd></div>` : ""}
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                ${designImagePath ? `<a href="${designImagePath}" class="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-300 rounded text-xs font-semibold inline-flex items-center gap-1 shadow-sm transition-colors" target="_blank" download="${orderId}-artwork">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download Artwork
+                </a>` : ""}
+                ${cutFilePath ? `<a href="${serverUrl}${cutFilePath}" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 rounded text-xs font-semibold inline-flex items-center gap-1 shadow-sm transition-colors" target="_blank" download="${orderId}-cutline.svg">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download Cutline
+                </a>` : ""}
+                <button type="button" class="export-single-order-btn px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-300 rounded text-xs font-semibold inline-flex items-center gap-1 shadow-sm transition-colors cursor-pointer" data-order-id="${orderId}" title="Export 300 DPI PDF + cutline SVG + specs package">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Export Single Order
+                </button>
+            </div>
         </div>
 
         <div class="mt-2 flex flex-wrap gap-2">
@@ -1569,12 +1969,17 @@ export function displayOrder(order) {
 
         ${packageControlsHtml}
 
-        <div class="mt-4" id="tracking-info-${orderId}" style="display: ${trackingDisplay};">
-            <input class="border rounded-md p-2" type="text" id="tracking-number-${orderId}" placeholder="Enter Tracking Number">
-            <select class="border rounded-md p-2" id="courier-${orderId}">
-                ${courierOptions}
-            </select>
-            <button class="add-tracking-btn" data-order-id="${orderId}">Add Tracking</button>
+        <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md" id="tracking-info-${orderId}" style="display: ${trackingDisplay};">
+            <span class="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+              <span>🚚</span> Shipping &amp; Tracking Information
+            </span>
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+              <select class="border rounded p-1.5 text-xs bg-white text-gray-800" id="courier-${orderId}">
+                  ${courierOptions}
+              </select>
+              <input class="border rounded p-1.5 text-xs flex-grow bg-white text-gray-800" type="text" id="tracking-number-${orderId}" placeholder="Enter Tracking Number" value="${escapeHtml(order.trackingNumber || '')}">
+              <button class="add-tracking-btn px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold whitespace-nowrap shadow-xs transition-colors" data-order-id="${orderId}">Save &amp; Notify Customer</button>
+            </div>
         </div>
 
         <div class="mt-4 border-t pt-2">
@@ -1610,10 +2015,31 @@ export function displayOrder(order) {
  * @param {Event} e - The click event.
  */
 function handleOrderListClick(e) {
+  const touchUpBtn = e.target.closest(".touchup-toggle-btn");
+  if (touchUpBtn) {
+    const orderId = touchUpBtn.dataset.orderId;
+    handleToggleTouchUp(orderId, touchUpBtn);
+    return;
+  }
+
+  const exportSingleBtn = e.target.closest(".export-single-order-btn");
+  if (exportSingleBtn) {
+    const orderId = exportSingleBtn.dataset.orderId;
+    handleExportSingleOrder(orderId, exportSingleBtn);
+    return;
+  }
+
   const trackingBtn = e.target.closest(".add-tracking-btn");
   if (trackingBtn) {
     const orderId = trackingBtn.dataset.orderId;
     handleAddTracking(orderId, trackingBtn);
+    return;
+  }
+
+  const shopNoteBtn = e.target.closest(".add-shop-note-btn");
+  if (shopNoteBtn) {
+    const orderId = shopNoteBtn.dataset.orderId;
+    handleAddShopNote(orderId, shopNoteBtn);
     return;
   }
 
@@ -1830,6 +2256,11 @@ function handleOrderListChange(e) {
     const payload = { status };
 
     if (status === 'SHIPPED') {
+        const trackingInfoEl = document.getElementById(`tracking-info-${orderId}`);
+        if (trackingInfoEl) trackingInfoEl.style.display = 'block';
+        const trackingRowEl = document.querySelector(`.tracking-inputs[data-order-id="${orderId}"]`);
+        if (trackingRowEl) trackingRowEl.style.display = 'flex';
+
         const trackingInput = document.querySelector(`.tracking-number[data-order-id="${orderId}"]`);
         const courierInput = document.querySelector(`.tracking-courier[data-order-id="${orderId}"]`);
         if (trackingInput && trackingInput.value.trim()) {
@@ -4215,7 +4646,7 @@ export async function copyShippingAddress(orderId, btnEl) {
         btnEl.innerHTML = origContent;
       }, 2000);
     }
-    showSuccessToast("Address copied to clipboard!");
+    showSuccessToast("Name & Address copied to clipboard!");
   };
 
   try {
@@ -5457,6 +5888,20 @@ export async function init() {
       filterAndDisplayOrders(activeFilter);
     });
   }
+
+  const densityToggleBtn = document.getElementById("density-toggle-btn");
+  if (densityToggleBtn) {
+    densityToggleBtn.addEventListener("click", () => {
+      isDenseMode = !isDenseMode;
+      localStorage.setItem("splotchDenseMode", String(isDenseMode));
+
+      const activeFilter =
+        document.querySelector("#filter-container .filter-btn.active")?.dataset
+          .status || "ALL";
+      filterAndDisplayOrders(activeFilter);
+      showSuccessToast(isDenseMode ? "Switched to Compact / Dense Spacing." : "Switched to Standard Spacing.");
+    });
+  }
   
   const bulkStatusSelect = document.getElementById("bulk-status-select");
   if (bulkStatusSelect) {
@@ -5703,6 +6148,17 @@ export function renderPricingEditor(config) {
                   <input type="number" step="0.05" min="0" placeholder="Multiplier" class="p-1.5 text-xs border rounded w-20 mat-mult" value="${m.costMultiplier}">
                 </div>
                 <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Material">&times;</button>
+              </div>
+              <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+                <div class="flex items-center gap-1.5">
+                  <label class="text-[11px] font-semibold text-gray-500">Substrate Base Color:</label>
+                  <select class="p-1.5 text-xs border rounded mat-base-preset bg-white">
+                    <option value="#ffffff" ${(!m.baseColor || m.baseColor.toLowerCase() === "#ffffff") ? "selected" : ""}>White (#ffffff)</option>
+                    <option value="transparent" ${m.baseColor === "transparent" ? "selected" : ""}>Transparent / Clear</option>
+                    <option value="custom" ${(m.baseColor && m.baseColor.toLowerCase() !== "#ffffff" && m.baseColor !== "transparent") ? "selected" : ""}>Custom</option>
+                  </select>
+                  <input type="text" placeholder="#ffffff" class="p-1.5 text-xs border rounded w-28 mat-base-color font-mono bg-white" value="${escapeHtml(m.baseColor || "#ffffff")}">
+                </div>
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-gray-500 mb-0.5">Supported Layers (comma-separated layer types, e.g. white, cmyk, clear, inlay):</label>
@@ -6022,6 +6478,17 @@ export function renderPricingEditor(config) {
         </div>
         <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-base remove-row-btn" title="Delete Material">&times;</button>
       </div>
+      <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+        <div class="flex items-center gap-1.5">
+          <label class="text-[11px] font-semibold text-gray-500">Substrate Base Color:</label>
+          <select class="p-1.5 text-xs border rounded mat-base-preset bg-white">
+            <option value="#ffffff" selected>White (#ffffff)</option>
+            <option value="transparent">Transparent / Clear</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input type="text" placeholder="#ffffff" class="p-1.5 text-xs border rounded w-28 mat-base-color font-mono bg-white" value="#ffffff">
+        </div>
+      </div>
       <div>
         <label class="block text-[11px] font-semibold text-gray-500 mb-0.5">Supported Layers (comma-separated):</label>
         <input type="text" placeholder="white, cmyk, clear" class="w-full p-1.5 border rounded text-xs mat-layers font-mono bg-white" value="white, cmyk, clear">
@@ -6149,9 +6616,28 @@ export function renderPricingEditor(config) {
       updateSimulatorDropdowns();
       runSimulator();
     }
+    if (e.target.classList.contains("mat-base-preset")) {
+      const row = e.target.closest(".material-row");
+      const colorInput = row?.querySelector(".mat-base-color");
+      if (colorInput) {
+        if (e.target.value === "#ffffff" || e.target.value === "transparent") {
+          colorInput.value = e.target.value;
+        }
+      }
+    }
   });
 
   ui.pricingEditorContainer.addEventListener("input", (e) => {
+    if (e.target.classList.contains("mat-base-color")) {
+      const row = e.target.closest(".material-row");
+      const presetSelect = row?.querySelector(".mat-base-preset");
+      if (presetSelect) {
+        const val = e.target.value.trim().toLowerCase();
+        if (val === "#ffffff") presetSelect.value = "#ffffff";
+        else if (val === "transparent") presetSelect.value = "transparent";
+        else presetSelect.value = "custom";
+      }
+    }
     if (e.target.classList.contains("disc-percent")) {
       const row = e.target.closest(".discount-row");
       const badge = row?.querySelector(".disc-badge");
@@ -6622,6 +7108,8 @@ async function savePricingConfig() {
       const name = row.querySelector(".mat-name").value.trim();
       const costMultiplier =
         parseFloat(row.querySelector(".mat-mult").value) || 1.0;
+      const baseColor =
+        row.querySelector(".mat-base-color")?.value.trim() || "#ffffff";
       const layersStr = row.querySelector(".mat-layers").value;
       const description = row.querySelector(".mat-desc").value.trim();
 
@@ -6630,6 +7118,7 @@ async function savePricingConfig() {
         id,
         name,
         costMultiplier,
+        baseColor,
         supportedLayers: layersStr
           ? layersStr
               .split(",")

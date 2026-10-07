@@ -48,20 +48,28 @@ test.describe('Dynamic Material & Finish Dropdown', () => {
     const ppDesc = pricingConfig.materials.find((m) => m.id === 'pp_standard').description;
     await expect(helperEl).toHaveText(ppDesc);
 
-    // Change selection to pvc_laminated
-    // Only select pvc if it exists
-    if (pricingConfig.materials.find(m => m.id === 'pvc_laminated')) {
-      await materialSelect.selectOption('pvc_laminated', { force: true });
-      const pvcDesc = pricingConfig.materials.find((m) => m.id === 'pvc_laminated').description;
-      await expect(helperEl).toHaveText(pvcDesc);
+    const badge = page.locator('#material-base-badge');
+    await expect(badge).toHaveText('White Film Substrate');
+
+    // Change selection to clear_cling if it exists
+    if (pricingConfig.materials.find(m => m.id === 'clear_cling')) {
+      await materialSelect.selectOption('clear_cling', { force: true });
+      const clearDesc = pricingConfig.materials.find((m) => m.id === 'clear_cling').description;
+      await expect(helperEl).toHaveText(clearDesc);
+      await expect(badge).toHaveText('Clear / Transparent Base');
     }
 
-    // Change selection to finish_holographic
-    // Only select holo if it exists
-    if (pricingConfig.materials.find(m => m.id === 'finish_holographic')) {
-      await materialSelect.selectOption('finish_holographic', { force: true });
-      const holoDesc = pricingConfig.materials.find((m) => m.id === 'finish_holographic').description;
-      await expect(helperEl).toHaveText(holoDesc);
+    // Change selection to flat_acrylic if it exists
+    if (pricingConfig.materials.find(m => m.id === 'flat_acrylic')) {
+      await materialSelect.selectOption('flat_acrylic', { force: true });
+      const acrylicDesc = pricingConfig.materials.find((m) => m.id === 'flat_acrylic').description;
+      await expect(helperEl).toHaveText(acrylicDesc);
+      await expect(badge).toHaveText('Clear / Transparent Base');
     }
+
+    // Change selection back to pp_standard
+    await materialSelect.selectOption('pp_standard', { force: true });
+    await expect(helperEl).toHaveText(ppDesc);
+    await expect(badge).toHaveText('White Film Substrate');
   });
 });

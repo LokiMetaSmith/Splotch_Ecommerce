@@ -403,7 +403,12 @@ export class LowDbAdapter {
         } else {
             orders = await this.getUserOrders(email);
         }
-        return orders.filter(order => order.orderId.includes(query));
+        const q = String(query).toLowerCase().trim().replace(/^#/, "");
+        return orders.filter(order => {
+            const matchesId = order.orderId && order.orderId.toLowerCase().includes(q);
+            const matchesFriendly = order.friendlyName && order.friendlyName.toLowerCase().includes(q);
+            return matchesId || matchesFriendly;
+        });
     }
 
     async getOrderByTelegramMessageId(messageId) {

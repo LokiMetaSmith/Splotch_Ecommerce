@@ -11,6 +11,7 @@ import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
+import { generateFriendlyName } from "./utils/friendly-name.js";
 
 const execFilePromise = util.promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
@@ -395,6 +396,7 @@ export function createMcpServer(db) {
         const orderRecord = {
           orderId,
           order_id: orderId,
+          friendlyName: generateFriendlyName(orderId),
           provenance: "agentic",
           status: "NEW",
           receivedAt: new Date().toISOString(),
