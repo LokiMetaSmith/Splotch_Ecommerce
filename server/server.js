@@ -1465,6 +1465,11 @@ async function startServer(
       });
     });
 
+    app.get("/.well-known/security.txt", (req, res) => {
+      res.setHeader("Content-Type", "text/plain");
+      res.sendFile(path.join(__dirname, "../public/.well-known/security.txt"));
+    });
+
     app.get(["/openapi.json", "/api/v1/openapi.json"], (req, res) => {
       res.setHeader("Content-Type", "application/json");
       res.json({

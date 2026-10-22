@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { hasNullByte, hasFullwidthDigitsOrDots, isNonCanonicalIPv4 } from './lib/security_sanitizer.js';
 
 // Define attack patterns
 // Using specific patterns to avoid false positives
@@ -59,6 +60,24 @@ function checkPayload(payload, depth = 0) {
     }
 
     if (typeof payload === 'string') {
+        // Check October 2026 Node security edge cases first
+        if (hasNullByte(payload)) {
+            return { type: 'Null Byte Injection', pattern: 'NUL Character or %00 Sequence', path: [], value: payload };
+        }
+
+        if (hasFullwidthDigitsOrDots(payload) && (payload.includes('://') || payload.includes('.'))) {
+            return { type: 'Fullwidth Hostname Bypass', pattern: 'Fullwidth Digits or Dots', path: [], value: payload };
+        }
+
+        if (payload.includes('://')) {
+            try {
+                const parsed = new URL(payload);
+                if (isNonCanonicalIPv4(parsed.hostname)) {
+                    return { type: 'Non-Canonical IPv4 Hostname', pattern: 'Hex/Octal/DWORD IPv4 Format', path: [], value: payload };
+                }
+            } catch (_) {}
+        }
+
         // Optimization: Fast path using combined regex
         // If the payload does not match ANY threat pattern, return immediately.
         // This saves ~66% of regex operations for benign traffic.

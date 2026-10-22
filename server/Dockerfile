@@ -1,5 +1,5 @@
-# Use an official Node.js runtime as a parent image
-FROM node:20-alpine
+# Use an official Node.js runtime as a parent image (patched security release e.g. v24.22.1 / v22.23.4 / v26.12.1)
+FROM node:24-alpine
 
 # Set the working directory in the container
 WORKDIR /usr/src/app

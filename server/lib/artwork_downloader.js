@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
+import { validateHostnameSecurity } from "./security_sanitizer.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -134,6 +135,8 @@ export async function downloadAgentArtwork(designUrl, uploadsDir = DEFAULT_UPLOA
 
   // Handle remote HTTP/HTTPS URLs
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    // Perform October 2026 Node security validation checks before fetching
+    validateHostnameSecurity(trimmed);
     // In Jest / unit tests, allow mock or fallback without real internet fetch if needed
     if (process.env.NODE_ENV === "test" || process.env.JEST_WORKER_ID !== undefined) {
       if (trimmed.includes("example.com") || trimmed.includes("test")) {
