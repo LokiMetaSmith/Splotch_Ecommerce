@@ -170,8 +170,9 @@ describe('Security Input Validation', () => {
             .set('Authorization', `Bearer ${token}`)
             .set('X-CSRF-Token', csrfRes.body.csrfToken)
             .send({
+                orderReadyConfirmed: true,
                 sourceId: 'cnon:card-nonce-ok',
-                amountCents: 1, // Correct price for dummy file
+                amountCents: 782, // Total including base price, shipping, handling, fees
                 designImagePath: '/uploads/d.png',
                 shippingContact: {
                     givenName: 'Good', familyName: 'User',
