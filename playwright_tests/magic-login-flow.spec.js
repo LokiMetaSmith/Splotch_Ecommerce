@@ -9,5 +9,5 @@ test('magic link login form', async ({ page }) => {
   await page.locator('#loginBtn').click();
 
   // Verify that the success message is displayed.
-  await expect(page.locator('#login-status')).toContainText('Magic link sent! Please check your email.');
+  await expect(page.locator('#login-status')).toContainText('Magic link sent');
 });

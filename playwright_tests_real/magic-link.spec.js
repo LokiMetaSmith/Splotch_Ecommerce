@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Real Backend Magic Link Flow', () => {
 
-  test.skip('should allow login via magic link', async ({ page }) => {
+  test('should allow login via magic link', async ({ page }) => {
     const email = 'test-magic-real@example.com';
 
     // 1. Navigate to the Order History / Login page
@@ -16,7 +16,7 @@ test.describe('Real Backend Magic Link Flow', () => {
     await page.locator('#loginBtn').click();
 
     // 3. Verify the success message
-    await expect(page.locator('#login-status')).toContainText('Magic link sent! Please check your email.');
+    await expect(page.locator('#login-status')).toContainText('Magic link sent! Please check your email');
 
     // 4. Fetch the token from the test-only endpoint
     // We retry fetching because the server might take a moment to process the request and update the variable,
