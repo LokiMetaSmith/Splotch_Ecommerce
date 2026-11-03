@@ -43,6 +43,7 @@ describe('Admin Pricing API', () => {
         process.env.TEST_DB_PATH = testDbPath;
         process.env.DB_PATH = testDbPath;
         process.env.ADMIN_EMAIL = 'admin@test.com';
+        process.env.SQUARE_ACCESS_TOKEN = 'dummy';
         process.env.TEST_PRICING_PATH = testPricingPath;
 
         const serverModule = await import('../server.js');
@@ -73,6 +74,7 @@ describe('Admin Pricing API', () => {
         delete process.env.TEST_USE_REAL_DB;
         delete process.env.DB_PATH;
         delete process.env.ADMIN_EMAIL;
+        delete process.env.SQUARE_ACCESS_TOKEN;
         delete process.env.TEST_PRICING_PATH;
     });
 
