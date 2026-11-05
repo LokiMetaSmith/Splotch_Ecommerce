@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" width="400" height="250">
+  <defs>
+    <!-- Laser cut path styles & acrylic appearance -->
+    <linearGradient id="acrylicGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="35%" stop-color="#f0f9ff" stop-opacity="0.6"/>
+      <stop offset="70%" stop-color="#e0f2fe" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#bae6fd" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="acrylicEdge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#0284c7" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#0369a1" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Rounded Rectangle Acrylic Badge Base -->
+  <rect x="5" y="5" width="390" height="240" rx="20" ry="20"
+        fill="url(#acrylicGrad)"
+        stroke="url(#acrylicEdge)"
+        stroke-width="3"/>
+
+  <!-- Subtle Inner Chamfer / Glass Bevel Line -->
+  <rect x="10" y="10" width="380" height="230" rx="16" ry="16"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="1.5"
+        stroke-opacity="0.75"/>
+
+  <!-- Centered 1cm Oval Slot (width: 38px / ~1cm, height: 12px / ~3mm) for badge lanyard clip -->
+  <g id="lanyard-slot">
+    <!-- Slot laser cut edge -->
+    <rect x="181" y="22" width="38" height="12" rx="6" ry="6"
+          fill="#0f172a"
+          fill-opacity="0.12"
+          stroke="#0284c7"
+          stroke-width="2"/>
+    <rect x="182" y="23" width="36" height="10" rx="5" ry="5"
+          fill="#ffffff"
+          fill-opacity="0.9"/>
+  </g>
+
+  <!-- Badge Content Header Accent -->
+  <line x1="40" y1="52" x2="360" y2="52" stroke="#0284c7" stroke-width="1.5" stroke-opacity="0.3" stroke-dasharray="4,4"/>
+
+  <!-- Badge Details / Laser Engraving Header -->
+  <text x="200" y="80" font-family="Arial, sans-serif" font-weight="bold" font-size="22" fill="#0369a1" text-anchor="middle" letter-spacing="3">ACRYLIC BADGE</text>
+  <text x="200" y="102" font-family="Arial, sans-serif" font-weight="600" font-size="12" fill="#0284c7" text-anchor="middle" letter-spacing="1.5">LASER CUT &#x2022; RIGID CLEAR</text>
+
+  <!-- Visitor / Pass Frame -->
+  <rect x="35" y="115" width="330" height="95" rx="10" ry="10"
+        fill="#ffffff"
+        fill-opacity="0.65"
+        stroke="#bae6fd"
+        stroke-width="1.5"/>
+</svg>

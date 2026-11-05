@@ -192,6 +192,7 @@ let currentTemplate = "blank";
 let templateBlankBtn;
 let templateHelloBtn;
 let templateThankYouBtn;
+let templateAcrylicBadgeBtn;
 let discountTableContainer;
 let discountTableBody;
 let promoAddonCheckbox;
@@ -794,6 +795,7 @@ async function BootStrap() {
   templateBlankBtn = document.getElementById("templateBlankBtn");
   templateHelloBtn = document.getElementById("templateHelloBtn");
   templateThankYouBtn = document.getElementById("templateThankYouBtn");
+  templateAcrylicBadgeBtn = document.getElementById("templateAcrylicBadgeBtn");
   discountTableContainer = document.getElementById("discountTableContainer");
   discountTableBody = document.getElementById("discountTableBody");
   promoAddonCheckbox = document.getElementById("promoAddonCheckbox");
@@ -890,6 +892,10 @@ async function BootStrap() {
   if (templateThankYouBtn)
     templateThankYouBtn.addEventListener("click", () =>
       setTemplate("thank_you"),
+    );
+  if (templateAcrylicBadgeBtn)
+    templateAcrylicBadgeBtn.addEventListener("click", () =>
+      setTemplate("acrylic_badge"),
     );
 
   // Fetch CSRF token, config, pricing, and inventory
@@ -5831,11 +5837,24 @@ function setTemplate(templateId) {
       "text-gray-700",
       "border-gray-300",
     );
+  if (templateAcrylicBadgeBtn)
+    templateAcrylicBadgeBtn.classList.remove(
+      "bg-indigo-100",
+      "text-indigo-700",
+      "border-indigo-200",
+    );
+  if (templateAcrylicBadgeBtn)
+    templateAcrylicBadgeBtn.classList.add(
+      "bg-white",
+      "text-gray-700",
+      "border-gray-300",
+    );
 
   let activeBtn;
   if (templateId === "blank") activeBtn = templateBlankBtn;
   if (templateId === "hello_badge") activeBtn = templateHelloBtn;
   if (templateId === "thank_you") activeBtn = templateThankYouBtn;
+  if (templateId === "acrylic_badge") activeBtn = templateAcrylicBadgeBtn;
 
   if (activeBtn) {
     activeBtn.classList.remove("bg-white", "text-gray-700", "border-gray-300");
@@ -5897,6 +5916,25 @@ function setTemplate(templateId) {
         if (textSizeInput) textSizeInput.value = "20";
         if (textSizeSlider) textSizeSlider.value = "20";
         handleAddText();
+      } else if (templateId === "acrylic_badge") {
+        if (stickerMaterialSelect) {
+          const acrylicOption = Array.from(stickerMaterialSelect.options).find(
+            (opt) => opt.value === "flat_acrylic",
+          );
+          if (acrylicOption) {
+            stickerMaterialSelect.value = "flat_acrylic";
+            stickerMaterialSelect.dispatchEvent(new Event("change"));
+          }
+        }
+        if (textInput) {
+          textInput.value = "GUEST PASS";
+          textColorInput.value = "#0284c7";
+          if (textSizeInput) textSizeInput.value = "26";
+          if (textSizeSlider) textSizeSlider.value = "26";
+          handleAddText();
+        } else {
+          calculateAndUpdatePrice();
+        }
       } else {
         calculateAndUpdatePrice();
       }
