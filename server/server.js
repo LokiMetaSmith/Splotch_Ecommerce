@@ -763,6 +763,26 @@ async function startServer(
       max: 1000, // Increase max for testing
       message:
         "Too many requests from this IP, please try again after 15 minutes",
+      standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+      legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+      handler: (req, res, next, options) => {
+        const ip = getClientIp(req);
+        dispatchSecurityAlert({
+          type: "API Rate Limit Exceeded",
+          severity: "MEDIUM",
+          ip,
+          method: req.method,
+          path: req.originalUrl || req.path,
+          details: "Excessive general API requests",
+          userAgent: req.headers["user-agent"],
+          scheduleTelegram,
+        });
+        if (typeof options.message === "object") {
+          res.status(options.statusCode).json(options.message);
+        } else {
+          res.status(options.statusCode).send(options.message);
+        }
+      },
       store: redisClient
         ? new RateLimitRedisStore({
             sendCommand: (...args) => redisClient.sendCommand(args),

@@ -1,3 +1,5 @@
+import { validateHostnameSecurity } from "./security_sanitizer.js";
+
 /**
  * Dispatches event notifications to an agent's registered webhook URL.
  *
@@ -9,6 +11,13 @@
 export async function dispatchOrderWebhook(order, event, extraData = {}) {
   const webhookUrl = order.webhookUrl || order.webhook_url;
   if (!webhookUrl || typeof webhookUrl !== "string" || !webhookUrl.startsWith("http")) {
+    return false;
+  }
+
+  try {
+    validateHostnameSecurity(webhookUrl);
+  } catch (err) {
+    console.warn(`[WEBHOOK] Security blocked dispatch to ${webhookUrl}: ${err.message}`);
     return false;
   }
 
@@ -31,24 +40,43 @@ export async function dispatchOrderWebhook(order, event, extraData = {}) {
     ...extraData
   };
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const maxRetries = 2;
+  const initialBackoffMs = 1000;
 
-  try {
-    const res = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "Splotch-Agent-Webhook/1.0 (+https://splotch.page)"
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    return res.ok;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    console.warn(`[WEBHOOK] Failed to dispatch ${event} to ${webhookUrl}: ${err.message}`);
-    return false;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    try {
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Splotch-Agent-Webhook/1.0 (+https://splotch.page)"
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        return true;
+      }
+
+      // If not ok, we log but still potentially retry
+      console.warn(`[WEBHOOK] Dispatch attempt ${attempt + 1} failed for ${webhookUrl} (HTTP ${res.status})`);
+
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.warn(`[WEBHOOK] Dispatch attempt ${attempt + 1} error for ${webhookUrl}: ${err.message}`);
+    }
+
+    if (attempt < maxRetries) {
+      const backoffMs = initialBackoffMs * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+    }
   }
+
+  console.warn(`[WEBHOOK] Exhausted retries for dispatching ${event} to ${webhookUrl}`);
+  return false;
 }

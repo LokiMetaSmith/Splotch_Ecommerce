@@ -168,11 +168,13 @@ export default function createAgentPaymentsRouter(db, options = {}) {
 
       const shippingAddress = body.shippingAddress || body.shipping_destination || {};
 
+      let maxSpendCents;
+      let customExpiryStr;
+
       // 3. Cryptographically verify mandate bindings if mandate was supplied
       if (parsedMandate) {
         verifyMandateBindings(parsedMandate, storedQuote, shippingAddress);
 
-        let maxSpendCents;
         if (parsedMandate.maxSpendCents !== undefined) {
           maxSpendCents = parseInt(parsedMandate.maxSpendCents, 10);
         } else if (parsedMandate.agentRules && parsedMandate.agentRules.maxSpendCents !== undefined) {
@@ -180,24 +182,26 @@ export default function createAgentPaymentsRouter(db, options = {}) {
         } else if (parsedMandate.agent_rules?.max_amount?.amount !== undefined) {
           maxSpendCents = Math.round(parseFloat(parsedMandate.agent_rules.max_amount.amount) * 100);
         }
+
+        customExpiryStr = parsedMandate.agentRules?.expiresAt || parsedMandate.agent_rules?.valid_until;
       }
 
       // 4. Verify Settlement Proof (Base USDC RPC, Lightning preimage, or valid simulated proof in non-prod)
       const settlementMeta = await verifySettlementProof(paymentProof, storedQuote, { merchantWallet });
-        if (maxSpendCents !== undefined) {
-          const storedQuoteCents = Math.round(storedQuote.total * 100);
-          if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
-            return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
-          }
-        }
 
-        const customExpiryStr = parsedMandate.agentRules?.expiresAt || parsedMandate.agent_rules?.valid_until;
-        if (customExpiryStr) {
-          const customExpiry = new Date(customExpiryStr);
-          if (isNaN(customExpiry.getTime()) || new Date() > customExpiry) {
-            return res.status(403).json({ error: "Agent mandate expired" });
-          }
-         }
+      if (maxSpendCents !== undefined) {
+        const storedQuoteCents = Math.round(storedQuote.total * 100);
+        if (isNaN(maxSpendCents) || maxSpendCents < 0 || storedQuoteCents > maxSpendCents) {
+          return res.status(403).json({ error: "Agent mandate spending limit exceeded" });
+        }
+      }
+
+      if (customExpiryStr) {
+        const customExpiry = new Date(customExpiryStr);
+        if (isNaN(customExpiry.getTime()) || new Date() > customExpiry) {
+          return res.status(403).json({ error: "Agent mandate expired" });
+        }
+      }
 
 
 
